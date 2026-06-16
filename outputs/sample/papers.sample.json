@@ -1,0 +1,52 @@
+[
+  {
+    "paper_id": "P001",
+    "title": "Graph Neural Networks for Drug Discovery",
+    "abstract": "Graph neural networks model molecular structures and improve virtual screening for drug discovery.",
+    "authors": ["Li Wei", "Chen Ming"],
+    "year": 2021,
+    "keywords": ["graph neural network", "drug discovery", "biomedicine"],
+    "field": "biomedicine",
+    "full_text": "Graph representation learning supports molecular property prediction."
+  },
+  {
+    "paper_id": "P002",
+    "title": "Large Language Models for Knowledge Graph Reasoning",
+    "abstract": "Large language models enhance knowledge graph completion and multi-hop reasoning.",
+    "authors": ["Zhang Rui", "Li Wei"],
+    "year": 2023,
+    "keywords": ["large language model", "knowledge graph", "reasoning"],
+    "field": "computer science",
+    "full_text": "The method combines retrieval augmented generation with graph reasoning."
+  },
+  {
+    "paper_id": "P003",
+    "title": "Machine Learning Accelerated Materials Discovery",
+    "abstract": "Machine learning methods accelerate material property prediction and candidate screening.",
+    "authors": ["Wang Han", "Sun Yue"],
+    "year": 2022,
+    "keywords": ["machine learning", "materials discovery", "property prediction"],
+    "field": "materials science",
+    "full_text": "Surrogate models reduce experimental cost in materials design."
+  },
+  {
+    "paper_id": "P004",
+    "title": "Retrieval Augmented Generation for Scientific Question Answering",
+    "abstract": "Retrieval augmented generation improves scientific question answering by grounding answers in paper evidence.",
+    "authors": ["Zhang Rui", "Garcia Ana"],
+    "year": 2024,
+    "keywords": ["retrieval augmented generation", "scientific qa", "evidence"],
+    "field": "computer science",
+    "full_text": "Evidence-aware generation reduces hallucination in literature assistants."
+  },
+  {
+    "paper_id": "P005",
+    "title": "Transformer Models for Biomedical Literature Mining",
+    "abstract": "Transformer models extract biomedical entities and relations from large-scale scientific abstracts.",
+    "authors": ["Chen Ming", "Garcia Ana"],
+    "year": 2020,
+    "keywords": ["transformer", "biomedical literature mining", "entity extraction"],
+    "field": "biomedicine",
+    "full_text": "Pretrained language models improve biomedical named entity recognition."
+  }
+]
