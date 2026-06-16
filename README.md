@@ -12,3 +12,7 @@ SciScope is a research literature intelligence workspace for scientific paper an
 ## Local development
 
 See `docs/runbook.md`.
+
+## Source documents
+
+The original contest/source documents are kept in the repository root as `赛题.docx` and `数据集.docx`.

@@ -1,0 +1,11 @@
+# Foundation Runbook
+
+This is the foundation runbook placeholder for SciScope.
+
+For now, use this repository context:
+
+- Project overview and local entry points are in `README.md`.
+- Example configuration is tracked in `configs/app.example.env`.
+- Original contest/source documents are kept at the repository root as `赛题.docx` and `数据集.docx`.
+
+The full runbook will be expanded as part of the foundation plan.

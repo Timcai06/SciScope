@@ -10,6 +10,10 @@ node_modules/
 dist/
 build/
 .env
+.env.*
+**/.env
+**/.env.*
+!configs/*.example.env
 *.sqlite
 *.db
 outputs/generated/
