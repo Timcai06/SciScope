@@ -3,7 +3,14 @@ import json
 from pathlib import Path
 from typing import Any
 
+from backend.app.models.paper import Paper
 from data_pipeline.normalize import normalize_paper
+
+
+def _validate_paper_schema(record: dict[str, Any]) -> dict[str, Any]:
+    if hasattr(Paper, "model_validate"):
+        return Paper.model_validate(record).model_dump()
+    return Paper.parse_obj(record).dict()
 
 
 def load_papers(path: str | Path) -> list[dict[str, Any]]:
@@ -17,4 +24,4 @@ def load_papers(path: str | Path) -> list[dict[str, Any]]:
         raise ValueError(f"Unsupported paper data format: {source.suffix}")
     if not isinstance(records, list):
         raise ValueError("Paper data must be a list of records")
-    return [normalize_paper(record) for record in records]
+    return [_validate_paper_schema(normalize_paper(record)) for record in records]
