@@ -43,6 +43,12 @@ def test_field_distribution_counts_and_sorts_sample_fields():
     ]
 
 
+def test_field_distribution_counts_missing_as_unknown():
+    assert field_distribution([{"field": None}, {}]) == [
+        {"field": "unknown", "count": 2},
+    ]
+
+
 def test_author_collaboration_edges_counts_sample_coauthors():
     edges = author_collaboration_edges(_sample_papers())
 
@@ -59,3 +65,11 @@ def test_build_dashboard_overview_combines_analytics():
     assert overview["field_distribution"] == field_distribution(_sample_papers())
     assert overview["top_keywords"] == keyword_counts(_sample_papers(), limit=10)
     assert overview["collaboration_edges"] == author_collaboration_edges(_sample_papers())
+
+
+def test_dashboard_overview_year_range_empty_when_no_years():
+    overview = build_dashboard_overview(
+        [{"year": None, "field": "unknown", "keywords": [], "authors": []}]
+    )
+
+    assert overview["year_range"] == {"start": None, "end": None}

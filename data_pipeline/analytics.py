@@ -16,7 +16,7 @@ def keyword_counts(papers: list[dict[str, Any]], limit: int = 20) -> list[dict[s
 
 
 def field_distribution(papers: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    counts = Counter(paper.get("field") for paper in papers if paper.get("field"))
+    counts = Counter(paper.get("field") or "unknown" for paper in papers)
     return [{"field": field, "count": counts[field]} for field in sorted(counts)]
 
 

@@ -8,10 +8,10 @@ from data_pipeline.analytics import (
 )
 
 
-def _year_range(papers: list[dict[str, Any]]) -> dict[str, int] | None:
+def _year_range(papers: list[dict[str, Any]]) -> dict[str, int | None]:
     years = [paper["year"] for paper in papers if paper.get("year") is not None]
     if not years:
-        return None
+        return {"start": None, "end": None}
     return {"start": min(years), "end": max(years)}
 
 
