@@ -80,6 +80,15 @@ def test_build_dashboard_overview_combines_analytics():
     assert overview["collaboration_edges"] == author_collaboration_edges(_sample_papers())
 
 
+def test_build_dashboard_overview():
+    overview = build_dashboard_overview(_sample_papers())
+
+    assert overview["total_papers"] == 5
+    assert overview["year_range"] == {"start": 2020, "end": 2024}
+    assert len(overview["publication_trend"]) == 5
+    assert len(overview["top_keywords"]) == 10
+
+
 def test_dashboard_overview_year_range_empty_when_no_years():
     overview = build_dashboard_overview(
         [{"year": None, "field": "unknown", "keywords": [], "authors": []}]
