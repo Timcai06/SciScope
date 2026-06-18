@@ -35,6 +35,7 @@ export function EvidenceChat() {
     try {
       setIsLoading(true);
       setError(null);
+      setResponse(null);
       const chatResponse = await askQuestion(normalizedQuestion);
       setResponse(chatResponse);
     } catch (submitError) {
@@ -92,11 +93,13 @@ export function EvidenceChat() {
               </div>
             </div>
           ) : response ? (
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-col gap-3 border-b border-line pb-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-medium uppercase tracking-[0.2em] text-silver/55">Answer</p>
-                  <p className="mt-3 text-sm leading-7 text-silver/78">{response.answer || "No answer returned."}</p>
+                  <p className="mt-3 min-w-0 break-words text-sm leading-7 text-silver/78 [overflow-wrap:anywhere]">
+                    {response.answer || "No answer returned."}
+                  </p>
                 </div>
                 <span
                   className={`shrink-0 border px-3 py-1 text-xs font-semibold ${
@@ -116,12 +119,16 @@ export function EvidenceChat() {
               {hasEvidence ? (
                 <div className="mt-4 grid gap-3 xl:grid-cols-2">
                   {response.evidence.map((item) => (
-                    <article className="border border-line bg-panel/80 p-4" key={`${item.paper_id}-${item.title}`}>
+                    <article className="min-w-0 border border-line bg-panel/80 p-4" key={`${item.paper_id}-${item.title}`}>
                       <div className="flex items-start justify-between gap-3">
-                        <h3 className="min-w-0 text-sm font-semibold leading-6 text-silver">{item.title || "Untitled paper"}</h3>
+                        <h3 className="min-w-0 break-words text-sm font-semibold leading-6 text-silver [overflow-wrap:anywhere]">
+                          {item.title || "Untitled paper"}
+                        </h3>
                         <span className="shrink-0 text-xs font-semibold text-cyanSoft">{item.year ?? "n/a"}</span>
                       </div>
-                      <p className="mt-3 text-sm leading-6 text-silver/58">{item.reason || "No evidence reason returned."}</p>
+                      <p className="mt-3 min-w-0 break-words text-sm leading-6 text-silver/58 [overflow-wrap:anywhere]">
+                        {item.reason || "No evidence reason returned."}
+                      </p>
                       <p className="mt-4 truncate border-t border-line pt-3 text-xs text-silver/38" title={item.paper_id}>
                         {item.paper_id || "Unknown paper id"}
                       </p>
