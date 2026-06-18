@@ -26,13 +26,26 @@ def test_publication_trend_counts_sample_years():
 def test_keyword_counts_returns_limited_most_common_keywords():
     counts = keyword_counts(_sample_papers(), limit=3)
 
-    assert len(counts) == 3
-    assert counts[0]["keyword"] in {
-        "graph neural network",
-        "drug discovery",
-        "biomedicine",
-    }
-    assert counts[0]["count"] == 1
+    assert counts == [
+        {"keyword": "biomedical literature mining", "count": 1},
+        {"keyword": "biomedicine", "count": 1},
+        {"keyword": "drug discovery", "count": 1},
+    ]
+
+
+def test_keyword_counts_sorts_ties_by_keyword():
+    counts = keyword_counts(
+        [
+            {"keywords": ["b", "a"]},
+            {"keywords": ["b", "a"]},
+        ],
+        limit=2,
+    )
+
+    assert counts == [
+        {"keyword": "a", "count": 2},
+        {"keyword": "b", "count": 2},
+    ]
 
 
 def test_field_distribution_counts_and_sorts_sample_fields():
