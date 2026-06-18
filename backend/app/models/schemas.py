@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -50,6 +52,11 @@ class ChatResponse(BaseModel):
     answer: str
     evidence: list[EvidenceItem]
     confidence: str
+
+
+class IngestStatusResponse(BaseModel):
+    status: Literal["ready"]
+    papers: int
 
 
 class DashboardResponse(BaseModel):

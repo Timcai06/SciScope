@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from backend.app.core.config import _parse_bool
+from backend.app.core.config import _parse_bool, _parse_cors_origins
 from backend.app.models.schemas import ChatRequest, DashboardResponse
 
 
@@ -17,6 +17,17 @@ def test_parse_bool_accepts_common_false_values():
 def test_parse_bool_rejects_unknown_values():
     with pytest.raises(ValueError, match="SCISCOPE_USE_MOCK_LLM"):
         _parse_bool("sometimes", True)
+
+
+def test_parse_cors_origins_defaults_to_localhost():
+    assert _parse_cors_origins(None) == ["http://localhost:3000"]
+
+
+def test_parse_cors_origins_splits_and_strips_values():
+    assert _parse_cors_origins(" http://localhost:3000, https://example.com, ") == [
+        "http://localhost:3000",
+        "https://example.com",
+    ]
 
 
 def test_chat_request_strips_question_whitespace():
