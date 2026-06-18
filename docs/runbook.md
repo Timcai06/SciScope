@@ -97,22 +97,19 @@ FastAPI backend. Use `http://localhost:8000` for the standard local backend.
 
 ## DeepSeek Configuration
 
-Mock mode is the default and is recommended for local verification:
+The foundation slice is runnable in mock mode only. Keep mock mode enabled for
+all current local verification:
 
 ```bash
 export SCISCOPE_USE_MOCK_LLM=true
 ```
 
-Real DeepSeek mode requires an API key and model configuration:
+Real DeepSeek HTTP integration is intentionally deferred to the next
+implementation slice. Setting `SCISCOPE_USE_MOCK_LLM=false` currently exercises
+configuration and error handling, but it will not complete a chat request.
 
-```bash
-export SCISCOPE_USE_MOCK_LLM=false
-export DEEPSEEK_API_KEY=your_api_key_here
-export DEEPSEEK_MODEL=deepseek-chat
-```
-
-`DEEPSEEK_BASE_URL` defaults to `https://api.deepseek.com` and only needs to be
-set when using a compatible alternate endpoint.
+When real integration lands, it will use environment configuration for the API
+key, model name, and optional compatible base URL.
 
 ## Webpack Workaround
 
