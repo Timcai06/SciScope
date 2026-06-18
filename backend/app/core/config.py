@@ -14,6 +14,19 @@ class Settings:
     use_mock_llm: bool
 
 
+def _parse_bool(value: str | None, default: bool) -> bool:
+    if value is None:
+        return default
+
+    normalized = value.strip().lower()
+    if normalized in {"true", "1", "yes", "y", "on"}:
+        return True
+    if normalized in {"false", "0", "no", "n", "off"}:
+        return False
+
+    raise ValueError(f"Invalid SCISCOPE_USE_MOCK_LLM value: {value!r}")
+
+
 def get_settings() -> Settings:
     return Settings(
         app_name=os.getenv("SCISCOPE_APP_NAME", "SciScope"),
@@ -22,5 +35,5 @@ def get_settings() -> Settings:
         deepseek_api_key=os.getenv("DEEPSEEK_API_KEY", ""),
         deepseek_base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
         deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
-        use_mock_llm=os.getenv("SCISCOPE_USE_MOCK_LLM", "true").lower() == "true",
+        use_mock_llm=_parse_bool(os.getenv("SCISCOPE_USE_MOCK_LLM"), default=True),
     )

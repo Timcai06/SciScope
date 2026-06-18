@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from backend.app.models.paper import Paper
+from data_pipeline.models import Paper
 from data_pipeline.normalize import normalize_paper
 
 
