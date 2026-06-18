@@ -14,6 +14,13 @@ def answer_question(
     provider: LLMProvider | None = None,
 ) -> ChatResponse:
     evidence = _retrieve_evidence(question, papers, limit=EVIDENCE_LIMIT)
+    if not evidence:
+        return ChatResponse(
+            answer="No matching evidence found for this question in the current corpus.",
+            evidence=[],
+            confidence="low",
+        )
+
     prompt = _build_prompt(question, evidence)
     llm = provider or get_llm_provider()
     answer = llm.complete(prompt)
@@ -26,24 +33,25 @@ def _retrieve_evidence(
     papers: list[dict[str, Any]],
     limit: int,
 ) -> list[EvidenceItem]:
-    query_terms = _query_terms(question)
+    query_terms = _text_terms(question)
+    query_phrases = _query_phrases(question)
+    special_phrases = _special_query_phrases(query_terms)
     ranked: list[tuple[int, int, EvidenceItem]] = []
 
     for index, paper in enumerate(papers):
-        haystack_terms = _paper_terms(paper)
-        overlap = query_terms & haystack_terms
-        if not overlap:
+        score, matches = _score_paper(query_terms, query_phrases, special_phrases, paper)
+        if score <= 0:
             continue
 
         ranked.append(
             (
-                len(overlap),
+                score,
                 -index,
                 EvidenceItem(
                     paper_id=str(paper.get("paper_id", "")),
                     title=str(paper.get("title", "")),
                     year=paper.get("year"),
-                    reason=f"Matched query terms: {', '.join(sorted(overlap))}",
+                    reason=f"Matched evidence: {', '.join(matches)}",
                 ),
             )
         )
@@ -60,31 +68,84 @@ def _build_prompt(question: str, evidence: list[EvidenceItem]) -> str:
     return f"Question: {question}\nEvidence:\n{evidence_block}\nAnswer with citations in mind."
 
 
-def _query_terms(question: str) -> set[str]:
-    terms = _text_terms(question)
-    if "rag" in terms:
-        terms.update({"retrieval", "augmented", "generation"})
-    return terms
-
-
-def _paper_terms(paper: dict[str, Any]) -> set[str]:
-    keywords = paper.get("keywords", [])
-    keyword_text = " ".join(str(keyword) for keyword in keywords)
-    searchable_text = " ".join(
-        [
-            str(paper.get("title", "")),
-            str(paper.get("abstract", "")),
-            keyword_text,
-            str(paper.get("full_text", "")),
-        ]
-    )
-    return _text_terms(searchable_text)
-
-
 def _text_terms(text: str) -> set[str]:
-    tokens = set(_TOKEN_RE.findall(text.lower()))
-    expanded = set(tokens)
-    for token in tokens:
-        if token.endswith("s") and len(token) > 4:
-            expanded.add(token[:-1])
-    return expanded
+    return set(_TOKEN_RE.findall(text.lower()))
+
+
+def _query_phrases(question: str) -> set[str]:
+    tokens = _TOKEN_RE.findall(question.lower())
+    phrases: set[str] = set()
+    for size in (2, 3):
+        phrases.update(
+            " ".join(tokens[index : index + size]) for index in range(len(tokens) - size + 1)
+        )
+    return phrases
+
+
+def _special_query_phrases(query_terms: set[str]) -> set[str]:
+    if "rag" in query_terms:
+        return {"retrieval augmented generation"}
+    return set()
+
+
+def _score_paper(
+    query_terms: set[str],
+    query_phrases: set[str],
+    special_phrases: set[str],
+    paper: dict[str, Any],
+) -> tuple[int, list[str]]:
+    fields = {
+        "title": str(paper.get("title", "")),
+        "keywords": " ".join(str(keyword) for keyword in paper.get("keywords", [])),
+        "abstract": str(paper.get("abstract", "")),
+        "full_text": str(paper.get("full_text", "")),
+    }
+    field_weights = {
+        "title": 60,
+        "keywords": 50,
+        "abstract": 20,
+        "full_text": 10,
+    }
+    phrase_multipliers = {
+        "title": 4,
+        "keywords": 4,
+        "abstract": 3,
+        "full_text": 2,
+    }
+
+    score = 0
+    direct_hits: set[str] = set()
+    exact_phrase_hits: set[str] = set()
+    special_phrase_hits: set[str] = set()
+
+    for field_name, field_text in fields.items():
+        normalized_text = _normalize_text(field_text)
+        field_terms = _text_terms(field_text)
+        terms = query_terms & field_terms
+        if terms:
+            direct_hits.update(terms)
+            score += len(terms) * field_weights[field_name]
+
+        phrases = {phrase for phrase in query_phrases if _contains_phrase(normalized_text, phrase)}
+        if phrases:
+            exact_phrase_hits.update(phrases)
+            score += len(phrases) * field_weights[field_name] * phrase_multipliers[field_name]
+
+        specials = {phrase for phrase in special_phrases if _contains_phrase(normalized_text, phrase)}
+        if specials:
+            special_phrase_hits.update(specials)
+            score += len(specials) * field_weights[field_name] * phrase_multipliers[field_name] * 2
+
+    if not (direct_hits or exact_phrase_hits or special_phrase_hits):
+        return 0, []
+
+    matches = [*sorted(special_phrase_hits), *sorted(exact_phrase_hits), *sorted(direct_hits)]
+    return score, matches
+
+
+def _normalize_text(text: str) -> str:
+    return " ".join(_TOKEN_RE.findall(text.lower()))
+
+
+def _contains_phrase(normalized_text: str, phrase: str) -> bool:
+    return f" {phrase} " in f" {normalized_text} "
