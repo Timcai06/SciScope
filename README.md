@@ -41,8 +41,8 @@ Run these commands before handing off the foundation slice:
 
 ```bash
 python3 -m pytest backend/tests -v
-cd frontend && npm run typecheck
-cd frontend && npm run build
+(cd frontend && npm run typecheck)
+(cd frontend && npm run build)
 ```
 
 ## Current Limitation
