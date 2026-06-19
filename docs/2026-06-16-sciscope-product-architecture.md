@@ -391,13 +391,15 @@ AI 生成内容和数据证据分离：
 ```text
 backend/
 frontend/
+src/
 data_pipeline/
-graph_builder/
-rag_engine/
-analysis_engine/
+data/
+output/
+graphs/
+indices/
+models/
 configs/
 docs/
-outputs/
 ```
 
 ### 8.5 运行说明

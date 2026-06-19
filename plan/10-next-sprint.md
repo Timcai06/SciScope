@@ -14,7 +14,7 @@ data/processed/
 indices/
 models/
 graphs/
-reports/assets/
+output/assets/sciscope_data_report/
 src/harvest/
 src/analysis/
 ```

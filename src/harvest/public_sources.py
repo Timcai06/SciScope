@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import time
 import xml.etree.ElementTree as ET
 from http.client import IncompleteRead, RemoteDisconnected
@@ -78,6 +79,10 @@ CORE_URL = "https://api.core.ac.uk/v3/search/works"
 
 class HarvestError(RuntimeError):
     """Raised when a public source harvest fails."""
+
+
+def _progress(message: str) -> None:
+    print(f"[harvest] {message}", file=sys.stderr, flush=True)
 
 
 def utc_now() -> str:
@@ -175,6 +180,7 @@ def _write_wrappers(
     target_per_query = max(1, (limit + len(query_plan) - 1) // len(query_plan))
     seen: set[str] = set()
     written = 0
+    _progress(f"{source}: start limit={limit} output={output}")
 
     with output.open("w", encoding="utf-8") as handle:
         def write_items(
@@ -208,7 +214,10 @@ def _write_wrappers(
             query_limit = min(target_per_query, limit - written)
             if query_limit <= 0:
                 break
+            _progress(f"{source}: query='{query}' field='{field}' target={query_limit} total={written}/{limit}")
+            before = written
             write_items(field, query, query_limit, fetch_query)
+            _progress(f"{source}: query='{query}' wrote={written - before} total={written}/{limit}")
             if written >= limit:
                 break
         for field, query in backfill_plan:
@@ -216,8 +225,12 @@ def _write_wrappers(
                 break
             query_limit = min(limit, max(limit - written, backfill_min_query_limit))
             backfill_fetch = backfill_fetch_query or fetch_query
+            _progress(f"{source}: backfill query='{query}' field='{field}' target={query_limit} total={written}/{limit}")
+            before = written
             write_items(field, query, query_limit, backfill_fetch)
+            _progress(f"{source}: backfill query='{query}' wrote={written - before} total={written}/{limit}")
 
+    _progress(f"{source}: done records={written} output={output}")
     return written
 
 

@@ -1,0 +1,39 @@
+\section{数据质量与可信度审计}
+
+\begin{reportbox}{为什么要单独写质量审计}
+科研文献分析最怕“图很好看, 但数据口径不可信”。本报告必须把缺失、重复、来源偏差、字段映射和后续修正策略写清楚, 这样数据分析和智能体回答才有可信基础。
+\end{reportbox}
+
+\subsection{当前质量观察}
+
+\begin{itemize}
+  \item 六源各 500 条 raw records 已实现唯一 source id。
+  \item arXiv、OpenAlex、DOAJ 摘要覆盖较好, 可直接进入摘要级 RAG。
+  \item PMC 有 266 条正文片段, 是当前全文增强的主要来源。
+  \item Crossref 摘要覆盖较低, 更适合作为 DOI、出版源和跨源校验补充。
+  \item Semantic Scholar 与 CORE 已预留代码入口, 但需要 API key 或更高配额。
+\end{itemize}
+
+\subsection{质量矩阵}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.88\textwidth]{abstract_fulltext_coverage.png}
+  \caption{摘要与全文覆盖率对比。该图用于明确摘要级分析和全文级 RAG 的证据边界。}
+\end{figure}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{30mm}X X}
+\toprule
+风险 & 表现 & 处理策略 \\
+\midrule
+跨源重复 & 同一 DOI 或标题在多个来源出现 & DOI 优先去重, 标题+年份作为次级键 \\
+摘要缺失 & Crossref 和部分 PMC summary 无摘要 & 使用 OpenAlex/DOAJ/PubMed 补全, 或降级为元数据证据 \\
+领域偏差 & 来源和 query 对领域分布有影响 & 报告中保留来源分布图, 趋势按来源归一化 \\
+作者歧义 & 同名作者或缩写作者难以区分 & 后续引入 ORCID、机构和论文上下文消歧 \\
+关键词噪声 & 高频泛词影响趋势判断 & 领域词表、停用词、短语归并和人工审计 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\clearpage

@@ -12,8 +12,8 @@ SciScope delivery package:
 ```text
 README.md
 docs/runbook.md
-reports/data_analysis_report.pdf
-reports/assets/
+output/pdf/sciscope_data_report/sciscope_data_report.pdf
+output/assets/sciscope_data_report/
 data/processed/
 indices/
 models/

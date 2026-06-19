@@ -15,7 +15,7 @@ Completed foundation:
 
 - FastAPI backend with ingest status, dashboard overview, and evidence chat APIs.
 - Next.js frontend foundation with dashboard and evidence chat.
-- Deterministic sample corpus path using `outputs/sample/papers.sample.json`.
+- Deterministic sample corpus path using `data/sample/papers.sample.json`.
 - Basic analytics: publication trends, field distribution, keyword counts, author collaboration edges.
 - Mock LLM provider and OpenAI-compatible local provider path for vLLM/LM Studio.
 - Makefile workflow, including backend/frontend/test commands and vLLM helpers.

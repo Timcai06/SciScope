@@ -9,10 +9,12 @@ The report must prove that SciScope can extract meaningful research insights fro
 Final report artifacts:
 
 ```text
-reports/
-  data_analysis_report.pdf
-  data_analysis_report.md
+output/
+  pdf/
+    sciscope_data_report/
+      sciscope_data_report.pdf
   assets/
+    sciscope_data_report/
     publication_trend.png
     field_distribution.png
     field_year_heatmap.png

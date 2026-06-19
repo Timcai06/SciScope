@@ -1,0 +1,61 @@
+\section{数据底座与采集状态}
+
+\begin{reportbox}{当前数据基线}
+当前本地已完成 6 个公共来源各 500 条记录采集, 共 3000 条 raw records, 并生成对应的统一规范化 JSON。生成数据不进入 Git 仓库, 通过 \texttt{data/raw/} 与 \texttt{data/processed/} 在本地保留, 后续可迁移到 PostgreSQL、Parquet 或对象存储。
+\end{reportbox}
+
+\subsection{多源采集状态}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{28mm}r X X}
+\toprule
+来源 & 当前记录数 & 主要价值 & 后续用途 \\
+\midrule
+OpenAlex & 500 & 综合学术元数据、主题、引用、开放知识库 id & 主干语料、领域分布、引用与主题分析 \\
+arXiv & 500 & 计算机与交叉学科预印本、摘要质量高 & AI/CS 热点、快速演化主题识别 \\
+PubMed & 500 & 生物医学文献元数据与摘要 & 医学方向关键词演化、领域对比 \\
+PMC & 500 & 开放全文与正文片段增强 & RAG 证据、全文片段检索、医学深读 \\
+Crossref & 500 & DOI 与期刊出版元数据覆盖广 & DOI 去重、出版源补全、跨源校验 \\
+DOAJ & 500 & 开放期刊文章与开放获取元数据 & OA 覆盖、开放科学视角、摘要补充 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{source_records_bar.png}
+  \caption{当前 6 个公开来源的基线采集规模。}
+\end{figure}
+
+\subsection{字段完整度基线}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{28mm}rrrrr}
+\toprule
+来源 & 标题 & 摘要/摘要索引 & 作者 & 年份 & 正文片段 \\
+\midrule
+OpenAlex & 499 & 500 & 498 & 499 & 0 \\
+arXiv & 500 & 500 & 500 & 500 & 0 \\
+PubMed & 500 & 483 & 500 & 500 & 0 \\
+PMC & 500 & 270 & 499 & 500 & 266 \\
+Crossref & 500 & 33 & 485 & 500 & 0 \\
+DOAJ & 500 & 496 & 499 & 500 & 0 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\textwidth]{source_quality_matrix.png}
+  \caption{按来源统计的关键字段完整度矩阵。}
+\end{figure}
+
+\subsection{标准化 Schema}
+
+\begin{plainbox}
+\texttt{paper\_id}, \texttt{title}, \texttt{abstract}, \texttt{authors}, \texttt{year}, \texttt{keywords}, \texttt{field}, \texttt{full\_text}
+\end{plainbox}
+
+这个 schema 是分析报告与科研智能体系统之间的共同接口。报告侧依赖它生成统计图表和洞察, 智能体侧依赖它构建检索证据、推荐解释、趋势 API 和知识图谱。
+
+\clearpage

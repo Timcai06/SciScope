@@ -41,7 +41,7 @@ def get_settings() -> Settings:
     return Settings(
         app_name=os.getenv("SCISCOPE_APP_NAME", "SciScope"),
         env=os.getenv("SCISCOPE_ENV", "local"),
-        data_path=Path(os.getenv("SCISCOPE_DATA_PATH", "outputs/sample/papers.sample.json")),
+        data_path=Path(os.getenv("SCISCOPE_DATA_PATH", "data/sample/papers.sample.json")),
         cors_origins=_parse_cors_origins(os.getenv("SCISCOPE_CORS_ORIGINS")),
         llm_provider=os.getenv("SCISCOPE_LLM_PROVIDER", "deepseek").strip().lower(),
         deepseek_api_key=os.getenv("DEEPSEEK_API_KEY", ""),

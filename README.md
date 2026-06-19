@@ -11,7 +11,9 @@ Next.js dashboard.
 - Source documents: the original project inputs live at the repository root as
   `赛题.docx` and `数据集.docx`.
 - Sample paper metadata: deterministic local paper records are stored in
-  `outputs/sample/papers.sample.json`.
+  `data/sample/papers.sample.json`.
+- Project layout: `data/` stores paper data assets, while `output/` stores
+  generated charts and final PDFs. See `docs/project_structure.md`.
 - Data loading and normalization: `data_pipeline/` loads JSON or CSV paper
   metadata and normalizes paper IDs, titles, abstracts, authors, years,
   keywords, fields, and full text into shared models.

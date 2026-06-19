@@ -1,0 +1,50 @@
+\section{文献分布分析框架}
+
+\begin{reportbox}{分析目标}
+文献分布分析回答三个问题: 文献在时间上如何增长, 在领域上如何分布, 在数据来源上是否存在偏差。最终报告需要把这些问题转化为可解释图表, 让评委看到数据覆盖面和分析可信度。
+\end{reportbox}
+
+\subsection{年份分布}
+
+后续 5 万条数据补齐后, 年份分布将作为报告第一组核心图表。建议输出:
+
+\begin{itemize}
+  \item 年份总量趋势线: 观察整体增长和数据覆盖断点。
+  \item 领域堆叠面积图: 比较计算机、生物医学、材料科学的年度结构变化。
+  \item 来源-年份热力图: 识别某些来源在年份上的偏置。
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\textwidth]{year_distribution.png}
+  \caption{当前样本文献的年份分布。横轴为发表年份, 纵轴为论文数量。}
+\end{figure}
+
+当前 3000 条样本已经能用于验证年份分布统计口径。最终扩展至 5 万条后, 这张图将用于判断样本是否覆盖近年研究增长段, 并辅助识别由数据源造成的年份偏差。
+
+\subsection{领域分布}
+
+当前采集 query 已覆盖 AI/CS、生物医学、材料科学三条主线。最终报告需要把字段来源分成两层:
+
+\begin{enumerate}
+  \item \textbf{原始来源领域}: 采集 query 和数据库原始分类。
+  \item \textbf{统一归一领域}: 经过规则和模型映射后的 contest-level field。
+\end{enumerate}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{32mm}X}
+\toprule
+领域 & 最终应展示的分析口径 \\
+\midrule
+计算机科学 & LLM、RAG、知识图谱、图神经网络、信息检索、推荐系统 \\
+生物医学 & 药物发现、生物医学 NLP、临床知识、蛋白设计、公共卫生 \\
+材料科学 & 材料发现、电池材料、催化剂、材料信息学、能源材料 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{来源偏差说明}
+
+不同公开源天然有不同偏置: arXiv 更偏预印本和计算机科学, PubMed/PMC 更偏生物医学, Crossref 覆盖广但摘要缺失较多, DOAJ 更偏开放期刊。报告中必须把偏差作为方法说明写出来, 否则趋势结论容易被误解为真实学科增长。
+
+\clearpage

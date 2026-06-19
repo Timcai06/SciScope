@@ -20,6 +20,11 @@ The original contest/source documents are stored at the repository root:
 Treat these files as the source reference material for the project brief and
 dataset description.
 
+## Project Layout
+
+Use `docs/project_structure.md` as the directory map. In short, `data/` holds
+paper data assets, and `output/` holds generated chart assets and final PDFs.
+
 ## Backend Setup
 
 Run backend commands from the repository root.
@@ -41,7 +46,7 @@ Manual backend setup is also available:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install fastapi uvicorn pydantic pandas numpy scikit-learn networkx pytest httpx
+python -m pip install fastapi uvicorn pydantic pandas numpy scikit-learn networkx matplotlib pytest httpx
 ```
 
 Configure local environment values. The defaults work for the sample corpus and
@@ -50,7 +55,7 @@ mock LLM mode.
 ```bash
 export SCISCOPE_APP_NAME=SciScope
 export SCISCOPE_ENV=local
-export SCISCOPE_DATA_PATH=outputs/sample/papers.sample.json
+export SCISCOPE_DATA_PATH=data/sample/papers.sample.json
 export SCISCOPE_CORS_ORIGINS=http://localhost:3000
 export SCISCOPE_USE_MOCK_LLM=true
 ```

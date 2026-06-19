@@ -71,7 +71,7 @@ configs/
   app.example.env
 docs/
   runbook.md
-outputs/
+data/
   sample/
     papers.sample.json
 ```
@@ -82,7 +82,7 @@ Responsibilities:
 - `backend/app/services/`: application services that call data functions and model providers.
 - `backend/app/api/`: HTTP route definitions only.
 - `frontend/src/components/`: focused UI components for the product shell.
-- `outputs/sample/`: deterministic sample data used for local testing and screenshots.
+- `data/sample/`: deterministic sample data used for local testing and screenshots.
 
 ## Task 1: Initialize Repository And Project Skeleton
 
@@ -107,7 +107,7 @@ Expected: command succeeds and creates `.git/`.
 Run:
 
 ```bash
-mkdir -p backend/app/{core,models,services,api} backend/tests data_pipeline frontend/app frontend/src/{api,components} configs docs outputs/sample
+mkdir -p backend/app/{core,models,services,api} backend/tests data_pipeline frontend/app frontend/src/{api,components} configs docs data/sample
 touch backend/app/__init__.py backend/app/core/__init__.py backend/app/models/__init__.py backend/app/services/__init__.py backend/app/api/__init__.py data_pipeline/__init__.py
 ```
 
@@ -132,7 +132,7 @@ build/
 .env
 *.sqlite
 *.db
-outputs/generated/
+output/pdf/**/main.pdf
 ```
 
 - [ ] **Step 4: Add environment example**
@@ -142,7 +142,7 @@ Create `configs/app.example.env`:
 ```dotenv
 SCISCOPE_APP_NAME=SciScope
 SCISCOPE_ENV=local
-SCISCOPE_DATA_PATH=outputs/sample/papers.sample.json
+SCISCOPE_DATA_PATH=data/sample/papers.sample.json
 DEEPSEEK_API_KEY=
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
@@ -175,7 +175,7 @@ See `docs/runbook.md`.
 Run:
 
 ```bash
-git add .gitignore README.md configs backend data_pipeline frontend docs outputs
+git add .gitignore README.md configs backend data_pipeline frontend docs data
 git commit -m "chore: initialize sciscope workspace"
 ```
 
@@ -184,13 +184,13 @@ Expected: commit succeeds.
 ## Task 2: Add Deterministic Sample Literature Data
 
 **Files:**
-- Create: `outputs/sample/papers.sample.json`
+- Create: `data/sample/papers.sample.json`
 - Create: `data_pipeline/sample_data.py`
 - Test: `backend/tests/test_ingest.py`
 
 - [ ] **Step 1: Create sample paper dataset**
 
-Create `outputs/sample/papers.sample.json`:
+Create `data/sample/papers.sample.json`:
 
 ```json
 [
@@ -256,7 +256,7 @@ from pathlib import Path
 
 
 def sample_papers_path() -> Path:
-    return Path(__file__).resolve().parents[1] / "outputs" / "sample" / "papers.sample.json"
+    return Path(__file__).resolve().parents[1] / "data" / "sample" / "papers.sample.json"
 ```
 
 - [ ] **Step 3: Add initial ingest test file**
@@ -288,7 +288,7 @@ Expected: `1 passed`.
 Run:
 
 ```bash
-git add outputs/sample/papers.sample.json data_pipeline/sample_data.py backend/tests/test_ingest.py
+git add data/sample/papers.sample.json data_pipeline/sample_data.py backend/tests/test_ingest.py
 git commit -m "test: add sample literature dataset"
 ```
 
@@ -689,7 +689,7 @@ def get_settings() -> Settings:
     return Settings(
         app_name=os.getenv("SCISCOPE_APP_NAME", "SciScope"),
         env=os.getenv("SCISCOPE_ENV", "local"),
-        data_path=Path(os.getenv("SCISCOPE_DATA_PATH", "outputs/sample/papers.sample.json")),
+        data_path=Path(os.getenv("SCISCOPE_DATA_PATH", "data/sample/papers.sample.json")),
         deepseek_api_key=os.getenv("DEEPSEEK_API_KEY", ""),
         deepseek_base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
         deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
@@ -1690,7 +1690,7 @@ Create `docs/runbook.md`:
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install fastapi uvicorn pydantic pandas numpy scikit-learn networkx pytest
-export SCISCOPE_DATA_PATH=outputs/sample/papers.sample.json
+export SCISCOPE_DATA_PATH=data/sample/papers.sample.json
 export SCISCOPE_USE_MOCK_LLM=true
 uvicorn backend.app.main:app --reload --port 8000
 ```
@@ -1791,7 +1791,7 @@ SciScope is a research literature intelligence workspace for scientific paper an
 
 This repository currently provides:
 
-- Sample paper metadata under `outputs/sample/papers.sample.json`.
+- Sample paper metadata under `data/sample/papers.sample.json`.
 - Data loading and normalization utilities under `data_pipeline/`.
 - Literature analytics for publication trends, keyword counts, field distribution, and author collaboration edges.
 - FastAPI backend routes for ingest status, dashboard overview, and evidence chat.

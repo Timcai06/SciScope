@@ -1,18 +1,20 @@
 SHELL := /bin/zsh
 
-PROJECT_PYTHON := $(shell if python3 -c "import fastapi, uvicorn" >/dev/null 2>&1; then command -v python3; elif [ -x /opt/homebrew/Caskroom/miniconda/base/envs/ai/bin/python ]; then echo /opt/homebrew/Caskroom/miniconda/base/envs/ai/bin/python; else echo python3; fi)
-PROJECT_TEST_PYTHON := $(shell if python3 -c "import pytest" >/dev/null 2>&1; then command -v python3; else echo $(PROJECT_PYTHON); fi)
+PROJECT_PYTHON := $(shell if [ -x /opt/homebrew/Caskroom/miniconda/base/envs/ai/bin/python ]; then echo /opt/homebrew/Caskroom/miniconda/base/envs/ai/bin/python; elif python3 -c "import fastapi, uvicorn" >/dev/null 2>&1; then command -v python3; else echo python3; fi)
+PROJECT_TEST_PYTHON := $(shell if $(PROJECT_PYTHON) -c "import pytest" >/dev/null 2>&1; then echo $(PROJECT_PYTHON); elif python3 -c "import pytest" >/dev/null 2>&1; then command -v python3; else echo $(PROJECT_PYTHON); fi)
 PYTHON ?= $(PROJECT_PYTHON)
 TEST_PYTHON ?= $(PROJECT_TEST_PYTHON)
 BACKEND_HOST ?= 127.0.0.1
 BACKEND_PORT ?= 8000
 FRONTEND_PORT ?= 3000
-DATA_PATH ?= outputs/sample/papers.sample.json
+DATA_PATH ?= data/sample/papers.sample.json
 HARVEST_SOURCE ?= openalex
 HARVEST_LIMIT ?= 500
 HARVEST_SOURCES ?= openalex arxiv pubmed pmc crossref doaj
 RAW_PAPERS_PATH ?= data/raw/openalex/works_sample.jsonl
 PROCESSED_PAPERS_PATH ?= data/processed/papers.json
+ANALYSIS_OUTPUT_DIR ?= data/analysis
+REPORT_ASSETS_DIR ?= output/assets/sciscope_data_report
 VLLM_HOST ?= 127.0.0.1
 VLLM_PORT ?= 8001
 VLLM_BASE_URL ?= http://$(VLLM_HOST):$(VLLM_PORT)/v1
@@ -38,7 +40,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources normalize normalize-source normalize-all-sources backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources normalize normalize-source normalize-all-sources analysis-assets report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -50,6 +52,10 @@ help:
 	@echo "                         API-key enhanced sources: semantic_scholar, core"
 	@echo "  make normalize        Normalize raw JSONL into processed SciScope JSON"
 	@echo "  make normalize-source Normalize one source into data/processed/<source>_<limit>.json"
+	@echo "  make analysis-assets  Build report-ready analysis tables from raw JSONL"
+	@echo "  make report-figures   Build report-ready chart assets from data/analysis"
+	@echo "  make data-report-pdf  Build the SciScope data analysis report PDF"
+	@echo "  make report           Rebuild analysis tables, report figures, and data PDF"
 	@echo "  make backend          Start FastAPI backend on $(BACKEND_HOST):$(BACKEND_PORT)"
 	@echo "  make frontend         Start Next.js frontend on localhost:$(FRONTEND_PORT)"
 	@echo "  make dev              Start backend and frontend together"
@@ -67,7 +73,7 @@ install: install-backend install-frontend
 
 install-backend:
 	$(PYTHON) -m pip install --upgrade pip
-	$(PYTHON) -m pip install fastapi uvicorn pydantic pandas numpy scikit-learn networkx pytest httpx
+	$(PYTHON) -m pip install fastapi uvicorn pydantic pandas numpy scikit-learn networkx matplotlib pytest httpx
 
 install-frontend:
 	cd frontend && npm install
@@ -95,6 +101,28 @@ normalize-all-sources:
 		echo "==> normalizing $$source ($(HARVEST_LIMIT))"; \
 		$(MAKE) normalize-source HARVEST_SOURCE=$$source HARVEST_LIMIT=$(HARVEST_LIMIT); \
 	done
+
+analysis-assets:
+	$(PYTHON) -m src.analysis.cli assets --raw-dir data/raw --output-dir $(ANALYSIS_OUTPUT_DIR) --filename-template '{source}_$(HARVEST_LIMIT).jsonl'
+
+report-figures:
+	@mkdir -p .cache/matplotlib
+	XDG_CACHE_HOME=$(CURDIR)/.cache MPLCONFIGDIR=$(CURDIR)/.cache/matplotlib $(PYTHON) -m src.analysis.cli figures --analysis-dir $(ANALYSIS_OUTPUT_DIR) --output-dir $(REPORT_ASSETS_DIR)
+
+data-report-pdf:
+	python3 /Users/tim/.codex/plugins/cache/openai-bundled/latex/0.2.3/scripts/compile_latex.py $(CURDIR)/output/pdf/sciscope_data_report/main.tex --engine xelatex
+	cp output/pdf/sciscope_data_report/main.pdf output/pdf/sciscope_data_report/sciscope_data_report.pdf
+	rm -f output/pdf/sciscope_data_report/main.aux \
+		output/pdf/sciscope_data_report/main.fdb_latexmk \
+		output/pdf/sciscope_data_report/main.fls \
+		output/pdf/sciscope_data_report/main.log \
+		output/pdf/sciscope_data_report/main.out \
+		output/pdf/sciscope_data_report/main.pdf \
+		output/pdf/sciscope_data_report/main.synctex.gz \
+		output/pdf/sciscope_data_report/main.toc \
+		output/pdf/sciscope_data_report/main.xdv
+
+report: analysis-assets report-figures data-report-pdf
 
 backend:
 	$(PYTHON) -m uvicorn backend.app.main:app --reload --host $(BACKEND_HOST) --port $(BACKEND_PORT)

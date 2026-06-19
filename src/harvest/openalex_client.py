@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 from datetime import UTC, datetime
 from http.client import IncompleteRead, RemoteDisconnected
@@ -30,6 +31,10 @@ DEFAULT_QUERIES = [
 
 class OpenAlexError(RuntimeError):
     """Raised when OpenAlex harvesting fails."""
+
+
+def _progress(message: str) -> None:
+    print(f"[harvest] openalex: {message}", file=sys.stderr, flush=True)
 
 
 def _utc_now() -> str:
@@ -113,13 +118,16 @@ def harvest_openalex(
 
     seen_ids: set[str] = set()
     written = 0
+    _progress(f"start limit={limit} output={output}")
     with output.open("w", encoding="utf-8") as handle:
         for field, query in query_plan:
             cursor = "*"
             query_written = 0
+            _progress(f"query='{query}' field='{field}' target={target_per_query} total={written}/{limit}")
             while written < limit and query_written < target_per_query:
                 page_size = min(per_page, limit - written, target_per_query - query_written)
                 payload = _request_json(_query_params(query=query, cursor=cursor, per_page=page_size))
+                before = written
                 for work in payload.get("results", []):
                     source_id = str(work.get("id") or "")
                     if not source_id or source_id in seen_ids:
@@ -138,14 +146,20 @@ def harvest_openalex(
                     query_written += 1
                     if written >= limit or query_written >= target_per_query:
                         break
+                _progress(
+                    f"query='{query}' page_wrote={written - before} "
+                    f"query_total={query_written}/{target_per_query} total={written}/{limit}"
+                )
 
                 next_cursor = payload.get("meta", {}).get("next_cursor")
                 if not next_cursor or next_cursor == cursor or not payload.get("results"):
                     break
                 cursor = next_cursor
                 time.sleep(delay_seconds)
+            _progress(f"query='{query}' done wrote={query_written} total={written}/{limit}")
 
             if written >= limit:
                 break
 
+    _progress(f"done records={written} output={output}")
     return written

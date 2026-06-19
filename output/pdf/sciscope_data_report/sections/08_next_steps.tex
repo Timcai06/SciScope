@@ -1,0 +1,34 @@
+\section{后续补数与报告完善路线}
+
+\begin{reportbox}{下一阶段目标}
+当前报告底座已经能承载最终交付。下一阶段重点不是再改排版, 而是扩大数据量、提升清洗质量、生成真实图表、固化分析脚本, 让 PDF 中每个结论都可由代码复现。
+\end{reportbox}
+
+\subsection{优先级}
+
+\begin{enumerate}
+  \item 扩展 OpenAlex 主干数据到 3 万条以上, 建立跨领域主体样本。
+  \item 扩展 arXiv、PubMed、DOAJ、Crossref 到各 5000 条级别, 强化来源互补。
+  \item 将 PMC 作为慢速全文增强源异步补充, 不阻塞主流程。
+  \item 建立 DOI/title/year 去重与字段补全 pipeline。
+  \item 在当前基线图表资产之上补充领域分布、突增关键词、主题模型和社区发现结果。
+  \item 将报告资产接入前端 Dashboard、Trends、Graph 与 Ask。
+\end{enumerate}
+
+\subsection{最终报告验收清单}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{36mm}X}
+\toprule
+验收项 & 标准 \\
+\midrule
+可复现 & 一条命令生成数据统计表、图表资产和 PDF \\
+可解释 & 每个结论注明数据来源、统计口径和不确定性 \\
+有洞见 & 不停留在数量统计, 给出趋势、迁移、合作和机会判断 \\
+能联动系统 & 报告图表对应系统接口和前端交互模块 \\
+适合评审 & 前几页能快速呈现数据真实度、分析深度和产品价值 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\clearpage

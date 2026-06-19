@@ -1,0 +1,78 @@
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage[most]{tcolorbox}
+\usetikzlibrary{arrows.meta,positioning,fit,calc}
+
+\geometry{left=18mm,right=18mm,top=18mm,bottom=21mm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\setlist[itemize]{leftmargin=1.25em,itemsep=2pt,topsep=2pt}
+\setlist[enumerate]{leftmargin=1.6em,itemsep=2pt,topsep=2pt}
+\hypersetup{hidelinks}
+\graphicspath{{../../assets/sciscope_data_report/}}
+\captionsetup{font=small,labelfont=bf}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small SciScope 数据分析报告}
+\rhead{\small 文献分布 · 关键词演化 · 作者网络}
+\cfoot{\small \thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\titleformat{\section}{\Large\bfseries\color{black}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{black}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{black}}{\thesubsubsection}{0.6em}{}
+
+\newtcolorbox{reportbox}[2][]{
+  enhanced,
+  breakable,
+  colback=white,
+  colframe=black,
+  colbacktitle=black,
+  coltitle=white,
+  fonttitle=\bfseries,
+  title=#2,
+  boxrule=0.7pt,
+  arc=2mm,
+  left=2.6mm,
+  right=2.6mm,
+  top=1.6mm,
+  bottom=1.6mm,
+  #1
+}
+
+\newtcolorbox{plainbox}[1][]{
+  enhanced,
+  breakable,
+  colback=white,
+  colframe=black,
+  boxrule=0.7pt,
+  arc=2mm,
+  left=2.6mm,
+  right=2.6mm,
+  top=1.6mm,
+  bottom=1.6mm,
+  #1
+}
+
+\newcommand{\metric}[2]{%
+  \begin{plainbox}
+  \textbf{#1}\par
+  {\Large #2}
+  \end{plainbox}
+}
+
+\newcommand{\statusmark}[1]{%
+  \tikz[baseline=(x.base)]\node[rounded corners=2pt,inner xsep=4pt,inner ysep=2pt,draw=black,fill=white,text=black,font=\scriptsize\bfseries] (x) {#1};%
+}

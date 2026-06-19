@@ -1,0 +1,32 @@
+\section{报告定位与交付边界}
+
+\begin{reportbox}{核心定位}
+本报告是 SciScope 项目面向赛题交付的独立数据分析报告, 目标是回答“公开科技文献数据本身揭示了什么”。它与系统设计 PDF 并列: 设计 PDF 解释智能体架构和工程路线, 本报告沉淀文献分布、关键词演化、作者合作网络、趋势预测和可复现分析结论。
+\end{reportbox}
+
+\subsection{当前底座阶段}
+
+当前版本不是最终竞赛报告, 而是最终报告的结构底座。它先固定报告章节、统计口径、图表占位、数据质量说明和智能体映射关系。后续当样本从 3000 条扩展到 5 万条后, 只需要替换统计资产和结论文本, 不再重新设计文档结构。
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{34mm}X X}
+\toprule
+交付维度 & 当前底座已有内容 & 后续补全内容 \\
+\midrule
+数据来源 & OpenAlex、arXiv、PubMed、PMC、Crossref、DOAJ 六源采集入口 & Semantic Scholar、CORE 等 API-key 增强源 \\
+数据规模 & 每源 500 条, 共 3000 条本地验证样本 & 5 万条公开论文主数据集与可复现抽样集 \\
+分析主题 & 分布、关键词、作者网络、质量审计、智能体映射 & 动态主题模型、趋势预测、图谱社区发现 \\
+报告产物 & 多章节 LaTeX 与可编译 PDF & 图表资产、最终结论、演示版摘要页 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{报告读者}
+
+\begin{itemize}
+  \item \textbf{评委}: 需要快速看见数据真实、分析深入、结论可解释。
+  \item \textbf{科研用户}: 需要理解某一领域文献热点、演化路径和关键合作网络。
+  \item \textbf{系统开发者}: 需要把报告中的统计资产复用到 RAG、推荐、趋势和知识图谱模块。
+\end{itemize}
+
+\clearpage

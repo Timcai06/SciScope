@@ -9,7 +9,7 @@ Tasks:
 - Confirm public sources: OpenAlex, arXiv, PubMed, Crossref as needed.
 - Define topic queries for computer science, biomedicine, and materials science.
 - Define crawl rules, API keys, rate limits, and attribution requirements.
-- Create `data/raw/`, `data/processed/`, `indices/`, `models/`, `graphs/`, and `reports/assets/`.
+- Create `data/raw/`, `data/processed/`, `indices/`, `models/`, `graphs/`, and `output/assets/sciscope_data_report/`.
 
 Acceptance:
 
