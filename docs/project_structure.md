@@ -15,9 +15,12 @@ separate top-level areas.
 
 ## Data
 
-- `data/sample/`: deterministic sample corpus used by local tests and demos.
+- `data/sample/`: deterministic sample corpus used by local tests and demos;
+  `data/sample/legacy_processed_500/` stores archived early 500-record
+  normalized samples.
 - `data/raw/`: harvested public-source JSONL records.
-- `data/processed/`: normalized per-source paper records.
+- `data/processed/`: normalized per-source paper records and the merged
+  `papers_corpus_50k.json` corpus generated from analysis tables.
 - `data/analysis/`: generated report-ready tables such as keyword-year matrices
   and author collaboration edges.
 

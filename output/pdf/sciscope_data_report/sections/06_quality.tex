@@ -7,10 +7,11 @@
 \subsection{当前质量观察}
 
 \begin{itemize}
-  \item 六源各 500 条 raw records 已实现唯一 source id。
-  \item arXiv、OpenAlex、DOAJ 摘要覆盖较好, 可直接进入摘要级 RAG。
-  \item PMC 有 266 条正文片段, 是当前全文增强的主要来源。
-  \item Crossref 摘要覆盖较低, 更适合作为 DOI、出版源和跨源校验补充。
+  \item 六源已形成 50,498 条 raw records, 标准化后生成 49,067 条跨源去重正式语料。
+  \item arXiv、OpenAlex、DOAJ、PubMed 摘要覆盖较好, 可直接进入摘要级 RAG。
+  \item PMC 当前提供 4,542 条正文片段, 是全文增强和证据链构建的主要来源。
+  \item Crossref 摘要覆盖较低, 但 DOI、出版源和作者元数据覆盖好, 更适合跨源校验与去重。
+  \item 年份图表统一过滤到 2022--2026, 避免历史记录和未来年份噪声影响近五年趋势判断。
   \item Semantic Scholar 与 CORE 已预留代码入口, 但需要 API key 或更高配额。
 \end{itemize}
 

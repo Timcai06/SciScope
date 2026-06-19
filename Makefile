@@ -40,7 +40,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources normalize normalize-source normalize-all-sources analysis-assets report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources normalize normalize-source normalize-all-sources analysis-assets processed-corpus report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -53,6 +53,7 @@ help:
 	@echo "  make normalize        Normalize raw JSONL into processed SciScope JSON"
 	@echo "  make normalize-source Normalize one source into data/processed/<source>_<limit>.json"
 	@echo "  make analysis-assets  Build report-ready analysis tables from raw JSONL"
+	@echo "  make processed-corpus Build merged 50k processed corpus from analysis tables"
 	@echo "  make report-figures   Build report-ready chart assets from data/analysis"
 	@echo "  make data-report-pdf  Build the SciScope data analysis report PDF"
 	@echo "  make report           Rebuild analysis tables, report figures, and data PDF"
@@ -105,6 +106,9 @@ normalize-all-sources:
 analysis-assets:
 	$(PYTHON) -m src.analysis.cli assets --raw-dir data/raw --output-dir $(ANALYSIS_OUTPUT_DIR) --filename-template '{source}_$(HARVEST_LIMIT).jsonl'
 
+processed-corpus:
+	$(PYTHON) -m src.analysis.cli corpus --input $(ANALYSIS_OUTPUT_DIR)/papers_clean.json --output data/processed/papers_corpus_50k.json --summary data/processed/papers_corpus_50k.summary.json
+
 report-figures:
 	@mkdir -p .cache/matplotlib
 	XDG_CACHE_HOME=$(CURDIR)/.cache MPLCONFIGDIR=$(CURDIR)/.cache/matplotlib $(PYTHON) -m src.analysis.cli figures --analysis-dir $(ANALYSIS_OUTPUT_DIR) --output-dir $(REPORT_ASSETS_DIR)
@@ -122,7 +126,7 @@ data-report-pdf:
 		output/pdf/sciscope_data_report/main.toc \
 		output/pdf/sciscope_data_report/main.xdv
 
-report: analysis-assets report-figures data-report-pdf
+report: analysis-assets processed-corpus report-figures data-report-pdf
 
 backend:
 	$(PYTHON) -m uvicorn backend.app.main:app --reload --host $(BACKEND_HOST) --port $(BACKEND_PORT)

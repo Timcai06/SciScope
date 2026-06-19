@@ -33,6 +33,7 @@ data/raw/**/*.tmp
 data/processed/*.json
 data/processed/*.jsonl
 data/processed/*.parquet
+data/sample/legacy_processed_500/*.json
 data/analysis/**
 indices/**
 models/**
@@ -40,6 +41,7 @@ graphs/**
 !data/raw/.gitkeep
 !data/raw/openalex/.gitkeep
 !data/sample/.gitkeep
+!data/sample/legacy_processed_500/.gitkeep
 !data/processed/.gitkeep
 !data/analysis/.gitkeep
 !indices/.gitkeep

@@ -28,6 +28,19 @@ def _build_figures(args: argparse.Namespace) -> None:
     print(json.dumps(summary, ensure_ascii=False))
 
 
+def _build_corpus(args: argparse.Namespace) -> None:
+    from src.analysis.corpus import build_processed_corpus
+
+    summary = build_processed_corpus(
+        input_path=args.input,
+        output_path=args.output,
+        summary_path=args.summary,
+        year_start=args.year_start,
+        year_end=args.year_end,
+    )
+    print(json.dumps(summary, ensure_ascii=False))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sciscope-analysis")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -43,6 +56,14 @@ def build_parser() -> argparse.ArgumentParser:
     figures.add_argument("--analysis-dir", type=Path, default=Path("data/analysis"))
     figures.add_argument("--output-dir", type=Path, default=Path("output/assets/sciscope_data_report"))
     figures.set_defaults(func=_build_figures)
+
+    corpus = subparsers.add_parser("corpus", help="Build merged processed corpus from analysis papers")
+    corpus.add_argument("--input", type=Path, default=Path("data/analysis/papers_clean.json"))
+    corpus.add_argument("--output", type=Path, default=Path("data/processed/papers_corpus_50k.json"))
+    corpus.add_argument("--summary", type=Path, default=Path("data/processed/papers_corpus_50k.summary.json"))
+    corpus.add_argument("--year-start", type=int, default=2022)
+    corpus.add_argument("--year-end", type=int, default=2026)
+    corpus.set_defaults(func=_build_corpus)
 
     return parser
 

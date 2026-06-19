@@ -2,7 +2,7 @@ figure_id,file,report_section,source_table,message,status
 source_records,source_records_bar.png,数据底座与采集状态,source_quality_report.csv,展示当前六个公开来源的基线采集规模。,final
 source_quality,source_quality_matrix.png,数据底座与采集状态,source_quality_report.csv,"比较各来源关键字段完整度, 支撑数据可信度说明。",final
 text_coverage,abstract_fulltext_coverage.png,数据质量与可信度审计,source_quality_report.csv,区分摘要级分析和全文级 RAG 的证据边界。,final
-year_distribution,year_distribution.png,文献分布分析,papers_clean.json,展示样本文献的年份覆盖和增长轮廓。,final
-top_keywords,top_keywords.png,关键词演化与热点趋势,paper_keywords.csv,呈现当前样本中的高频研究主题。,final
-keyword_evolution,keyword_evolution_heatmap.png,关键词演化与热点趋势,keyword_year_matrix.csv,"展示高频关键词的年度热度变化, 支撑热点趋势分析。",final
-author_collaboration,author_collaboration_network.png,作者合作网络分析,author_collaboration_edges.csv,展示高权重合作关系形成的核心作者网络。,final
+year_distribution,year_distribution.png,文献分布分析,papers_clean.json,"聚焦近五年有效年份, 过滤历史和未来年份噪声。",final
+top_keywords,top_keywords.png,关键词演化与热点趋势,paper_keywords.csv,呈现近五年样本中的高频研究主题。,final
+keyword_evolution,keyword_evolution_heatmap.png,关键词演化与热点趋势,keyword_year_matrix.csv,"展示近五年高频关键词的年度热度变化, 支撑热点趋势分析。",final
+author_collaboration,author_collaboration_network.png,作者合作网络分析,papers_clean.json,"展示近五年高加权度作者形成的核心合作子图, 非全量作者网络。",final
