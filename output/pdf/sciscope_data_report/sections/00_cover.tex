@@ -1,32 +1,86 @@
 \begin{titlepage}
+\thispagestyle{empty}
+
 \begin{center}
 {\Huge\bfseries SciScope 科技文献智能分析报告\par}
-\vspace{6mm}
+\vspace{4mm}
 {\Large 面向科技文献智能分析的科研智能体构建\par}
-\vspace{6mm}
+\vspace{4mm}
 {\large 5 万级公开科技文献数据资产 · 分布分析 · 关键词演化 · 作者合作网络\par}
-\vspace{8mm}
-\rule{0.9\textwidth}{0.7pt}
-\vspace{9mm}
+\vspace{5mm}
+\rule{0.92\textwidth}{0.75pt}
+\end{center}
+
+\vspace{4mm}
 
 \begin{tikzpicture}[
-  node distance=7mm,
+  x=1mm,
+  y=1mm,
   every node/.style={font=\small},
-  flowstep/.style={draw=black, fill=white, rounded corners=1.2pt, minimum width=35mm, minimum height=13mm, align=center, line width=0.55pt},
-  arrow/.style={-{Latex[length=2mm]}, thick}
+  metricbox/.style={draw=black, fill=white, rounded corners=1.1pt, line width=0.55pt, align=left, inner sep=4.2pt},
+  darkbox/.style={draw=black, fill=black, rounded corners=1.1pt, line width=0.55pt, align=left, inner sep=4.2pt, text=white},
+  flow/.style={draw=black, fill=white, rounded corners=1.1pt, line width=0.55pt, align=center, minimum height=13mm},
+  arrow/.style={-{Latex[length=2mm]}, line width=0.55pt},
+  label/.style={font=\scriptsize\bfseries}
 ]
-  \node[flowstep] (data) {50,498 raw records\\6 个公开来源};
-  \node[flowstep, right=7mm of data] (asset) {49,067 去重语料\\论文 / 作者 / 关键词};
-  \node[flowstep, right=7mm of asset] (analysis) {13 张报告图表\\分布 / 演化 / 网络};
-  \node[flowstep, below=9mm of analysis] (agent) {RAG / Agent 底座\\问答 / 推荐 / 趋势};
-  \draw[arrow] (data) -- (asset);
-  \draw[arrow] (asset) -- (analysis);
-  \draw[arrow] (analysis) -- (agent);
+  \node[metricbox, minimum width=49mm, minimum height=25mm] at (0,94) {
+    {\scriptsize RAW RECORDS}\\[-0.4mm]
+    {\LARGE\bfseries 50,498}\\[-0.4mm]
+    {\scriptsize 6 个公开来源}
+  };
+  \node[metricbox, minimum width=49mm, minimum height=25mm] at (58,94) {
+    {\scriptsize DEDUP CORPUS}\\[-0.4mm]
+    {\LARGE\bfseries 49,067}\\[-0.4mm]
+    {\scriptsize 可进入智能体语料}
+  };
+  \node[metricbox, minimum width=49mm, minimum height=25mm] at (116,94) {
+    {\scriptsize RECENT WINDOW}\\[-0.4mm]
+    {\LARGE\bfseries 40,137}\\[-0.4mm]
+    {\scriptsize 2022--2026 去重语料}
+  };
+
+  \node[metricbox, minimum width=49mm, minimum height=25mm] at (0,62) {
+    {\scriptsize REPORT FIGURES}\\[-0.4mm]
+    {\LARGE\bfseries 13}\\[-0.4mm]
+    {\scriptsize 分布 / 关键词 / 作者网络}
+  };
+  \node[metricbox, minimum width=49mm, minimum height=25mm] at (58,62) {
+    {\scriptsize AUTHOR GRAPH}\\[-0.4mm]
+    {\LARGE\bfseries 503,598}\\[-0.4mm]
+    {\scriptsize 加权候选合作边}
+  };
+  \node[darkbox, minimum width=49mm, minimum height=25mm] at (116,62) {
+    {\scriptsize DATA GAP}\\[-0.4mm]
+    {\LARGE\bfseries 10,458}\\[-0.4mm]
+    {\scriptsize 正文片段距 15k 目标}
+  };
+
+  \node[label, anchor=west] at (-24,38) {REPRODUCIBLE DATA FLOW};
+  \draw[line width=0.65pt] (-24,35) -- (141,35);
+  \node[flow, minimum width=28mm] (raw) at (-10,24) {Raw JSONL\\公开源采集};
+  \node[flow, minimum width=28mm] (clean) at (27,24) {Clean Corpus\\去重 / 标准化};
+  \node[flow, minimum width=28mm] (assets) at (64,24) {Analysis Assets\\表格 / 图表};
+  \node[flow, minimum width=28mm] (models) at (101,24) {RAG Assets\\chunks / index};
+  \node[flow, minimum width=28mm] (agent) at (138,24) {Agent Tools\\问答 / 推荐 / 趋势};
+  \draw[arrow] (raw) -- (clean);
+  \draw[arrow] (clean) -- (assets);
+  \draw[arrow] (assets) -- (models);
+  \draw[arrow] (models) -- (agent);
+
+  \node[metricbox, minimum width=78mm, minimum height=22mm, text width=70mm, anchor=north west] at (-24,5) {
+    {\bfseries 当前结论}\\
+    已形成 5 万级文献分析报告底座；领域、年份、关键词、作者合作网络均可由 Makefile 复现。
+  };
+  \node[metricbox, minimum width=78mm, minimum height=22mm, text width=70mm, anchor=north west] at (63,5) {
+    {\bfseries 今晚主线}\\
+    均衡 2022--2025 年份分布，增加正文证据，补齐 DOI、venue、URL、text provenance 与 chunk 字段。
+  };
 \end{tikzpicture}
 
 \vfill
 
-\begin{tabularx}{0.86\textwidth}{>{\bfseries}p{32mm}X}
+\begin{center}
+\begin{tabularx}{0.92\textwidth}{>{\bfseries}p{28mm}X}
 \toprule
 文档性质 & 赛题交付物中的数据分析报告 \\
 当前版本 & 5 万级分析版: 50,498 条 raw records, 49,067 条去重语料记录 \\
@@ -35,7 +89,7 @@
 \bottomrule
 \end{tabularx}
 
-\vspace{8mm}
+\vspace{5mm}
 {\small 生成位置: \texttt{output/pdf/sciscope\_data\_report/sciscope\_data\_report.pdf}\par}
 \end{center}
 \end{titlepage}
