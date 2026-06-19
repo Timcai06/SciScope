@@ -35,14 +35,22 @@ Use `docs/runbook.md` for setup, environment variables, backend/frontend start
 commands, API smoke checks, and the current webpack workaround for this
 repository path.
 
+The shortest local path is:
+
+```bash
+make install
+make dev
+```
+
+Then open `http://localhost:3000`. The backend API docs are available at
+`http://127.0.0.1:8000/docs`.
+
 ## Acceptance Checks
 
 Run these commands before handing off the foundation slice:
 
 ```bash
-python3 -m pytest backend/tests -v
-(cd frontend && npm run typecheck)
-(cd frontend && npm run build)
+make test
 ```
 
 ## Current Limitation

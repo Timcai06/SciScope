@@ -24,6 +24,19 @@ dataset description.
 
 Run backend commands from the repository root.
 
+The Makefile wraps the setup and development commands:
+
+```bash
+make install
+make dev
+```
+
+`make dev` starts both services. Open the frontend at
+`http://localhost:3000`; the backend API docs are at
+`http://127.0.0.1:8000/docs`.
+
+Manual backend setup is also available:
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -53,7 +66,7 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 Run tests from the repository root:
 
 ```bash
-python3 -m pytest backend/tests -v
+make test-backend
 ```
 
 With the backend running on `127.0.0.1:8000`, verify the local APIs:
@@ -95,6 +108,14 @@ http://localhost:3000
 The frontend reads `NEXT_PUBLIC_SCISCOPE_API_BASE` at build/runtime to call the
 FastAPI backend. Use `http://localhost:8000` for the standard local backend.
 
+From the repository root, the equivalent Makefile commands are:
+
+```bash
+make frontend
+make typecheck
+make build
+```
+
 ## DeepSeek Configuration
 
 The foundation slice is runnable in mock mode only. Keep mock mode enabled for
@@ -129,10 +150,7 @@ Next/Turbopack upgrade or after moving the repository to an ASCII-only path.
 Use this checklist before handing off foundation changes:
 
 ```bash
-python3 -m pytest backend/tests -v
-cd frontend
-npm run typecheck
-npm run build
+make test
 ```
 
 For full manual verification, run the backend and frontend together, open
