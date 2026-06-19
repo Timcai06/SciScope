@@ -107,6 +107,17 @@ def _field_bucket(value: Any) -> str:
     return "Cross-field"
 
 
+def _contest_field_label(paper: dict[str, Any]) -> str:
+    field = str(paper.get("field_seed") or paper.get("field") or "").lower()
+    if "bio" in field or "med" in field:
+        return "Biomedicine"
+    if "material" in field:
+        return "Materials"
+    if "computer" in field or "cs" in field or "artificial" in field:
+        return "Computer Science"
+    return _field_bucket(paper.get("field"))
+
+
 def _topic_label(keywords: Counter[str], fallback: str) -> str:
     stopwords = {
         "article",
@@ -129,6 +140,40 @@ def _topic_label(keywords: Counter[str], fallback: str) -> str:
         if len(normalized) >= 4 and normalized not in stopwords:
             return normalized
     return fallback
+
+
+def _is_report_keyword(value: Any) -> bool:
+    keyword = re.sub(r"\s+", " ", str(value or "").strip().lower())
+    stopwords = {
+        "article",
+        "chemistry",
+        "computer science",
+        "cureus",
+        "electronic computers. computer science",
+        "frontiers in immunology",
+        "health sciences",
+        "humans",
+        "life sciences",
+        "materials science",
+        "medicine",
+        "physical sciences",
+        "science",
+        "scientific reports",
+        "social sciences",
+        "study",
+        "method",
+        "model",
+        "models",
+    }
+    if len(keyword) < 4 or keyword in stopwords:
+        return False
+    if re.match(r"^[a-z]{2,5}\.[a-z0-9-]{1,8}$", keyword):
+        return False
+    if re.match(r"^[a-z]{2,5} [a-z]{2,5}$", keyword):
+        return False
+    if "." in keyword:
+        return False
+    return True
 
 
 def _compact_topic(value: Any) -> str:
@@ -228,12 +273,14 @@ def _plot_year_distribution(papers: list[dict[str, Any]], output_dir: Path) -> d
     ordered_years = list(range(RECENT_YEAR_START, RECENT_YEAR_END + 1))
     values = [counts[year] for year in ordered_years]
     total_recent = sum(values)
+    total_records = len(papers)
 
     fig, ax = plt.subplots(figsize=(7.2, 3.4))
     ax.plot(ordered_years, values, color="black", linewidth=1.5, marker="o", markersize=2.8)
     ax.fill_between(ordered_years, values, color="0.88")
     ax.set_title(
-        f"Publication Year Distribution ({RECENT_YEAR_START}-{RECENT_YEAR_END}, n={_format_count(total_recent)})"
+        f"Publication Years ({RECENT_YEAR_START}-{RECENT_YEAR_END}: "
+        f"{_format_count(total_recent)} / {_format_count(total_records)} records)"
     )
     ax.set_xlabel("Year")
     ax.set_ylabel("Papers")
@@ -258,6 +305,7 @@ def _plot_source_year_heatmap(papers: list[dict[str, Any]], output_dir: Path) ->
     from matplotlib import pyplot as plt
 
     recent = _recent_papers(papers)
+    total_records = len(papers)
     preferred_sources = ["arxiv", "pubmed", "pmc", "crossref", "doaj", "openalex"]
     seen_sources = {str(paper.get("source") or "unknown").lower() for paper in recent}
     sources = [source for source in preferred_sources if source in seen_sources]
@@ -272,7 +320,10 @@ def _plot_source_year_heatmap(papers: list[dict[str, Any]], output_dir: Path) ->
 
     fig, ax = plt.subplots(figsize=(7.2, 3.8))
     image = ax.imshow(matrix, cmap="Greys", aspect="auto")
-    ax.set_title(f"Source-Year Coverage ({RECENT_YEAR_START}-{RECENT_YEAR_END}, n={_format_count(total_recent)})")
+    ax.set_title(
+        f"Source-Year Coverage ({RECENT_YEAR_START}-{RECENT_YEAR_END}: "
+        f"{_format_count(total_recent)} / {_format_count(total_records)} records)"
+    )
     ax.set_xticks(range(len(years)), years)
     ax.set_yticks(range(len(sources)), sources)
     max_value = float(matrix.max()) if matrix.size else 0
@@ -294,12 +345,89 @@ def _plot_source_year_heatmap(papers: list[dict[str, Any]], output_dir: Path) ->
     }
 
 
+def _plot_field_distribution(papers: list[dict[str, Any]], output_dir: Path) -> dict[str, str]:
+    from matplotlib import pyplot as plt
+
+    field_order = ["Computer Science", "Biomedicine", "Materials", "Cross-field"]
+    counts = Counter(_contest_field_label(paper) for paper in papers)
+    rows = [(field, counts[field]) for field in field_order if counts[field]]
+    rows.extend(sorted((field, count) for field, count in counts.items() if field not in field_order))
+    rows = sorted(rows, key=lambda item: item[1], reverse=True)
+    labels = [field for field, _ in rows]
+    values = [count for _, count in rows]
+    total = sum(values)
+
+    fig, ax = plt.subplots(figsize=(6.8, 3.4))
+    positions = np.arange(len(labels))
+    shades = [str(value) for value in np.linspace(0.18, 0.78, max(len(labels), 1))]
+    ax.barh(positions, values, color=shades, edgecolor="black", linewidth=0.4)
+    ax.set_yticks(positions, labels)
+    ax.invert_yaxis()
+    ax.set_xlabel("Records")
+    ax.set_title(f"Contest Field Distribution (n={_format_count(total)})")
+    ax.grid(axis="x", linestyle="--")
+    max_value = max(values) if values else 1
+    ax.set_xlim(0, max_value * 1.22)
+    for position, value in zip(positions, values, strict=False):
+        percent = value / total if total else 0
+        ax.text(value + max_value * 0.012, position, f"{_format_count(value)} / {percent:.1%}", va="center", fontsize=7)
+    save_figure(fig, output_dir / "field_distribution.png")
+    return {
+        "figure_id": "field_distribution",
+        "file": "field_distribution.png",
+        "report_section": "文献分布分析",
+        "source_table": "papers_clean.json",
+        "message": "按赛题三大领域口径展示 5 万级语料结构。",
+        "status": "final",
+    }
+
+
+def _plot_field_year_heatmap(papers: list[dict[str, Any]], output_dir: Path) -> dict[str, str]:
+    from matplotlib import pyplot as plt
+
+    field_order = ["Computer Science", "Biomedicine", "Materials", "Cross-field"]
+    years = list(range(RECENT_YEAR_START, RECENT_YEAR_END + 1))
+    recent = _recent_papers(papers)
+    total_records = len(papers)
+    counts = Counter((_contest_field_label(paper), _year_value(paper.get("year"))) for paper in recent)
+    fields = [field for field in field_order if any(counts[(field, year)] for year in years)]
+    matrix = np.array([[counts[(field, year)] for year in years] for field in fields], dtype=float)
+    total = int(matrix.sum())
+
+    fig, ax = plt.subplots(figsize=(7.2, 2.9))
+    image = ax.imshow(matrix, cmap="Greys", aspect="auto")
+    ax.set_title(
+        f"Field-Year Coverage ({RECENT_YEAR_START}-{RECENT_YEAR_END}: "
+        f"{_format_count(total)} / {_format_count(total_records)} records)"
+    )
+    ax.set_xticks(range(len(years)), years)
+    ax.set_yticks(range(len(fields)), fields)
+    max_value = float(matrix.max()) if matrix.size else 0
+    threshold = max_value * 0.62
+    for row_index in range(matrix.shape[0]):
+        for col_index in range(matrix.shape[1]):
+            value = int(matrix[row_index, col_index])
+            color = "white" if value > threshold else "black"
+            ax.text(col_index, row_index, _format_count(value), ha="center", va="center", color=color, fontsize=7)
+    fig.colorbar(image, ax=ax, fraction=0.035, pad=0.02, label="Records")
+    save_figure(fig, output_dir / "field_year_heatmap.png")
+    return {
+        "figure_id": "field_year_heatmap",
+        "file": "field_year_heatmap.png",
+        "report_section": "文献分布分析",
+        "source_table": "papers_clean.json",
+        "message": "展示计算机、生物医学、材料科学在近五年窗口内的年度覆盖。",
+        "status": "final",
+    }
+
+
 def _plot_top_keywords(keywords: pd.DataFrame, output_dir: Path, *, top_n: int = 15) -> dict[str, str]:
     from matplotlib import pyplot as plt
 
     data = keywords.copy()
     data["year"] = pd.to_numeric(data["year"], errors="coerce")
     data = data[(data["year"] >= RECENT_YEAR_START) & (data["year"] <= RECENT_YEAR_END)]
+    data = data[data["keyword"].map(_is_report_keyword)]
     counts = data["keyword"].dropna().astype(str).value_counts().head(top_n).sort_values(ascending=True)
     labels = [_wrap_label(label, width=28) for label in counts.index]
     fig, ax = plt.subplots(figsize=(7.0, 4.6))
@@ -328,6 +456,7 @@ def _plot_keyword_year_heatmap(keyword_year: pd.DataFrame, output_dir: Path, *, 
     data = data.dropna(subset=["keyword", "year"])
     data["year"] = data["year"].astype(int)
     data = data[(data["year"] >= RECENT_YEAR_START) & (data["year"] <= RECENT_YEAR_END)]
+    data = data[data["keyword"].map(_is_report_keyword)]
     top_keywords = data.groupby("keyword")["count"].sum().sort_values(ascending=False).head(top_n).index
     data = data[data["keyword"].isin(top_keywords)]
     pivot = data.pivot_table(index="keyword", columns="year", values="count", aggfunc="sum", fill_value=0)
@@ -358,12 +487,68 @@ def _plot_keyword_year_heatmap(keyword_year: pd.DataFrame, output_dir: Path, *, 
     }
 
 
+def _plot_keyword_momentum(keyword_year: pd.DataFrame, output_dir: Path, *, top_n: int = 12) -> dict[str, str]:
+    from matplotlib import pyplot as plt
+
+    data = keyword_year.copy()
+    data["year"] = pd.to_numeric(data["year"], errors="coerce")
+    data["count"] = pd.to_numeric(data["count"], errors="coerce").fillna(0)
+    data = data.dropna(subset=["keyword", "year"])
+    data["year"] = data["year"].astype(int)
+    data = data[(data["year"] >= RECENT_YEAR_START) & (data["year"] <= RECENT_YEAR_END)]
+    data = data[data["keyword"].map(_is_report_keyword)]
+    baseline = data[data["year"].between(RECENT_YEAR_START, RECENT_YEAR_START + 1)]
+    recent = data[data["year"].between(RECENT_YEAR_END - 2, RECENT_YEAR_END)]
+    baseline_counts = baseline.groupby("keyword")["count"].sum()
+    recent_counts = recent.groupby("keyword")["count"].sum()
+    keywords = sorted(set(baseline_counts.index).union(set(recent_counts.index)))
+    rows = []
+    for keyword in keywords:
+        baseline_value = float(baseline_counts.get(keyword, 0))
+        recent_value = float(recent_counts.get(keyword, 0))
+        if recent_value <= 0:
+            continue
+        momentum = math.log1p(recent_value) - math.log1p(baseline_value)
+        support = math.log1p(recent_value + baseline_value)
+        rows.append((keyword, momentum * support, recent_value, baseline_value))
+    rows = sorted(rows, key=lambda item: (item[1], item[2]), reverse=True)[:top_n]
+    rows = list(reversed(rows))
+
+    labels = [_wrap_label(keyword, width=28) for keyword, *_ in rows]
+    values = [score for _, score, _, _ in rows]
+    fig, ax = plt.subplots(figsize=(7.4, 4.7))
+    positions = np.arange(len(labels))
+    ax.barh(positions, values, color="0.24", height=0.6)
+    ax.set_yticks(positions, labels)
+    ax.set_xlabel("Momentum score")
+    ax.set_title(f"Emerging Keyword Momentum ({RECENT_YEAR_START}-{RECENT_YEAR_END})")
+    ax.grid(axis="x", linestyle="--")
+    max_value = max(values) if values else 1
+    for position, (_, _, recent_value, baseline_value) in zip(positions, rows, strict=False):
+        ax.text(
+            values[position] + max_value * 0.012,
+            position,
+            f"{_format_count(recent_value)} vs {_format_count(baseline_value)}",
+            va="center",
+            fontsize=7,
+        )
+    save_figure(fig, output_dir / "keyword_momentum.png")
+    return {
+        "figure_id": "keyword_momentum",
+        "file": "keyword_momentum.png",
+        "report_section": "关键词演化与热点趋势",
+        "source_table": "keyword_year_matrix.csv",
+        "message": "比较近期窗口与早期窗口的关键词升温幅度, 形成热点趋势候选榜。",
+        "status": "final",
+    }
+
+
 def _plot_author_communities(
     papers: list[dict[str, Any]],
     output_dir: Path,
     *,
-    graph_edges: int = 900,
-    communities_per_field: int = 3,
+    graph_edges: int = 25_000,
+    communities_per_field: int = 5,
 ) -> dict[str, str]:
     from matplotlib import pyplot as plt
 
@@ -377,7 +562,7 @@ def _plot_author_communities(
         graph.add_edge(author_a, author_b, weight=float(weight))
 
     communities = (
-        list(nx.algorithms.community.greedy_modularity_communities(graph, weight="weight"))
+        list(nx.algorithms.community.louvain_communities(graph, weight="weight", seed=42))
         if graph.number_of_edges()
         else []
     )
@@ -398,7 +583,7 @@ def _plot_author_communities(
         paper_key = str(paper.get("paper_id") or paper.get("title") or id(paper))
         for community_id in community_ids:
             community_papers[community_id].add(paper_key)
-            community_fields[community_id][_field_bucket(paper.get("field"))] += 1
+            community_fields[community_id][_contest_field_label(paper)] += 1
             for keyword in paper.get("keywords") or []:
                 community_keywords[community_id][str(keyword).strip().lower()] += 1
 
@@ -437,7 +622,7 @@ def _plot_author_communities(
     active_fields = [field for field in field_order if grouped.get(field)]
     used_labels: Counter[str] = Counter()
 
-    fig, ax = plt.subplots(figsize=(7.4, 4.6))
+    fig, ax = plt.subplots(figsize=(8.2, 5.7))
     shade_by_field = {
         "Computer Science": "white",
         "Biomedicine": "0.82",
@@ -447,7 +632,7 @@ def _plot_author_communities(
     for x_index, field in enumerate(active_fields):
         field_rows = grouped.get(field, [])
         for y_index, row in enumerate(field_rows):
-            y = (len(field_rows) - y_index) * 1.55
+            y = (len(field_rows) - y_index) * 1.35
             size = 280 + min(row["papers"], 120) * 7 + min(row["strength"], 40) * 12
             ax.scatter(
                 x_index,
@@ -462,22 +647,20 @@ def _plot_author_communities(
             used_labels[topic] += 1
             if used_labels[topic] > 1:
                 topic = _compact_topic(row["fallback"])
-            label = f"{_wrap_label(topic, width=15)}\n{row['members']} authors / {row['papers']} papers"
-            ax.text(x_index, y, label, ha="center", va="center", fontsize=5.7, zorder=4)
-    ax.set_title(
-        f"Author Collaboration Communities ({RECENT_YEAR_START}-{RECENT_YEAR_END}, "
-        f"core {min(graph_edges, candidate_edges):,}/{candidate_edges:,} edges)"
-    )
+            label = f"{_wrap_label(topic, width=14)}\n{row['members']} authors / {row['papers']} papers"
+            ax.text(x_index, y, label, ha="center", va="center", fontsize=5.2, zorder=4)
+    ax.set_title(f"Author Collaboration Communities (core {min(graph_edges, candidate_edges):,}/{candidate_edges:,} edges)")
     ax.set_xticks(range(len(active_fields)), active_fields)
     ax.set_yticks([])
     ax.grid(axis="x", linestyle="--", color="0.86")
     ax.set_xlim(-0.6, max(len(active_fields) - 0.4, 0.6))
     max_rows = max((len(items) for items in grouped.values()), default=1)
-    ax.set_ylim(0.3, max_rows * 1.55 + 0.9)
+    ax.set_ylim(0.3, max_rows * 1.35 + 0.9)
     ax.set_xlabel("Dominant Community Field")
     ax.text(
         0.01,
         0.015,
+        f"Window: {len(_recent_papers(papers)):,}/{len(papers):,} records. "
         f"Scope: {valid_papers:,} papers, {candidate_authors:,} authors, {candidate_edges:,} weighted coauthor edges.",
         transform=ax.transAxes,
         fontsize=6.8,
@@ -494,7 +677,53 @@ def _plot_author_communities(
     }
 
 
-def _plot_top_author_collaborations(papers: list[dict[str, Any]], output_dir: Path, *, top_n: int = 12) -> dict[str, str]:
+def _plot_author_network_scale(papers: list[dict[str, Any]], output_dir: Path, *, graph_edges: int = 25_000) -> dict[str, str]:
+    from matplotlib import pyplot as plt
+
+    scope = _recent_author_scope(papers)
+    recent_papers = len(_recent_papers(papers))
+    total_records = len(papers)
+    values = [
+        recent_papers,
+        int(scope["valid_papers"]),
+        len(scope["authors"]),
+        len(scope["edge_counts"]),
+        min(graph_edges, len(scope["edge_counts"])),
+    ]
+    labels = [
+        "Recent papers",
+        "Coauthor-valid papers",
+        "Informative authors",
+        "Weighted coauthor edges",
+        "Core graph edges",
+    ]
+    positions = np.arange(len(labels))
+
+    fig, ax = plt.subplots(figsize=(7.2, 3.8))
+    ax.barh(positions, values, color=["0.82", "0.68", "0.5", "0.28", "0.1"], edgecolor="black", linewidth=0.4)
+    ax.set_yticks(positions, labels)
+    ax.invert_yaxis()
+    ax.set_xscale("log")
+    ax.set_xlabel("Count (log scale)")
+    ax.set_title(
+        f"Author Network Scale Funnel ({RECENT_YEAR_START}-{RECENT_YEAR_END}: "
+        f"{_format_count(recent_papers)} / {_format_count(total_records)} records)"
+    )
+    ax.grid(axis="x", linestyle="--")
+    for position, value in zip(positions, values, strict=False):
+        ax.text(value * 1.05, position, _format_count(value), va="center", fontsize=7)
+    save_figure(fig, output_dir / "author_network_scale_funnel.png")
+    return {
+        "figure_id": "author_network_scale",
+        "file": "author_network_scale_funnel.png",
+        "report_section": "作者合作网络分析",
+        "source_table": "papers_clean.json",
+        "message": "展示从近五年论文到核心作者合作图的规模压缩过程。",
+        "status": "final",
+    }
+
+
+def _plot_top_author_collaborations(papers: list[dict[str, Any]], output_dir: Path, *, top_n: int = 20) -> dict[str, str]:
     from matplotlib import pyplot as plt
 
     edge_counts = _recent_author_edges(papers)
@@ -503,7 +732,7 @@ def _plot_top_author_collaborations(papers: list[dict[str, Any]], output_dir: Pa
     labels = [_wrap_label(f"{author_a} / {author_b}", width=32) for (author_a, author_b), _ in top_edges]
     values = [weight for _, weight in top_edges]
 
-    fig, ax = plt.subplots(figsize=(7.4, 4.8))
+    fig, ax = plt.subplots(figsize=(7.6, 6.2))
     positions = np.arange(len(labels))
     ax.barh(positions, values, color="0.22", height=0.58)
     ax.set_yticks(positions, labels)
@@ -581,11 +810,15 @@ def build_report_figures(
     if papers:
         manifest.append(_plot_year_distribution(papers, output_path))
         manifest.append(_plot_source_year_heatmap(papers, output_path))
+        manifest.append(_plot_field_distribution(papers, output_path))
+        manifest.append(_plot_field_year_heatmap(papers, output_path))
     if not keywords.empty:
         manifest.append(_plot_top_keywords(keywords, output_path))
     if not keyword_year.empty:
         manifest.append(_plot_keyword_year_heatmap(keyword_year, output_path))
+        manifest.append(_plot_keyword_momentum(keyword_year, output_path))
     if papers:
+        manifest.append(_plot_author_network_scale(papers, output_path))
         manifest.append(_plot_author_communities(papers, output_path))
         manifest.append(_plot_top_author_collaborations(papers, output_path))
 

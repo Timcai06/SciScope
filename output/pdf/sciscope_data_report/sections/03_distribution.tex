@@ -1,7 +1,7 @@
-\section{文献分布分析框架}
+\section{文献分布分析}
 
 \begin{reportbox}{分析目标}
-文献分布分析回答三个问题: 文献在时间上如何增长, 在领域上如何分布, 在数据来源上是否存在偏差。最终报告需要把这些问题转化为可解释图表, 让评委看到数据覆盖面和分析可信度。
+文献分布分析回答三个问题: 文献在时间上如何集中, 在计算机、生物医学、材料科学三大领域中如何分布, 以及不同公开来源是否存在明显年份偏置。
 \end{reportbox}
 
 \subsection{近五年年份分布}
@@ -10,7 +10,7 @@
 
 \begin{itemize}
   \item 近五年总量趋势线: 观察 2022--2026 的研究增长和数据覆盖断点。
-  \item 领域堆叠面积图: 比较计算机、生物医学、材料科学在近五年的年度结构变化。
+  \item 领域-年份热力图: 比较计算机、生物医学、材料科学在近五年的年度结构变化。
   \item 来源-年份热力图: 识别某些来源在近五年窗口内的年份偏置。
 \end{itemize}
 
@@ -30,17 +30,24 @@
 
 \subsection{领域分布}
 
-当前采集 query 已覆盖 AI/CS、生物医学、材料科学三条主线。最终报告需要把字段来源分成两层:
+当前采集 query 已覆盖 AI/CS、生物医学、材料科学三条主线。报告采用 \texttt{field\_seed} 作为赛题领域口径, 避免不同数据库原始学科标签粒度不一致造成统计偏移。
 
-\begin{enumerate}
-  \item \textbf{原始来源领域}: 采集 query 和数据库原始分类。
-  \item \textbf{统一归一领域}: 经过规则和模型映射后的 contest-level field。
-\end{enumerate}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.86\textwidth]{field_distribution.png}
+  \caption{三大赛题领域的文献规模分布。}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\textwidth]{field_year_heatmap.png}
+  \caption{2022--2026 三大领域年度覆盖热力图。}
+\end{figure}
 
 \begin{center}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{32mm}X}
 \toprule
-领域 & 最终应展示的分析口径 \\
+领域 & 当前统计口径 \\
 \midrule
 计算机科学 & LLM、RAG、知识图谱、图神经网络、信息检索、推荐系统 \\
 生物医学 & 药物发现、生物医学 NLP、临床知识、蛋白设计、公共卫生 \\

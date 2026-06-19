@@ -90,13 +90,17 @@ def test_build_report_figures_creates_manifest_and_pdf_assets(tmp_path):
 
     summary = build_report_figures(analysis_dir=analysis_dir, output_dir=output_dir)
 
-    assert summary["figures"] == 9
+    assert summary["figures"] == 13
     manifest = list(csv.DictReader((output_dir / "figure_manifest.csv").open(encoding="utf-8")))
-    assert len(manifest) == 9
+    assert len(manifest) == 13
     assert {row["figure_id"] for row in manifest} >= {
+        "field_distribution",
+        "field_year_heatmap",
         "source_quality",
         "source_year_heatmap",
         "keyword_evolution",
+        "keyword_momentum",
+        "author_network_scale",
         "author_communities",
         "top_author_collaborations",
     }

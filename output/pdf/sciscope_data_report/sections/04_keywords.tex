@@ -13,7 +13,7 @@
   \item 为每个关键词生成年度频次、增长率、突增分数和代表论文。
 \end{enumerate}
 
-\subsection{推荐图表}
+\subsection{当前图表}
 
 \begin{figure}[htbp]
   \centering
@@ -27,14 +27,20 @@
   \caption{2022--2026 高频关键词年度热度矩阵。每一行按自身最大值归一化, 用于观察主题升温和迁移。}
 \end{figure}
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{keyword_momentum.png}
+  \caption{2022--2026 关键词升温候选榜。}
+\end{figure}
+
 \begin{center}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{32mm}X X}
 \toprule
-图表 & 说明 & 评委看到的价值 \\
+分析项 & 当前口径 & 评委看到的价值 \\
 \midrule
 关键词 Top-K & 全局高频关键词与领域高频关键词 & 快速理解数据主题结构 \\
 关键词年度热力图 & 行为关键词, 列为年份, 值为频次或标准化热度 & 发现主题升温与降温 \\
-突增关键词榜 & 使用增长率、突发检测或 z-score 识别突然变热的词 & 显示趋势预测能力 \\
+关键词升温榜 & 比较 2024--2026 与 2022--2023 的窗口差异 & 显示趋势预测能力 \\
 主题河流图 & 展示主题簇在年份上的占比变化 & 形成故事化趋势展示 \\
 \bottomrule
 \end{tabularx}
@@ -45,7 +51,7 @@
 趋势预测不应直接声称“未来一定热门”。更稳妥的表达是:
 
 \begin{plainbox}
-基于近年频次增长、跨领域扩散、代表论文质量、作者合作密度和引用信号, 将候选方向分成“强上升”“稳定增长”“早期萌芽”“可能噪声”四类。
+基于近年频次增长、跨领域扩散、代表论文质量、作者合作密度和引用信号, 将候选方向分成“强上升”“稳定增长”“早期萌芽”“可能噪声”四类。当前 PDF 已给出关键词升温候选榜, 后续系统侧将其接入趋势 API 与自然语言解释。
 \end{plainbox}
 
 \clearpage

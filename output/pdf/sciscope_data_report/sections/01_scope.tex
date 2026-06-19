@@ -4,19 +4,19 @@
 本报告是 SciScope 项目面向赛题交付的独立数据分析报告, 目标是回答“公开科技文献数据本身揭示了什么”。它与系统设计 PDF 并列: 设计 PDF 解释智能体架构和工程路线, 本报告沉淀文献分布、关键词演化、作者合作网络、趋势预测和可复现分析结论。
 \end{reportbox}
 
-\subsection{当前底座阶段}
+\subsection{当前分析阶段}
 
-当前版本不是最终竞赛报告, 而是最终报告的结构底座。它先固定报告章节、统计口径、图表占位、数据质量说明和智能体映射关系。后续当样本从 3000 条扩展到 5 万条后, 只需要替换统计资产和结论文本, 不再重新设计文档结构。
+当前版本已经从报告底座推进到 5 万级数据分析版本。分析资产覆盖 50,498 条 raw records、49,067 条去重语料记录、40,137 条近五年智能体语料记录, 并生成文献分布、关键词演化、作者合作网络和数据质量审计图表。
 
 \begin{center}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{34mm}X X}
 \toprule
-交付维度 & 当前底座已有内容 & 后续补全内容 \\
+交付维度 & 当前已有内容 & 下一轮增强内容 \\
 \midrule
-数据来源 & OpenAlex、arXiv、PubMed、PMC、Crossref、DOAJ 六源采集入口 & Semantic Scholar、CORE 等 API-key 增强源 \\
-数据规模 & 每源 500 条, 共 3000 条本地验证样本 & 5 万条公开论文主数据集与可复现抽样集 \\
+数据来源 & OpenAlex、arXiv、PubMed、PMC、Crossref、DOAJ 六源采集 & Semantic Scholar、CORE 等 API-key 增强源 \\
+数据规模 & 50,498 条 raw records 与 49,067 条去重语料记录 & DOI/title/year 深度去重与字段补全 \\
 分析主题 & 分布、关键词、作者网络、质量审计、智能体映射 & 动态主题模型、趋势预测、图谱社区发现 \\
-报告产物 & 多章节 LaTeX 与可编译 PDF & 图表资产、最终结论、演示版摘要页 \\
+报告产物 & 多章节 LaTeX、可编译 PDF、13 张图表资产 & 评审版摘要页与前端联动展示 \\
 \bottomrule
 \end{tabularx}
 \end{center}

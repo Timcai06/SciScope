@@ -1,4 +1,4 @@
-\section{作者合作网络分析框架}
+\section{作者合作网络分析}
 
 \begin{reportbox}{分析目标}
 作者合作网络用于识别核心研究者、跨领域连接者和合作团簇。它是知识图谱查询和论文推荐解释的重要依据, 也是数据分析报告中最能体现“科研智能体”差异化的图分析部分。
@@ -32,6 +32,12 @@ Temporal Activity & 作者按年份的活跃情况 & 判断作者是否仍处于
 
 \begin{figure}[htbp]
   \centering
+  \includegraphics[width=0.9\textwidth]{author_network_scale_funnel.png}
+  \caption{2022--2026 作者合作网络规模漏斗。}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
   \includegraphics[width=0.88\textwidth]{author_collaboration_network.png}
   \caption{2022--2026 近五年作者合作社区气泡图。}
 \end{figure}
@@ -42,6 +48,6 @@ Temporal Activity & 作者按年份的活跃情况 & 判断作者是否仍处于
   \caption{2022--2026 近五年高频作者合作关系。}
 \end{figure}
 
-作者合作边由论文作者列表两两组合得到。为避免一篇大团队论文生成过多虚高边, 静态报告图仅纳入作者数不超过 12 的论文, 并对每篇论文内的合作关系使用分数化权重。全量作者合作网络包含数十万作者展开记录和百万级合作边, 直接静态绘制会变成不可读的黑团; 因此 PDF 侧展示“社区气泡 + 高频合作关系”, 前端系统侧承接可筛选、可缩放、可查询的全量交互网络。
+作者合作边由论文作者列表两两组合得到。为避免一篇大团队论文生成过多虚高边, 静态报告图仅纳入作者数不超过 12 的论文, 并对每篇论文内的合作关系使用分数化权重。当前作者社区图使用 25,000 条高权重合作边构建核心图, 既保留 50 万级候选边的规模依据, 又避免 PDF 静态图退化成不可读的全量网络。
 
 \clearpage
