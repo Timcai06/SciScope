@@ -5,15 +5,20 @@ BACKEND_HOST ?= 127.0.0.1
 BACKEND_PORT ?= 8000
 FRONTEND_PORT ?= 3000
 DATA_PATH ?= outputs/sample/papers.sample.json
+VLLM_BASE_URL ?= http://127.0.0.1:8001/v1
+VLLM_MODEL ?= mlx-community/Qwen2.5-7B-Instruct-4bit
 
 export SCISCOPE_APP_NAME ?= SciScope
 export SCISCOPE_ENV ?= local
 export SCISCOPE_DATA_PATH ?= $(DATA_PATH)
 export SCISCOPE_CORS_ORIGINS ?= http://localhost:$(FRONTEND_PORT)
 export SCISCOPE_USE_MOCK_LLM ?= true
+export SCISCOPE_LLM_PROVIDER ?= deepseek
+export LOCAL_LLM_BASE_URL ?= $(VLLM_BASE_URL)
+export LOCAL_LLM_MODEL ?= $(VLLM_MODEL)
 export NEXT_PUBLIC_SCISCOPE_API_BASE ?= http://$(BACKEND_HOST):$(BACKEND_PORT)
 
-.PHONY: help install install-backend install-frontend backend frontend dev test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend backend frontend dev dev-vllm test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -22,6 +27,7 @@ help:
 	@echo "  make backend          Start FastAPI backend on $(BACKEND_HOST):$(BACKEND_PORT)"
 	@echo "  make frontend         Start Next.js frontend on localhost:$(FRONTEND_PORT)"
 	@echo "  make dev              Start backend and frontend together"
+	@echo "  make dev-vllm         Start app using local vLLM/Metal OpenAI-compatible server"
 	@echo "  make test             Run backend tests and frontend typecheck/build"
 	@echo "  make smoke            Check backend health endpoints with curl"
 	@echo "  make clean            Remove generated frontend build artifacts"
@@ -51,6 +57,9 @@ dev:
 	@trap 'kill 0' INT TERM EXIT; \
 	$(PYTHON) -m uvicorn backend.app.main:app --reload --host $(BACKEND_HOST) --port $(BACKEND_PORT) & \
 	cd frontend && npm run dev -- --hostname 0.0.0.0 --port $(FRONTEND_PORT)
+
+dev-vllm:
+	@$(MAKE) dev SCISCOPE_USE_MOCK_LLM=false SCISCOPE_LLM_PROVIDER=vllm LOCAL_LLM_BASE_URL=$(VLLM_BASE_URL) LOCAL_LLM_MODEL=$(VLLM_MODEL)
 
 test: test-backend typecheck build
 

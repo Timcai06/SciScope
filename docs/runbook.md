@@ -118,16 +118,58 @@ make build
 
 ## DeepSeek Configuration
 
-The foundation slice is runnable in mock mode only. Keep mock mode enabled for
-all current local verification:
+The default development path uses the deterministic mock provider. Keep mock
+mode enabled for repeatable tests:
 
 ```bash
 export SCISCOPE_USE_MOCK_LLM=true
 ```
 
-Real DeepSeek HTTP integration is intentionally deferred to the next
-implementation slice. Setting `SCISCOPE_USE_MOCK_LLM=false` currently exercises
-configuration and error handling, but it will not complete a chat request.
+## Local vLLM-Metal Configuration
+
+For local model generation on Apple Silicon, run a vLLM-Metal OpenAI-compatible
+server separately, then start SciScope with the local provider.
+
+Recommended first model:
+
+```text
+mlx-community/Qwen2.5-7B-Instruct-4bit
+```
+
+Start the local model server on a port that does not conflict with the SciScope
+backend:
+
+```bash
+vllm serve mlx-community/Qwen2.5-7B-Instruct-4bit \
+  --host 127.0.0.1 \
+  --port 8001
+```
+
+Then start the full SciScope app against that local server:
+
+```bash
+make dev-vllm
+```
+
+Equivalent manual environment:
+
+```bash
+export SCISCOPE_USE_MOCK_LLM=false
+export SCISCOPE_LLM_PROVIDER=vllm
+export LOCAL_LLM_BASE_URL=http://127.0.0.1:8001/v1
+export LOCAL_LLM_MODEL=mlx-community/Qwen2.5-7B-Instruct-4bit
+make dev
+```
+
+The same provider also works with LM Studio or another OpenAI-compatible local
+server by changing `SCISCOPE_LLM_PROVIDER`, `LOCAL_LLM_BASE_URL`, and
+`LOCAL_LLM_MODEL`.
+
+## DeepSeek Configuration
+
+Real DeepSeek HTTP integration is intentionally deferred to a later
+implementation slice. Keep `SCISCOPE_LLM_PROVIDER=deepseek` only for mock mode
+or configuration/error-path tests until that provider is implemented.
 
 When real integration lands, it will use environment configuration for the API
 key, model name, and optional compatible base URL.

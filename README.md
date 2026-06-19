@@ -23,7 +23,8 @@ Next.js dashboard.
   `/api/chat`.
 - Evidence-grounded mock DeepSeek chat: the chat service retrieves relevant
   sample papers, returns answer text with evidence cards, and uses a
-  deterministic mock DeepSeek provider for local verification.
+  deterministic mock provider for local verification or an OpenAI-compatible
+  local model provider for vLLM/LM Studio.
 - Next.js dashboard shell: the frontend renders a SciScope command-center
   layout with metrics, charts, keyword panels, and evidence chat.
 - Evidence chat UI: the frontend lets users ask the indexed corpus questions
@@ -45,6 +46,13 @@ make dev
 Then open `http://localhost:3000`. The backend API docs are available at
 `http://127.0.0.1:8000/docs`.
 
+To use a local vLLM-Metal server instead of the mock provider, start vLLM on
+`127.0.0.1:8001`, then run:
+
+```bash
+make dev-vllm
+```
+
 ## Acceptance Checks
 
 Run these commands before handing off the foundation slice:
@@ -55,6 +63,6 @@ make test
 
 ## Current Limitation
 
-The foundation slice intentionally uses the mock DeepSeek provider. Real
-DeepSeek HTTP integration, including authenticated remote model calls, is
-deferred to a later implementation slice.
+The foundation slice supports mock mode and OpenAI-compatible local model
+servers such as vLLM-Metal. Real DeepSeek HTTP integration, including
+authenticated remote model calls, is deferred to a later implementation slice.
