@@ -3,93 +3,104 @@
 
 \begin{center}
 {\Huge\bfseries SciScope 科技文献智能分析报告\par}
-\vspace{4mm}
+\vspace{3mm}
 {\Large 面向科技文献智能分析的科研智能体构建\par}
+\vspace{3mm}
+{\large 赛题交付物一：数据分析报告 \quad 支撑交付物二：科研智能体系统\par}
 \vspace{4mm}
-{\large 5 万级公开科技文献数据资产 · 分布分析 · 关键词演化 · 作者合作网络\par}
-\vspace{5mm}
 \rule{0.92\textwidth}{0.75pt}
 \end{center}
 
-\vspace{4mm}
+\vspace{3mm}
 
 \begin{tikzpicture}[
   x=1mm,
   y=1mm,
   every node/.style={font=\small},
-  metricbox/.style={draw=black, fill=white, rounded corners=1.1pt, line width=0.55pt, align=left, inner sep=4.2pt},
-  darkbox/.style={draw=black, fill=black, rounded corners=1.1pt, line width=0.55pt, align=left, inner sep=4.2pt, text=white},
-  flow/.style={draw=black, fill=white, rounded corners=1.1pt, line width=0.55pt, align=center, minimum height=13mm},
-  arrow/.style={-{Latex[length=2mm]}, line width=0.55pt},
-  label/.style={font=\scriptsize\bfseries}
+  stage/.style={draw=black, fill=white, rounded corners=1.2pt, line width=0.65pt, align=left, inner sep=4.2pt, minimum height=24mm},
+  stageDark/.style={draw=black, fill=black, rounded corners=1.2pt, line width=0.65pt, align=left, inner sep=4.2pt, minimum height=24mm, text=white},
+  micro/.style={draw=black, fill=white, rounded corners=1pt, line width=0.45pt, align=center, inner sep=3.1pt},
+  badge/.style={draw=black, fill=white, rounded corners=1pt, line width=0.45pt, align=center, inner sep=2.6pt, font=\scriptsize},
+  arrow/.style={-{Latex[length=2mm]}, line width=0.7pt},
+  rail/.style={line width=0.55pt},
+  label/.style={font=\scriptsize\bfseries, anchor=west}
 ]
-  \node[metricbox, minimum width=49mm, minimum height=25mm] at (0,94) {
-    {\scriptsize RAW RECORDS}\\[-0.4mm]
-    {\LARGE\bfseries 50,498}\\[-0.4mm]
-    {\scriptsize 6 个公开来源}
+  \node[label] at (-24,100) {SCISCOPE EVIDENCE PATHWAY};
+  \draw[rail] (-24,97) -- (141,97);
+
+  \node[stage, text width=30mm, minimum width=38mm] (data) at (-5,78) {
+    {\bfseries 1. 公开文献数据层}\\[1mm]
+    OpenAlex / arXiv\\
+    PubMed / PMC\\
+    Crossref / DOAJ
   };
-  \node[metricbox, minimum width=49mm, minimum height=25mm] at (58,94) {
-    {\scriptsize DEDUP CORPUS}\\[-0.4mm]
-    {\LARGE\bfseries 49,067}\\[-0.4mm]
-    {\scriptsize 可进入智能体语料}
+  \node[stage, text width=30mm, minimum width=38mm] (asset) at (42,78) {
+    {\bfseries 2. 数据资产治理}\\[1mm]
+    去重、标准化、字段审计\\
+    作者 / 关键词 / 年份归一
   };
-  \node[metricbox, minimum width=49mm, minimum height=25mm] at (116,94) {
-    {\scriptsize RECENT WINDOW}\\[-0.4mm]
-    {\LARGE\bfseries 40,137}\\[-0.4mm]
-    {\scriptsize 2022--2026 去重语料}
+  \node[stage, text width=30mm, minimum width=38mm] (analysis) at (89,78) {
+    {\bfseries 3. 分析洞察报告}\\[1mm]
+    文献分布、关键词演化\\
+    作者合作网络
+  };
+  \node[stageDark, text width=30mm, minimum width=38mm] (agent) at (136,78) {
+    {\bfseries 4. 科研智能体承接}\\[1mm]
+    RAG 问答、趋势预测\\
+    推荐与知识图谱查询
+  };
+  \draw[arrow] (data) -- (asset);
+  \draw[arrow] (asset) -- (analysis);
+  \draw[arrow] (analysis) -- (agent);
+
+  \node[badge, minimum width=29mm] at (-5,52) {{\bfseries 50,498}\\ raw records};
+  \node[badge, minimum width=29mm] at (42,52) {{\bfseries 49,067}\\ 去重语料};
+  \node[badge, minimum width=29mm] at (89,52) {{\bfseries 13}\\ 报告图表};
+  \node[badge, minimum width=29mm] at (136,52) {{\bfseries 40,137}\\ 近五年语料};
+
+  \draw[rail] (-5,65) -- (-5,58);
+  \draw[rail] (42,65) -- (42,58);
+  \draw[rail] (89,65) -- (89,58);
+  \draw[rail] (136,65) -- (136,58);
+
+  \node[label] at (-24,35) {WHAT THE JURY CAN VERIFY};
+  \draw[rail] (-24,32) -- (141,32);
+  \node[micro, text width=36mm, minimum width=42mm, minimum height=18mm] at (-1,19) {
+    {\bfseries 数据真实性}\\
+    6 源公开采集，可复现 raw JSONL
+  };
+  \node[micro, text width=36mm, minimum width=42mm, minimum height=18mm] at (47,19) {
+    {\bfseries 分析完整性}\\
+    分布、关键词、作者网络覆盖赛题要求
+  };
+  \node[micro, text width=36mm, minimum width=42mm, minimum height=18mm] at (95,19) {
+    {\bfseries 图谱与趋势基础}\\
+    503,598 条候选合作边与热点演化矩阵
+  };
+  \node[micro, text width=36mm, minimum width=42mm, minimum height=18mm] at (143,19) {
+    {\bfseries 系统转化价值}\\
+    数据资产直接进入 RAG、推荐、趋势 API
   };
 
-  \node[metricbox, minimum width=49mm, minimum height=25mm] at (0,62) {
-    {\scriptsize REPORT FIGURES}\\[-0.4mm]
-    {\LARGE\bfseries 13}\\[-0.4mm]
-    {\scriptsize 分布 / 关键词 / 作者网络}
+  \node[draw=black, fill=white, rounded corners=1pt, line width=0.5pt, text width=77mm, align=left, inner sep=4pt] at (19,-11) {
+    {\bfseries 交付物一：数据分析报告}\\
+    已展示 5 万级文献分布、关键词演化、作者合作社区、数据质量审计与智能体映射。
   };
-  \node[metricbox, minimum width=49mm, minimum height=25mm] at (58,62) {
-    {\scriptsize AUTHOR GRAPH}\\[-0.4mm]
-    {\LARGE\bfseries 503,598}\\[-0.4mm]
-    {\scriptsize 加权候选合作边}
-  };
-  \node[darkbox, minimum width=49mm, minimum height=25mm] at (116,62) {
-    {\scriptsize DATA GAP}\\[-0.4mm]
-    {\LARGE\bfseries 10,458}\\[-0.4mm]
-    {\scriptsize 正文片段距 15k 目标}
-  };
-
-  \node[label, anchor=west] at (-24,38) {REPRODUCIBLE DATA FLOW};
-  \draw[line width=0.65pt] (-24,35) -- (141,35);
-  \node[flow, minimum width=28mm] (raw) at (-10,24) {Raw JSONL\\公开源采集};
-  \node[flow, minimum width=28mm] (clean) at (27,24) {Clean Corpus\\去重 / 标准化};
-  \node[flow, minimum width=28mm] (assets) at (64,24) {Analysis Assets\\表格 / 图表};
-  \node[flow, minimum width=28mm] (models) at (101,24) {RAG Assets\\chunks / index};
-  \node[flow, minimum width=28mm] (agent) at (138,24) {Agent Tools\\问答 / 推荐 / 趋势};
-  \draw[arrow] (raw) -- (clean);
-  \draw[arrow] (clean) -- (assets);
-  \draw[arrow] (assets) -- (models);
-  \draw[arrow] (models) -- (agent);
-
-  \node[metricbox, minimum width=78mm, minimum height=22mm, text width=70mm, anchor=north west] at (-24,5) {
-    {\bfseries 当前结论}\\
-    已形成 5 万级文献分析报告底座；领域、年份、关键词、作者合作网络均可由 Makefile 复现。
-  };
-  \node[metricbox, minimum width=78mm, minimum height=22mm, text width=70mm, anchor=north west] at (63,5) {
-    {\bfseries 今晚主线}\\
-    均衡 2022--2025 年份分布，增加正文证据，补齐 DOI、venue、URL、text provenance 与 chunk 字段。
+  \node[draw=black, fill=white, rounded corners=1pt, line width=0.5pt, text width=77mm, align=left, inner sep=4pt] at (101,-11) {
+    {\bfseries 交付物二：科研智能体系统}\\
+    后端/前端/本地模型接口已具备基础链路，下一步以均衡数据和正文证据增强 RAG 与 Agent。
   };
 \end{tikzpicture}
 
 \vfill
 
 \begin{center}
-\begin{tabularx}{0.92\textwidth}{>{\bfseries}p{28mm}X}
+\begin{tabularx}{0.92\textwidth}{>{\bfseries}p{26mm}X}
 \toprule
-文档性质 & 赛题交付物中的数据分析报告 \\
-当前版本 & 5 万级分析版: 50,498 条 raw records, 49,067 条去重语料记录 \\
-后续演进 & 继续补齐正文、均衡年份分布、增强 RAG 字段与 Agent 索引资产 \\
-设计约束 & 黑白、可复现、章节化 LaTeX、多文件编译 \\
+评审定位 & 面向赛题验收的数据分析报告，证明数据规模、分析深度和系统转化能力 \\
+当前证据 & 50,498 条 raw records，49,067 条去重语料，13 张报告图表，503,598 条作者合作候选边 \\
+后续增强 & 补齐正文证据、均衡 2022--2025 年份分布、完善 DOI/venue/URL/chunk 等 RAG 字段 \\
 \bottomrule
 \end{tabularx}
-
-\vspace{5mm}
-{\small 生成位置: \texttt{output/pdf/sciscope\_data\_report/sciscope\_data\_report.pdf}\par}
 \end{center}
 \end{titlepage}
