@@ -33,13 +33,13 @@ Temporal Activity & 作者按年份的活跃情况 & 判断作者是否仍处于
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.88\textwidth]{author_collaboration_network.png}
-  \caption{2022--2026 近五年作者合作社区气泡图。气泡代表由高权重合作关系聚合得到的合作社区, 气泡大小综合覆盖论文数与社区内部合作强度。}
+  \caption{2022--2026 近五年作者合作社区气泡图。}
 \end{figure}
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.9\textwidth]{top_author_collaborations.png}
-  \caption{2022--2026 近五年高频作者合作关系。边权采用分数化合作权重, 用于降低超长作者列表对静态图表的支配。}
+  \caption{2022--2026 近五年高频作者合作关系。}
 \end{figure}
 
 作者合作边由论文作者列表两两组合得到。为避免一篇大团队论文生成过多虚高边, 静态报告图仅纳入作者数不超过 12 的论文, 并对每篇论文内的合作关系使用分数化权重。全量作者合作网络包含数十万作者展开记录和百万级合作边, 直接静态绘制会变成不可读的黑团; 因此 PDF 侧展示“社区气泡 + 高频合作关系”, 前端系统侧承接可筛选、可缩放、可查询的全量交互网络。

@@ -29,6 +29,10 @@ RECENT_YEAR_START = 2022
 RECENT_YEAR_END = 2026
 
 
+def _format_count(value: int | float) -> str:
+    return f"{int(value):,}"
+
+
 def _year_value(value: Any) -> int | None:
     if str(value or "").isdigit():
         return int(value)
@@ -56,7 +60,15 @@ def _is_informative_author(name: str) -> bool:
 
 
 def _recent_author_edges(papers: list[dict[str, Any]], *, max_authors: int = 12) -> Counter[tuple[str, str]]:
+    return _recent_author_scope(papers, max_authors=max_authors)["edge_counts"]
+
+
+def _recent_author_scope(papers: list[dict[str, Any]], *, max_authors: int = 12) -> dict[str, Any]:
     edge_counts: Counter[tuple[str, str]] = Counter()
+    author_names: set[str] = set()
+    valid_papers = 0
+    skipped_long = 0
+    no_pair = 0
     for paper in _recent_papers(papers):
         authors = [
             str(author).strip()
@@ -64,12 +76,24 @@ def _recent_author_edges(papers: list[dict[str, Any]], *, max_authors: int = 12)
             if str(author).strip() and _is_informative_author(str(author))
         ]
         authors = sorted(set(authors))
-        if len(authors) < 2 or len(authors) > max_authors:
+        if len(authors) < 2:
+            no_pair += 1
             continue
+        if len(authors) > max_authors:
+            skipped_long += 1
+            continue
+        valid_papers += 1
+        author_names.update(authors)
         fractional_weight = 1 / math.sqrt(len(authors) - 1)
         for author_a, author_b in combinations(authors, 2):
             edge_counts[(author_a, author_b)] += fractional_weight
-    return edge_counts
+    return {
+        "edge_counts": edge_counts,
+        "authors": author_names,
+        "valid_papers": valid_papers,
+        "skipped_long": skipped_long,
+        "no_pair": no_pair,
+    }
 
 
 def _field_bucket(value: Any) -> str:
@@ -146,13 +170,14 @@ def _plot_source_records(quality: pd.DataFrame, output_dir: Path) -> dict[str, s
     from matplotlib import pyplot as plt
 
     data = quality.sort_values("records", ascending=True)
+    total_records = int(data["records"].sum())
     fig, ax = plt.subplots(figsize=(6.6, 3.2))
     ax.barh(data["source"], data["records"], color="0.25", height=0.58)
-    ax.set_title("Source Record Coverage")
+    ax.set_title(f"Source Record Coverage (n={_format_count(total_records)})")
     ax.set_xlabel("Records")
     ax.grid(axis="x", linestyle="--")
     for index, value in enumerate(data["records"]):
-        ax.text(value + max(data["records"]) * 0.01, index, str(int(value)), va="center", fontsize=8)
+        ax.text(value + max(data["records"]) * 0.01, index, _format_count(value), va="center", fontsize=8)
     save_figure(fig, output_dir / "source_records_bar.png")
     return {
         "figure_id": "source_records",
@@ -202,15 +227,22 @@ def _plot_year_distribution(papers: list[dict[str, Any]], output_dir: Path) -> d
     counts = Counter(year for year in years if year is not None and RECENT_YEAR_START <= year <= RECENT_YEAR_END)
     ordered_years = list(range(RECENT_YEAR_START, RECENT_YEAR_END + 1))
     values = [counts[year] for year in ordered_years]
+    total_recent = sum(values)
 
     fig, ax = plt.subplots(figsize=(7.2, 3.4))
     ax.plot(ordered_years, values, color="black", linewidth=1.5, marker="o", markersize=2.8)
     ax.fill_between(ordered_years, values, color="0.88")
-    ax.set_title(f"Publication Year Distribution ({RECENT_YEAR_START}-{RECENT_YEAR_END})")
+    ax.set_title(
+        f"Publication Year Distribution ({RECENT_YEAR_START}-{RECENT_YEAR_END}, n={_format_count(total_recent)})"
+    )
     ax.set_xlabel("Year")
     ax.set_ylabel("Papers")
     ax.grid(axis="y", linestyle="--")
     ax.set_xticks(ordered_years)
+    max_value = max(values) if values else 1
+    for year, value in zip(ordered_years, values, strict=False):
+        if value:
+            ax.text(year, value + max_value * 0.025, _format_count(value), ha="center", va="bottom", fontsize=7)
     save_figure(fig, output_dir / "year_distribution.png")
     return {
         "figure_id": "year_distribution",
@@ -218,6 +250,46 @@ def _plot_year_distribution(papers: list[dict[str, Any]], output_dir: Path) -> d
         "report_section": "文献分布分析",
         "source_table": "papers_clean.json",
         "message": "聚焦近五年有效年份, 过滤历史和未来年份噪声。",
+        "status": "final",
+    }
+
+
+def _plot_source_year_heatmap(papers: list[dict[str, Any]], output_dir: Path) -> dict[str, str]:
+    from matplotlib import pyplot as plt
+
+    recent = _recent_papers(papers)
+    preferred_sources = ["arxiv", "pubmed", "pmc", "crossref", "doaj", "openalex"]
+    seen_sources = {str(paper.get("source") or "unknown").lower() for paper in recent}
+    sources = [source for source in preferred_sources if source in seen_sources]
+    sources.extend(sorted(seen_sources.difference(sources)))
+    years = list(range(RECENT_YEAR_START, RECENT_YEAR_END + 1))
+    counts = Counter(
+        (str(paper.get("source") or "unknown").lower(), _year_value(paper.get("year")))
+        for paper in recent
+    )
+    matrix = np.array([[counts[(source, year)] for year in years] for source in sources], dtype=float)
+    total_recent = int(matrix.sum())
+
+    fig, ax = plt.subplots(figsize=(7.2, 3.8))
+    image = ax.imshow(matrix, cmap="Greys", aspect="auto")
+    ax.set_title(f"Source-Year Coverage ({RECENT_YEAR_START}-{RECENT_YEAR_END}, n={_format_count(total_recent)})")
+    ax.set_xticks(range(len(years)), years)
+    ax.set_yticks(range(len(sources)), sources)
+    max_value = float(matrix.max()) if matrix.size else 0
+    threshold = max_value * 0.62
+    for row_index in range(matrix.shape[0]):
+        for col_index in range(matrix.shape[1]):
+            value = int(matrix[row_index, col_index])
+            color = "white" if value > threshold else "black"
+            ax.text(col_index, row_index, _format_count(value), ha="center", va="center", color=color, fontsize=6.5)
+    fig.colorbar(image, ax=ax, fraction=0.028, pad=0.02, label="Records")
+    save_figure(fig, output_dir / "source_year_heatmap.png")
+    return {
+        "figure_id": "source_year_heatmap",
+        "file": "source_year_heatmap.png",
+        "report_section": "文献分布分析",
+        "source_table": "papers_clean.json",
+        "message": "展示近五年来源-年份覆盖规模, 直接暴露采集年份偏置。",
         "status": "final",
     }
 
@@ -295,7 +367,11 @@ def _plot_author_communities(
 ) -> dict[str, str]:
     from matplotlib import pyplot as plt
 
-    edge_counts = _recent_author_edges(papers)
+    scope = _recent_author_scope(papers)
+    edge_counts = scope["edge_counts"]
+    candidate_edges = len(edge_counts)
+    candidate_authors = len(scope["authors"])
+    valid_papers = int(scope["valid_papers"])
     graph = nx.Graph()
     for (author_a, author_b), weight in edge_counts.most_common(graph_edges):
         graph.add_edge(author_a, author_b, weight=float(weight))
@@ -388,7 +464,10 @@ def _plot_author_communities(
                 topic = _compact_topic(row["fallback"])
             label = f"{_wrap_label(topic, width=15)}\n{row['members']} authors / {row['papers']} papers"
             ax.text(x_index, y, label, ha="center", va="center", fontsize=5.7, zorder=4)
-    ax.set_title(f"Author Collaboration Communities ({RECENT_YEAR_START}-{RECENT_YEAR_END})")
+    ax.set_title(
+        f"Author Collaboration Communities ({RECENT_YEAR_START}-{RECENT_YEAR_END}, "
+        f"core {min(graph_edges, candidate_edges):,}/{candidate_edges:,} edges)"
+    )
     ax.set_xticks(range(len(active_fields)), active_fields)
     ax.set_yticks([])
     ax.grid(axis="x", linestyle="--", color="0.86")
@@ -399,7 +478,7 @@ def _plot_author_communities(
     ax.text(
         0.01,
         0.015,
-        "Bubble size combines covered papers and internal collaboration strength.",
+        f"Scope: {valid_papers:,} papers, {candidate_authors:,} authors, {candidate_edges:,} weighted coauthor edges.",
         transform=ax.transAxes,
         fontsize=6.8,
         color="0.25",
@@ -419,6 +498,7 @@ def _plot_top_author_collaborations(papers: list[dict[str, Any]], output_dir: Pa
     from matplotlib import pyplot as plt
 
     edge_counts = _recent_author_edges(papers)
+    candidate_edges = len(edge_counts)
     top_edges = edge_counts.most_common(top_n)
     labels = [_wrap_label(f"{author_a} / {author_b}", width=32) for (author_a, author_b), _ in top_edges]
     values = [weight for _, weight in top_edges]
@@ -429,7 +509,10 @@ def _plot_top_author_collaborations(papers: list[dict[str, Any]], output_dir: Pa
     ax.set_yticks(positions, labels)
     ax.invert_yaxis()
     ax.set_xlabel("Fractional Collaboration Weight")
-    ax.set_title(f"Top Repeated Author Collaborations ({RECENT_YEAR_START}-{RECENT_YEAR_END})")
+    ax.set_title(
+        f"Top Repeated Author Collaborations "
+        f"(top {len(top_edges)}/{_format_count(candidate_edges)} weighted edges)"
+    )
     ax.grid(axis="x", linestyle="--")
     max_value = max(values) if values else 1
     for position, value in zip(positions, values, strict=False):
@@ -497,6 +580,7 @@ def build_report_figures(
         manifest.append(_plot_text_coverage(quality, output_path))
     if papers:
         manifest.append(_plot_year_distribution(papers, output_path))
+        manifest.append(_plot_source_year_heatmap(papers, output_path))
     if not keywords.empty:
         manifest.append(_plot_top_keywords(keywords, output_path))
     if not keyword_year.empty:
