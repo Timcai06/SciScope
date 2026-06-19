@@ -25,7 +25,7 @@ Next.js dashboard.
   sample papers, returns answer text with evidence cards, and uses a
   deterministic mock DeepSeek provider for local verification.
 - Next.js dashboard shell: the frontend renders a SciScope command-center
-  layout with metrics, charts, keyword panels, and corpus status.
+  layout with metrics, charts, keyword panels, and evidence chat.
 - Evidence chat UI: the frontend lets users ask the indexed corpus questions
   and review returned answers, confidence, and cited paper evidence.
 
