@@ -29,6 +29,7 @@ output/pdf/**/*.synctex.gz
 output/pdf/**/*.toc
 output/pdf/**/*.xdv
 data/raw/**/*.jsonl
+data/raw/**/*.tmp
 data/processed/*.json
 data/processed/*.jsonl
 data/processed/*.parquet

@@ -3,7 +3,7 @@ import json
 import pytest
 
 from src.harvest.normalize import normalize_raw_jsonl, openalex_work_to_paper, paper_wrapper_to_paper
-from src.harvest.public_sources import SUPPORTED_SOURCES, default_raw_path, pmc_summary_record_to_item
+from src.harvest.public_sources import SUPPORTED_SOURCES, _write_wrappers, default_raw_path, pmc_summary_record_to_item
 
 
 def _openalex_wrapper():
@@ -191,6 +191,30 @@ def test_paper_wrapper_to_paper_supports_public_sources(source, wrapper, expecte
 
 def test_default_raw_path_separates_sources_and_limits():
     assert str(default_raw_path("arxiv", 500)) == "data/raw/arxiv/arxiv_500.jsonl"
+
+
+def test_write_wrappers_keeps_existing_output_when_new_harvest_is_smaller(tmp_path):
+    output = tmp_path / "raw.jsonl"
+    old_lines = [
+        json.dumps({"source_id": "old-1"}),
+        json.dumps({"source_id": "old-2"}),
+    ]
+    output.write_text("\n".join(old_lines) + "\n", encoding="utf-8")
+
+    def fetch_query(_field, _query, _limit):
+        return [{"source_id": "new-1", "raw": {"title": "New Paper"}}]
+
+    count = _write_wrappers(
+        output_path=output,
+        source="test",
+        limit=1,
+        fetch_query=fetch_query,
+        queries=[("field", "query")],
+    )
+
+    assert count == 2
+    assert output.read_text(encoding="utf-8") == "\n".join(old_lines) + "\n"
+    assert not output.with_name("raw.jsonl.tmp").exists()
 
 
 def test_pmc_summary_record_to_item_preserves_metadata_when_full_text_is_unavailable():

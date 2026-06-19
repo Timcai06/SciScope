@@ -8,6 +8,7 @@ import time
 import xml.etree.ElementTree as ET
 from http.client import IncompleteRead, RemoteDisconnected
 from datetime import UTC, datetime
+from itertools import islice
 from pathlib import Path
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
@@ -75,6 +76,13 @@ CROSSREF_URL = "https://api.crossref.org/works"
 SEMANTIC_SCHOLAR_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
 DOAJ_URL = "https://doaj.org/api/search/articles"
 CORE_URL = "https://api.core.ac.uk/v3/search/works"
+ARXIV_BATCH_SIZE = 100
+ARXIV_SLEEP_SECONDS = 5.0
+NCBI_EFETCH_BATCH_SIZE = 100
+NCBI_ESUMMARY_BATCH_SIZE = 200
+CROSSREF_BATCH_SIZE = 1000
+DOAJ_BATCH_SIZE = 100
+DOAJ_QUERY_RESULT_CAP = 1000
 
 
 class HarvestError(RuntimeError):
@@ -83,6 +91,19 @@ class HarvestError(RuntimeError):
 
 def _progress(message: str) -> None:
     print(f"[harvest] {message}", file=sys.stderr, flush=True)
+
+
+def _batched(values: list[str], size: int):
+    iterator = iter(values)
+    while batch := list(islice(iterator, size)):
+        yield batch
+
+
+def _line_count(path: Path) -> int:
+    if not path.exists():
+        return 0
+    with path.open("r", encoding="utf-8") as handle:
+        return sum(1 for _ in handle)
 
 
 def utc_now() -> str:
@@ -115,7 +136,7 @@ def _request_json(
             if exc.code not in {429, 500, 502, 503, 504} or attempt == 3:
                 raise last_error from exc
             time.sleep(float(exc.headers.get("Retry-After") or attempt * 10))
-        except (URLError, IncompleteRead, RemoteDisconnected) as exc:
+        except (TimeoutError, URLError, IncompleteRead, RemoteDisconnected) as exc:
             last_error = HarvestError(f"{url} request failed: {exc}")
             if attempt == 3:
                 raise last_error from exc
@@ -137,7 +158,7 @@ def _request_xml(url: str, params: dict[str, Any], *, timeout: int = 45) -> ET.E
             if exc.code not in {429, 500, 502, 503, 504} or attempt == 3:
                 raise last_error from exc
             time.sleep(float(exc.headers.get("Retry-After") or attempt * 10))
-        except (URLError, IncompleteRead, RemoteDisconnected, ET.ParseError) as exc:
+        except (TimeoutError, URLError, IncompleteRead, RemoteDisconnected, ET.ParseError) as exc:
             last_error = HarvestError(f"{url} request failed: {exc}")
             if attempt == 3:
                 raise last_error from exc
@@ -180,9 +201,11 @@ def _write_wrappers(
     target_per_query = max(1, (limit + len(query_plan) - 1) // len(query_plan))
     seen: set[str] = set()
     written = 0
+    existing_records = _line_count(output)
     _progress(f"{source}: start limit={limit} output={output}")
+    temp_output = output.with_name(f"{output.name}.tmp")
 
-    with output.open("w", encoding="utf-8") as handle:
+    with temp_output.open("w", encoding="utf-8") as handle:
         def write_items(
             field: str,
             query: str,
@@ -216,7 +239,10 @@ def _write_wrappers(
                 break
             _progress(f"{source}: query='{query}' field='{field}' target={query_limit} total={written}/{limit}")
             before = written
-            write_items(field, query, query_limit, fetch_query)
+            try:
+                write_items(field, query, query_limit, fetch_query)
+            except HarvestError as exc:
+                _progress(f"{source}: query='{query}' skipped after error: {exc}")
             _progress(f"{source}: query='{query}' wrote={written - before} total={written}/{limit}")
             if written >= limit:
                 break
@@ -227,41 +253,66 @@ def _write_wrappers(
             backfill_fetch = backfill_fetch_query or fetch_query
             _progress(f"{source}: backfill query='{query}' field='{field}' target={query_limit} total={written}/{limit}")
             before = written
-            write_items(field, query, query_limit, backfill_fetch)
+            try:
+                write_items(field, query, query_limit, backfill_fetch)
+            except HarvestError as exc:
+                _progress(f"{source}: backfill query='{query}' skipped after error: {exc}")
             _progress(f"{source}: backfill query='{query}' wrote={written - before} total={written}/{limit}")
 
-    _progress(f"{source}: done records={written} output={output}")
-    return written
+    if written >= existing_records:
+        temp_output.replace(output)
+        _progress(f"{source}: done records={written} output={output}")
+        return written
+
+    temp_output.unlink(missing_ok=True)
+    _progress(
+        f"{source}: kept existing output records={existing_records}; "
+        f"new records={written} was lower output={output}"
+    )
+    return existing_records
 
 
 def _arxiv_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
-    root = _request_xml(
-        ARXIV_URL,
-        {
-            "search_query": f"all:{query}",
-            "start": 0,
-            "max_results": query_limit,
-            "sortBy": "submittedDate",
-            "sortOrder": "descending",
-        },
-    )
     ns = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
     items: list[dict[str, Any]] = []
-    for entry in root.findall("atom:entry", ns):
-        entry_id = _text(entry.find("atom:id", ns))
-        raw = {
-            "id": entry_id,
-            "title": _text(entry.find("atom:title", ns)),
-            "summary": _text(entry.find("atom:summary", ns)),
-            "authors": [_text(author.find("atom:name", ns)) for author in entry.findall("atom:author", ns)],
-            "published": _text(entry.find("atom:published", ns)),
-            "updated": _text(entry.find("atom:updated", ns)),
-            "categories": [category.attrib.get("term", "") for category in entry.findall("atom:category", ns)],
-            "doi": _text(entry.find("arxiv:doi", ns)),
-            "source_id": entry_id,
-        }
-        items.append({"source_id": entry_id, "raw": raw})
-    time.sleep(3.0)
+    for start in range(0, query_limit, ARXIV_BATCH_SIZE):
+        batch_size = min(ARXIV_BATCH_SIZE, query_limit - start)
+        _progress(f"arxiv: fetch query='{query}' start={start} batch={batch_size}")
+        try:
+            root = _request_xml(
+                ARXIV_URL,
+                {
+                    "search_query": f"all:{query}",
+                    "start": start,
+                    "max_results": batch_size,
+                    "sortBy": "submittedDate",
+                    "sortOrder": "descending",
+                },
+                timeout=90,
+            )
+        except HarvestError as exc:
+            if items:
+                _progress(f"arxiv: partial query='{query}' stopped after error: {exc}")
+                break
+            raise
+        entries = root.findall("atom:entry", ns)
+        if not entries:
+            break
+        for entry in entries:
+            entry_id = _text(entry.find("atom:id", ns))
+            raw = {
+                "id": entry_id,
+                "title": _text(entry.find("atom:title", ns)),
+                "summary": _text(entry.find("atom:summary", ns)),
+                "authors": [_text(author.find("atom:name", ns)) for author in entry.findall("atom:author", ns)],
+                "published": _text(entry.find("atom:published", ns)),
+                "updated": _text(entry.find("atom:updated", ns)),
+                "categories": [category.attrib.get("term", "") for category in entry.findall("atom:category", ns)],
+                "doi": _text(entry.find("arxiv:doi", ns)),
+                "source_id": entry_id,
+            }
+            items.append({"source_id": entry_id, "raw": raw})
+        time.sleep(ARXIV_SLEEP_SECONDS)
     return items
 
 
@@ -295,33 +346,36 @@ def _pubmed_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, A
     ids = _ncbi_search_ids("pubmed", query, query_limit)
     if not ids:
         return []
-    root = _request_xml(
-        NCBI_EFETCH_URL,
-        {**_ncbi_base_params(), "retmode": "xml", "db": "pubmed", "id": ",".join(ids)},
-    )
     items: list[dict[str, Any]] = []
-    for article in root.findall(".//PubmedArticle"):
-        pmid = _first_text(article, [".//PMID"])
-        authors: list[str] = []
-        for author in article.findall(".//AuthorList/Author"):
-            collective = _first_text(author, ["CollectiveName"])
-            name = collective or " ".join(
-                part for part in [_first_text(author, ["ForeName"]), _first_text(author, ["LastName"])] if part
-            )
-            if name:
-                authors.append(name)
-        raw = {
-            "pmid": pmid,
-            "title": _first_text(article, [".//ArticleTitle"]),
-            "abstract": " ".join(_text(node) for node in article.findall(".//Abstract/AbstractText")),
-            "authors": authors,
-            "year": _first_text(article, [".//PubDate/Year", ".//ArticleDate/Year"]),
-            "keywords": [_text(node) for node in article.findall(".//KeywordList/Keyword")],
-            "journal": _first_text(article, [".//Journal/Title"]),
-            "doi": _first_text(article, [".//ArticleId[@IdType='doi']"]),
-        }
-        items.append({"source_id": pmid, "raw": raw})
-    time.sleep(0.35)
+    for batch in _batched(ids, NCBI_EFETCH_BATCH_SIZE):
+        _progress(f"pubmed: efetch query='{query}' batch={len(batch)}")
+        root = _request_xml(
+            NCBI_EFETCH_URL,
+            {**_ncbi_base_params(), "retmode": "xml", "db": "pubmed", "id": ",".join(batch)},
+            timeout=90,
+        )
+        for article in root.findall(".//PubmedArticle"):
+            pmid = _first_text(article, [".//PMID"])
+            authors: list[str] = []
+            for author in article.findall(".//AuthorList/Author"):
+                collective = _first_text(author, ["CollectiveName"])
+                name = collective or " ".join(
+                    part for part in [_first_text(author, ["ForeName"]), _first_text(author, ["LastName"])] if part
+                )
+                if name:
+                    authors.append(name)
+            raw = {
+                "pmid": pmid,
+                "title": _first_text(article, [".//ArticleTitle"]),
+                "abstract": " ".join(_text(node) for node in article.findall(".//Abstract/AbstractText")),
+                "authors": authors,
+                "year": _first_text(article, [".//PubDate/Year", ".//ArticleDate/Year"]),
+                "keywords": [_text(node) for node in article.findall(".//KeywordList/Keyword")],
+                "journal": _first_text(article, [".//Journal/Title"]),
+                "doi": _first_text(article, [".//ArticleId[@IdType='doi']"]),
+            }
+            items.append({"source_id": pmid, "raw": raw})
+        time.sleep(0.35)
     return items
 
 
@@ -333,40 +387,44 @@ def _pmc_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any]
     ids = _ncbi_search_ids("pmc", query, query_limit)
     if not ids:
         return []
-    root = _request_xml(
-        NCBI_EFETCH_URL,
-        {**_ncbi_base_params(), "retmode": "xml", "db": "pmc", "id": ",".join(ids)},
-    )
     items: list[dict[str, Any]] = []
     parsed_ids: set[str] = set()
-    for index, article in enumerate(root.findall(".//{*}article")):
-        pmc_id = _first_text(article, [".//{*}article-id[@pub-id-type='pmc']"])
-        source_id = f"PMC{pmc_id}" if pmc_id and not pmc_id.startswith("PMC") else pmc_id
-        if not source_id and index < len(ids):
-            source_id = f"PMC{ids[index]}"
-        parsed_ids.add(source_id)
-        paragraphs = [_text(node) for node in article.findall(".//{*}body//{*}p")]
-        raw = {
-            "pmcid": source_id,
-            "title": _first_text(article, [".//{*}article-title"]),
-            "abstract": " ".join(_text(node) for node in article.findall(".//{*}abstract")),
-            "authors": [
-                " ".join(
-                    part for part in [_first_text(author, [".//{*}given-names"]), _first_text(author, [".//{*}surname"])]
-                    if part
-                )
-                for author in article.findall(".//{*}contrib[@contrib-type='author']")
-            ],
-            "year": _first_text(article, [".//{*}pub-date/{*}year"]),
-            "keywords": [_text(node) for node in article.findall(".//{*}kwd")],
-            "doi": _first_text(article, [".//{*}article-id[@pub-id-type='doi']"]),
-            "body_excerpt": " ".join(paragraphs)[:2500],
-        }
-        items.append({"source_id": source_id, "raw": raw})
+    for batch in _batched(ids, NCBI_EFETCH_BATCH_SIZE):
+        _progress(f"pmc: efetch query='{query}' batch={len(batch)}")
+        root = _request_xml(
+            NCBI_EFETCH_URL,
+            {**_ncbi_base_params(), "retmode": "xml", "db": "pmc", "id": ",".join(batch)},
+            timeout=120,
+        )
+        for index, article in enumerate(root.findall(".//{*}article")):
+            pmc_id = _first_text(article, [".//{*}article-id[@pub-id-type='pmc']"])
+            source_id = f"PMC{pmc_id}" if pmc_id and not pmc_id.startswith("PMC") else pmc_id
+            if not source_id and index < len(batch):
+                source_id = f"PMC{batch[index]}"
+            parsed_ids.add(source_id)
+            paragraphs = [_text(node) for node in article.findall(".//{*}body//{*}p")]
+            raw = {
+                "pmcid": source_id,
+                "title": _first_text(article, [".//{*}article-title"]),
+                "abstract": " ".join(_text(node) for node in article.findall(".//{*}abstract")),
+                "authors": [
+                    " ".join(
+                        part
+                        for part in [_first_text(author, [".//{*}given-names"]), _first_text(author, [".//{*}surname"])]
+                        if part
+                    )
+                    for author in article.findall(".//{*}contrib[@contrib-type='author']")
+                ],
+                "year": _first_text(article, [".//{*}pub-date/{*}year"]),
+                "keywords": [_text(node) for node in article.findall(".//{*}kwd")],
+                "doi": _first_text(article, [".//{*}article-id[@pub-id-type='doi']"]),
+                "body_excerpt": " ".join(paragraphs)[:2500],
+            }
+            items.append({"source_id": source_id, "raw": raw})
+        time.sleep(0.35)
     missing_ids = [pmc_id for pmc_id in ids if f"PMC{pmc_id}" not in parsed_ids and pmc_id not in parsed_ids]
     if missing_ids:
         items.extend(_pmc_summary_fetch(missing_ids))
-    time.sleep(0.35)
     return items
 
 
@@ -399,18 +457,21 @@ def pmc_summary_record_to_item(record: dict[str, Any]) -> dict[str, Any]:
 def _pmc_summary_fetch(ids: list[str]) -> list[dict[str, Any]]:
     if not ids:
         return []
-    payload = _request_json(
-        NCBI_ESUMMARY_URL,
-        {**_ncbi_base_params(), "retmode": "json", "db": "pmc", "id": ",".join(ids)},
-    )
-    result = payload.get("result") or {}
     items: list[dict[str, Any]] = []
-    for uid in result.get("uids") or []:
-        record = result.get(uid) or {}
-        item = pmc_summary_record_to_item(record)
-        if item["source_id"]:
-            items.append(item)
-    time.sleep(0.35)
+    for batch in _batched(ids, NCBI_ESUMMARY_BATCH_SIZE):
+        _progress(f"pmc: esummary batch={len(batch)}")
+        payload = _request_json(
+            NCBI_ESUMMARY_URL,
+            {**_ncbi_base_params(), "retmode": "json", "db": "pmc", "id": ",".join(batch)},
+            timeout=90,
+        )
+        result = payload.get("result") or {}
+        for uid in result.get("uids") or []:
+            record = result.get(uid) or {}
+            item = pmc_summary_record_to_item(record)
+            if item["source_id"]:
+                items.append(item)
+        time.sleep(0.35)
     return items
 
 
@@ -436,23 +497,33 @@ def _crossref_fetch(_field: str, query: str, query_limit: int) -> list[dict[str,
     headers = {}
     if email := os.getenv("CROSSREF_EMAIL"):
         headers["User-Agent"] = f"SciScopeHarvester/0.1 (mailto:{email})"
-    payload = _request_json(
-        CROSSREF_URL,
-        {
-            "query": query,
-            "rows": query_limit,
-            "sort": "published",
-            "order": "desc",
-            "filter": "from-pub-date:2020-01-01,type:journal-article",
-        },
-        headers=headers,
-    )
     items: list[dict[str, Any]] = []
-    for work in (payload.get("message") or {}).get("items") or []:
-        doi = str(work.get("DOI") or "").strip()
-        if doi:
-            items.append({"source_id": doi, "raw": work})
-    time.sleep(1.0)
+    for offset in range(0, query_limit, CROSSREF_BATCH_SIZE):
+        rows = min(CROSSREF_BATCH_SIZE, query_limit - offset)
+        _progress(f"crossref: fetch query='{query}' offset={offset} rows={rows}")
+        payload = _request_json(
+            CROSSREF_URL,
+            {
+                "query": query,
+                "rows": rows,
+                "offset": offset,
+                "sort": "published",
+                "order": "desc",
+                "filter": "from-pub-date:2020-01-01,type:journal-article",
+            },
+            headers=headers,
+            timeout=90,
+        )
+        batch = (payload.get("message") or {}).get("items") or []
+        if not batch:
+            break
+        for work in batch:
+            doi = str(work.get("DOI") or "").strip()
+            if doi:
+                items.append({"source_id": doi, "raw": work})
+        if len(batch) < rows:
+            break
+        time.sleep(1.0)
     return items
 
 
@@ -488,14 +559,29 @@ def harvest_semantic_scholar(*, output_path: str | Path, limit: int) -> int:
 
 
 def _doaj_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
-    page_size = min(query_limit, 100)
+    query_limit = min(query_limit, DOAJ_QUERY_RESULT_CAP)
+    page_size = min(query_limit, DOAJ_BATCH_SIZE)
     url = f"{DOAJ_URL}/{quote(query)}"
-    payload = _request_json(url, {"page": 1, "pageSize": page_size})
-    results = payload.get("results") or []
-    return [
-        {"source_id": str(article.get("id") or article.get("bibjson", {}).get("identifier", [{}])[0].get("id") or ""), "raw": article}
-        for article in results
-    ]
+    items: list[dict[str, Any]] = []
+    page = 1
+    while len(items) < query_limit:
+        _progress(f"doaj: fetch query='{query}' page={page} page_size={page_size}")
+        payload = _request_json(url, {"page": page, "pageSize": min(page_size, query_limit - len(items))}, timeout=90)
+        results = payload.get("results") or []
+        if not results:
+            break
+        items.extend(
+            {
+                "source_id": str(article.get("id") or article.get("bibjson", {}).get("identifier", [{}])[0].get("id") or ""),
+                "raw": article,
+            }
+            for article in results
+        )
+        if len(results) < page_size:
+            break
+        page += 1
+        time.sleep(0.5)
+    return items
 
 
 def harvest_doaj(*, output_path: str | Path, limit: int) -> int:
