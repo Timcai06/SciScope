@@ -90,9 +90,14 @@ def test_build_report_figures_creates_manifest_and_pdf_assets(tmp_path):
 
     summary = build_report_figures(analysis_dir=analysis_dir, output_dir=output_dir)
 
-    assert summary["figures"] == 7
+    assert summary["figures"] == 8
     manifest = list(csv.DictReader((output_dir / "figure_manifest.csv").open(encoding="utf-8")))
-    assert len(manifest) == 7
-    assert {row["figure_id"] for row in manifest} >= {"source_quality", "keyword_evolution", "author_collaboration"}
+    assert len(manifest) == 8
+    assert {row["figure_id"] for row in manifest} >= {
+        "source_quality",
+        "keyword_evolution",
+        "author_communities",
+        "top_author_collaborations",
+    }
     for row in manifest:
         assert (output_dir / row["file"]).exists()
