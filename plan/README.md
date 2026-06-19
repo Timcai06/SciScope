@@ -22,14 +22,15 @@ The plan is organized around the contest's two required outcomes:
 - [08-infra-and-runtime.md](08-infra-and-runtime.md): runtime profiles, PostgreSQL plan, DeepSeek/local vLLM strategy.
 - [09-delivery-and-acceptance.md](09-delivery-and-acceptance.md): final deliverables, scoring strategy, and acceptance checklist.
 - [10-next-sprint.md](10-next-sprint.md): immediate sprint to move from foundation slice to real public data.
+- [11-tonight-data-layer-sprint.md](11-tonight-data-layer-sprint.md): immediate data-layer sprint for year balance, full-text enrichment, and RAG schema readiness.
 
 ## Immediate Next Step
 
-Start with [10-next-sprint.md](10-next-sprint.md).
+Start with [11-tonight-data-layer-sprint.md](11-tonight-data-layer-sprint.md).
 
 The next sprint goal is:
 
-> Harvest 500 real public paper records, normalize them, generate first analysis assets, and serve them through the existing SciScope backend/frontend foundation.
+> Improve the 50k data asset layer by balancing non-2026 years, increasing evidence text coverage, and preparing RAG/Agent-oriented fields.
 
 ## Current Critical Decision
 

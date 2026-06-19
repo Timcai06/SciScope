@@ -1,17 +1,34 @@
-\section{后续补数与报告完善路线}
+\section{数据层补强与下一步路线}
 
-\begin{reportbox}{下一阶段目标}
-当前已经跨过约 5 万篇公开论文数据资产基线。下一阶段重点不是继续堆数量, 而是把数据清洗、近五年趋势洞察、作者社区发现和智能体证据链做深, 让 PDF 中每个结论都可由代码复现。
+\begin{reportbox}{今晚优先级}
+当前已经跨过约 5 万篇公开论文数据资产基线。下一阶段重点不是继续堆总量, 而是修正年份偏置、提升正文证据覆盖、补齐 RAG/Agent 所需字段, 让后续问答、推荐、趋势和图谱模块建立在更可靠的数据底座上。
 \end{reportbox}
 
-\subsection{优先级}
+\subsection{数据层缺口}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{38mm}r X}
+\toprule
+缺口 & 当前数值 & 下一步动作 \\
+\midrule
+2022 年记录 & 1,472 & 年份过滤回补, 目标接近 8k--10k \\
+2023 年记录 & 1,690 & 年份过滤回补, 避免继续扩大 2026 偏置 \\
+2024 年记录 & 2,416 & 分来源、分领域回补 \\
+2025 年记录 & 4,915 & 补足到与其他年份同一量级 \\
+正文片段记录 & 4,542 & PMC/CORE/开放全文增强, 阶段目标 15k \\
+RAG 增强字段 & 未完全落表 & DOI、venue、URL、引用数、text provenance、chunk 字段 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{执行优先级}
 
 \begin{enumerate}
-  \item 固化 \texttt{papers\_corpus\_50k.json} 为智能体检索、推荐、趋势分析的统一语料入口。
-  \item 深化 DOI/title/year 去重与字段补全 pipeline, 对作者、机构、年份异常进行质量审计。
-  \item 在当前图表资产之上补充领域分布、突增关键词、主题模型和社区发现结果。
-  \item 将作者合作网络从静态核心子图升级为前端交互式全量图谱查询。
-  \item 将报告资产接入前端 Dashboard、Trends、Graph 与 Ask, 形成产品化演示闭环。
+  \item 跑 \texttt{make data-layer-audit}, 固化年份、正文、字段覆盖缺口。
+  \item 建立 2022--2025 年份均衡回补批次, 暂停继续追加 2026-heavy 数据。
+  \item 扩展正文与证据片段来源, 先把 full-text/evidence records 推向 15k。
+  \item 升级 canonical schema, 显式落 \texttt{doi}, \texttt{venue}, \texttt{url}, \texttt{citation\_count}, \texttt{text\_source}, \texttt{chunk\_count}。
+  \item 在稳定数据层上构建 RAG chunks、FTS/vector index、趋势模型、推荐特征和图谱资产。
 \end{enumerate}
 
 \subsection{最终报告验收清单}

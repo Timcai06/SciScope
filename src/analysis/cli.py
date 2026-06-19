@@ -41,6 +41,19 @@ def _build_corpus(args: argparse.Namespace) -> None:
     print(json.dumps(summary, ensure_ascii=False))
 
 
+def _build_readiness(args: argparse.Namespace) -> None:
+    from src.analysis.data_readiness import build_data_readiness_report
+
+    summary = build_data_readiness_report(
+        papers_path=args.papers,
+        output_path=args.output,
+        year_start=args.year_start,
+        year_end=args.year_end,
+        target_per_year=args.target_per_year,
+    )
+    print(json.dumps(summary, ensure_ascii=False))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sciscope-analysis")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -64,6 +77,14 @@ def build_parser() -> argparse.ArgumentParser:
     corpus.add_argument("--year-start", type=int, default=2022)
     corpus.add_argument("--year-end", type=int, default=2026)
     corpus.set_defaults(func=_build_corpus)
+
+    readiness = subparsers.add_parser("readiness", help="Audit corpus readiness for balanced data and RAG assets")
+    readiness.add_argument("--papers", type=Path, default=Path("data/analysis/papers_clean.json"))
+    readiness.add_argument("--output", type=Path, default=Path("output/assets/sciscope_data_report/data_layer_readiness.json"))
+    readiness.add_argument("--year-start", type=int, default=2022)
+    readiness.add_argument("--year-end", type=int, default=2026)
+    readiness.add_argument("--target-per-year", type=int, default=10000)
+    readiness.set_defaults(func=_build_readiness)
 
     return parser
 

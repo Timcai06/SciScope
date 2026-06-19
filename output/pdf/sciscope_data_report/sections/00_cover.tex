@@ -3,20 +3,22 @@
 {\Huge\bfseries SciScope 科技文献智能分析报告\par}
 \vspace{6mm}
 {\Large 面向科技文献智能分析的科研智能体构建\par}
-\vspace{10mm}
-\rule{0.86\textwidth}{0.6pt}
-\vspace{10mm}
+\vspace{6mm}
+{\large 5 万级公开科技文献数据资产 · 分布分析 · 关键词演化 · 作者合作网络\par}
+\vspace{8mm}
+\rule{0.9\textwidth}{0.7pt}
+\vspace{9mm}
 
 \begin{tikzpicture}[
   node distance=7mm,
   every node/.style={font=\small},
-  flowstep/.style={draw=black, fill=white, rounded corners=2pt, minimum width=34mm, minimum height=12mm, align=center},
+  flowstep/.style={draw=black, fill=white, rounded corners=1.2pt, minimum width=35mm, minimum height=13mm, align=center, line width=0.55pt},
   arrow/.style={-{Latex[length=2mm]}, thick}
 ]
-  \node[flowstep] (data) {多源数据\\OpenAlex / arXiv / PubMed};
-  \node[flowstep, right=8mm of data] (asset) {标准化资产\\论文 / 作者 / 关键词};
-  \node[flowstep, right=8mm of asset] (analysis) {分析洞察\\分布 / 演化 / 网络};
-  \node[flowstep, below=9mm of analysis] (agent) {智能体调用\\问答 / 推荐 / 趋势};
+  \node[flowstep] (data) {50,498 raw records\\6 个公开来源};
+  \node[flowstep, right=7mm of data] (asset) {49,067 去重语料\\论文 / 作者 / 关键词};
+  \node[flowstep, right=7mm of asset] (analysis) {13 张报告图表\\分布 / 演化 / 网络};
+  \node[flowstep, below=9mm of analysis] (agent) {RAG / Agent 底座\\问答 / 推荐 / 趋势};
   \draw[arrow] (data) -- (asset);
   \draw[arrow] (asset) -- (analysis);
   \draw[arrow] (analysis) -- (agent);
@@ -26,9 +28,9 @@
 
 \begin{tabularx}{0.86\textwidth}{>{\bfseries}p{32mm}X}
 \toprule
-文档性质 & 赛题交付物中的数据分析报告底座 \\
-当前版本 & 基线版: 以 6 个公共源共 3000 条样本为验证数据 \\
-后续演进 & 扩展至 5 万条公开论文, 补充图表、模型结果和最终结论 \\
+文档性质 & 赛题交付物中的数据分析报告 \\
+当前版本 & 5 万级分析版: 50,498 条 raw records, 49,067 条去重语料记录 \\
+后续演进 & 继续补齐正文、均衡年份分布、增强 RAG 字段与 Agent 索引资产 \\
 设计约束 & 黑白、可复现、章节化 LaTeX、多文件编译 \\
 \bottomrule
 \end{tabularx}
