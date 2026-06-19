@@ -26,9 +26,14 @@ def _iter_wrappers(
         for path in paths:
             if not path.exists():
                 continue
-            for line in path.read_text(encoding="utf-8").splitlines():
-                if line.strip():
-                    yield json.loads(line)
+            with path.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    if not line.strip():
+                        continue
+                    try:
+                        yield json.loads(line)
+                    except json.JSONDecodeError:
+                        yield None
 
 
 def _dedupe_key(paper: dict[str, Any], wrapper: dict[str, Any]) -> str:
@@ -73,10 +78,18 @@ def build_analysis_assets(
     seen: set[str] = set()
     input_records = 0
     duplicates = 0
+    invalid_records = 0
 
     for wrapper in _iter_wrappers(raw_path, sources=sources, filename_template=filename_template):
         input_records += 1
-        paper = _paper_with_source(wrapper)
+        if wrapper is None:
+            invalid_records += 1
+            continue
+        try:
+            paper = _paper_with_source(wrapper)
+        except (ValueError, TypeError, KeyError):
+            invalid_records += 1
+            continue
         key = _dedupe_key(paper, wrapper)
         if key in seen:
             duplicates += 1
@@ -186,6 +199,7 @@ def build_analysis_assets(
         "input_records": input_records,
         "papers": len(papers),
         "duplicates": duplicates,
+        "invalid_records": invalid_records,
         "sources": sorted({paper.get("source") for paper in papers if paper.get("source")}),
         "paper_authors": len(paper_authors),
         "paper_keywords": len(paper_keywords),

@@ -256,5 +256,20 @@ def test_normalize_raw_jsonl_writes_processed_json(tmp_path):
     stats = normalize_raw_jsonl(raw_path, output_path)
     papers = json.loads(output_path.read_text(encoding="utf-8"))
 
-    assert stats == {"input_records": 1, "output_records": 1, "duplicates": 0}
+    assert stats == {"input_records": 1, "output_records": 1, "duplicates": 0, "invalid_records": 0}
+    assert papers[0]["paper_id"] == "W123"
+
+
+def test_normalize_raw_jsonl_skips_invalid_lines(tmp_path):
+    raw_path = tmp_path / "works.jsonl"
+    output_path = tmp_path / "papers.json"
+    raw_path.write_text(
+        json.dumps(_openalex_wrapper(), ensure_ascii=False) + "\n" + '{"source": "openalex", "raw": "truncated\n',
+        encoding="utf-8",
+    )
+
+    stats = normalize_raw_jsonl(raw_path, output_path)
+    papers = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert stats == {"input_records": 2, "output_records": 1, "duplicates": 0, "invalid_records": 1}
     assert papers[0]["paper_id"] == "W123"

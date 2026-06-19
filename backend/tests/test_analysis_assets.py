@@ -75,6 +75,7 @@ def test_build_analysis_assets_creates_report_ready_tables(tmp_path):
     assert summary["input_records"] == 3
     assert summary["papers"] == 2
     assert summary["duplicates"] == 1
+    assert summary["invalid_records"] == 0
     assert set(summary["sources"]) == {"pubmed", "doaj"}
 
     papers = json.loads(output_dir.joinpath("papers_clean.json").read_text(encoding="utf-8"))
@@ -141,5 +142,30 @@ def test_build_analysis_assets_can_select_source_filename_template(tmp_path):
 
     assert summary["input_records"] == 1
     assert summary["papers"] == 1
+    assert summary["invalid_records"] == 0
     papers = json.loads(output_dir.joinpath("papers_clean.json").read_text(encoding="utf-8"))
     assert papers[0]["paper_id"] == "REAL"
+
+
+def test_build_analysis_assets_skips_invalid_jsonl_lines(tmp_path):
+    raw_dir = tmp_path / "raw"
+    output_dir = tmp_path / "analysis"
+    pubmed_dir = raw_dir / "pubmed"
+    pubmed_dir.mkdir(parents=True)
+    pubmed_dir.joinpath("pubmed_500.jsonl").write_text(
+        json.dumps(_wrapper("REAL", title="Real Paper", year=2024, authors=["Real Author"], keywords=["rag"]))
+        + "\n"
+        + '{"source": "pubmed", "raw": "truncated\n',
+        encoding="utf-8",
+    )
+
+    summary = build_analysis_assets(
+        raw_dir=raw_dir,
+        output_dir=output_dir,
+        sources=("pubmed",),
+        filename_template="{source}_500.jsonl",
+    )
+
+    assert summary["input_records"] == 2
+    assert summary["papers"] == 1
+    assert summary["invalid_records"] == 1

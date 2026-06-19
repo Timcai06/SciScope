@@ -230,22 +230,29 @@ def normalize_raw_jsonl(input_path: str | Path, output_path: str | Path) -> dict
     seen: set[str] = set()
     input_count = 0
     duplicate_count = 0
-    for line in source.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        input_count += 1
-        wrapper = json.loads(line)
-        paper = paper_wrapper_to_paper(wrapper)
-        dedupe_key = paper["paper_id"] or f"{paper['title']}::{paper['year']}"
-        if dedupe_key in seen:
-            duplicate_count += 1
-            continue
-        seen.add(dedupe_key)
-        papers.append(paper)
+    invalid_count = 0
+    with source.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            input_count += 1
+            try:
+                wrapper = json.loads(line)
+                paper = paper_wrapper_to_paper(wrapper)
+            except (json.JSONDecodeError, ValueError, TypeError, KeyError):
+                invalid_count += 1
+                continue
+            dedupe_key = paper["paper_id"] or f"{paper['title']}::{paper['year']}"
+            if dedupe_key in seen:
+                duplicate_count += 1
+                continue
+            seen.add(dedupe_key)
+            papers.append(paper)
 
     output.write_text(json.dumps(papers, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return {
         "input_records": input_count,
         "output_records": len(papers),
         "duplicates": duplicate_count,
+        "invalid_records": invalid_count,
     }
