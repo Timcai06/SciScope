@@ -1,0 +1,38 @@
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+\vspace*{12mm}
+{\Huge\bfseries SciScope 科技文献智能分析报告\\与科研智能体系统设计\par}
+\vspace{6mm}
+{\Large 内部架构与设计思路文档\par}
+\vspace{8mm}
+{\large \tagpill{数据分析报告} \quad
+\tagpill{科研智能体模型} \quad
+\tagpill{RAG 与知识图谱} \quad
+\tagpill{AI Infra 支撑}\par}
+\vspace{16mm}
+
+\begin{tikzpicture}[
+  node distance=8mm,
+  every node/.style={font=\small},
+  box/.style={draw=black, fill=white, rounded corners=3pt, minimum height=14mm, align=center},
+  arrow/.style={-{Latex[length=2.2mm]}, thick, color=black}
+]
+  \node[box, minimum width=34mm] (data) {论文数据\\元数据 / 摘要 / 作者 / 年份 / 关键词};
+  \node[box, minimum width=37mm, right=10mm of data, very thick] (analysis) {数据分析报告\\分布 / 演化 / 合作网络 / 热点};
+  \node[box, minimum width=37mm, right=10mm of analysis, very thick] (agent) {科研智能体\\问答 / 推荐 / 预测 / 图谱查询};
+  \node[box, minimum width=48mm, below=15mm of analysis, double] (infra) {AI Infra 支撑层\\DeepSeek / 本地 vLLM / Makefile / 可降级运行};
+  \draw[arrow] (data) -- (analysis);
+  \draw[arrow] (analysis) -- (agent);
+  \draw[arrow] (infra) -- (analysis);
+  \draw[arrow] (infra) -- (agent);
+\end{tikzpicture}
+
+\vfill
+\begin{designbox}{文档定位}
+这不是交付给评委的最终分析报告, 而是团队内部用于统一架构、模型、数据、工程路线和产品边界的设计文档。最终对外交付仍然必须落在两条主线上: 可复现的数据分析报告, 以及可运行的科研智能体系统。AI Infra 很重要, 但它只服务于主线能力。
+\end{designbox}
+\vspace{6mm}
+{\small 版本: 多文件 LaTeX 重构稿 \quad 日期: 2026-06-19}
+\end{titlepage}
+\clearpage

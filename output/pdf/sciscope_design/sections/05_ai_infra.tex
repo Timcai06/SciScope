@@ -1,0 +1,73 @@
+\section{AI Infra 架构思路}
+
+\begin{designbox}{定位校准}
+AI Infra 是 SciScope 的工程可靠性和差异化加分项, 不是替代数据分析报告与科研智能体模型的主线。它的目标是让同一套智能体能力可以在三种环境下运行: Mock 快速验收, 本地 vLLM 离线运行, DeepSeek 高质量生成。
+\end{designbox}
+
+\subsection{三档运行 profile}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{28mm}X X}
+\toprule
+Profile & 用途 & 技术路径 \\
+\midrule
+Lite & 无模型环境下快速启动与 CI 验收 & Mock provider + 预置证据 + 轻量索引 \\
+Local & 本机离线演示与 Infra 展示 & M5 Pro + vLLM-Metal + 本地 embedding + 轻量知识底座 \\
+DeepSeek & 正式效果与复杂中文综述 & DeepSeek API + 本地检索证据 + 引用约束生成 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{M5 单机优先, i5 可选增强}
+
+\begin{tikzpicture}[
+  node distance=6mm,
+  every node/.style={font=\small},
+  box/.style={draw=black, fill=white, rounded corners=2pt, align=center, minimum width=38mm, minimum height=11mm},
+  arrow/.style={-{Latex[length=2mm]}, thick, color=black}
+]
+  \node[box, very thick] (m5) {M5 主系统\\前端 / 后端 / 检索 / LLM};
+  \node[box, left=14mm of m5] (data) {轻量数据底座\\SQLite / DuckDB / LanceDB};
+  \node[box, right=14mm of m5, densely dashed] (i5) {i5 可选控制面\\UI / 文件中转 / 批处理};
+  \node[box, below=12mm of m5, double] (router) {Model Router\\Mock / vLLM / DeepSeek};
+  \draw[arrow] (data) -- (m5);
+  \draw[arrow,densely dashed] (i5) -- node[above,font=\scriptsize] {可选接入} (m5);
+  \draw[arrow] (router) -- (m5);
+\end{tikzpicture}
+
+\begin{plainbox}
+\begin{itemize}
+  \item 基础链路必须在 M5 单机完整跑通, 包括前端、后端、RAG、趋势 API 和模型 provider。
+  \item i5 不承担关键路径, 只作为可选控制面、静态图谱托管或离线批处理节点。
+  \item PostgreSQL 与 Qdrant 不进入默认依赖, 仅作为增强模式或后续生产化选项。
+  \item Makefile 是工程入口, 评审、开发和演示都通过清晰命令启动。
+\end{itemize}
+\end{plainbox}
+
+\subsection{模型 provider 路由}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{p{33mm}X X}
+\toprule
+Provider & 适合场景 & 注意事项 \\
+\midrule
+Mock & CI、无网、首次启动、接口验收 & 必须明确标记, 不代表最终回答质量 \\
+vLLM-Metal 0.5B & 本地链路 smoke, 端口和 OpenAI-compatible API 验证 & 速度快, 质量有限 \\
+vLLM-Metal 7B & 本机离线演示, 强调 M5 推理能力 & 需要模型下载和预热 \\
+DeepSeek & 正式生成、中文综述、复杂推理 & 需要 API Key 与网络环境 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Infra 应该服务的产品指标}
+
+\begin{plainbox}
+\begin{itemize}
+  \item \textbf{启动确定性}: 一条命令能启动对应 profile, 端口和模型状态可检查。
+  \item \textbf{回答可追溯}: 无论 provider 是 DeepSeek 还是本地模型, 答案都必须绑定本地检索证据。
+  \item \textbf{失败可降级}: DeepSeek 不可用时能切回本地 vLLM 或 Mock, 系统不崩。
+  \item \textbf{硬件友好}: 老 i5 不被设计为关键数据库中枢, M5 统一内存优先给模型与向量计算。
+\end{itemize}
+\end{plainbox}
+
+\clearpage

@@ -1,0 +1,74 @@
+\section{科研智能体系统设计}
+
+\begin{designbox}{产品定位}
+科研智能体不是一个普通聊天框, 而是一个围绕科技文献构建的研究工作台。它要把数据分析报告中的静态洞察转化为可交互能力: 用户能继续追问、筛选证据、跳转图谱、获得推荐, 并理解答案来自哪些文献。
+\end{designbox}
+
+\subsection{核心能力矩阵}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{30mm}X X}
+\toprule
+能力 & 用户体验 & 后端能力 \\
+\midrule
+文献问答 & 用户用自然语言询问某个方向的研究现状, 系统返回答案与证据卡 & 混合检索、RAG 合成、引用校验 \\
+趋势预测 & 用户询问未来哪些方向值得关注, 系统返回趋势解释与依据 & 关键词时序、主题增长率、突增检测 \\
+论文推荐 & 用户输入兴趣主题或一篇论文, 系统推荐相关论文并解释原因 & 向量相似、主题相似、作者关系、时间加权排序 \\
+知识图谱查询 & 用户查询作者、机构、关键词、主题之间的关系 & 图谱索引、NetworkX 预计算、前端图谱渲染 \\
+综述辅助 & 用户要求生成某方向的初步综述框架 & 证据聚合、主题分组、引用约束生成 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Agentic Workflow}
+
+\begin{tikzpicture}[
+  node distance=6mm,
+  every node/.style={font=\small},
+  box/.style={draw=black, fill=white, rounded corners=2pt, align=center, minimum width=30mm, minimum height=10mm},
+  arrow/.style={-{Latex[length=2mm]}, thick, color=black}
+]
+  \node[box, very thick] (q) {用户问题};
+  \node[box, right=6mm of q] (planner) {Planner\\意图识别};
+  \node[box, right=6mm of planner] (retriever) {Retriever\\混合检索};
+  \node[box, below=7mm of retriever] (kg) {Graph Agent\\图谱查询};
+  \node[box, double, left=6mm of kg] (trend) {Trend Agent\\趋势分析};
+  \node[box, below=7mm of planner] (synth) {Synthesis Agent\\证据合成};
+  \node[box, densely dashed, left=6mm of synth] (critic) {Critic\\引用校验};
+  \node[box, very thick, left=6mm of critic] (answer) {答案\\证据卡};
+  \draw[arrow] (q) -- (planner);
+  \draw[arrow] (planner) -- (retriever);
+  \draw[arrow] (retriever) -- (kg);
+  \draw[arrow] (retriever) -- (synth);
+  \draw[arrow] (kg) -- (synth);
+  \draw[arrow,double] (trend) -- (synth);
+  \draw[arrow,densely dashed] (synth) -- (critic);
+  \draw[arrow] (critic) -- (answer);
+\end{tikzpicture}
+
+\subsection{API 与模块边界}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{p{34mm}X X}
+\toprule
+接口或模块 & 输入 & 输出 \\
+\midrule
+\texttt{/api/chat} & 问题、筛选条件、会话上下文 & 答案、证据、引用论文、检索诊断 \\
+\texttt{/api/trends} & 关键词、主题、时间范围、领域 & 趋势曲线、突增词、预测说明 \\
+\texttt{/api/recommend} & 论文 id、主题描述、用户偏好 & 推荐列表、推荐理由、相似度分解 \\
+\texttt{/api/graph} & 作者、关键词、主题、机构查询 & 节点、边、社区、中心性指标 \\
+\texttt{/api/dashboard} & 数据集版本、过滤条件 & 报告指标、图表数据、质量诊断 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{可信答案原则}
+
+\begin{itemize}
+  \item 答案必须绑定证据卡, 证据卡必须能追溯到论文标题、年份、作者和片段。
+  \item 趋势判断必须同时给出数据依据和不确定性, 避免把短期波动说成确定结论。
+  \item 推荐结果必须解释“为什么推荐”, 至少包含主题相似、关键词重叠、作者关系或时间新鲜度之一。
+  \item 图谱查询必须区分真实合作边、关键词共现边和模型推断关系。
+\end{itemize}
+
+\clearpage

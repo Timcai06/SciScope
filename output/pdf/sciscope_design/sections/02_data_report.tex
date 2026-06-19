@@ -1,0 +1,69 @@
+\section{数据分析报告设计}
+
+\begin{designbox}{报告目标}
+数据分析报告要回答“这批科技文献本身揭示了什么”。它不是系统截图集合, 而是由 Python 分析代码可复现生成的研究洞察报告。报告中的每个图表都应能追溯到数据处理脚本、统计口径和中间资产。
+\end{designbox}
+
+\subsection{分析主题}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{30mm}X X}
+\toprule
+分析主题 & 关键问题 & 推荐图表 \\
+\midrule
+文献分布分析 & 不同年份、领域、来源、关键词的数量结构如何变化 & 年份趋势线、领域堆叠图、关键词 Top-K 表 \\
+关键词演化 & 哪些关键词在近年变热, 哪些主题在衰退或迁移 & 关键词时序热力图、突增词榜、主题河流图 \\
+作者合作网络 & 哪些作者或机构是核心节点, 合作团簇如何形成 & 合作网络图、中心性排行、社区划分图 \\
+主题结构分析 & 文献可被分成哪些主题, 主题之间如何关联 & 主题聚类图、主题关键词表、主题间相似矩阵 \\
+热点趋势预测 & 未来一段时间哪些方向可能继续升温 & 热点预测表、增长率曲线、置信说明 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{可复现分析流水线}
+
+\begin{tikzpicture}[
+  node distance=5mm,
+  every node/.style={font=\small},
+  flowstep/.style={draw=black, fill=white, rounded corners=2pt, minimum width=31mm, minimum height=10mm, align=center},
+  arrow/.style={-{Latex[length=2mm]}, thick, color=black}
+]
+  \node[flowstep] (ingest) {Ingest\\读取与校验};
+  \node[flowstep, right=5mm of ingest] (normalize) {Normalize\\清洗与标准化};
+  \node[flowstep, right=5mm of normalize] (enrich) {Enrich\\切块与特征};
+  \node[flowstep, right=5mm of enrich] (analyze) {Analyze\\统计与建模};
+  \node[flowstep, below=8mm of analyze, double] (report) {Report\\图表与结论};
+  \draw[arrow] (ingest) -- (normalize);
+  \draw[arrow] (normalize) -- (enrich);
+  \draw[arrow] (enrich) -- (analyze);
+  \draw[arrow] (analyze) -- (report);
+\end{tikzpicture}
+
+\subsection{数据资产设计}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{p{34mm}X X}
+\toprule
+资产 & 内容 & 用途 \\
+\midrule
+\texttt{papers.parquet} & 标准化论文元数据, 包括标题、摘要、作者、年份、关键词、领域 & 仪表盘统计、筛选、领域对比 \\
+\texttt{chunks.parquet} & 摘要或全文片段, 保留论文 id、年份、领域、作者上下文 & RAG 检索、证据卡片、摘要问答 \\
+\texttt{keyword\_year.csv} & 关键词按年份聚合后的频次、增长率和突增标记 & 关键词演化、热点检测、趋势图 \\
+\texttt{author\_graph.json} & 作者节点、合作边、中心性、社区编号 & 作者合作网络、图谱查询 \\
+\texttt{topic\_model.json} & 主题编号、主题词、代表论文、年份分布 & 主题聚类、综述生成、推荐解释 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{报告结构草案}
+
+\begin{enumerate}
+  \item 数据概览: 样本规模、字段完整度、年份覆盖、领域覆盖。
+  \item 文献分布: 年份趋势、领域结构、关键词总体排行。
+  \item 主题演化: 动态主题、突增关键词、领域间主题迁移。
+  \item 作者合作: 合作网络、核心作者、社区结构、跨领域合作。
+  \item 热点预测: 高增长主题、潜在研究机会、风险与不确定性。
+  \item 系统映射: 报告中的每类洞察如何被智能体调用和解释。
+\end{enumerate}
+
+\clearpage

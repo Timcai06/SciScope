@@ -1,0 +1,55 @@
+\section{实施路线与风险控制}
+
+\begin{designbox}{实施策略}
+先把 1 万样本做成稳定、可复现、可演示的闭环, 再扩展到 5 万全量。每个阶段都必须产生可检查资产, 避免只完成界面或只完成算法而没有端到端价值。
+\end{designbox}
+
+\subsection{阶段路线}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{24mm}X X}
+\toprule
+阶段 & 目标 & 验收物 \\
+\midrule
+Phase 1 & 样本数据清洗与报告骨架 & processed 数据表、基础统计、报告章节草稿 \\
+Phase 2 & 检索与问答闭环 & chunk、FTS、向量索引、\texttt{/api/chat} 证据返回 \\
+Phase 3 & 趋势与推荐模型 & 关键词时序、主题模型、推荐排序、趋势 API \\
+Phase 4 & 图谱与 GraphRAG & 作者图谱、关键词共现图、图谱查询、图谱辅助问答 \\
+Phase 5 & 产品化与 Infra 加固 & 工作台联动、DeepSeek、本地 vLLM、Makefile 验收 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{关键风险}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{p{33mm}X X}
+\toprule
+风险 & 表现 & 控制方式 \\
+\midrule
+偏离赛题主线 & 过度讲 AI Infra, 数据分析和智能体能力不足 & 任何 Infra 章节都必须回扣问答、趋势、推荐或图谱 \\
+数据报告空泛 & 图表漂亮但统计口径不可复现 & 所有图表由 Python 脚本生成, 保留中间资产 \\
+RAG 答案幻觉 & 回答像综述但缺乏具体文献证据 & 强制证据卡、引用校验、答案和片段绑定 \\
+本地模型质量不足 & 小模型能跑但回答弱 & 正式质量使用 DeepSeek, 本地模型用于离线与 Infra 展示 \\
+老 i5 拖累链路 & PostgreSQL、Docker 或向量库安装不稳定 & 默认 M5 单机, i5 只做可选增强 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{架构决策记录}
+
+\begin{plainbox}
+\begin{itemize}
+  \item \textbf{默认轻量数据底座}: 用 SQLite、DuckDB、Parquet、LanceDB 或 FAISS 支撑 1 万到 5 万论文规模。
+  \item \textbf{DeepSeek 是正式生成后端}: 用它保证中文综述、复杂推理和演示效果。
+  \item \textbf{本地 vLLM 是可降级后端}: 用它证明系统可本地运行, 并作为无网兜底。
+  \item \textbf{i5 是可选节点}: 它展示协同架构思路, 但不成为系统生命线。
+  \item \textbf{报告和系统共享资产}: 数据分析报告不是孤岛, 智能体也必须调用同一批统计、索引和图谱资产。
+\end{itemize}
+\end{plainbox}
+
+\subsection{最终状态定义}
+
+\begin{designbox}{完成标准}
+当且仅当我们能从样本数据生成分析资产, 用这些资产生成报告图表, 启动科研智能体系统, 通过自然语言查询得到有证据的答案, 并展示趋势预测、论文推荐和图谱查询时, SciScope 才算真正跑在主线上。AI Infra 的完成标准是让这些能力更稳定, 而不是替代这些能力。
+\end{designbox}

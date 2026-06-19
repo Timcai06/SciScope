@@ -1,0 +1,66 @@
+\section{工程交付设计}
+
+\begin{designbox}{交付原则}
+最终交付不是一个孤立 PDF, 也不是一个只能在开发机上运行的 demo。它应是一套可复现工程包: 数据处理代码生成分析资产, 后端服务消费这些资产, 前端工作台展示与交互, 模型 provider 提供可切换生成能力。
+\end{designbox}
+
+\subsection{交付物清单}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{31mm}X}
+\toprule
+交付物 & 内容 \\
+\midrule
+数据分析报告 & 文献分布、关键词演化、作者合作网络、主题结构、趋势预测和洞察结论 \\
+科研智能体系统 & Next.js 工作台, FastAPI 后端, RAG 问答, 推荐、趋势、图谱查询接口 \\
+Python 模型代码 & 数据清洗、索引构建、主题建模、趋势检测、推荐排序、图谱构建 \\
+模型与索引文件 & 向量索引、FTS 索引、主题模型、趋势结果、作者图谱、关键词矩阵 \\
+运行与验收文档 & Makefile 命令、DeepSeek 配置、本地 vLLM 配置、故障排查、演示脚本 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{Makefile 命令分层}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{p{36mm}X}
+\toprule
+命令 & 作用 \\
+\midrule
+\texttt{make install} & 安装前后端依赖和 Python 环境依赖 \\
+\texttt{make ingest} & 读取样本数据, 生成标准化中间表 \\
+\texttt{make index} & 构建 FTS、向量索引、主题模型和图谱资产 \\
+\texttt{make report} & 生成数据分析报告所需图表和统计结果 \\
+\texttt{make dev} & 启动默认开发链路, 可使用 Mock 或 DeepSeek \\
+\texttt{make vllm-serve} & 启动本地 vLLM-Metal OpenAI-compatible 服务 \\
+\texttt{make dev-vllm} & 使用本地 vLLM provider 启动后端 \\
+\texttt{make smoke} & 检查 ingest、dashboard、chat、recommend、trend、graph \\
+\texttt{make status} & 检查端口、索引文件、模型 provider 和数据版本 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{产品工作台页面}
+
+\begin{plainbox}
+\begin{itemize}
+  \item \textbf{Overview}: 数据集规模、领域分布、年份趋势、热点关键词。
+  \item \textbf{Ask}: 文献问答、证据卡、引用论文、检索诊断。
+  \item \textbf{Trends}: 关键词演化、主题热度、突增检测、预测说明。
+  \item \textbf{Graph}: 作者合作网络、关键词共现、主题关系路径。
+  \item \textbf{Recommend}: 论文推荐、相似度解释、时间与主题过滤。
+  \item \textbf{Workbench}: 一个研究问题贯穿问答、趋势、图谱、推荐的联动视图。
+\end{itemize}
+\end{plainbox}
+
+\subsection{验收口径}
+
+\begin{enumerate}
+  \item 能从原始样本数据生成标准化资产和分析图表。
+  \item 能启动前端、后端和至少一种模型 provider。
+  \item \texttt{/api/chat} 能返回答案和证据, 且证据来自本地索引。
+  \item 趋势、推荐、图谱接口能返回结构化结果。
+  \item 所有对外结论都能追溯到数据资产或检索证据。
+\end{enumerate}
+
+\clearpage

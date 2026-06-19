@@ -1,12 +1,25 @@
 SHELL := /bin/zsh
 
-PYTHON ?= python3
+PROJECT_PYTHON := $(shell if python3 -c "import fastapi, uvicorn" >/dev/null 2>&1; then command -v python3; elif [ -x /opt/homebrew/Caskroom/miniconda/base/envs/ai/bin/python ]; then echo /opt/homebrew/Caskroom/miniconda/base/envs/ai/bin/python; else echo python3; fi)
+PROJECT_TEST_PYTHON := $(shell if python3 -c "import pytest" >/dev/null 2>&1; then command -v python3; else echo $(PROJECT_PYTHON); fi)
+PYTHON ?= $(PROJECT_PYTHON)
+TEST_PYTHON ?= $(PROJECT_TEST_PYTHON)
 BACKEND_HOST ?= 127.0.0.1
 BACKEND_PORT ?= 8000
 FRONTEND_PORT ?= 3000
 DATA_PATH ?= outputs/sample/papers.sample.json
-VLLM_BASE_URL ?= http://127.0.0.1:8001/v1
+HARVEST_SOURCE ?= openalex
+HARVEST_LIMIT ?= 500
+HARVEST_SOURCES ?= openalex arxiv pubmed pmc crossref doaj
+RAW_PAPERS_PATH ?= data/raw/openalex/works_sample.jsonl
+PROCESSED_PAPERS_PATH ?= data/processed/papers.json
+VLLM_HOST ?= 127.0.0.1
+VLLM_PORT ?= 8001
+VLLM_BASE_URL ?= http://$(VLLM_HOST):$(VLLM_PORT)/v1
 VLLM_MODEL ?= mlx-community/Qwen2.5-7B-Instruct-4bit
+VLLM_VENV ?= $(HOME)/.venv-vllm-metal
+VLLM_MAX_MODEL_LEN ?= 8192
+VLLM_EXTRA_ARGS ?=
 
 export SCISCOPE_APP_NAME ?= SciScope
 export SCISCOPE_ENV ?= local
@@ -17,17 +30,32 @@ export SCISCOPE_LLM_PROVIDER ?= deepseek
 export LOCAL_LLM_BASE_URL ?= $(VLLM_BASE_URL)
 export LOCAL_LLM_MODEL ?= $(VLLM_MODEL)
 export NEXT_PUBLIC_SCISCOPE_API_BASE ?= http://$(BACKEND_HOST):$(BACKEND_PORT)
+unexport VLLM_BASE_URL
+unexport VLLM_EXTRA_ARGS
+unexport VLLM_HOST
+unexport VLLM_MAX_MODEL_LEN
+unexport VLLM_MODEL
+unexport VLLM_PORT
+unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend backend frontend dev dev-vllm test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources normalize normalize-source normalize-all-sources backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
 	@echo ""
 	@echo "  make install          Install backend Python deps and frontend npm deps"
+	@echo "  make harvest-sample   Harvest public paper metadata into raw JSONL"
+	@echo "  make harvest-source   Harvest one source into data/raw/<source>/<source>_<limit>.jsonl"
+	@echo "  make harvest-all-sources Harvest $(HARVEST_LIMIT) records/source for configured public sources"
+	@echo "                         API-key enhanced sources: semantic_scholar, core"
+	@echo "  make normalize        Normalize raw JSONL into processed SciScope JSON"
+	@echo "  make normalize-source Normalize one source into data/processed/<source>_<limit>.json"
 	@echo "  make backend          Start FastAPI backend on $(BACKEND_HOST):$(BACKEND_PORT)"
 	@echo "  make frontend         Start Next.js frontend on localhost:$(FRONTEND_PORT)"
 	@echo "  make dev              Start backend and frontend together"
+	@echo "  make vllm-serve       Start local vLLM-Metal server on $(VLLM_BASE_URL)"
 	@echo "  make dev-vllm         Start app using local vLLM/Metal OpenAI-compatible server"
+	@echo "  make vllm-smoke       Check local vLLM OpenAI-compatible endpoint"
 	@echo "  make test             Run backend tests and frontend typecheck/build"
 	@echo "  make smoke            Check backend health endpoints with curl"
 	@echo "  make clean            Remove generated frontend build artifacts"
@@ -43,6 +71,30 @@ install-backend:
 
 install-frontend:
 	cd frontend && npm install
+
+harvest-sample:
+	$(PYTHON) -m src.harvest.cli harvest --source $(HARVEST_SOURCE) --limit $(HARVEST_LIMIT) --output $(RAW_PAPERS_PATH)
+
+harvest-source:
+	$(PYTHON) -m src.harvest.cli harvest --source $(HARVEST_SOURCE) --limit $(HARVEST_LIMIT)
+
+harvest-all-sources:
+	@for source in $(HARVEST_SOURCES); do \
+		echo "==> harvesting $$source ($(HARVEST_LIMIT))"; \
+		$(MAKE) harvest-source HARVEST_SOURCE=$$source HARVEST_LIMIT=$(HARVEST_LIMIT); \
+	done
+
+normalize:
+	$(PYTHON) -m src.harvest.cli normalize --input $(RAW_PAPERS_PATH) --output $(PROCESSED_PAPERS_PATH)
+
+normalize-source:
+	$(PYTHON) -m src.harvest.cli normalize --input data/raw/$(HARVEST_SOURCE)/$(HARVEST_SOURCE)_$(HARVEST_LIMIT).jsonl --output data/processed/$(HARVEST_SOURCE)_$(HARVEST_LIMIT).json
+
+normalize-all-sources:
+	@for source in $(HARVEST_SOURCES); do \
+		echo "==> normalizing $$source ($(HARVEST_LIMIT))"; \
+		$(MAKE) normalize-source HARVEST_SOURCE=$$source HARVEST_LIMIT=$(HARVEST_LIMIT); \
+	done
 
 backend:
 	$(PYTHON) -m uvicorn backend.app.main:app --reload --host $(BACKEND_HOST) --port $(BACKEND_PORT)
@@ -61,10 +113,28 @@ dev:
 dev-vllm:
 	@$(MAKE) dev SCISCOPE_USE_MOCK_LLM=false SCISCOPE_LLM_PROVIDER=vllm LOCAL_LLM_BASE_URL=$(VLLM_BASE_URL) LOCAL_LLM_MODEL=$(VLLM_MODEL)
 
+vllm-serve:
+	@echo "Starting vLLM-Metal: $(VLLM_MODEL)"
+	@echo "Endpoint: $(VLLM_BASE_URL)"
+	@source $(VLLM_VENV)/bin/activate; \
+	VLLM_HOST_IP=$(VLLM_HOST) \
+	vllm serve $(VLLM_MODEL) \
+		--host $(VLLM_HOST) \
+		--port $(VLLM_PORT) \
+		--max-model-len $(VLLM_MAX_MODEL_LEN) \
+		$(VLLM_EXTRA_ARGS)
+
+vllm-smoke:
+	curl -fsS $(VLLM_BASE_URL)/models
+	@echo ""
+	curl -fsS -X POST $(VLLM_BASE_URL)/chat/completions \
+		-H "Content-Type: application/json" \
+		-d '{"model":"$(VLLM_MODEL)","messages":[{"role":"user","content":"用一句话解释RAG是什么"}],"temperature":0.2}'
+
 test: test-backend typecheck build
 
 test-backend:
-	$(PYTHON) -m pytest backend/tests -v
+	$(TEST_PYTHON) -m pytest backend/tests -v
 
 typecheck:
 	cd frontend && npm run typecheck

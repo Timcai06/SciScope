@@ -1,0 +1,83 @@
+\section{模型与算法设计}
+
+\begin{designbox}{模型交付边界}
+赛题期望的“科研智能体模型”不应只理解为一个大语言模型权重。我们的模型资产应包括 Python 代码、索引文件、主题模型、推荐排序模型、趋势预测结果、图谱结构和 LLM provider 配置。大模型负责语言理解与生成, 领域洞察主要来自可复现的数据模型。
+\end{designbox}
+
+\subsection{算法组合}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{29mm}X X}
+\toprule
+模块 & 推荐技术 & 输出资产 \\
+\midrule
+文本检索 & SQLite FTS5 或 BM25, 向量检索, RRF 融合 & 候选片段、分数、召回诊断 \\
+向量表示 & bge 或 sentence-transformer 本地 embedding, 可替换为云端 embedding & 向量索引、文本 chunk embedding \\
+GraphRAG & 作者合作图、关键词共现图、论文主题边与检索证据融合 & 图谱上下文、关系解释、路径证据 \\
+主题建模 & BERTopic 或 embedding 聚类, 结合关键词抽取与人工可读标签 & 主题编号、主题词、代表论文 \\
+趋势预测 & 关键词频次时序、增长率、突增检测、滑动窗口预测 & 热点榜、趋势曲线、预测说明 \\
+论文推荐 & 向量相似、主题相似、时间加权、作者关系重排 & 推荐列表、解释因子、排序分 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{RAG 检索策略}
+
+\begin{tikzpicture}[
+  node distance=5mm,
+  every node/.style={font=\small},
+  box/.style={draw=black, fill=white, rounded corners=2pt, minimum width=32mm, minimum height=10mm, align=center},
+  arrow/.style={-{Latex[length=2mm]}, thick, color=black}
+]
+  \node[box, very thick] (query) {Query};
+  \node[box, right=5mm of query] (rewrite) {Query Rewrite\\领域词扩展};
+  \node[box, right=5mm of rewrite] (hybrid) {Hybrid Recall\\FTS + Vector};
+  \node[box, below=8mm of hybrid] (graph) {Graph Expand\\作者/关键词/主题};
+  \node[box, left=5mm of graph] (rank) {Rerank\\RRF + 过滤};
+  \node[box, left=5mm of rank, very thick] (ctx) {Context Pack\\证据包};
+  \draw[arrow] (query) -- (rewrite);
+  \draw[arrow] (rewrite) -- (hybrid);
+  \draw[arrow] (hybrid) -- (graph);
+  \draw[arrow] (graph) -- (rank);
+  \draw[arrow] (rank) -- (ctx);
+\end{tikzpicture}
+
+\subsection{趋势预测设计}
+
+\begin{plainbox}
+趋势预测不追求夸张的“预测未来”, 而是做可解释的热点识别: 对关键词、主题和领域构建按年或按月的时序矩阵, 计算增长率、近年加速度、突增分数和稳定性。最终输出应是“值得关注的方向 + 依据 + 不确定性”, 而不是孤立的排行榜。
+\end{plainbox}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{p{32mm}X}
+\toprule
+指标 & 含义 \\
+\midrule
+频次增长率 & 近三年出现频次相对历史均值的提升程度 \\
+突增分数 & 某关键词或主题在短时间内显著上升的强度 \\
+稳定性 & 热度是否连续增长, 避免一次性噪声造成误判 \\
+跨领域扩散 & 某主题是否从一个领域扩展到多个领域 \\
+证据密度 & 支撑该趋势的论文数量、代表论文和主题一致性 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{模型文件组织建议}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{p{42mm}X}
+\toprule
+路径 & 内容 \\
+\midrule
+\texttt{data/processed/} & 清洗后的论文表、chunk 表、关键词时序表 \\
+\texttt{indices/fts/} & 全文或摘要关键词检索索引 \\
+\texttt{indices/vector/} & LanceDB 或 FAISS 向量索引 \\
+\texttt{models/topics/} & 主题模型、主题标签、代表论文映射 \\
+\texttt{models/trends/} & 热点检测结果、趋势预测结果、解释元数据 \\
+\texttt{graphs/} & 作者合作图、关键词共现图、主题关系图 \\
+\begin{tabular}[t]{@{}l@{}}\texttt{configs/}\\\texttt{providers.yaml}\end{tabular} & DeepSeek、本地 vLLM、Mock provider 配置 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\clearpage
