@@ -45,6 +45,7 @@ def _raw_canonical(args: argparse.Namespace) -> None:
         canonical_dir=args.canonical_dir,
         inventory_path=args.inventory,
         summary_path=args.summary,
+        max_year=args.max_year,
         archive_dir=args.archive_dir if args.archive_old else None,
         delete_archive=args.delete_archive,
     )
@@ -78,6 +79,7 @@ def build_parser() -> argparse.ArgumentParser:
     raw_canonical.add_argument("--canonical-dir", type=Path, default=Path("data/raw_canonical"))
     raw_canonical.add_argument("--inventory", type=Path, default=Path("data/raw_inventory.csv"))
     raw_canonical.add_argument("--summary", type=Path, default=Path("data/raw_canonical/summary.json"))
+    raw_canonical.add_argument("--max-year", type=int)
     raw_canonical.add_argument("--archive-old", action="store_true")
     raw_canonical.add_argument("--archive-dir", type=Path, default=Path("data/raw_archive"))
     raw_canonical.add_argument("--delete-archive", action="store_true")

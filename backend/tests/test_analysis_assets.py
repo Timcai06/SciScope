@@ -111,6 +111,68 @@ def test_build_analysis_assets_creates_report_ready_tables(tmp_path):
     assert saved_summary == summary
 
 
+def test_build_analysis_assets_outputs_trend_network_and_topic_layers(tmp_path):
+    raw_dir = tmp_path / "raw"
+    output_dir = tmp_path / "analysis"
+    pubmed_dir = raw_dir / "pubmed"
+    pubmed_dir.mkdir(parents=True)
+    rows = [
+        _wrapper(
+            "A1",
+            title="Retrieval-Augmented Generation for Clinical Search",
+            year=2022,
+            authors=["Ada Chen", "Lin Wang", "Mira Zhao"],
+            keywords=["Retrieval-Augmented Generation", "Clinical Search"],
+        ),
+        _wrapper(
+            "A2",
+            title="Retrieval Augmented Generation for Biomedical Question Answering",
+            year=2025,
+            authors=["Ada Chen", "Bo Li"],
+            keywords=["retrieval augmented generation", "Question Answering"],
+        ),
+        _wrapper(
+            "A3",
+            title="Graph Neural Networks for Catalyst Discovery",
+            year=2025,
+            authors=["Nia Kumar", "Omar Singh"],
+            keywords=["Graph neural networks", "Catalyst Discovery"],
+        ),
+    ]
+    pubmed_dir.joinpath("pubmed.jsonl").write_text(
+        "\n".join(json.dumps(record, ensure_ascii=False) for record in rows) + "\n",
+        encoding="utf-8",
+    )
+
+    summary = build_analysis_assets(raw_dir=raw_dir, output_dir=output_dir, sources=("pubmed",))
+
+    assert summary["collection_files"] == 1
+    manifest = _read_csv(output_dir / "collection_manifest.csv")
+    assert manifest[0]["records"] == "3"
+    assert manifest[0]["empty_file"] == "False"
+
+    trends = _read_csv(output_dir / "keyword_trends.csv")
+    rag = next(row for row in trends if row["keyword"] == "retrieval augmented generation")
+    assert rag["doc_count"] == "2"
+    assert float(rag["normalized_df_2025"]) == 0.5
+    assert rag["representative_paper_id"] == "A2"
+
+    edges = _read_csv(output_dir / "author_collaboration_edges.csv")
+    ada_bo = next(row for row in edges if row["author_a"] == "Ada Chen" and row["author_b"] == "Bo Li")
+    assert ada_bo["paper_count"] == "1"
+    assert float(ada_bo["weight_fraction_pair"]) == 0.5
+    assert ada_bo["first_year"] == "2025"
+
+    metrics = _read_csv(output_dir / "author_metrics.csv")
+    assert "betweenness" in metrics[0]
+    assert any(row["author"] == "Ada Chen" for row in metrics)
+
+    comparison = _read_csv(output_dir / "topic_model_comparison.csv")
+    assert {row["model"] for row in comparison} == {"lda", "nmf"}
+    topic_keywords = _read_csv(output_dir / "topic_keywords.csv")
+    assert topic_keywords
+
+
 def test_build_analysis_assets_can_select_source_filename_template(tmp_path):
     raw_dir = tmp_path / "raw"
     output_dir = tmp_path / "analysis"
@@ -169,3 +231,28 @@ def test_build_analysis_assets_skips_invalid_jsonl_lines(tmp_path):
     assert summary["input_records"] == 2
     assert summary["papers"] == 1
     assert summary["invalid_records"] == 1
+
+
+def test_build_analysis_assets_keeps_future_year_suspects_without_formal_year(tmp_path):
+    raw_dir = tmp_path / "raw"
+    output_dir = tmp_path / "analysis"
+    pubmed_dir = raw_dir / "pubmed"
+    pubmed_dir.mkdir(parents=True)
+    record = {
+        **_wrapper("FUTURE", title="Future Metadata Paper", year=2027, authors=["Future Author"], keywords=["metadata"]),
+        "_sciscope_year_status": "future_year_suspect",
+        "_sciscope_original_year": 2027,
+    }
+    pubmed_dir.joinpath("future_year_suspect.jsonl").write_text(
+        json.dumps(record, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    summary = build_analysis_assets(raw_dir=raw_dir, output_dir=output_dir, sources=("pubmed",))
+
+    assert summary["papers"] == 1
+    papers = json.loads(output_dir.joinpath("papers_clean.json").read_text(encoding="utf-8"))
+    assert papers[0]["paper_id"] == "FUTURE"
+    assert papers[0]["year"] == ""
+    assert papers[0]["original_year"] == 2027
+    assert papers[0]["year_status"] == "future_year_suspect"

@@ -92,3 +92,30 @@ def test_build_raw_canonical_preserves_existing_canonical_when_raw_is_empty(tmp_
 
     assert summary["canonical_records"] == 1
     assert (canonical_dir / "pubmed" / "2024.jsonl").exists()
+
+
+def test_build_raw_canonical_routes_future_years_to_suspect_partition(tmp_path):
+    raw_dir = tmp_path / "raw"
+    source_dir = raw_dir / "pubmed"
+    source_dir.mkdir(parents=True)
+    source_dir.joinpath("pubmed_future.jsonl").write_text(
+        json.dumps(_wrapper("P1", year=2027), ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    canonical_dir = tmp_path / "raw_canonical"
+    summary = build_raw_canonical(
+        raw_dir=raw_dir,
+        canonical_dir=canonical_dir,
+        inventory_path=tmp_path / "raw_inventory.csv",
+        summary_path=canonical_dir / "summary.json",
+        max_year=2026,
+    )
+
+    assert summary["canonical_records"] == 1
+    assert summary["source_year_counts"]["pubmed"] == {"future_year_suspect": 1}
+    assert not (canonical_dir / "pubmed" / "2027.jsonl").exists()
+    suspect_path = canonical_dir / "pubmed" / "future_year_suspect.jsonl"
+    record = json.loads(suspect_path.read_text(encoding="utf-8").strip())
+    assert record["_sciscope_original_year"] == 2027
+    assert record["_sciscope_year_status"] == "future_year_suspect"

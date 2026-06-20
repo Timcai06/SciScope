@@ -119,6 +119,7 @@ def build_raw_canonical(
     inventory_path: str | Path = "data/raw_inventory.csv",
     summary_path: str | Path = "data/raw_canonical/summary.json",
     sources: tuple[str, ...] = DEFAULT_SOURCES,
+    max_year: int | None = None,
     archive_dir: str | Path | None = None,
     delete_archive: bool = False,
 ) -> dict[str, Any]:
@@ -126,6 +127,7 @@ def build_raw_canonical(
     canonical_path = Path(canonical_dir)
     inventory = Path(inventory_path)
     summary_file = Path(summary_path)
+    year_ceiling = max_year or datetime.now(UTC).year
 
     partitions: dict[tuple[str, str], dict[str, dict[str, Any]]] = defaultdict(dict)
     partition_scores: dict[tuple[str, str], dict[str, tuple[int, int, int, int]]] = defaultdict(dict)
@@ -160,6 +162,9 @@ def build_raw_canonical(
                 wrapper = {**wrapper, "source": source}
                 year = _record_year(wrapper)
                 valid += 1
+                original_year = year
+                if year.isdigit() and int(year) > year_ceiling:
+                    year = "future_year_suspect"
                 years[year] += 1
                 sources_seen[source] += 1
 
@@ -172,6 +177,10 @@ def build_raw_canonical(
                     "_sciscope_raw_file": str(path),
                     "_sciscope_canonicalized_at": _utc_now(),
                     "_sciscope_canonical_year": int(year) if year.isdigit() else year,
+                    "_sciscope_original_year": int(original_year) if original_year.isdigit() else original_year,
+                    "_sciscope_year_status": "future_year_suspect"
+                    if year == "future_year_suspect"
+                    else "normal",
                 }
                 if existing_score is None:
                     canonical_new += 1

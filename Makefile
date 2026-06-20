@@ -15,6 +15,7 @@ RAW_SOURCE_DIR ?= data/raw
 RAW_CANONICAL_DIR ?= data/raw_canonical
 RAW_ARCHIVE_DIR ?= data/raw_archive
 RAW_INVENTORY_PATH ?= data/raw_inventory.csv
+RAW_MAX_YEAR ?= 2026
 BALANCE_SOURCE ?= openalex
 BALANCE_SOURCES ?= openalex arxiv pubmed pmc crossref doaj
 BALANCE_YEAR ?= 2025
@@ -141,10 +142,10 @@ harvest-fulltext-years:
 	done
 
 raw-canonical:
-	$(PYTHON) -m src.harvest.cli raw-canonical --raw-dir $(RAW_SOURCE_DIR) --canonical-dir $(RAW_CANONICAL_DIR) --inventory $(RAW_INVENTORY_PATH) --summary $(RAW_CANONICAL_DIR)/summary.json
+	$(PYTHON) -m src.harvest.cli raw-canonical --raw-dir $(RAW_SOURCE_DIR) --canonical-dir $(RAW_CANONICAL_DIR) --inventory $(RAW_INVENTORY_PATH) --summary $(RAW_CANONICAL_DIR)/summary.json --max-year $(RAW_MAX_YEAR)
 
 raw-governance:
-	$(PYTHON) -m src.harvest.cli raw-canonical --raw-dir $(RAW_SOURCE_DIR) --canonical-dir $(RAW_CANONICAL_DIR) --inventory $(RAW_INVENTORY_PATH) --summary $(RAW_CANONICAL_DIR)/summary.json --archive-old --archive-dir $(RAW_ARCHIVE_DIR) --delete-archive
+	$(PYTHON) -m src.harvest.cli raw-canonical --raw-dir $(RAW_SOURCE_DIR) --canonical-dir $(RAW_CANONICAL_DIR) --inventory $(RAW_INVENTORY_PATH) --summary $(RAW_CANONICAL_DIR)/summary.json --max-year $(RAW_MAX_YEAR) --archive-old --archive-dir $(RAW_ARCHIVE_DIR) --delete-archive
 
 normalize:
 	$(PYTHON) -m src.harvest.cli normalize --input $(RAW_PAPERS_PATH) --output $(PROCESSED_PAPERS_PATH)

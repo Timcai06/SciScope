@@ -33,8 +33,10 @@ data/raw_inventory.csv
 - Deduplicate inside each `source + year` partition.
 - Preserve early harvested records if they contribute unique source records.
 - Preserve records with missing year under `unknown_year.jsonl`.
+- Preserve records whose parsed year is greater than `RAW_MAX_YEAR` under `future_year_suspect.jsonl`.
 - Do not perform cross-source deduplication at the raw layer.
 - Keep source, source_id, raw payload, and `_sciscope_raw_file` provenance on each canonical record.
+- Keep suspicious future-year records in the dataset, but remove them from formal year statistics by setting their analysis-layer `year` to blank and retaining `original_year`.
 - Delete temporary `raw_archive` after canonical verification to save local disk.
 
 ## Commands
@@ -58,6 +60,7 @@ After the June 20 raw governance pass:
 - raw input records absorbed: 220,278
 - canonical raw records: 169,324
 - canonical source/year files: 147
+- future-year suspect records are retained under `future_year_suspect.jsonl` instead of being treated as formal publication years
 - source counts:
   - openalex: 41,477
   - arxiv: 29,760
