@@ -88,18 +88,18 @@ def test_build_analysis_assets_creates_report_ready_tables(tmp_path):
     assert authors[0]["author_position"] == "1"
 
     keywords = _read_csv(output_dir / "paper_keywords.csv")
-    assert {row["keyword"] for row in keywords} == {"rag", "ai", "knowledge graph"}
+    assert {row["keyword"] for row in keywords} == {"retrieval augmented generation", "knowledge graph"}
 
     keyword_year = _read_csv(output_dir / "keyword_year_matrix.csv")
-    assert {"keyword": "rag", "year": "2024", "count": "1"} in keyword_year
-    assert {"keyword": "rag", "year": "2025", "count": "1"} in keyword_year
+    assert {"keyword": "retrieval augmented generation", "year": "2024", "count": "1", "total_docs_in_year": "1", "normalized_df": "1.0"} in keyword_year
+    assert {"keyword": "retrieval augmented generation", "year": "2025", "count": "1", "total_docs_in_year": "1", "normalized_df": "1.0"} in keyword_year
 
     edges = _read_csv(output_dir / "author_collaboration_edges.csv")
-    assert {"author_a": "Ada Chen", "author_b": "Lin Wang", "weight": "1"} in [
-        {key: row[key] for key in ("author_a", "author_b", "weight")} for row in edges
+    assert {"author_a": "Ada Chen", "author_b": "Lin Wang", "weight": "1", "paper_count": "1"} in [
+        {key: row[key] for key in ("author_a", "author_b", "weight", "paper_count")} for row in edges
     ]
-    assert {"author_a": "Ada Chen", "author_b": "Bo Li", "weight": "1"} in [
-        {key: row[key] for key in ("author_a", "author_b", "weight")} for row in edges
+    assert {"author_a": "Ada Chen", "author_b": "Bo Li", "weight": "1", "paper_count": "1"} in [
+        {key: row[key] for key in ("author_a", "author_b", "weight", "paper_count")} for row in edges
     ]
 
     quality = _read_csv(output_dir / "source_quality_report.csv")
@@ -158,10 +158,10 @@ def test_build_analysis_assets_outputs_trend_network_and_topic_layers(tmp_path):
     assert rag["representative_paper_id"] == "A2"
 
     edges = _read_csv(output_dir / "author_collaboration_edges.csv")
-    ada_bo = next(row for row in edges if row["author_a"] == "Ada Chen" and row["author_b"] == "Bo Li")
-    assert ada_bo["paper_count"] == "1"
-    assert float(ada_bo["weight_fraction_pair"]) == 0.5
-    assert ada_bo["first_year"] == "2025"
+    ada_lin = next(row for row in edges if row["author_a"] == "Ada Chen" and row["author_b"] == "Lin Wang")
+    assert ada_lin["paper_count"] == "1"
+    assert round(float(ada_lin["weight_fraction_pair"]), 6) == 0.333333
+    assert ada_lin["first_year"] == "2022"
 
     metrics = _read_csv(output_dir / "author_metrics.csv")
     assert "betweenness" in metrics[0]

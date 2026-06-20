@@ -18,6 +18,7 @@ DEFAULT_SOURCES = ("openalex", "arxiv", "pubmed", "pmc", "crossref", "doaj")
 RECENT_YEAR_START = 2022
 RECENT_YEAR_END = 2026
 MAX_AUTHORS_FOR_CORE_NETWORK = 12
+MAX_CORE_AUTHOR_GRAPH_EDGES = 25_000
 TOPIC_SAMPLE_LIMIT = 50_000
 
 KEYWORD_ALIASES = {
@@ -363,7 +364,6 @@ def _build_author_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, A
             author_collaborators[author_b].add(author_a)
 
     edge_rows: list[dict[str, Any]] = []
-    graph = nx.Graph() if nx is not None else None
     for stats in edge_stats.values():
         row = {
             "author_a": stats["author_a"],
@@ -379,14 +379,22 @@ def _build_author_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, A
             "long_author_papers": int(stats["long_author_papers"]),
         }
         edge_rows.append(row)
-        if graph is not None and int(stats["long_author_papers"]) == 0:
-            weight = float(stats["weight_fraction_pair"])
-            graph.add_edge(str(stats["author_a"]), str(stats["author_b"]), weight=weight, distance=1 / weight if weight else 1)
     edge_rows.sort(key=lambda row: (-float(row["weight_fraction_pair"]), -int(row["paper_count"]), row["author_a"], row["author_b"]))
+    graph = nx.Graph() if nx is not None else None
+    if graph is not None:
+        core_edges = 0
+        for row in edge_rows:
+            if int(row["long_author_papers"]) != 0:
+                continue
+            weight = float(row["weight_fraction_pair"])
+            graph.add_edge(str(row["author_a"]), str(row["author_b"]), weight=weight, distance=1 / weight if weight else 1)
+            core_edges += 1
+            if core_edges >= MAX_CORE_AUTHOR_GRAPH_EDGES:
+                break
 
     degree = dict(graph.degree(weight="weight")) if graph is not None and graph.number_of_nodes() else {}
     betweenness = (
-        nx.betweenness_centrality(graph, weight="distance", k=min(500, graph.number_of_nodes()), seed=42)
+        nx.betweenness_centrality(graph, weight="distance", k=min(200, graph.number_of_nodes()), seed=42)
         if nx is not None and graph is not None and graph.number_of_nodes() > 1
         else {}
     )
@@ -711,6 +719,7 @@ def build_analysis_assets(
         "recent_year_end": RECENT_YEAR_END,
         "recent_papers": sum(1 for paper in papers if _is_recent_year(paper.get("year"))),
         "max_authors_for_core_network": MAX_AUTHORS_FOR_CORE_NETWORK,
+        "max_core_author_graph_edges": MAX_CORE_AUTHOR_GRAPH_EDGES,
     }
     output_path.joinpath("summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
