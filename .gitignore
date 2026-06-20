@@ -30,6 +30,10 @@ output/pdf/**/*.toc
 output/pdf/**/*.xdv
 data/raw/**/*.jsonl
 data/raw/**/*.tmp
+data/raw_canonical/**/*.jsonl
+data/raw_canonical/**/*.json
+data/raw_archive/**
+data/raw_inventory.csv
 data/processed/*.json
 data/processed/*.jsonl
 data/processed/*.parquet
@@ -40,6 +44,8 @@ models/**
 graphs/**
 !data/raw/.gitkeep
 !data/raw/openalex/.gitkeep
+!data/raw/*/.gitkeep
+!data/raw_canonical/.gitkeep
 !data/sample/.gitkeep
 !data/sample/legacy_processed_500/.gitkeep
 !data/processed/.gitkeep

@@ -11,6 +11,10 @@ DATA_PATH ?= data/sample/papers.sample.json
 HARVEST_SOURCE ?= openalex
 HARVEST_LIMIT ?= 500
 HARVEST_SOURCES ?= openalex arxiv pubmed pmc crossref doaj
+RAW_SOURCE_DIR ?= data/raw
+RAW_CANONICAL_DIR ?= data/raw_canonical
+RAW_ARCHIVE_DIR ?= data/raw_archive
+RAW_INVENTORY_PATH ?= data/raw_inventory.csv
 BALANCE_SOURCE ?= openalex
 BALANCE_SOURCES ?= openalex arxiv pubmed pmc crossref doaj
 BALANCE_YEAR ?= 2025
@@ -53,7 +57,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -65,6 +69,8 @@ help:
 	@echo "  make harvest-year     Harvest one year into data/raw/<source>/<source>_<year>_<limit>.jsonl"
 	@echo "  make harvest-balanced-years Harvest $(BALANCE_YEARS) by source/year for year balance"
 	@echo "  make harvest-fulltext-years Harvest PMC full-text excerpts by publication year"
+	@echo "  make raw-canonical  Merge raw files into source/year canonical JSONL partitions"
+	@echo "  make raw-governance Build canonical raw, archive old raw, and remove archive copy"
 	@echo "                         API-key enhanced sources: semantic_scholar, core"
 	@echo "  make normalize        Normalize raw JSONL into processed SciScope JSON"
 	@echo "  make normalize-source Normalize one source into data/processed/<source>_<limit>.json"
@@ -134,6 +140,12 @@ harvest-fulltext-years:
 		$(MAKE) harvest-fulltext-year FULLTEXT_SOURCE=$(FULLTEXT_SOURCE) FULLTEXT_YEAR=$$year FULLTEXT_LIMIT=$(FULLTEXT_LIMIT); \
 	done
 
+raw-canonical:
+	$(PYTHON) -m src.harvest.cli raw-canonical --raw-dir $(RAW_SOURCE_DIR) --canonical-dir $(RAW_CANONICAL_DIR) --inventory $(RAW_INVENTORY_PATH) --summary $(RAW_CANONICAL_DIR)/summary.json
+
+raw-governance:
+	$(PYTHON) -m src.harvest.cli raw-canonical --raw-dir $(RAW_SOURCE_DIR) --canonical-dir $(RAW_CANONICAL_DIR) --inventory $(RAW_INVENTORY_PATH) --summary $(RAW_CANONICAL_DIR)/summary.json --archive-old --archive-dir $(RAW_ARCHIVE_DIR) --delete-archive
+
 normalize:
 	$(PYTHON) -m src.harvest.cli normalize --input $(RAW_PAPERS_PATH) --output $(PROCESSED_PAPERS_PATH)
 
@@ -147,10 +159,10 @@ normalize-all-sources:
 	done
 
 analysis-assets:
-	$(PYTHON) -m src.analysis.cli assets --raw-dir data/raw --output-dir $(ANALYSIS_OUTPUT_DIR) --filename-template '{source}_$(HARVEST_LIMIT).jsonl'
+	$(PYTHON) -m src.analysis.cli assets --raw-dir $(RAW_CANONICAL_DIR) --output-dir $(ANALYSIS_OUTPUT_DIR)
 
 analysis-assets-all:
-	$(PYTHON) -m src.analysis.cli assets --raw-dir data/raw --output-dir $(ANALYSIS_OUTPUT_DIR)
+	$(PYTHON) -m src.analysis.cli assets --raw-dir $(RAW_CANONICAL_DIR) --output-dir $(ANALYSIS_OUTPUT_DIR)
 
 processed-corpus:
 	$(PYTHON) -m src.analysis.cli corpus --input $(ANALYSIS_OUTPUT_DIR)/papers_clean.json --output data/processed/papers_corpus_50k.json --summary data/processed/papers_corpus_50k.summary.json

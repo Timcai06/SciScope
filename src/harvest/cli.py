@@ -13,6 +13,7 @@ from src.harvest.public_sources import (
     harvest_source_year,
     year_raw_path,
 )
+from src.harvest.raw_governance import build_raw_canonical
 
 
 def _harvest(args: argparse.Namespace) -> None:
@@ -38,6 +39,18 @@ def _normalize(args: argparse.Namespace) -> None:
     print(json.dumps(stats, ensure_ascii=False))
 
 
+def _raw_canonical(args: argparse.Namespace) -> None:
+    summary = build_raw_canonical(
+        raw_dir=args.raw_dir,
+        canonical_dir=args.canonical_dir,
+        inventory_path=args.inventory,
+        summary_path=args.summary,
+        archive_dir=args.archive_dir if args.archive_old else None,
+        delete_archive=args.delete_archive,
+    )
+    print(json.dumps(summary, ensure_ascii=False))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sciscope-harvest")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -59,6 +72,16 @@ def build_parser() -> argparse.ArgumentParser:
     normalize.add_argument("--input", type=Path, default=Path("data/raw/openalex/works_sample.jsonl"))
     normalize.add_argument("--output", type=Path, default=Path("data/processed/papers.json"))
     normalize.set_defaults(func=_normalize)
+
+    raw_canonical = subparsers.add_parser("raw-canonical", help="Build source/year canonical raw JSONL assets")
+    raw_canonical.add_argument("--raw-dir", type=Path, default=Path("data/raw"))
+    raw_canonical.add_argument("--canonical-dir", type=Path, default=Path("data/raw_canonical"))
+    raw_canonical.add_argument("--inventory", type=Path, default=Path("data/raw_inventory.csv"))
+    raw_canonical.add_argument("--summary", type=Path, default=Path("data/raw_canonical/summary.json"))
+    raw_canonical.add_argument("--archive-old", action="store_true")
+    raw_canonical.add_argument("--archive-dir", type=Path, default=Path("data/raw_archive"))
+    raw_canonical.add_argument("--delete-archive", action="store_true")
+    raw_canonical.set_defaults(func=_raw_canonical)
 
     return parser
 
