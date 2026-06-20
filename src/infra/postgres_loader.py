@@ -52,7 +52,7 @@ def batched(values: Iterable[tuple[Any, ...]], size: int = DEFAULT_BATCH_SIZE) -
 def import_postgres(
     *,
     dsn: str,
-    papers_path: str | Path = "data/processed/papers_corpus_50k.json",
+    papers_path: str | Path = "data/processed/papers_corpus.json",
     chunks_path: str | Path = "data/processed/paper_chunks.jsonl",
     batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> dict[str, int]:

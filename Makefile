@@ -27,6 +27,8 @@ FULLTEXT_YEARS ?= 2022 2023 2024 2025 2026
 FULLTEXT_LIMIT ?= 3000
 RAW_PAPERS_PATH ?= data/raw/openalex/works_sample.jsonl
 PROCESSED_PAPERS_PATH ?= data/processed/papers.json
+PROCESSED_CORPUS_PATH ?= data/processed/papers_corpus.json
+PROCESSED_CORPUS_SUMMARY_PATH ?= data/processed/papers_corpus.summary.json
 ANALYSIS_OUTPUT_DIR ?= data/analysis
 REPORT_ASSETS_DIR ?= output/assets/sciscope_data_report
 YEAR_BALANCE_TARGET ?= 10000
@@ -77,7 +79,7 @@ help:
 	@echo "  make normalize-source Normalize one source into data/processed/<source>_<limit>.json"
 	@echo "  make analysis-assets  Build report-ready analysis tables from raw JSONL"
 	@echo "  make analysis-assets-all Build report tables from every JSONL under data/raw"
-	@echo "  make processed-corpus Build merged 50k processed corpus from analysis tables"
+	@echo "  make processed-corpus Build merged processed corpus from analysis tables"
 	@echo "  make data-layer-audit Audit year balance, text coverage, and RAG field readiness"
 	@echo "  make data-layer-tonight Rebuild corpus plus data-layer readiness report"
 	@echo "  make rag-chunks       Build chunk-level RAG assets from processed corpus"
@@ -166,7 +168,7 @@ analysis-assets-all:
 	$(PYTHON) -m src.analysis.cli assets --raw-dir $(RAW_CANONICAL_DIR) --output-dir $(ANALYSIS_OUTPUT_DIR)
 
 processed-corpus:
-	$(PYTHON) -m src.analysis.cli corpus --input $(ANALYSIS_OUTPUT_DIR)/papers_clean.json --output data/processed/papers_corpus_50k.json --summary data/processed/papers_corpus_50k.summary.json
+	$(PYTHON) -m src.analysis.cli corpus --input $(ANALYSIS_OUTPUT_DIR)/papers_clean.json --output $(PROCESSED_CORPUS_PATH) --summary $(PROCESSED_CORPUS_SUMMARY_PATH)
 
 data-layer-audit:
 	$(PYTHON) -m src.analysis.cli readiness --papers $(ANALYSIS_OUTPUT_DIR)/papers_clean.json --output $(REPORT_ASSETS_DIR)/data_layer_readiness.json --target-per-year $(YEAR_BALANCE_TARGET)
@@ -176,13 +178,13 @@ data-layer-tonight: analysis-assets processed-corpus data-layer-audit
 data-layer-refresh: analysis-assets-all processed-corpus data-layer-audit report-figures data-report-pdf
 
 rag-chunks:
-	$(PYTHON) -m src.infra.cli chunks --input data/processed/papers_corpus_50k.json --output $(RAG_CHUNKS_PATH) --summary $(RAG_CHUNKS_SUMMARY_PATH)
+	$(PYTHON) -m src.infra.cli chunks --input $(PROCESSED_CORPUS_PATH) --output $(RAG_CHUNKS_PATH) --summary $(RAG_CHUNKS_SUMMARY_PATH)
 
 postgres-schema:
 	$(PYTHON) -m src.infra.cli schema --dsn $(POSTGRES_DSN) --file infra/postgres/schema.sql
 
 postgres-load: rag-chunks
-	$(PYTHON) -m src.infra.cli load-postgres --dsn $(POSTGRES_DSN) --papers data/processed/papers_corpus_50k.json --chunks $(RAG_CHUNKS_PATH)
+	$(PYTHON) -m src.infra.cli load-postgres --dsn $(POSTGRES_DSN) --papers $(PROCESSED_CORPUS_PATH) --chunks $(RAG_CHUNKS_PATH)
 
 postgres-refresh: data-layer-refresh postgres-schema postgres-load
 

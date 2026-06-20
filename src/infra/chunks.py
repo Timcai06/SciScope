@@ -104,7 +104,7 @@ def build_paper_chunks(
 
 def build_chunk_assets(
     *,
-    input_path: str | Path = "data/processed/papers_corpus_50k.json",
+    input_path: str | Path = "data/processed/papers_corpus.json",
     output_path: str | Path = "data/processed/paper_chunks.jsonl",
     summary_path: str | Path = "data/processed/paper_chunks.summary.json",
     max_chars: int = DEFAULT_MAX_CHARS,

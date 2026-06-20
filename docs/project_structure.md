@@ -20,7 +20,7 @@ separate top-level areas.
   normalized samples.
 - `data/raw/`: harvested public-source JSONL records.
 - `data/processed/`: normalized per-source paper records and the merged
-  `papers_corpus_50k.json` corpus generated from analysis tables.
+  `papers_corpus.json` corpus generated from analysis tables.
 - `data/analysis/`: generated report-ready tables such as keyword-year matrices
   and author collaboration edges.
 

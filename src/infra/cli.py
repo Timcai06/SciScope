@@ -41,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     chunks = subparsers.add_parser("chunks", help="Build chunk-level RAG assets from processed corpus")
-    chunks.add_argument("--input", type=Path, default=Path("data/processed/papers_corpus_50k.json"))
+    chunks.add_argument("--input", type=Path, default=Path("data/processed/papers_corpus.json"))
     chunks.add_argument("--output", type=Path, default=Path("data/processed/paper_chunks.jsonl"))
     chunks.add_argument("--summary", type=Path, default=Path("data/processed/paper_chunks.summary.json"))
     chunks.add_argument("--max-chars", type=int, default=1800)
@@ -55,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     load = subparsers.add_parser("load-postgres", help="Load processed corpus and chunks into PostgreSQL")
     load.add_argument("--dsn", default=os.getenv("SCISCOPE_DATABASE_URL", "postgresql://tim@localhost:5432/sciscope"))
-    load.add_argument("--papers", type=Path, default=Path("data/processed/papers_corpus_50k.json"))
+    load.add_argument("--papers", type=Path, default=Path("data/processed/papers_corpus.json"))
     load.add_argument("--chunks", type=Path, default=Path("data/processed/paper_chunks.jsonl"))
     load.add_argument("--batch-size", type=int, default=1000)
     load.set_defaults(func=_load_postgres)

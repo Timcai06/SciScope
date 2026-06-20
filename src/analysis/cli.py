@@ -72,8 +72,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     corpus = subparsers.add_parser("corpus", help="Build merged processed corpus from analysis papers")
     corpus.add_argument("--input", type=Path, default=Path("data/analysis/papers_clean.json"))
-    corpus.add_argument("--output", type=Path, default=Path("data/processed/papers_corpus_50k.json"))
-    corpus.add_argument("--summary", type=Path, default=Path("data/processed/papers_corpus_50k.summary.json"))
+    corpus.add_argument("--output", type=Path, default=Path("data/processed/papers_corpus.json"))
+    corpus.add_argument("--summary", type=Path, default=Path("data/processed/papers_corpus.summary.json"))
     corpus.add_argument("--year-start", type=int, default=2022)
     corpus.add_argument("--year-end", type=int, default=2026)
     corpus.set_defaults(func=_build_corpus)

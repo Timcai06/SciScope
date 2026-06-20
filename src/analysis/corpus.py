@@ -34,8 +34,8 @@ def _is_recent_year(value: Any, *, year_start: int, year_end: int) -> bool:
 def build_processed_corpus(
     *,
     input_path: str | Path = "data/analysis/papers_clean.json",
-    output_path: str | Path = "data/processed/papers_corpus_50k.json",
-    summary_path: str | Path = "data/processed/papers_corpus_50k.summary.json",
+    output_path: str | Path = "data/processed/papers_corpus.json",
+    summary_path: str | Path = "data/processed/papers_corpus.summary.json",
     year_start: int = RECENT_YEAR_START,
     year_end: int = RECENT_YEAR_END,
 ) -> dict[str, Any]:
