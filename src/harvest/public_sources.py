@@ -114,6 +114,10 @@ def default_raw_path(source: str, limit: int) -> Path:
     return Path("data") / "raw" / source / f"{source}_{limit}.jsonl"
 
 
+def year_raw_path(source: str, year: int, limit: int) -> Path:
+    return Path("data") / "raw" / source / f"{source}_{year}_{limit}.jsonl"
+
+
 def _request_json(
     url: str,
     params: dict[str, Any] | None = None,
@@ -170,6 +174,11 @@ def _text(node: ET.Element | None) -> str:
     if node is None:
         return ""
     return " ".join(part.strip() for part in node.itertext() if part.strip())
+
+
+def _year_from_text(value: Any) -> int | None:
+    match = re.search(r"(19|20)\d{2}", str(value or ""))
+    return int(match.group(0)) if match else None
 
 
 def _first_text(parent: ET.Element, paths: list[str]) -> str:
@@ -272,17 +281,25 @@ def _write_wrappers(
     return existing_records
 
 
-def _arxiv_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
+def _arxiv_search_query(query: str, year: int | None = None) -> str:
+    search_query = f'all:"{query}"'
+    if year is not None:
+        search_query = f"{search_query} AND submittedDate:[{year}01010000 TO {year}12312359]"
+    return search_query
+
+
+def _arxiv_fetch(_field: str, query: str, query_limit: int, year: int | None = None) -> list[dict[str, Any]]:
     ns = {"atom": "http://www.w3.org/2005/Atom", "arxiv": "http://arxiv.org/schemas/atom"}
     items: list[dict[str, Any]] = []
     for start in range(0, query_limit, ARXIV_BATCH_SIZE):
         batch_size = min(ARXIV_BATCH_SIZE, query_limit - start)
-        _progress(f"arxiv: fetch query='{query}' start={start} batch={batch_size}")
+        year_label = f" year={year}" if year is not None else ""
+        _progress(f"arxiv: fetch{year_label} query='{query}' start={start} batch={batch_size}")
         try:
             root = _request_xml(
                 ARXIV_URL,
                 {
-                    "search_query": f"all:{query}",
+                    "search_query": _arxiv_search_query(query, year=year),
                     "start": start,
                     "max_results": batch_size,
                     "sortBy": "submittedDate",
@@ -311,6 +328,8 @@ def _arxiv_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, An
                 "doi": _text(entry.find("arxiv:doi", ns)),
                 "source_id": entry_id,
             }
+            if year is not None and _year_from_text(raw["published"] or raw["updated"]) != year:
+                continue
             items.append({"source_id": entry_id, "raw": raw})
         time.sleep(ARXIV_SLEEP_SECONDS)
     return items
@@ -318,6 +337,13 @@ def _arxiv_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, An
 
 def harvest_arxiv(*, output_path: str | Path, limit: int) -> int:
     return _write_wrappers(output_path=output_path, source="arxiv", limit=limit, fetch_query=_arxiv_fetch)
+
+
+def harvest_arxiv_year(*, output_path: str | Path, limit: int, year: int) -> int:
+    def fetch_query(field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
+        return _arxiv_fetch(field, query, query_limit, year=year)
+
+    return _write_wrappers(output_path=output_path, source="arxiv", limit=limit, fetch_query=fetch_query)
 
 
 def _ncbi_base_params() -> dict[str, str]:
@@ -329,11 +355,16 @@ def _ncbi_base_params() -> dict[str, str]:
     return params
 
 
-def _ncbi_search_ids(db: str, query: str, query_limit: int) -> list[str]:
+def _year_query(query: str, year: int) -> str:
+    return f"({query}) AND {year}[pdat]"
+
+
+def _ncbi_search_ids(db: str, query: str, query_limit: int, year: int | None = None) -> list[str]:
+    term = _year_query(query, year) if year is not None else query
     params = {
         **_ncbi_base_params(),
         "db": db,
-        "term": query,
+        "term": term,
         "retmax": query_limit,
         "sort": "pub+date",
     }
@@ -344,6 +375,10 @@ def _ncbi_search_ids(db: str, query: str, query_limit: int) -> list[str]:
 
 def _pubmed_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
     ids = _ncbi_search_ids("pubmed", query, query_limit)
+    return _pubmed_fetch_ids(query=query, ids=ids)
+
+
+def _pubmed_fetch_ids(*, query: str, ids: list[str]) -> list[dict[str, Any]]:
     if not ids:
         return []
     items: list[dict[str, Any]] = []
@@ -381,6 +416,18 @@ def _pubmed_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, A
 
 def harvest_pubmed(*, output_path: str | Path, limit: int) -> int:
     return _write_wrappers(output_path=output_path, source="pubmed", limit=limit, fetch_query=_pubmed_fetch)
+
+
+def harvest_pubmed_year(*, output_path: str | Path, limit: int, year: int) -> int:
+    def fetch_query(_field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
+        ids = _ncbi_search_ids("pubmed", query, query_limit, year=year)
+        return [
+            item
+            for item in _pubmed_fetch_ids(query=query, ids=ids)
+            if _year_from_text((item.get("raw") or {}).get("year")) == year
+        ]
+
+    return _write_wrappers(output_path=output_path, source="pubmed", limit=limit, fetch_query=fetch_query)
 
 
 def _pmc_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
@@ -493,6 +540,71 @@ def harvest_pmc(*, output_path: str | Path, limit: int) -> int:
     )
 
 
+def harvest_pmc_year(*, output_path: str | Path, limit: int, year: int) -> int:
+    def fetch_query(field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
+        ids = _ncbi_search_ids("pmc", query, query_limit, year=year)
+        if not ids:
+            return []
+        items: list[dict[str, Any]] = []
+        parsed_ids: set[str] = set()
+        for batch in _batched(ids, NCBI_EFETCH_BATCH_SIZE):
+            _progress(f"pmc: efetch year={year} query='{query}' batch={len(batch)}")
+            root = _request_xml(
+                NCBI_EFETCH_URL,
+                {**_ncbi_base_params(), "retmode": "xml", "db": "pmc", "id": ",".join(batch)},
+                timeout=120,
+            )
+            for index, article in enumerate(root.findall(".//{*}article")):
+                pmc_id = _first_text(article, [".//{*}article-id[@pub-id-type='pmc']"])
+                source_id = f"PMC{pmc_id}" if pmc_id and not pmc_id.startswith("PMC") else pmc_id
+                if not source_id and index < len(batch):
+                    source_id = f"PMC{batch[index]}"
+                parsed_ids.add(source_id)
+                paragraphs = [_text(node) for node in article.findall(".//{*}body//{*}p")]
+                raw = {
+                    "pmcid": source_id,
+                    "title": _first_text(article, [".//{*}article-title"]),
+                    "abstract": " ".join(_text(node) for node in article.findall(".//{*}abstract")),
+                    "authors": [
+                        " ".join(
+                            part
+                            for part in [
+                                _first_text(author, [".//{*}given-names"]),
+                                _first_text(author, [".//{*}surname"]),
+                            ]
+                            if part
+                        )
+                        for author in article.findall(".//{*}contrib[@contrib-type='author']")
+                    ],
+                    "year": _first_text(article, [".//{*}pub-date/{*}year"]) or str(year),
+                    "keywords": [_text(node) for node in article.findall(".//{*}kwd")],
+                    "doi": _first_text(article, [".//{*}article-id[@pub-id-type='doi']"]),
+                    "body_excerpt": " ".join(paragraphs)[:2500],
+                }
+                if _year_from_text(raw["year"]) != year:
+                    continue
+                items.append({"source_id": source_id, "raw": raw})
+            time.sleep(0.35)
+        missing_ids = [pmc_id for pmc_id in ids if f"PMC{pmc_id}" not in parsed_ids and pmc_id not in parsed_ids]
+        if missing_ids:
+            items.extend(_pmc_summary_fetch(missing_ids))
+        return items
+
+    def summary_query(field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
+        return _pmc_summary_fetch(_ncbi_search_ids("pmc", query, query_limit, year=year))
+
+    return _write_wrappers(
+        output_path=output_path,
+        source="pmc",
+        limit=limit,
+        fetch_query=fetch_query,
+        queries=PMC_QUERIES,
+        backfill_queries=PMC_BACKFILL_QUERIES,
+        backfill_fetch_query=summary_query,
+        backfill_min_query_limit=250,
+    )
+
+
 def _crossref_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
     headers = {}
     if email := os.getenv("CROSSREF_EMAIL"):
@@ -529,6 +641,43 @@ def _crossref_fetch(_field: str, query: str, query_limit: int) -> list[dict[str,
 
 def harvest_crossref(*, output_path: str | Path, limit: int) -> int:
     return _write_wrappers(output_path=output_path, source="crossref", limit=limit, fetch_query=_crossref_fetch)
+
+
+def harvest_crossref_year(*, output_path: str | Path, limit: int, year: int) -> int:
+    def fetch_query(_field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
+        headers = {}
+        if email := os.getenv("CROSSREF_EMAIL"):
+            headers["User-Agent"] = f"SciScopeHarvester/0.1 (mailto:{email})"
+        items: list[dict[str, Any]] = []
+        for offset in range(0, query_limit, CROSSREF_BATCH_SIZE):
+            rows = min(CROSSREF_BATCH_SIZE, query_limit - offset)
+            _progress(f"crossref: fetch year={year} query='{query}' offset={offset} rows={rows}")
+            payload = _request_json(
+                CROSSREF_URL,
+                {
+                    "query": query,
+                    "rows": rows,
+                    "offset": offset,
+                    "sort": "published",
+                    "order": "desc",
+                    "filter": f"from-pub-date:{year}-01-01,until-pub-date:{year}-12-31,type:journal-article",
+                },
+                headers=headers,
+                timeout=90,
+            )
+            batch = (payload.get("message") or {}).get("items") or []
+            if not batch:
+                break
+            for work in batch:
+                doi = str(work.get("DOI") or "").strip()
+                if doi:
+                    items.append({"source_id": doi, "raw": work})
+            if len(batch) < rows:
+                break
+            time.sleep(1.0)
+        return items
+
+    return _write_wrappers(output_path=output_path, source="crossref", limit=limit, fetch_query=fetch_query)
 
 
 def _semantic_scholar_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
@@ -588,6 +737,58 @@ def harvest_doaj(*, output_path: str | Path, limit: int) -> int:
     return _write_wrappers(output_path=output_path, source="doaj", limit=limit, fetch_query=_doaj_fetch)
 
 
+def _doaj_article_year(article: dict[str, Any]) -> int | None:
+    bibjson = article.get("bibjson") or {}
+    value = bibjson.get("year") or bibjson.get("publication_year") or bibjson.get("month")
+    match = re.search(r"(19|20)\d{2}", str(value or ""))
+    return int(match.group(0)) if match else None
+
+
+def _doaj_fetch_year(_field: str, query: str, query_limit: int, year: int) -> list[dict[str, Any]]:
+    query_limit = min(query_limit, DOAJ_QUERY_RESULT_CAP)
+    page_size = min(query_limit, DOAJ_BATCH_SIZE)
+    server_query = f"{query} AND bibjson.year:{year}"
+    url = f"{DOAJ_URL}/{quote(server_query)}"
+    items: list[dict[str, Any]] = []
+    page = 1
+    while len(items) < query_limit:
+        _progress(f"doaj: fetch year={year} query='{query}' page={page} page_size={page_size}")
+        try:
+            payload = _request_json(
+                url,
+                {"page": page, "pageSize": min(page_size, query_limit - len(items))},
+                timeout=90,
+            )
+        except HarvestError as exc:
+            if items:
+                _progress(f"doaj: partial year={year} query='{query}' stopped after error: {exc}")
+                break
+            raise
+        results = payload.get("results") or []
+        if not results:
+            break
+        for article in results:
+            if _doaj_article_year(article) != year:
+                continue
+            source_id = str(article.get("id") or article.get("bibjson", {}).get("identifier", [{}])[0].get("id") or "")
+            if source_id:
+                items.append({"source_id": source_id, "raw": article})
+            if len(items) >= query_limit:
+                break
+        if len(results) < page_size:
+            break
+        page += 1
+        time.sleep(0.5)
+    return items
+
+
+def harvest_doaj_year(*, output_path: str | Path, limit: int, year: int) -> int:
+    def fetch_query(field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
+        return _doaj_fetch_year(field, query, query_limit, year=year)
+
+    return _write_wrappers(output_path=output_path, source="doaj", limit=limit, fetch_query=fetch_query)
+
+
 def _core_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any]]:
     api_key = os.getenv("CORE_API_KEY")
     if not api_key:
@@ -621,6 +822,26 @@ def harvest_source(*, source: str, output_path: str | Path, limit: int) -> int:
     if source not in HARVESTERS:
         raise HarvestError(f"Unsupported source: {source}. Supported sources: {', '.join(SUPPORTED_SOURCES)}")
     return HARVESTERS[source](output_path=output_path, limit=limit)
+
+
+YEAR_HARVESTERS: dict[str, Callable[..., int]] = {
+    "openalex": harvest_openalex,
+    "arxiv": harvest_arxiv_year,
+    "pubmed": harvest_pubmed_year,
+    "pmc": harvest_pmc_year,
+    "crossref": harvest_crossref_year,
+    "doaj": harvest_doaj_year,
+}
+
+YEAR_SUPPORTED_SOURCES = tuple(YEAR_HARVESTERS)
+
+
+def harvest_source_year(*, source: str, output_path: str | Path, limit: int, year: int) -> int:
+    if source not in YEAR_HARVESTERS:
+        raise HarvestError(
+            f"Unsupported year-balanced source: {source}. Supported sources: {', '.join(YEAR_SUPPORTED_SOURCES)}"
+        )
+    return YEAR_HARVESTERS[source](output_path=output_path, limit=limit, year=year)
 
 
 def strip_markup(value: str) -> str:

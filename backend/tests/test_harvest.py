@@ -3,7 +3,18 @@ import json
 import pytest
 
 from src.harvest.normalize import normalize_raw_jsonl, openalex_work_to_paper, paper_wrapper_to_paper
-from src.harvest.public_sources import SUPPORTED_SOURCES, _write_wrappers, default_raw_path, pmc_summary_record_to_item
+from src.harvest.openalex_client import _query_params
+from src.harvest.public_sources import (
+    SUPPORTED_SOURCES,
+    YEAR_SUPPORTED_SOURCES,
+    _arxiv_search_query,
+    _doaj_article_year,
+    _year_query,
+    _write_wrappers,
+    default_raw_path,
+    pmc_summary_record_to_item,
+    year_raw_path,
+)
 
 
 def _openalex_wrapper():
@@ -191,6 +202,31 @@ def test_paper_wrapper_to_paper_supports_public_sources(source, wrapper, expecte
 
 def test_default_raw_path_separates_sources_and_limits():
     assert str(default_raw_path("arxiv", 500)) == "data/raw/arxiv/arxiv_500.jsonl"
+
+
+def test_year_raw_path_separates_sources_years_and_limits():
+    assert str(year_raw_path("openalex", 2024, 9000)) == "data/raw/openalex/openalex_2024_9000.jsonl"
+    assert {"openalex", "arxiv", "pubmed", "pmc", "crossref", "doaj"} <= set(YEAR_SUPPORTED_SOURCES)
+
+
+def test_public_source_year_queries_encode_source_specific_year_filters():
+    assert _arxiv_search_query("large language model", year=2024) == (
+        'all:"large language model" AND submittedDate:[202401010000 TO 202412312359]'
+    )
+    assert _year_query("cancer", 2023) == "(cancer) AND 2023[pdat]"
+
+
+def test_doaj_article_year_reads_bibjson_year():
+    assert _doaj_article_year({"bibjson": {"year": "2024"}}) == 2024
+    assert _doaj_article_year({"bibjson": {"month": "2023-05"}}) == 2023
+
+
+def test_openalex_query_params_can_filter_publication_year():
+    params = _query_params(query="knowledge graph", cursor="*", per_page=200, year=2023)
+
+    assert "has_abstract:true" in params["filter"]
+    assert "from_publication_date:2023-01-01" in params["filter"]
+    assert "to_publication_date:2023-12-31" in params["filter"]
 
 
 def test_write_wrappers_keeps_existing_output_when_new_harvest_is_smaller(tmp_path):

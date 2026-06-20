@@ -41,6 +41,13 @@ def _utc_now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
+def _line_count(path: Path) -> int:
+    if not path.exists():
+        return 0
+    with path.open("r", encoding="utf-8") as handle:
+        return sum(1 for _ in handle)
+
+
 def _request_json(params: dict[str, Any], timeout: int = 30) -> dict[str, Any]:
     query = urlencode({key: value for key, value in params.items() if value not in {None, ""}})
     request = Request(
@@ -66,10 +73,13 @@ def _request_json(params: dict[str, Any], timeout: int = 30) -> dict[str, Any]:
     raise OpenAlexError(f"OpenAlex request failed: {last_error}")
 
 
-def _query_params(query: str, cursor: str, per_page: int) -> dict[str, Any]:
+def _query_params(query: str, cursor: str, per_page: int, year: int | None = None) -> dict[str, Any]:
+    filters = ["has_abstract:true"]
+    if year is not None:
+        filters.extend([f"from_publication_date:{year}-01-01", f"to_publication_date:{year}-12-31"])
     params: dict[str, Any] = {
         "search": query,
-        "filter": "has_abstract:true",
+        "filter": ",".join(filters),
         "per-page": per_page,
         "cursor": cursor,
         "select": ",".join(
@@ -102,6 +112,7 @@ def harvest_openalex(
     *,
     output_path: str | Path,
     limit: int,
+    year: int | None = None,
     queries: list[tuple[str, str]] | None = None,
     per_page: int = 200,
     delay_seconds: float = 0.2,
@@ -118,15 +129,18 @@ def harvest_openalex(
 
     seen_ids: set[str] = set()
     written = 0
-    _progress(f"start limit={limit} output={output}")
-    with output.open("w", encoding="utf-8") as handle:
+    existing_records = _line_count(output)
+    temp_output = output.with_name(f"{output.name}.tmp")
+    year_label = f" year={year}" if year is not None else ""
+    _progress(f"start limit={limit}{year_label} output={output}")
+    with temp_output.open("w", encoding="utf-8") as handle:
         for field, query in query_plan:
             cursor = "*"
             query_written = 0
             _progress(f"query='{query}' field='{field}' target={target_per_query} total={written}/{limit}")
             while written < limit and query_written < target_per_query:
                 page_size = min(per_page, limit - written, target_per_query - query_written)
-                payload = _request_json(_query_params(query=query, cursor=cursor, per_page=page_size))
+                payload = _request_json(_query_params(query=query, cursor=cursor, per_page=page_size, year=year))
                 before = written
                 for work in payload.get("results", []):
                     source_id = str(work.get("id") or "")
@@ -161,5 +175,14 @@ def harvest_openalex(
             if written >= limit:
                 break
 
-    _progress(f"done records={written} output={output}")
-    return written
+    if written >= existing_records:
+        temp_output.replace(output)
+        _progress(f"done records={written} output={output}")
+        return written
+
+    temp_output.unlink(missing_ok=True)
+    _progress(
+        f"kept existing output records={existing_records}; "
+        f"new records={written} was lower output={output}"
+    )
+    return existing_records

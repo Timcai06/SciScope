@@ -11,11 +11,23 @@ DATA_PATH ?= data/sample/papers.sample.json
 HARVEST_SOURCE ?= openalex
 HARVEST_LIMIT ?= 500
 HARVEST_SOURCES ?= openalex arxiv pubmed pmc crossref doaj
+BALANCE_SOURCE ?= openalex
+BALANCE_SOURCES ?= openalex arxiv pubmed pmc crossref doaj
+BALANCE_YEAR ?= 2025
+BALANCE_YEARS ?= 2022 2023 2024 2025
+BALANCE_LIMIT ?= 9000
+FULLTEXT_SOURCE ?= pmc
+FULLTEXT_YEAR ?= 2025
+FULLTEXT_YEARS ?= 2022 2023 2024 2025 2026
+FULLTEXT_LIMIT ?= 3000
 RAW_PAPERS_PATH ?= data/raw/openalex/works_sample.jsonl
 PROCESSED_PAPERS_PATH ?= data/processed/papers.json
 ANALYSIS_OUTPUT_DIR ?= data/analysis
 REPORT_ASSETS_DIR ?= output/assets/sciscope_data_report
 YEAR_BALANCE_TARGET ?= 10000
+POSTGRES_DSN ?= postgresql://tim@localhost:5432/sciscope
+RAG_CHUNKS_PATH ?= data/processed/paper_chunks.jsonl
+RAG_CHUNKS_SUMMARY_PATH ?= data/processed/paper_chunks.summary.json
 VLLM_HOST ?= 127.0.0.1
 VLLM_PORT ?= 8001
 VLLM_BASE_URL ?= http://$(VLLM_HOST):$(VLLM_PORT)/v1
@@ -41,7 +53,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources normalize normalize-source normalize-all-sources analysis-assets processed-corpus data-layer-audit data-layer-tonight report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -50,13 +62,21 @@ help:
 	@echo "  make harvest-sample   Harvest public paper metadata into raw JSONL"
 	@echo "  make harvest-source   Harvest one source into data/raw/<source>/<source>_<limit>.jsonl"
 	@echo "  make harvest-all-sources Harvest $(HARVEST_LIMIT) records/source for configured public sources"
+	@echo "  make harvest-year     Harvest one year into data/raw/<source>/<source>_<year>_<limit>.jsonl"
+	@echo "  make harvest-balanced-years Harvest $(BALANCE_YEARS) by source/year for year balance"
+	@echo "  make harvest-fulltext-years Harvest PMC full-text excerpts by publication year"
 	@echo "                         API-key enhanced sources: semantic_scholar, core"
 	@echo "  make normalize        Normalize raw JSONL into processed SciScope JSON"
 	@echo "  make normalize-source Normalize one source into data/processed/<source>_<limit>.json"
 	@echo "  make analysis-assets  Build report-ready analysis tables from raw JSONL"
+	@echo "  make analysis-assets-all Build report tables from every JSONL under data/raw"
 	@echo "  make processed-corpus Build merged 50k processed corpus from analysis tables"
 	@echo "  make data-layer-audit Audit year balance, text coverage, and RAG field readiness"
 	@echo "  make data-layer-tonight Rebuild corpus plus data-layer readiness report"
+	@echo "  make rag-chunks       Build chunk-level RAG assets from processed corpus"
+	@echo "  make postgres-schema  Apply PostgreSQL schema to $(POSTGRES_DSN)"
+	@echo "  make postgres-load    Load corpus/chunks into PostgreSQL"
+	@echo "  make postgres-refresh Build chunks and load PostgreSQL service tables"
 	@echo "  make report-figures   Build report-ready chart assets from data/analysis"
 	@echo "  make data-report-pdf  Build the SciScope data analysis report PDF"
 	@echo "  make report           Rebuild analysis tables, report figures, and data PDF"
@@ -77,7 +97,7 @@ install: install-backend install-frontend
 
 install-backend:
 	$(PYTHON) -m pip install --upgrade pip
-	$(PYTHON) -m pip install fastapi uvicorn pydantic pandas numpy scikit-learn networkx matplotlib pytest httpx
+	$(PYTHON) -m pip install fastapi uvicorn pydantic pandas numpy scikit-learn networkx matplotlib pytest httpx 'psycopg[binary]'
 
 install-frontend:
 	cd frontend && npm install
@@ -92,6 +112,26 @@ harvest-all-sources:
 	@for source in $(HARVEST_SOURCES); do \
 		echo "==> harvesting $$source ($(HARVEST_LIMIT))"; \
 		$(MAKE) harvest-source HARVEST_SOURCE=$$source HARVEST_LIMIT=$(HARVEST_LIMIT); \
+	done
+
+harvest-year:
+	$(PYTHON) -m src.harvest.cli harvest-year --source $(BALANCE_SOURCE) --year $(BALANCE_YEAR) --limit $(BALANCE_LIMIT)
+
+harvest-balanced-years:
+	@for year in $(BALANCE_YEARS); do \
+		for source in $(BALANCE_SOURCES); do \
+			echo "==> harvesting $$source year=$$year limit=$(BALANCE_LIMIT)"; \
+			$(MAKE) harvest-year BALANCE_SOURCE=$$source BALANCE_YEAR=$$year BALANCE_LIMIT=$(BALANCE_LIMIT); \
+		done; \
+	done
+
+harvest-fulltext-year:
+	$(PYTHON) -m src.harvest.cli harvest-year --source $(FULLTEXT_SOURCE) --year $(FULLTEXT_YEAR) --limit $(FULLTEXT_LIMIT)
+
+harvest-fulltext-years:
+	@for year in $(FULLTEXT_YEARS); do \
+		echo "==> harvesting full text source=$(FULLTEXT_SOURCE) year=$$year limit=$(FULLTEXT_LIMIT)"; \
+		$(MAKE) harvest-fulltext-year FULLTEXT_SOURCE=$(FULLTEXT_SOURCE) FULLTEXT_YEAR=$$year FULLTEXT_LIMIT=$(FULLTEXT_LIMIT); \
 	done
 
 normalize:
@@ -109,6 +149,9 @@ normalize-all-sources:
 analysis-assets:
 	$(PYTHON) -m src.analysis.cli assets --raw-dir data/raw --output-dir $(ANALYSIS_OUTPUT_DIR) --filename-template '{source}_$(HARVEST_LIMIT).jsonl'
 
+analysis-assets-all:
+	$(PYTHON) -m src.analysis.cli assets --raw-dir data/raw --output-dir $(ANALYSIS_OUTPUT_DIR)
+
 processed-corpus:
 	$(PYTHON) -m src.analysis.cli corpus --input $(ANALYSIS_OUTPUT_DIR)/papers_clean.json --output data/processed/papers_corpus_50k.json --summary data/processed/papers_corpus_50k.summary.json
 
@@ -116,6 +159,19 @@ data-layer-audit:
 	$(PYTHON) -m src.analysis.cli readiness --papers $(ANALYSIS_OUTPUT_DIR)/papers_clean.json --output $(REPORT_ASSETS_DIR)/data_layer_readiness.json --target-per-year $(YEAR_BALANCE_TARGET)
 
 data-layer-tonight: analysis-assets processed-corpus data-layer-audit
+
+data-layer-refresh: analysis-assets-all processed-corpus data-layer-audit report-figures data-report-pdf
+
+rag-chunks:
+	$(PYTHON) -m src.infra.cli chunks --input data/processed/papers_corpus_50k.json --output $(RAG_CHUNKS_PATH) --summary $(RAG_CHUNKS_SUMMARY_PATH)
+
+postgres-schema:
+	$(PYTHON) -m src.infra.cli schema --dsn $(POSTGRES_DSN) --file infra/postgres/schema.sql
+
+postgres-load: rag-chunks
+	$(PYTHON) -m src.infra.cli load-postgres --dsn $(POSTGRES_DSN) --papers data/processed/papers_corpus_50k.json --chunks $(RAG_CHUNKS_PATH)
+
+postgres-refresh: data-layer-refresh postgres-schema postgres-load
 
 report-figures:
 	@mkdir -p .cache/matplotlib

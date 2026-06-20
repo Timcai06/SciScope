@@ -1,42 +1,42 @@
 {
-  "records": 50498,
+  "records": 168447,
   "recent_window": "2022-2026",
-  "recent_records": 41435,
+  "recent_records": 159397,
   "target_per_year": 10000,
   "year_counts": {
-    "2022": 1472,
-    "2023": 1690,
-    "2024": 2416,
-    "2025": 4915,
-    "2026": 30942
+    "2022": 30926,
+    "2023": 30278,
+    "2024": 30666,
+    "2025": 33126,
+    "2026": 34401
   },
   "year_deficits_to_target": {
-    "2022": 8528,
-    "2023": 8310,
-    "2024": 7584,
-    "2025": 5085,
+    "2022": 0,
+    "2023": 0,
+    "2024": 0,
+    "2025": 0,
     "2026": 0
   },
   "year_balance_action": "Backfill 2022-2025 by year-filtered source queries and avoid adding more 2026-heavy batches until the non-2026 window approaches the target.",
   "source_counts": {
-    "openalex": 8500,
-    "pubmed": 8500,
-    "crossref": 8500,
-    "doaj": 8500,
-    "arxiv": 8496,
-    "pmc": 8002
+    "openalex": 41477,
+    "arxiv": 29760,
+    "pmc": 29227,
+    "crossref": 28500,
+    "pubmed": 28163,
+    "doaj": 11320
   },
   "field_counts": {
-    "computer science": 22011,
-    "biomedicine": 19793,
-    "materials science": 8694
+    "computer science": 75492,
+    "biomedicine": 64859,
+    "materials science": 28096
   },
   "text_coverage": {
-    "abstract_records": 38605,
-    "abstract_rate": 0.7645,
-    "full_text_records": 4542,
-    "full_text_rate": 0.0899,
-    "full_text_gap_to_15000": 10458
+    "abstract_records": 138071,
+    "abstract_rate": 0.8197,
+    "full_text_records": 11534,
+    "full_text_rate": 0.0685,
+    "full_text_gap_to_15000": 3466
   },
   "rag_field_coverage": {
     "doi": {
@@ -44,40 +44,40 @@
       "rate": 0.0
     },
     "title": {
-      "count": 50496,
+      "count": 168444,
       "rate": 1.0
     },
     "abstract": {
-      "count": 38605,
-      "rate": 0.7645
+      "count": 138071,
+      "rate": 0.8197
     },
     "authors": {
-      "count": 50399,
-      "rate": 0.998
+      "count": 167765,
+      "rate": 0.996
     },
     "year": {
-      "count": 50486,
-      "rate": 0.9998
+      "count": 168435,
+      "rate": 0.9999
     },
     "keywords": {
-      "count": 38584,
-      "rate": 0.7641
+      "count": 129142,
+      "rate": 0.7667
     },
     "field": {
-      "count": 50498,
+      "count": 168447,
       "rate": 1.0
     },
     "source": {
-      "count": 50498,
+      "count": 168447,
       "rate": 1.0
     },
     "source_id": {
-      "count": 50498,
+      "count": 168447,
       "rate": 1.0
     },
     "full_text": {
-      "count": 4542,
-      "rate": 0.0899
+      "count": 11534,
+      "rate": 0.0685
     }
   },
   "next_data_layer_tasks": [
