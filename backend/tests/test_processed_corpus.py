@@ -5,8 +5,8 @@ from src.analysis.corpus import build_processed_corpus
 
 def test_build_processed_corpus_dedupes_and_marks_recent_window(tmp_path):
     input_path = tmp_path / "papers_clean.json"
-    output_path = tmp_path / "papers_corpus_50k.json"
-    summary_path = tmp_path / "papers_corpus_50k.summary.json"
+    output_path = tmp_path / "papers_corpus.json"
+    summary_path = tmp_path / "papers_corpus.summary.json"
     input_path.write_text(
         json.dumps(
             [

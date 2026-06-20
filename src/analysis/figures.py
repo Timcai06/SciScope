@@ -543,6 +543,79 @@ def _plot_keyword_momentum(keyword_year: pd.DataFrame, output_dir: Path, *, top_
     }
 
 
+def _plot_keyword_normalized_trends(keyword_trends: pd.DataFrame, output_dir: Path, *, top_n: int = 8) -> dict[str, str]:
+    from matplotlib import pyplot as plt
+
+    if keyword_trends.empty:
+        raise ValueError("keyword_trends is empty")
+    data = keyword_trends.copy()
+    data["momentum_score"] = pd.to_numeric(data.get("momentum_score"), errors="coerce").fillna(0)
+    data["doc_count"] = pd.to_numeric(data.get("doc_count"), errors="coerce").fillna(0)
+    data = data[data["keyword"].map(_is_report_keyword)]
+    data = data.sort_values(["momentum_score", "doc_count"], ascending=False).head(top_n)
+    years = list(range(RECENT_YEAR_START, RECENT_YEAR_END + 1))
+
+    fig, ax = plt.subplots(figsize=(7.5, 4.5))
+    shades = np.linspace(0.12, 0.72, max(len(data), 1))
+    for shade, (_, row) in zip(shades, data.iterrows(), strict=False):
+        values = [float(row.get(f"normalized_df_{year}") or 0) for year in years]
+        ax.plot(years, values, marker="o", linewidth=1.3, markersize=3.2, color=str(shade), label=_compact_topic(row["keyword"]))
+    ax.set_title("Normalized Keyword Document Share")
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Documents containing term / year documents")
+    ax.set_xticks(years)
+    ax.grid(axis="y", linestyle="--")
+    ax.legend(loc="center left", bbox_to_anchor=(1.0, 0.5), fontsize=6.8, frameon=False)
+    save_figure(fig, output_dir / "keyword_normalized_trends.png")
+    return {
+        "figure_id": "keyword_normalized_trends",
+        "file": "keyword_normalized_trends.png",
+        "report_section": "关键词演化与热点趋势",
+        "source_table": "keyword_trends.csv",
+        "message": "使用年度文档占比展示关键词趋势, 避免年度总量变化误导 raw count。",
+        "status": "final",
+    }
+
+
+def _plot_topic_year_share(topic_year: pd.DataFrame, output_dir: Path, *, model: str = "nmf") -> dict[str, str]:
+    from matplotlib import pyplot as plt
+
+    data = topic_year.copy()
+    data = data[data["model"].astype(str) == model]
+    if data.empty:
+        data = topic_year.copy()
+    data["year"] = pd.to_numeric(data["year"], errors="coerce")
+    data["paper_count"] = pd.to_numeric(data["paper_count"], errors="coerce").fillna(0)
+    data = data.dropna(subset=["year"])
+    data["year"] = data["year"].astype(int)
+    data = data[(data["year"] >= RECENT_YEAR_START) & (data["year"] <= RECENT_YEAR_END)]
+    pivot = data.pivot_table(index="year", columns="topic_id", values="paper_count", aggfunc="sum", fill_value=0)
+    pivot = pivot.reindex(index=list(range(RECENT_YEAR_START, RECENT_YEAR_END + 1)), fill_value=0)
+    shares = pivot.div(pivot.sum(axis=1).replace(0, np.nan), axis=0).fillna(0)
+
+    fig, ax = plt.subplots(figsize=(7.4, 4.0))
+    bottom = np.zeros(len(shares.index))
+    shades = np.linspace(0.18, 0.82, max(len(shares.columns), 1))
+    for shade, topic_id in zip(shades, shares.columns, strict=False):
+        values = shares[topic_id].to_numpy()
+        ax.bar(shares.index.astype(str), values, bottom=bottom, color=str(shade), edgecolor="black", linewidth=0.25, label=f"T{topic_id}")
+        bottom = bottom + values
+    ax.set_title(f"Topic Year Share ({model.upper()} baseline)")
+    ax.set_ylabel("Share within year")
+    ax.set_ylim(0, 1.02)
+    ax.set_yticks(np.linspace(0, 1, 6), [f"{int(value * 100)}%" for value in np.linspace(0, 1, 6)])
+    ax.legend(ncol=4, fontsize=6.8, loc="upper center", bbox_to_anchor=(0.5, -0.14), frameon=False)
+    save_figure(fig, output_dir / "topic_year_share.png")
+    return {
+        "figure_id": "topic_year_share",
+        "file": "topic_year_share.png",
+        "report_section": "关键词演化与热点趋势",
+        "source_table": "topic_year_share.csv",
+        "message": "展示主题模型基线中各主题在年度语料中的占比变化。",
+        "status": "final",
+    }
+
+
 def _plot_author_communities(
     papers: list[dict[str, Any]],
     output_dir: Path,
@@ -801,6 +874,8 @@ def build_report_figures(
     quality = _read_csv(analysis_path / "source_quality_report.csv")
     keywords = _read_csv(analysis_path / "paper_keywords.csv")
     keyword_year = _read_csv(analysis_path / "keyword_year_matrix.csv")
+    keyword_trends = _read_csv(analysis_path / "keyword_trends.csv")
+    topic_year = _read_csv(analysis_path / "topic_year_share.csv")
 
     manifest: list[dict[str, str]] = []
     if not quality.empty:
@@ -817,6 +892,10 @@ def build_report_figures(
     if not keyword_year.empty:
         manifest.append(_plot_keyword_year_heatmap(keyword_year, output_path))
         manifest.append(_plot_keyword_momentum(keyword_year, output_path))
+    if not keyword_trends.empty:
+        manifest.append(_plot_keyword_normalized_trends(keyword_trends, output_path))
+    if not topic_year.empty:
+        manifest.append(_plot_topic_year_share(topic_year, output_path))
     if papers:
         manifest.append(_plot_author_network_scale(papers, output_path))
         manifest.append(_plot_author_communities(papers, output_path))
