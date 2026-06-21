@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import math
 import re
@@ -20,6 +21,10 @@ RECENT_YEAR_END = 2026
 MAX_AUTHORS_FOR_CORE_NETWORK = 12
 MAX_CORE_AUTHOR_GRAPH_EDGES = 25_000
 TOPIC_SAMPLE_LIMIT = 50_000
+KEYWORD_GRAPH_EDGE_LIMIT = 8_000
+KEYWORD_EXTRACTION_SAMPLE_LIMIT = 50_000
+KEYWORD_DRIFT_TOP_N = 40
+INCREMENTAL_CACHE_VERSION = "2026-06-21-v2"
 
 KEYWORD_ALIASES = {
     "ai": "artificial intelligence",
@@ -231,6 +236,43 @@ def _write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) ->
         writer.writerows(rows)
 
 
+def _stable_hash(value: Any) -> str:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def _load_incremental_cache(path: Path) -> dict[str, dict[str, Any]]:
+    records: dict[str, dict[str, Any]] = {}
+    if not path.exists():
+        return records
+    checked_version = False
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not checked_version:
+                checked_version = True
+                if record.get("cache_version") != INCREMENTAL_CACHE_VERSION:
+                    return {}
+            if record.get("cache_version") != INCREMENTAL_CACHE_VERSION:
+                continue
+            cache_key = str(record.get("cache_key") or "")
+            if cache_key:
+                records[cache_key] = record
+    return records
+
+
+def _write_incremental_cache(path: Path, records: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+
 def _paper_with_source(wrapper: dict[str, Any]) -> dict[str, Any]:
     paper = paper_wrapper_to_paper(wrapper)
     raw_metadata = _raw_metadata(wrapper)
@@ -319,6 +361,198 @@ def _raw_metadata(wrapper: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _clean_taxon(value: Any) -> str:
+    text = re.sub(r"\s+", " ", str(value or "").strip())
+    return text
+
+
+def _first_taxon(values: list[Any]) -> str:
+    for value in values:
+        text = _clean_taxon(value)
+        if text:
+            return text
+    return ""
+
+
+def _arxiv_taxonomy(categories: list[str]) -> tuple[str, str, str]:
+    primary = categories[0] if categories else ""
+    prefix = primary.split(".", 1)[0].lower()
+    domain = "Physical Sciences"
+    field = "Physics"
+    subfield = primary
+    category_labels = {
+        "cs.ai": ("Computer Science", "Artificial Intelligence", "Artificial Intelligence"),
+        "cs.cl": ("Computer Science", "Artificial Intelligence", "Natural Language Processing"),
+        "cs.cv": ("Computer Science", "Artificial Intelligence", "Computer Vision"),
+        "cs.lg": ("Computer Science", "Artificial Intelligence", "Machine Learning"),
+        "cs.ir": ("Computer Science", "Information Systems", "Information Retrieval"),
+        "cs.cr": ("Computer Science", "Security", "Computer Security"),
+        "cs.ro": ("Computer Science", "Robotics", "Robotics"),
+        "cond-mat.mtrl-sci": ("Physical Sciences", "Materials Science", "Materials Science"),
+        "q-bio.qm": ("Life Sciences", "Computational Biology", "Quantitative Methods"),
+        "q-bio.gn": ("Life Sciences", "Computational Biology", "Genomics"),
+        "q-bio.nc": ("Life Sciences", "Computational Biology", "Neurons and Cognition"),
+        "stat.ml": ("Computer Science", "Statistics", "Statistical Machine Learning"),
+        "stat.me": ("Physical Sciences", "Statistics", "Statistical Methods"),
+        "eess.iv": ("Computer Science", "Electrical Engineering", "Image and Video Processing"),
+    }
+    if primary.lower() in category_labels:
+        return category_labels[primary.lower()]
+    if prefix == "cs":
+        domain, field = "Computer Science", "Computer Science"
+    elif prefix == "q-bio":
+        domain, field = "Life Sciences", "Computational Biology"
+    elif prefix in {"cond-mat"}:
+        domain, field = "Physical Sciences", "Materials Science"
+    elif prefix in {"stat"}:
+        domain, field = "Physical Sciences", "Statistics"
+    elif prefix in {"eess"}:
+        domain, field = "Computer Science", "Electrical Engineering"
+    elif prefix in {"math"}:
+        domain, field = "Physical Sciences", "Mathematics"
+    elif prefix in {"astro-ph", "gr-qc", "hep-ex", "hep-lat", "hep-ph", "hep-th", "nucl-ex", "nucl-th"}:
+        domain, field = "Physical Sciences", "Physics"
+    return domain, field, subfield
+
+
+def _subject_taxonomy(subjects: list[str], fallback: str) -> tuple[str, str, str]:
+    joined = " ".join(subjects).lower()
+    fallback_clean = _clean_taxon(fallback)
+    if any(token in joined for token in ("computer", "information technology", "electronic")):
+        return "Computer Science", "Computer Science", _first_taxon(subjects)
+    if any(token in joined for token in ("medicine", "medical", "public health", "health")):
+        return "Health Sciences", "Medicine", _first_taxon(subjects)
+    if any(token in joined for token in ("biology", "biological", "genetics", "life sciences")):
+        return "Life Sciences", "Biology", _first_taxon(subjects)
+    if any(token in joined for token in ("material", "nanomaterial", "chemical technology", "engineering")):
+        return "Physical Sciences", "Materials Science", _first_taxon(subjects)
+    if any(token in joined for token in ("physics", "chemistry", "mathematics", "science")):
+        return "Physical Sciences", "Physical Sciences", _first_taxon(subjects)
+    if any(token in joined for token in ("social", "education", "economics", "law", "political")):
+        return "Social Sciences", "Social Sciences", _first_taxon(subjects)
+    if fallback_clean:
+        return _subject_taxonomy([fallback_clean], "")
+    return "Cross-field", "Unknown", ""
+
+
+def _keyword_subfield(keywords: list[Any]) -> str:
+    generic = {"article", "humans", "male", "female", "adult", "study", "method", "methods"}
+    for keyword in keywords:
+        text = _normalize_keyword(keyword)
+        if len(text) >= 4 and text not in generic:
+            return text
+    return ""
+
+
+def _taxonomy_for_paper(wrapper: dict[str, Any], paper: dict[str, Any]) -> dict[str, Any]:
+    raw = wrapper.get("raw") if isinstance(wrapper.get("raw"), dict) else {}
+    source = str(wrapper.get("source") or paper.get("source") or "")
+    domain = ""
+    field = ""
+    subfield = ""
+    taxonomy_source = "field_seed"
+    confidence = 0.55
+    raw_terms: list[str] = []
+
+    if source == "openalex":
+        primary_topic = raw.get("primary_topic") if isinstance(raw.get("primary_topic"), dict) else {}
+        domain = _clean_taxon((primary_topic.get("domain") or {}).get("display_name") if isinstance(primary_topic.get("domain"), dict) else "")
+        field = _clean_taxon((primary_topic.get("field") or {}).get("display_name") if isinstance(primary_topic.get("field"), dict) else "")
+        subfield = _clean_taxon((primary_topic.get("subfield") or {}).get("display_name") if isinstance(primary_topic.get("subfield"), dict) else "")
+        topic_name = _clean_taxon(primary_topic.get("display_name"))
+        raw_terms = [term for term in (topic_name, domain, field, subfield) if term]
+        taxonomy_source = "openalex_primary_topic"
+        confidence = 0.95 if raw_terms else 0.55
+    elif source == "arxiv":
+        categories = raw.get("categories") or raw.get("category") or []
+        if isinstance(categories, str):
+            categories = categories.split()
+        categories = [_clean_taxon(category) for category in categories if _clean_taxon(category)]
+        domain, field, subfield = _arxiv_taxonomy(categories)
+        raw_terms = categories
+        taxonomy_source = "arxiv_category"
+        confidence = 0.9 if categories else 0.55
+    elif source == "doaj":
+        bibjson = raw.get("bibjson") if isinstance(raw.get("bibjson"), dict) else {}
+        subjects = []
+        for subject in bibjson.get("subject") or []:
+            if isinstance(subject, dict):
+                subjects.append(_clean_taxon(subject.get("term") or subject.get("code")))
+            else:
+                subjects.append(_clean_taxon(subject))
+        subjects = [subject for subject in subjects if subject]
+        domain, field, subfield = _subject_taxonomy(subjects, str(wrapper.get("field_seed") or ""))
+        raw_terms = subjects
+        taxonomy_source = "doaj_subject"
+        confidence = 0.82 if subjects else 0.55
+    elif source in {"pubmed", "pmc"}:
+        keywords = list(raw.get("keywords") or raw.get("mesh_terms") or paper.get("keywords") or [])
+        domain, field = _subject_taxonomy([str(wrapper.get("field_seed") or paper.get("field") or "")], "")[:2]
+        if domain == "Cross-field":
+            domain, field = "Health Sciences", "Medicine"
+        subfield = _keyword_subfield(keywords)
+        raw_terms = [_clean_taxon(keyword) for keyword in keywords[:8] if _clean_taxon(keyword)]
+        taxonomy_source = "biomedical_keywords"
+        confidence = 0.75 if raw_terms else 0.6
+    else:
+        domain, field, subfield = _subject_taxonomy([str(wrapper.get("field_seed") or paper.get("field") or "")], "")
+        raw_terms = [term for term in (str(wrapper.get("field_seed") or ""), str(paper.get("field") or "")) if term]
+
+    if not domain or not field:
+        domain, field, fallback_subfield = _subject_taxonomy([str(wrapper.get("field_seed") or paper.get("field") or "")], "")
+        subfield = subfield or fallback_subfield
+    if not subfield:
+        subfield = _keyword_subfield(list(paper.get("keywords") or []))
+
+    return {
+        "paper_id": paper.get("paper_id") or "",
+        "source": source,
+        "year": paper.get("year") or "",
+        "domain": domain or "Cross-field",
+        "field": field or "Unknown",
+        "subfield": subfield or "",
+        "taxonomy_source": taxonomy_source,
+        "taxonomy_confidence": round(confidence, 2),
+        "raw_taxonomy_terms": ";".join(raw_terms[:12]),
+        "has_full_text": int(bool(paper.get("full_text"))),
+    }
+
+
+def _build_taxonomy_coverage(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for row in rows:
+        key = (
+            str(row.get("source") or ""),
+            str(row.get("domain") or ""),
+            str(row.get("field") or ""),
+            str(row.get("subfield") or ""),
+        )
+        current = grouped.setdefault(
+            key,
+            {
+                "source": key[0],
+                "domain": key[1],
+                "field": key[2],
+                "subfield": key[3],
+                "records": 0,
+                "full_text_count": 0,
+            },
+        )
+        current["records"] += 1
+        current["full_text_count"] += int(row.get("has_full_text") or 0)
+    output = []
+    for row in grouped.values():
+        records = int(row["records"])
+        full_text_count = int(row["full_text_count"])
+        output.append(
+            {
+                **row,
+                "full_text_rate": round(full_text_count / records, 4) if records else 0,
+            }
+        )
+    return sorted(output, key=lambda row: (-int(row["records"]), row["source"], row["domain"], row["field"], row["subfield"]))
+
+
 def _raw_paths(raw_path: Path, sources: tuple[str, ...], filename_template: str | None) -> list[tuple[str, Path]]:
     paths: list[tuple[str, Path]] = []
     for source in sources:
@@ -387,12 +621,31 @@ def _doc_key(paper: dict[str, Any]) -> str:
     return str(paper.get("paper_id") or paper.get("title") or id(paper))
 
 
-def _build_keyword_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+def _build_keyword_assets(
+    papers: list[dict[str, Any]],
+    *,
+    edge_cache_dir: Path | None = None,
+) -> tuple[
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
     paper_keywords: list[dict[str, Any]] = []
     paper_keyword_signals: list[dict[str, Any]] = []
     alias_rows: dict[str, str] = {}
     keyword_year_docs: dict[tuple[str, int], dict[str, set[str]]] = defaultdict(lambda: {"explicit": set(), "text": set(), "fused": set()})
     keyword_representatives: dict[str, dict[str, Any]] = {}
+    paper_keyword_docs: dict[str, dict[str, Any]] = {}
     docs_by_year = Counter(int(paper["year"]) for paper in papers if _is_recent_year(paper.get("year")))
     analyzable_docs_by_year = Counter(
         int(paper["year"])
@@ -407,11 +660,23 @@ def _build_keyword_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, 
         paper_id_text = str(paper.get("paper_id") or "")
         source = str(paper.get("source") or "")
         paper_year = paper.get("year") or ""
+        keyword_doc = paper_keyword_docs.setdefault(
+            paper_id,
+            {
+                "doc_key": paper_id,
+                "paper_id": paper_id_text,
+                "source": source,
+                "year": year,
+                "paper_year": paper_year,
+                "keywords": set(),
+            },
+        )
         for raw_keyword in paper.get("keywords") or []:
             keyword = _normalize_keyword(raw_keyword)
             if not keyword or not _is_keyword_signal(keyword) or keyword in seen_explicit_keywords:
                 continue
             seen_explicit_keywords.add(keyword)
+            keyword_doc["keywords"].add(keyword)
             alias_rows[str(raw_keyword).strip().lower()] = keyword
             row = {"paper_id": paper_id_text, "source": source, "year": paper_year, "keyword": keyword}
             paper_keywords.append(row)
@@ -428,6 +693,7 @@ def _build_keyword_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, 
             if not keyword or not _is_keyword_signal(keyword) or keyword in seen_text_terms:
                 continue
             seen_text_terms.add(keyword)
+            keyword_doc["keywords"].add(keyword)
             row = {"paper_id": paper_id_text, "source": source, "year": paper_year, "keyword": keyword}
             if year is not None:
                 docs = keyword_year_docs[(keyword, year)]
@@ -507,7 +773,580 @@ def _build_keyword_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, 
         trend_rows.append(row)
     trend_rows.sort(key=lambda row: (float(row["momentum_score"]), int(row["doc_count"])), reverse=True)
     alias_output = [{"raw_keyword": raw, "canonical_keyword": canonical} for raw, canonical in sorted(alias_rows.items()) if raw != canonical]
-    return paper_keywords, paper_keyword_signals, keyword_year_rows, trend_rows, alias_output
+    keyword_docs = list(paper_keyword_docs.values())
+    (
+        keyword_edge_rows,
+        keyword_metrics_rows,
+        keyword_community_rows,
+        keyword_burst_rows,
+        keyword_lifecycle_rows,
+        keyword_drift_rows,
+        keyword_edge_cache_stats,
+    ) = _build_keyword_network_assets(keyword_docs, keyword_year_rows, trend_rows, edge_cache_dir=edge_cache_dir)
+    keyword_tfidf_rows, keyword_extraction_diagnostics = _build_keyword_extraction_assets(papers, keyword_drift_rows)
+    return (
+        paper_keywords,
+        paper_keyword_signals,
+        keyword_year_rows,
+        trend_rows,
+        alias_output,
+        keyword_edge_rows,
+        keyword_metrics_rows,
+        keyword_community_rows,
+        keyword_burst_rows,
+        keyword_lifecycle_rows,
+        keyword_drift_rows,
+        keyword_tfidf_rows,
+        keyword_extraction_diagnostics + keyword_edge_cache_stats,
+    )
+
+
+def _keyword_edge_signature(keyword_doc: dict[str, Any]) -> str:
+    return _stable_hash(
+        {
+            "paper_id": keyword_doc.get("paper_id") or "",
+            "doc_key": keyword_doc.get("doc_key") or keyword_doc.get("paper_id") or "",
+            "source": keyword_doc.get("source") or "",
+            "year": keyword_doc.get("paper_year") or keyword_doc.get("year") or "",
+            "keywords": sorted(str(keyword) for keyword in keyword_doc.get("keywords", set())),
+        }
+    )
+
+
+def _keyword_edge_contributions(keyword_doc: dict[str, Any]) -> list[dict[str, Any]]:
+    keywords = sorted(str(keyword) for keyword in keyword_doc.get("keywords", set()) if str(keyword).strip())
+    if len(keywords) < 2:
+        return []
+    weight = 2 / (len(keywords) * (len(keywords) - 1))
+    year = keyword_doc.get("year")
+    contributions: list[dict[str, Any]] = []
+    for keyword_a, keyword_b in combinations(keywords, 2):
+        contributions.append(
+            {
+                "keyword_a": keyword_a,
+                "keyword_b": keyword_b,
+                "paper_count": 1,
+                "weight": weight,
+                "year": year,
+            }
+        )
+    return contributions
+
+
+def _merge_keyword_edge_contribution(
+    edge_stats: dict[tuple[str, str], dict[str, Any]],
+    contribution: dict[str, Any],
+) -> None:
+    key = tuple(sorted((str(contribution["keyword_a"]), str(contribution["keyword_b"]))))
+    year = _year_value(contribution.get("year"))
+    stats = edge_stats.setdefault(
+        key,
+        {
+            "keyword_a": key[0],
+            "keyword_b": key[1],
+            "paper_count": 0,
+            "weight": 0.0,
+            "first_year": year,
+            "last_year": year,
+            "years": set(),
+            "active_years": 0,
+        },
+    )
+    stats["paper_count"] += int(contribution.get("paper_count") or 1)
+    stats["weight"] += float(contribution.get("weight") or 0)
+    if year is not None:
+        stats["years"].add(year)
+        stats["first_year"] = min([item for item in (stats["first_year"], year) if item is not None])
+        stats["last_year"] = max([item for item in (stats["last_year"], year) if item is not None])
+
+
+def _load_keyword_edge_aggregate(path: Path) -> dict[tuple[str, str], dict[str, Any]]:
+    edge_stats: dict[tuple[str, str], dict[str, Any]] = {}
+    if not path.exists():
+        return edge_stats
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            keyword_a = str(row.get("keyword_a") or "").strip()
+            keyword_b = str(row.get("keyword_b") or "").strip()
+            if not keyword_a or not keyword_b or keyword_a == keyword_b:
+                continue
+            key = tuple(sorted((keyword_a, keyword_b)))
+            edge_stats[key] = {
+                "keyword_a": key[0],
+                "keyword_b": key[1],
+                "weight": float(row.get("weight") or 0),
+                "paper_count": int(float(row.get("paper_count") or 0)),
+                "first_year": _year_value(row.get("first_year")),
+                "last_year": _year_value(row.get("last_year")),
+                "years": set(),
+                "active_years": int(float(row.get("active_years") or 0)),
+            }
+    return edge_stats
+
+
+def _keyword_year_lookup(keyword_year_rows: list[dict[str, Any]]) -> tuple[dict[str, dict[int, int]], dict[str, dict[int, float]]]:
+    counts: dict[str, dict[int, int]] = defaultdict(dict)
+    normalized: dict[str, dict[int, float]] = defaultdict(dict)
+    for row in keyword_year_rows:
+        keyword = str(row["keyword"])
+        year = int(row["year"])
+        counts[keyword][year] = int(row.get("count") or 0)
+        normalized[keyword][year] = float(row.get("normalized_df") or 0)
+    return counts, normalized
+
+
+def _keyword_lifecycle_stage(counts: dict[int, int], growth_rate: float) -> str:
+    years = list(range(RECENT_YEAR_START, RECENT_YEAR_END + 1))
+    values = [int(counts.get(year, 0)) for year in years]
+    nonzero_years = [year for year in years if counts.get(year, 0) > 0]
+    if not nonzero_years:
+        return "decline"
+    first_year = nonzero_years[0]
+    peak_index = max(range(len(values)), key=lambda index: values[index])
+    peak_year = years[peak_index]
+    if first_year >= RECENT_YEAR_END - 1:
+        return "emergence"
+    if growth_rate >= 0.3 or (first_year > RECENT_YEAR_START and peak_year >= RECENT_YEAR_END - 1):
+        return "growth"
+    if peak_year < RECENT_YEAR_END - 1 and values[-1] < values[peak_index]:
+        return "decline"
+    return "maturity"
+
+
+def _build_keyword_burst_and_lifecycle(
+    keyword_year_rows: list[dict[str, Any]],
+    trend_rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, str]]:
+    counts_by_keyword, normalized_by_keyword = _keyword_year_lookup(keyword_year_rows)
+    trend_by_keyword = {str(row["keyword"]): row for row in trend_rows}
+    years = list(range(RECENT_YEAR_START, RECENT_YEAR_END + 1))
+
+    burst_rows: list[dict[str, Any]] = []
+    lifecycle_rows: list[dict[str, Any]] = []
+    stage_by_keyword: dict[str, str] = {}
+    for keyword, counts in sorted(counts_by_keyword.items()):
+        trend = trend_by_keyword.get(keyword, {})
+        doc_count = sum(int(counts.get(year, 0)) for year in years)
+        if doc_count <= 0:
+            continue
+        peak_year = max(years, key=lambda year: int(counts.get(year, 0)))
+        peak_count = int(counts.get(peak_year, 0))
+        first_year = min(year for year in years if int(counts.get(year, 0)) > 0)
+        last_year = max(year for year in years if int(counts.get(year, 0)) > 0)
+        growth_rate = float(trend.get("growth_rate") or 0)
+        stage = _keyword_lifecycle_stage(counts, growth_rate)
+        stage_by_keyword[keyword] = stage
+        lifecycle_rows.append(
+            {
+                "keyword": keyword,
+                "lifecycle_stage": stage,
+                "doc_count": doc_count,
+                "first_year": first_year,
+                "peak_year": peak_year,
+                "last_year": last_year,
+                "peak_count": peak_count,
+                "growth_rate": round(growth_rate, 6),
+                "burst_score": round(float(trend.get("burst_score") or 0), 6),
+            }
+        )
+        for year in years:
+            count = int(counts.get(year, 0))
+            previous_year = year - 1
+            previous_count = int(counts.get(previous_year, 0)) if previous_year in years else 0
+            current_norm = float(normalized_by_keyword[keyword].get(year, 0))
+            previous_norm = float(normalized_by_keyword[keyword].get(previous_year, 0)) if previous_year in years else 0.0
+            if count <= 0 and previous_count <= 0:
+                continue
+            if previous_count == 0:
+                annual_growth = float(count) if count else 0.0
+            else:
+                annual_growth = (count - previous_count) / max(previous_count, 1)
+            burst_state = ""
+            if count > 0 and previous_count == 0:
+                burst_state = "emergence"
+            elif annual_growth >= 0.3:
+                burst_state = "growth"
+            elif annual_growth <= -0.3:
+                burst_state = "decline"
+            if not burst_state:
+                continue
+            burst_score = math.log1p(count + previous_count) * abs(annual_growth)
+            burst_rows.append(
+                {
+                    "keyword": keyword,
+                    "year": year,
+                    "previous_year": previous_year if previous_year in years else "",
+                    "count": count,
+                    "previous_count": previous_count,
+                    "normalized_df": round(current_norm, 6),
+                    "previous_normalized_df": round(previous_norm, 6),
+                    "growth_rate": round(annual_growth, 6),
+                    "burst_score": round(burst_score, 6),
+                    "burst_state": burst_state,
+                }
+            )
+    lifecycle_rows.sort(key=lambda row: (-int(row["doc_count"]), row["keyword"]))
+    burst_rows.sort(key=lambda row: (-float(row["burst_score"]), row["keyword"], row["year"]))
+    return burst_rows, lifecycle_rows, stage_by_keyword
+
+
+def _counter_cosine(left: Counter[str], right: Counter[str]) -> float:
+    if not left or not right:
+        return 0.0
+    common = set(left).intersection(right)
+    numerator = sum(left[key] * right[key] for key in common)
+    left_norm = math.sqrt(sum(value * value for value in left.values()))
+    right_norm = math.sqrt(sum(value * value for value in right.values()))
+    if not left_norm or not right_norm:
+        return 0.0
+    return numerator / (left_norm * right_norm)
+
+
+def _build_keyword_context_drift(
+    keyword_docs: list[dict[str, Any]],
+    trend_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    top_keywords = {
+        str(row["keyword"])
+        for row in sorted(trend_rows, key=lambda item: (int(item.get("doc_count") or 0), float(item.get("momentum_score") or 0)), reverse=True)[
+            :KEYWORD_DRIFT_TOP_N
+        ]
+    }
+    contexts: dict[tuple[str, int], Counter[str]] = defaultdict(Counter)
+    for keyword_doc in keyword_docs:
+        year = _year_value(keyword_doc.get("year"))
+        if year is None:
+            continue
+        keywords = sorted(str(keyword) for keyword in keyword_doc.get("keywords", set()) if str(keyword).strip())
+        for keyword in keywords:
+            if keyword not in top_keywords:
+                continue
+            contexts[(keyword, year)].update(other for other in keywords if other != keyword)
+
+    rows: list[dict[str, Any]] = []
+    for keyword in sorted(top_keywords):
+        for year in range(RECENT_YEAR_START, RECENT_YEAR_END):
+            left = contexts.get((keyword, year), Counter())
+            right = contexts.get((keyword, year + 1), Counter())
+            if not left or not right:
+                continue
+            similarity = _counter_cosine(left, right)
+            rows.append(
+                {
+                    "keyword": keyword,
+                    "year_from": year,
+                    "year_to": year + 1,
+                    "cosine_similarity": round(similarity, 6),
+                    "drift_score": round(1 - similarity, 6),
+                    "method": "keyword_context_cosine_proxy",
+                    "significant": 0,
+                }
+            )
+    if rows:
+        scores = sorted(float(row["drift_score"]) for row in rows)
+        threshold = scores[max(0, int(len(scores) * 0.9) - 1)]
+        for row in rows:
+            row["significant"] = int(float(row["drift_score"]) >= threshold)
+    return sorted(rows, key=lambda row: (-float(row["drift_score"]), row["keyword"], row["year_from"]))
+
+
+def _build_keyword_network_assets(
+    keyword_docs: list[dict[str, Any]],
+    keyword_year_rows: list[dict[str, Any]],
+    trend_rows: list[dict[str, Any]],
+    *,
+    edge_cache_dir: Path | None = None,
+) -> tuple[
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
+    try:
+        import networkx as nx
+    except ImportError:
+        nx = None
+
+    edge_cache_path = edge_cache_dir / "keyword_edge_papers.jsonl" if edge_cache_dir else None
+    previous_edge_path = edge_cache_dir.parent / "keyword_cooccurrence_edges.csv" if edge_cache_dir else None
+    edge_cache = _load_incremental_cache(edge_cache_path) if edge_cache_path else {}
+    cache_hits = 0
+    cache_misses = 0
+    cache_changed = False
+    current_cache_keys: set[str] = set()
+    keyword_doc_records: list[dict[str, Any]] = []
+
+    for keyword_doc in keyword_docs:
+        keywords = keyword_doc.get("keywords", set())
+        if len(keywords) < 2:
+            continue
+        signature = _keyword_edge_signature(keyword_doc)
+        cache_key = f"{keyword_doc.get('source') or ''}:{keyword_doc.get('doc_key') or keyword_doc.get('paper_id') or signature}"
+        current_cache_keys.add(cache_key)
+        cached = edge_cache.get(cache_key)
+        cache_hit = bool(cached and cached.get("signature") == signature)
+        if cached and not cache_hit:
+            cache_changed = True
+        keyword_doc_records.append({"cache_key": cache_key, "signature": signature, "keyword_doc": keyword_doc, "cache_hit": cache_hit})
+
+    cache_removed = bool(set(edge_cache) - current_cache_keys)
+    can_reuse_previous_edges = bool(edge_cache) and bool(previous_edge_path and previous_edge_path.exists()) and not cache_changed and not cache_removed
+    edge_stats = _load_keyword_edge_aggregate(previous_edge_path) if can_reuse_previous_edges and previous_edge_path else {}
+
+    for record in keyword_doc_records:
+        if can_reuse_previous_edges and record["cache_hit"]:
+            cache_hits += 1
+            continue
+        contributions = _keyword_edge_contributions(record["keyword_doc"])
+        cache_misses += 1
+        for contribution in contributions:
+            _merge_keyword_edge_contribution(edge_stats, contribution)
+
+    if edge_cache_path:
+        _write_incremental_cache(
+            edge_cache_path,
+            (
+                {
+                    "cache_version": INCREMENTAL_CACHE_VERSION,
+                    "cache_key": record["cache_key"],
+                    "paper_id": record["keyword_doc"].get("paper_id") or "",
+                    "source": record["keyword_doc"].get("source") or "",
+                    "signature": record["signature"],
+                }
+                for record in keyword_doc_records
+            ),
+        )
+
+    edge_rows = [
+        {
+            "keyword_a": stats["keyword_a"],
+            "keyword_b": stats["keyword_b"],
+            "weight": round(float(stats["weight"]), 6),
+            "paper_count": int(stats["paper_count"]),
+            "first_year": stats["first_year"] or "",
+            "last_year": stats["last_year"] or "",
+            "active_years": max(len(stats["years"]), int(stats.get("active_years") or 0)),
+        }
+        for stats in edge_stats.values()
+    ]
+    edge_rows.sort(key=lambda row: (-float(row["weight"]), -int(row["paper_count"]), row["keyword_a"], row["keyword_b"]))
+
+    burst_rows, lifecycle_rows, stage_by_keyword = _build_keyword_burst_and_lifecycle(keyword_year_rows, trend_rows)
+    drift_rows = _build_keyword_context_drift(keyword_docs, trend_rows)
+    trend_by_keyword = {str(row["keyword"]): row for row in trend_rows}
+
+    graph = nx.Graph() if nx is not None else None
+    if graph is not None:
+        for row in edge_rows[:KEYWORD_GRAPH_EDGE_LIMIT]:
+            weight = float(row["weight"])
+            graph.add_edge(row["keyword_a"], row["keyword_b"], weight=weight, distance=1 / weight if weight else 1)
+
+    degree = dict(graph.degree(weight="weight")) if graph is not None and graph.number_of_nodes() else {}
+    pagerank = nx.pagerank(graph, weight="weight") if nx is not None and graph is not None and graph.number_of_nodes() > 1 else {}
+    betweenness = (
+        nx.betweenness_centrality(graph, weight="distance", k=min(200, graph.number_of_nodes()), seed=42)
+        if nx is not None and graph is not None and graph.number_of_nodes() > 1
+        else {}
+    )
+    community_by_keyword: dict[str, int] = {}
+    community_rows: list[dict[str, Any]] = []
+    modularity = 0.0
+    if nx is not None and graph is not None and graph.number_of_edges():
+        communities = list(nx.algorithms.community.louvain_communities(graph, weight="weight", resolution=1.0, seed=42))
+        modularity = nx.algorithms.community.modularity(graph, communities, weight="weight") if communities else 0.0
+        for community_id, community in enumerate(communities):
+            for keyword in community:
+                community_by_keyword[str(keyword)] = community_id
+            subgraph = graph.subgraph(community)
+            top_keywords = [keyword for keyword, _ in sorted(subgraph.degree(weight="weight"), key=lambda item: item[1], reverse=True)[:8]]
+            community_rows.append(
+                {
+                    "community_id": community_id,
+                    "keyword_count": len(community),
+                    "edge_count": subgraph.number_of_edges(),
+                    "total_weight": round(sum(float(data.get("weight") or 0) for _, _, data in subgraph.edges(data=True)), 6),
+                    "modularity": round(float(modularity), 6),
+                    "top_keywords": "; ".join(str(keyword) for keyword in top_keywords),
+                }
+            )
+    community_rows.sort(key=lambda row: (-int(row["keyword_count"]), -float(row["total_weight"])))
+
+    metric_keywords = set(trend_by_keyword).union(degree)
+    metric_rows: list[dict[str, Any]] = []
+    for keyword in sorted(metric_keywords):
+        trend = trend_by_keyword.get(keyword, {})
+        metric_rows.append(
+            {
+                "keyword": keyword,
+                "doc_count": int(trend.get("doc_count") or 0),
+                "explicit_doc_count": int(trend.get("explicit_doc_count") or 0),
+                "text_signal_doc_count": int(trend.get("text_signal_doc_count") or 0),
+                "normalized_df": float(trend.get("normalized_df") or 0),
+                "growth_rate": float(trend.get("growth_rate") or 0),
+                "burst_score": float(trend.get("burst_score") or 0),
+                "degree": round(float(degree.get(keyword, 0)), 6),
+                "weighted_degree": round(float(degree.get(keyword, 0)), 6),
+                "betweenness": round(float(betweenness.get(keyword, 0)), 6),
+                "pagerank": round(float(pagerank.get(keyword, 0)), 6),
+                "community_id": community_by_keyword.get(keyword, ""),
+                "lifecycle_stage": stage_by_keyword.get(keyword, ""),
+            }
+        )
+    metric_rows.sort(key=lambda row: (-float(row["pagerank"]), -float(row["weighted_degree"]), -int(row["doc_count"]), row["keyword"]))
+
+    cache_rows = [
+        {
+            "method": "keyword_edge_cache_hits",
+            "status": "final",
+            "records": cache_hits,
+            "note": "Papers whose keyword edge contributions were reused from cache.",
+        },
+        {
+            "method": "keyword_edge_cache_misses",
+            "status": "final",
+            "records": cache_misses,
+            "note": "Papers whose keyword edge contributions were recomputed.",
+        },
+    ]
+    return edge_rows, metric_rows, community_rows, burst_rows, lifecycle_rows, drift_rows, cache_rows
+
+
+def _build_keyword_extraction_assets(
+    papers: list[dict[str, Any]],
+    drift_rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    docs = [
+        str(paper.get("text_for_analysis") or "").strip()
+        for paper in papers
+        if _is_recent_year(paper.get("year")) and str(paper.get("text_for_analysis") or "").strip()
+    ][:KEYWORD_EXTRACTION_SAMPLE_LIMIT]
+    diagnostics = [
+        {
+            "method": "textrank",
+            "status": "sample_only",
+            "records": 0,
+            "note": "TextRank is intentionally reserved for representative documents to avoid full-corpus graph cost.",
+        },
+        {
+            "method": "keybert",
+            "status": "optional_not_run",
+            "records": 0,
+            "note": "KeyBERT is treated as an optional reranker for selected candidates, not a required full-corpus pass.",
+        },
+        {
+            "method": "semantic_drift",
+            "status": "context_proxy",
+            "records": len(drift_rows),
+            "note": "Semantic drift uses keyword-context cosine proxy for top keywords.",
+        },
+    ]
+    if not docs:
+        diagnostics.append({"method": "tfidf", "status": "empty", "records": 0, "note": "No analyzable recent documents."})
+        return [], diagnostics
+    try:
+        from sklearn.feature_extraction.text import TfidfVectorizer
+    except ImportError:
+        rows = _fallback_tfidf_rows(docs)
+        diagnostics.append(
+            {
+                "method": "tfidf",
+                "status": "fallback",
+                "records": len(rows),
+                "note": "scikit-learn is not installed; used deterministic n-gram TF-IDF fallback.",
+            }
+        )
+        return rows, diagnostics
+
+    min_df = 1 if len(docs) < 20 else 5
+    try:
+        vectorizer = TfidfVectorizer(
+            ngram_range=(1, 2),
+            min_df=min_df,
+            max_df=0.85,
+            max_features=3000,
+            stop_words="english",
+            sublinear_tf=True,
+        )
+        matrix = vectorizer.fit_transform(docs)
+    except ValueError as exc:
+        diagnostics.append({"method": "tfidf", "status": "failed", "records": 0, "note": str(exc)})
+        return [], diagnostics
+
+    terms = vectorizer.get_feature_names_out()
+    mean_scores = np.asarray(matrix.mean(axis=0)).ravel()
+    doc_counts = np.asarray((matrix > 0).sum(axis=0)).ravel()
+    order = np.argsort(mean_scores)[::-1][:120]
+    rows = [
+        {
+            "term": _normalize_keyword(terms[index]),
+            "method": "tfidf",
+            "mean_tfidf": round(float(mean_scores[index]), 8),
+            "doc_count": int(doc_counts[index]),
+            "sample_documents": len(docs),
+        }
+        for index in order
+        if _is_keyword_signal(str(terms[index]))
+    ]
+    if not rows:
+        rows = _fallback_tfidf_rows(docs)
+    diagnostics.append(
+        {
+            "method": "tfidf",
+            "status": "final",
+            "records": len(rows),
+            "note": f"TF-IDF ran on {len(docs)} recent documents with max_features=3000.",
+        }
+    )
+    return rows, diagnostics
+
+
+def _fallback_tfidf_rows(docs: list[str]) -> list[dict[str, Any]]:
+    stopwords = {
+        "and",
+        "are",
+        "for",
+        "from",
+        "into",
+        "that",
+        "the",
+        "their",
+        "this",
+        "with",
+    }
+    term_counts: Counter[str] = Counter()
+    term_docs: Counter[str] = Counter()
+    for doc in docs:
+        tokens = [
+            token
+            for token in re.findall(r"[a-z][a-z0-9]+", _normalize_keyword(doc))
+            if len(token) >= 3 and token not in stopwords
+        ]
+        terms: list[str] = []
+        terms.extend(tokens)
+        terms.extend(" ".join(tokens[index : index + 2]) for index in range(max(0, len(tokens) - 1)))
+        terms.extend(" ".join(tokens[index : index + 3]) for index in range(max(0, len(tokens) - 2)))
+        counts = Counter(term for term in terms if _is_keyword_signal(term))
+        term_counts.update(counts)
+        term_docs.update(counts.keys())
+    scored_rows = []
+    doc_total = max(len(docs), 1)
+    for term, count in term_counts.items():
+        doc_count = term_docs[term]
+        idf = math.log((doc_total + 1) / (doc_count + 1)) + 1
+        scored_rows.append(
+            {
+                "term": term,
+                "method": "tfidf",
+                "mean_tfidf": round((count / doc_total) * idf, 8),
+                "doc_count": int(doc_count),
+                "sample_documents": len(docs),
+            }
+        )
+    scored_rows.sort(key=lambda row: (-float(row["mean_tfidf"]), -int(row["doc_count"]), row["term"]))
+    return scored_rows[:120]
 
 
 def _author_name_key(value: Any) -> str:
@@ -619,8 +1458,130 @@ def _select_core_edge_rows(edge_rows: list[dict[str, Any]], nx_module: Any, *, m
     return selected or candidates
 
 
+def _author_edge_signature(paper: dict[str, Any], unique_authors: list[dict[str, Any]]) -> str:
+    return _stable_hash(
+        {
+            "paper_id": _doc_key(paper),
+            "source": paper.get("source") or "",
+            "year": paper.get("year") or "",
+            "authors": [
+                {
+                    "author_key": entry["author_key"],
+                    "author": entry["author"],
+                    "author_id": entry.get("author_id") or "",
+                }
+                for entry in unique_authors
+            ],
+        }
+    )
+
+
+def _author_edge_contributions(
+    unique_by_key: dict[str, dict[str, Any]],
+    unique_authors: list[dict[str, Any]],
+    year: int | None,
+) -> list[dict[str, Any]]:
+    if len(unique_authors) < 2:
+        return []
+    pair_weight = 1 / math.comb(len(unique_authors), 2)
+    author_weight = 1 / (len(unique_authors) - 1)
+    long_author_paper = int(len(unique_authors) > MAX_AUTHORS_FOR_CORE_NETWORK)
+    contributions: list[dict[str, Any]] = []
+    for entry_a, entry_b in combinations(unique_authors, 2):
+        key = tuple(sorted((str(entry_a["author_key"]), str(entry_b["author_key"]))))
+        row_a = unique_by_key[key[0]]
+        row_b = unique_by_key[key[1]]
+        contributions.append(
+            {
+                "author_a_key": key[0],
+                "author_b_key": key[1],
+                "author_a": row_a["author"],
+                "author_b": row_b["author"],
+                "paper_count": 1,
+                "weight_full": 1.0,
+                "weight_fraction_pair": pair_weight,
+                "weight_fraction_author": author_weight,
+                "year": year,
+                "long_author_papers": long_author_paper,
+            }
+        )
+    return contributions
+
+
+def _merge_author_edge_contribution(
+    edge_stats: dict[tuple[str, str], dict[str, Any]],
+    author_collaborators: dict[str, set[str]],
+    contribution: dict[str, Any],
+) -> None:
+    key = (str(contribution["author_a_key"]), str(contribution["author_b_key"]))
+    year = _year_value(contribution.get("year"))
+    stats = edge_stats.setdefault(
+        key,
+        {
+            "author_a_key": key[0],
+            "author_b_key": key[1],
+            "author_a": contribution["author_a"],
+            "author_b": contribution["author_b"],
+            "paper_count": 0,
+            "weight_full": 0.0,
+            "weight_fraction_pair": 0.0,
+            "weight_fraction_author": 0.0,
+            "first_year": year,
+            "last_year": year,
+            "years": set(),
+            "active_years": 0,
+            "long_author_papers": 0,
+        },
+    )
+    stats["paper_count"] += int(contribution.get("paper_count") or 1)
+    stats["weight_full"] += float(contribution.get("weight_full") or 0)
+    stats["weight_fraction_pair"] += float(contribution.get("weight_fraction_pair") or 0)
+    stats["weight_fraction_author"] += float(contribution.get("weight_fraction_author") or 0)
+    if year is not None:
+        stats["years"].add(year)
+        stats["first_year"] = min([item for item in (stats["first_year"], year) if item is not None])
+        stats["last_year"] = max([item for item in (stats["last_year"], year) if item is not None])
+    stats["long_author_papers"] += int(contribution.get("long_author_papers") or 0)
+    author_collaborators[key[0]].add(key[1])
+    author_collaborators[key[1]].add(key[0])
+
+
+def _load_author_edge_aggregate(path: Path, author_collaborators: dict[str, set[str]]) -> dict[tuple[str, str], dict[str, Any]]:
+    edge_stats: dict[tuple[str, str], dict[str, Any]] = {}
+    if not path.exists():
+        return edge_stats
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        for row in csv.DictReader(handle):
+            author_a_key = str(row.get("author_a_key") or "").strip()
+            author_b_key = str(row.get("author_b_key") or "").strip()
+            if not author_a_key or not author_b_key or author_a_key == author_b_key:
+                continue
+            key = tuple(sorted((author_a_key, author_b_key)))
+            stats = {
+                "author_a_key": key[0],
+                "author_b_key": key[1],
+                "author_a": str(row.get("author_a") or key[0]),
+                "author_b": str(row.get("author_b") or key[1]),
+                "paper_count": int(float(row.get("paper_count") or row.get("weight") or 0)),
+                "weight_full": float(row.get("weight_full") or row.get("paper_count") or row.get("weight") or 0),
+                "weight_fraction_pair": float(row.get("weight_fraction_pair") or 0),
+                "weight_fraction_author": float(row.get("weight_fraction_author") or 0),
+                "first_year": _year_value(row.get("first_year")),
+                "last_year": _year_value(row.get("last_year")),
+                "years": set(),
+                "active_years": int(float(row.get("active_years") or 0)),
+                "long_author_papers": int(float(row.get("long_author_papers") or 0)),
+            }
+            edge_stats[key] = stats
+            author_collaborators[key[0]].add(key[1])
+            author_collaborators[key[1]].add(key[0])
+    return edge_stats
+
+
 def _build_author_assets(
     papers: list[dict[str, Any]],
+    *,
+    edge_cache_dir: Path | None = None,
 ) -> tuple[
     list[dict[str, Any]],
     list[dict[str, Any]],
@@ -636,7 +1597,6 @@ def _build_author_assets(
         nx = None
 
     paper_authors: list[dict[str, Any]] = []
-    edge_stats: dict[tuple[str, str], dict[str, Any]] = {}
     author_years: dict[str, Counter[int]] = defaultdict(Counter)
     author_fields: dict[str, Counter[str]] = defaultdict(Counter)
     author_collaborators: dict[str, set[str]] = defaultdict(set)
@@ -646,6 +1606,14 @@ def _build_author_assets(
     papers_with_structured_authorships = 0
     author_mentions = 0
     author_mentions_with_id = 0
+    author_edge_cache_hits = 0
+    author_edge_cache_misses = 0
+    author_edge_cache_path = edge_cache_dir / "author_edge_papers.jsonl" if edge_cache_dir else None
+    previous_edge_path = edge_cache_dir.parent / "author_collaboration_edges.csv" if edge_cache_dir else None
+    author_edge_cache = _load_incremental_cache(author_edge_cache_path) if author_edge_cache_path else {}
+    author_edge_records: list[dict[str, Any]] = []
+    current_cache_keys: set[str] = set()
+    cache_changed = False
 
     for paper in papers:
         paper_id = str(paper.get("paper_id") or "")
@@ -712,43 +1680,51 @@ def _build_author_assets(
             skipped_long_author_papers += 1
         if len(unique_authors) < 2:
             continue
-        pair_weight = 1 / math.comb(len(unique_authors), 2)
-        author_weight = 1 / (len(unique_authors) - 1)
-        for entry_a, entry_b in combinations(unique_authors, 2):
-            author_a_key = str(entry_a["author_key"])
-            author_b_key = str(entry_b["author_key"])
-            key = tuple(sorted((author_a_key, author_b_key)))
-            row_a = unique_by_key[key[0]]
-            row_b = unique_by_key[key[1]]
-            stats = edge_stats.setdefault(
-                key,
+        signature = _author_edge_signature(paper, unique_authors)
+        cache_key = f"{source}:{_doc_key(paper)}"
+        current_cache_keys.add(cache_key)
+        cached = author_edge_cache.get(cache_key)
+        cache_hit = bool(cached and cached.get("signature") == signature)
+        if cached and not cache_hit:
+            cache_changed = True
+        author_edge_records.append({"cache_key": cache_key, "paper_id": _doc_key(paper), "source": source, "signature": signature, "cache_hit": cache_hit})
+
+    cache_removed = bool(set(author_edge_cache) - current_cache_keys)
+    can_reuse_previous_edges = bool(author_edge_cache) and bool(previous_edge_path and previous_edge_path.exists()) and not cache_changed and not cache_removed
+    edge_stats = _load_author_edge_aggregate(previous_edge_path, author_collaborators) if can_reuse_previous_edges and previous_edge_path else {}
+
+    signature_by_cache_key = {record["cache_key"]: record for record in author_edge_records}
+    for paper in papers:
+        source = str(paper.get("source") or "")
+        cache_key = f"{source}:{_doc_key(paper)}"
+        record = signature_by_cache_key.get(cache_key)
+        if record is None:
+            continue
+        if can_reuse_previous_edges and record["cache_hit"]:
+            author_edge_cache_hits += 1
+            continue
+        author_entries = _paper_author_entries(paper)
+        unique_by_key = {entry["author_key"]: entry for entry in author_entries}
+        unique_authors = [unique_by_key[key] for key in sorted(unique_by_key)]
+        contributions = _author_edge_contributions(unique_by_key, unique_authors, _year_value(paper.get("year")))
+        author_edge_cache_misses += 1
+        for contribution in contributions:
+            _merge_author_edge_contribution(edge_stats, author_collaborators, contribution)
+
+    if author_edge_cache_path:
+        _write_incremental_cache(
+            author_edge_cache_path,
+            (
                 {
-                    "author_a_key": key[0],
-                    "author_b_key": key[1],
-                    "author_a": row_a["author"],
-                    "author_b": row_b["author"],
-                    "paper_count": 0,
-                    "weight_full": 0.0,
-                    "weight_fraction_pair": 0.0,
-                    "weight_fraction_author": 0.0,
-                    "first_year": year,
-                    "last_year": year,
-                    "years": set(),
-                    "long_author_papers": 0,
-                },
-            )
-            stats["paper_count"] += 1
-            stats["weight_full"] += 1.0
-            stats["weight_fraction_pair"] += pair_weight
-            stats["weight_fraction_author"] += author_weight
-            if year is not None:
-                stats["years"].add(year)
-                stats["first_year"] = min([item for item in (stats["first_year"], year) if item is not None])
-                stats["last_year"] = max([item for item in (stats["last_year"], year) if item is not None])
-            if len(unique_authors) > MAX_AUTHORS_FOR_CORE_NETWORK:
-                stats["long_author_papers"] += 1
-            author_collaborators[author_a_key].add(author_b_key)
-            author_collaborators[author_b_key].add(author_a_key)
+                    "cache_version": INCREMENTAL_CACHE_VERSION,
+                    "cache_key": record["cache_key"],
+                    "paper_id": record["paper_id"],
+                    "source": record["source"],
+                    "signature": record["signature"],
+                }
+                for record in author_edge_records
+            ),
+        )
 
     edge_rows: list[dict[str, Any]] = []
     for stats in edge_stats.values():
@@ -764,7 +1740,7 @@ def _build_author_assets(
             "weight_fraction_author": round(float(stats["weight_fraction_author"]), 6),
             "first_year": stats["first_year"] or "",
             "last_year": stats["last_year"] or "",
-            "active_years": len(stats["years"]),
+            "active_years": max(len(stats["years"]), int(stats.get("active_years") or 0)),
             "long_author_papers": int(stats["long_author_papers"]),
         }
         edge_rows.append(row)
@@ -910,6 +1886,8 @@ def _build_author_assets(
         {"metric": "louvain_resolution", "value": best_resolution, "note": "Selected by modularity over tested resolutions."},
         {"metric": "louvain_modularity", "value": round(best_modularity, 6), "note": "Modularity of selected Louvain partition."},
         {"metric": "louvain_communities", "value": len(communities), "note": "Communities in selected core graph partition."},
+        {"metric": "author_edge_cache_hits", "value": author_edge_cache_hits, "note": "Papers whose coauthor edge contributions were reused from cache."},
+        {"metric": "author_edge_cache_misses", "value": author_edge_cache_misses, "note": "Papers whose coauthor edge contributions were recomputed."},
     ]
     return paper_authors, edge_rows, metrics_rows, by_year_rows, communities, diagnostics, sensitivity_rows
 
@@ -992,9 +1970,11 @@ def build_analysis_assets(
     raw_path = Path(raw_dir)
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
+    edge_cache_dir = output_path / ".incremental"
     collection_rows, collection_summary = _build_collection_manifest(raw_path, sources, filename_template)
 
     papers: list[dict[str, Any]] = []
+    paper_taxonomy: list[dict[str, Any]] = []
     seen: set[str] = set()
     input_records = 0
     duplicates = 0
@@ -1016,8 +1996,23 @@ def build_analysis_assets(
             continue
         seen.add(key)
         papers.append(paper)
+        paper_taxonomy.append(_taxonomy_for_paper(wrapper, paper))
 
-    paper_keywords, paper_keyword_signals, keyword_year_rows, keyword_trend_rows, keyword_alias_rows = _build_keyword_assets(papers)
+    (
+        paper_keywords,
+        paper_keyword_signals,
+        keyword_year_rows,
+        keyword_trend_rows,
+        keyword_alias_rows,
+        keyword_edge_rows,
+        keyword_metrics_rows,
+        keyword_community_rows,
+        keyword_burst_rows,
+        keyword_lifecycle_rows,
+        keyword_drift_rows,
+        keyword_tfidf_rows,
+        keyword_extraction_diagnostics_rows,
+    ) = _build_keyword_assets(papers, edge_cache_dir=edge_cache_dir)
     (
         paper_authors,
         edge_rows,
@@ -1026,8 +2021,9 @@ def build_analysis_assets(
         author_community_rows,
         author_network_diagnostics_rows,
         author_louvain_sensitivity_rows,
-    ) = _build_author_assets(papers)
+    ) = _build_author_assets(papers, edge_cache_dir=edge_cache_dir)
     topic_comparison_rows, topic_keyword_rows, paper_topic_rows, topic_year_share_rows = _build_topic_assets(papers)
+    taxonomy_coverage_rows = _build_taxonomy_coverage(paper_taxonomy)
 
     quality_by_source: dict[str, dict[str, int | str]] = defaultdict(
         lambda: {
@@ -1146,6 +2142,92 @@ def build_analysis_assets(
     _write_csv(output_path / "keyword_trends.csv", keyword_trend_rows, keyword_trend_fields)
     _write_csv(output_path / "keyword_aliases.csv", keyword_alias_rows, ["raw_keyword", "canonical_keyword"])
     _write_csv(
+        output_path / "keyword_cooccurrence_edges.csv",
+        keyword_edge_rows,
+        ["keyword_a", "keyword_b", "weight", "paper_count", "first_year", "last_year", "active_years"],
+    )
+    _write_csv(
+        output_path / "keyword_metrics.csv",
+        keyword_metrics_rows,
+        [
+            "keyword",
+            "doc_count",
+            "explicit_doc_count",
+            "text_signal_doc_count",
+            "normalized_df",
+            "growth_rate",
+            "burst_score",
+            "degree",
+            "weighted_degree",
+            "betweenness",
+            "pagerank",
+            "community_id",
+            "lifecycle_stage",
+        ],
+    )
+    _write_csv(
+        output_path / "keyword_communities.csv",
+        keyword_community_rows,
+        ["community_id", "keyword_count", "edge_count", "total_weight", "modularity", "top_keywords"],
+    )
+    _write_csv(
+        output_path / "keyword_burst_windows.csv",
+        keyword_burst_rows,
+        [
+            "keyword",
+            "year",
+            "previous_year",
+            "count",
+            "previous_count",
+            "normalized_df",
+            "previous_normalized_df",
+            "growth_rate",
+            "burst_score",
+            "burst_state",
+        ],
+    )
+    _write_csv(
+        output_path / "keyword_lifecycle.csv",
+        keyword_lifecycle_rows,
+        ["keyword", "lifecycle_stage", "doc_count", "first_year", "peak_year", "last_year", "peak_count", "growth_rate", "burst_score"],
+    )
+    _write_csv(
+        output_path / "keyword_semantic_drift.csv",
+        keyword_drift_rows,
+        ["keyword", "year_from", "year_to", "cosine_similarity", "drift_score", "method", "significant"],
+    )
+    _write_csv(
+        output_path / "keyword_tfidf_terms.csv",
+        keyword_tfidf_rows,
+        ["term", "method", "mean_tfidf", "doc_count", "sample_documents"],
+    )
+    _write_csv(
+        output_path / "keyword_extraction_diagnostics.csv",
+        keyword_extraction_diagnostics_rows,
+        ["method", "status", "records", "note"],
+    )
+    _write_csv(
+        output_path / "paper_taxonomy.csv",
+        paper_taxonomy,
+        [
+            "paper_id",
+            "source",
+            "year",
+            "domain",
+            "field",
+            "subfield",
+            "taxonomy_source",
+            "taxonomy_confidence",
+            "raw_taxonomy_terms",
+            "has_full_text",
+        ],
+    )
+    _write_csv(
+        output_path / "source_taxonomy_coverage.csv",
+        taxonomy_coverage_rows,
+        ["source", "domain", "field", "subfield", "records", "full_text_count", "full_text_rate"],
+    )
+    _write_csv(
         output_path / "author_collaboration_edges.csv",
         edge_rows,
         [
@@ -1219,6 +2301,9 @@ def build_analysis_assets(
         ],
     )
 
+    author_diagnostic_values = {str(row.get("metric") or ""): row.get("value") for row in author_network_diagnostics_rows}
+    keyword_diagnostic_values = {str(row.get("method") or ""): row.get("records") for row in keyword_extraction_diagnostics_rows}
+
     summary = {
         "input_records": input_records,
         "papers": len(papers),
@@ -1228,14 +2313,28 @@ def build_analysis_assets(
         "sources": sorted({paper.get("source") for paper in papers if paper.get("source")}),
         "paper_authors": len(paper_authors),
         "paper_keywords": len(paper_keywords),
+        "paper_taxonomy": len(paper_taxonomy),
+        "taxonomy_coverage_rows": len(taxonomy_coverage_rows),
         "paper_keyword_signals": len(paper_keyword_signals),
         "keyword_year_rows": len(keyword_year_rows),
         "keyword_trends": len(keyword_trend_rows),
+        "keyword_edges": len(keyword_edge_rows),
+        "keyword_metrics": len(keyword_metrics_rows),
+        "keyword_communities": len(keyword_community_rows),
+        "keyword_burst_windows": len(keyword_burst_rows),
+        "keyword_lifecycle": len(keyword_lifecycle_rows),
+        "keyword_semantic_drift": len(keyword_drift_rows),
+        "keyword_tfidf_terms": len(keyword_tfidf_rows),
+        "keyword_extraction_diagnostics": len(keyword_extraction_diagnostics_rows),
+        "keyword_edge_cache_hits": int(keyword_diagnostic_values.get("keyword_edge_cache_hits") or 0),
+        "keyword_edge_cache_misses": int(keyword_diagnostic_values.get("keyword_edge_cache_misses") or 0),
         "author_edges": len(edge_rows),
         "author_metrics": len(author_metrics_rows),
         "author_communities": len(author_community_rows),
         "author_network_diagnostics": len(author_network_diagnostics_rows),
         "author_louvain_sensitivity": len(author_louvain_sensitivity_rows),
+        "author_edge_cache_hits": int(author_diagnostic_values.get("author_edge_cache_hits") or 0),
+        "author_edge_cache_misses": int(author_diagnostic_values.get("author_edge_cache_misses") or 0),
         "topic_models": len(topic_comparison_rows),
         "topic_keywords": len(topic_keyword_rows),
         "recent_year_start": RECENT_YEAR_START,

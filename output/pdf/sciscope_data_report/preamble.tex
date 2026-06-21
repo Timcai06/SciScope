@@ -8,34 +8,39 @@
 \usepackage{array}
 \usepackage{enumitem}
 \usepackage{fancyhdr}
+\usepackage{float}
 \usepackage{titlesec}
 \usepackage{hyperref}
 \usepackage[most]{tcolorbox}
 \usetikzlibrary{arrows.meta,positioning,fit,calc}
 
-\definecolor{SciTealDark}{HTML}{000000}
-\definecolor{SciTeal}{HTML}{000000}
-\definecolor{SciMint}{HTML}{FFFFFF}
-\definecolor{SciClay}{HTML}{000000}
-\definecolor{SciGold}{HTML}{000000}
-\definecolor{SciMoss}{HTML}{000000}
-\definecolor{SciPlum}{HTML}{000000}
-\definecolor{SciInk}{HTML}{000000}
-\definecolor{SciMuted}{HTML}{000000}
-\definecolor{SciLine}{HTML}{000000}
-\definecolor{SciPanel}{HTML}{FFFFFF}
+\definecolor{SciTealDark}{HTML}{1F3F46}
+\definecolor{SciTeal}{HTML}{3F7378}
+\definecolor{SciMint}{HTML}{EAF5F2}
+\definecolor{SciClay}{HTML}{75624F}
+\definecolor{SciGold}{HTML}{A98645}
+\definecolor{SciMoss}{HTML}{63735C}
+\definecolor{SciPlum}{HTML}{6F607A}
+\definecolor{SciInk}{HTML}{20252A}
+\definecolor{SciMuted}{HTML}{647176}
+\definecolor{SciLine}{HTML}{C9D5D5}
+\definecolor{SciPanel}{HTML}{F7FAF9}
+\definecolor{SciPanelWarm}{HTML}{FBF8F2}
 
-\geometry{left=17mm,right=17mm,top=17mm,bottom=20mm,headheight=14pt}
+\geometry{left=17mm,right=17mm,top=16mm,bottom=18mm,headheight=14pt}
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{4.5pt}
+\setlength{\parskip}{3.8pt}
 \setlength{\tabcolsep}{5pt}
 \renewcommand{\arraystretch}{1.16}
 \setlist[itemize]{leftmargin=1.18em,itemsep=1.6pt,topsep=2pt}
 \setlist[enumerate]{leftmargin=1.55em,itemsep=1.6pt,topsep=2pt}
 \hypersetup{hidelinks}
 \graphicspath{{../../assets/sciscope_data_report/}}
-\captionsetup{font={small,bf},labelfont=bf,labelsep=quad,skip=5pt}
+\captionsetup{font={small,bf},labelfont=bf,labelsep=quad,skip=3pt}
 \arrayrulecolor{SciLine}
+\setlength{\floatsep}{5pt plus 1pt minus 1pt}
+\setlength{\textfloatsep}{6pt plus 1pt minus 1pt}
+\setlength{\intextsep}{5pt plus 1pt minus 1pt}
 
 \pagestyle{fancy}
 \fancyhf{}
@@ -56,12 +61,12 @@
   enhanced,
   breakable,
   colback=SciPanel,
-  colframe=SciTealDark,
-  colbacktitle=SciTealDark,
-  coltitle=white,
+  colframe=SciTeal,
+  colbacktitle=SciMint,
+  coltitle=SciTealDark,
   fonttitle=\bfseries,
   title=#2,
-  boxrule=0.55pt,
+  boxrule=0.45pt,
   arc=1.2mm,
   left=2.8mm,
   right=2.8mm,
@@ -75,7 +80,7 @@
   breakable,
   colback=SciPanel,
   colframe=SciLine,
-  boxrule=0.5pt,
+  boxrule=0.42pt,
   arc=1.2mm,
   left=2.8mm,
   right=2.8mm,
@@ -89,13 +94,13 @@
     enhanced,
     colback=white,
     colframe=SciLine,
-    boxrule=0.4pt,
+    boxrule=0.32pt,
     arc=1mm,
-    left=1.4mm,
-    right=1.4mm,
-    top=1.4mm,
-    bottom=1.4mm,
-    before skip=1mm,
+    left=1mm,
+    right=1mm,
+    top=1mm,
+    bottom=1mm,
+    before skip=0.5mm,
     after skip=0mm
   ]
   \centering

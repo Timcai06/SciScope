@@ -94,6 +94,40 @@ def _has_full_text(wrapper: dict[str, Any]) -> bool:
     )
 
 
+def _flatten_filter_values(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (int, float, bool)):
+        return [str(value)]
+    if isinstance(value, list):
+        values: list[str] = []
+        for item in value:
+            values.extend(_flatten_filter_values(item))
+        return values
+    if isinstance(value, dict):
+        values: list[str] = []
+        for key in (
+            "display_name",
+            "term",
+            "code",
+            "name",
+            "id",
+            "field",
+            "domain",
+            "subfield",
+            "keywords",
+            "topics",
+            "subject",
+            "categories",
+        ):
+            if key in value:
+                values.extend(_flatten_filter_values(value.get(key)))
+        return values
+    return [str(value)]
+
+
 def _matches_field_filter(wrapper: dict[str, Any], field_filter: str | None) -> bool:
     if not field_filter:
         return True
@@ -101,15 +135,23 @@ def _matches_field_filter(wrapper: dict[str, Any], field_filter: str | None) -> 
     if not needle:
         return True
     raw = wrapper.get("raw") if isinstance(wrapper.get("raw"), dict) else {}
-    haystack = " ".join(
-        str(value or "")
-        for value in (
-            wrapper.get("field_seed"),
-            wrapper.get("query"),
-            raw.get("field"),
-            raw.get("category"),
-        )
-    ).lower()
+    values = [
+        wrapper.get("field_seed"),
+        wrapper.get("query"),
+        raw.get("field"),
+        raw.get("category"),
+        raw.get("categories"),
+        raw.get("keywords"),
+        raw.get("topics"),
+        raw.get("subject"),
+        raw.get("mesh_terms"),
+        raw.get("primary_topic"),
+        raw.get("best_oa_location"),
+        raw.get("primary_location"),
+    ]
+    bibjson = raw.get("bibjson") if isinstance(raw.get("bibjson"), dict) else {}
+    values.extend([bibjson.get("subject"), bibjson.get("keywords")])
+    haystack = " ".join(text for value in values for text in _flatten_filter_values(value)).lower()
     return needle in haystack
 
 

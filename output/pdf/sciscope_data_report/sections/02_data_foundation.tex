@@ -1,7 +1,7 @@
 \section{数据覆盖与字段质量}
 
 \begin{reportbox}{当前数据基线}
-本轮数据覆盖 OpenAlex、arXiv、PubMed、PMC、Crossref 和 DOAJ 六个公开来源, 共形成 169,324 条原始记录。标准化后进入分析层的记录为 168,447 条, 跨源去重后保留 160,488 条正式语料, 其中 151,556 条位于 2022--2026 年主分析窗口。
+本轮数据覆盖 OpenAlex、arXiv、PubMed、PMC、Crossref 和 DOAJ 六个公开来源, 共形成 169,324 条原始记录。经标准化、异常年份治理和跨源去重后, 进入分析层的语料为 168,447 条, 其中 159,382 条位于 2022--2026 年主分析窗口。
 \end{reportbox}
 
 \subsection{来源结构}
@@ -21,7 +21,7 @@ DOAJ & 11,320 & 开放期刊文章集中 & 适合观察开放获取文献结构 
 \end{tabularx}
 \end{center}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \figasset[0.82\textwidth]{source_records_bar.png}
   \caption{六个公开来源的标准化分析记录规模。OpenAlex 规模最大, DOAJ 规模最小, 后续跨来源比较需注意来源结构差异。}
@@ -29,7 +29,7 @@ DOAJ & 11,320 & 开放期刊文章集中 & 适合观察开放获取文献结构 
 
 \subsection{字段完整度}
 
-标题、作者和年份字段整体完整度较高, 是分布统计和作者网络分析的主要基础。摘要覆盖率为 83.22\%, 可以支撑摘要级主题和趋势分析。正文片段覆盖率为 8.40\%, 适合做高质量证据补充, 但暂不适合把全文级结论推广到全部来源。
+标题、作者和年份字段整体完整度较高, 是分布统计和作者网络分析的主要基础。摘要覆盖率为 83.22\%, 可以支撑摘要级主题和趋势分析。正文片段覆盖率为 8.99\%, 适合做高质量证据补充, 但暂不适合把全文级结论推广到全部来源。
 
 \begin{center}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{28mm}rrrrr}
@@ -46,7 +46,7 @@ DOAJ & 11,319 & 11,155 & 11,310 & 11,310 & 121 \\
 \end{tabularx}
 \end{center}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \figasset[0.92\textwidth]{source_quality_matrix.png}
   \caption{各来源关键字段完整度矩阵。颜色越深表示覆盖越高; Crossref 的摘要和关键词覆盖相对较弱, PMC 的正文片段优势明显。}

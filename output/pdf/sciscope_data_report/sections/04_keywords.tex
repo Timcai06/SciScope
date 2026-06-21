@@ -11,6 +11,8 @@
   \item 同时使用显式关键词和题名摘要中的受控术语信号, 避免新近论文因关键词尚未完整入库而被低估。
   \item 过滤 study、method、model 等泛词, 避免高频但低信息量的词主导结论。
   \item 对每个主题词同时计算融合文档数、显式关键词支持数、文本术语支持数、年度占比和近期动量。
+  \item 对同一论文中的关键词建立共现边, 并输出 PageRank、weighted degree、Louvain community、burst window、生命周期阶段和语义漂移代理指标。
+  \item 作者边和关键词边均使用增量缓存保存单篇论文的边贡献; 数据继续扩充时, 未变化论文可复用已有边贡献, 只重算新增或内容变化的论文。
 \end{enumerate}
 
 从整体结果看, retrieval augmented generation、large language model、prompt engineering、vision language model、knowledge graph 等方向同时具有较高频次和较强近期动量。它们不仅出现在词频统计中, 也能在年度归一化趋势和主题模型中得到支持, 因而比单纯高频词更适合作为热点候选。
@@ -21,31 +23,49 @@
 
 \subsection{高频与升温主题}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \figasset[0.86\textwidth]{top_keywords.png}
   \caption{2022--2026 年高频融合主题词。融合信号同时吸收显式关键词和题名摘要术语, 用于降低关键词字段滞后的影响。}
 \end{figure}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \figasset[0.94\textwidth]{keyword_evolution_heatmap.png}
   \caption{融合主题词年度热度矩阵。每一行按自身最大值归一化; 2026 年为截至 6 月 21 日的未完整年度, 只作为早期信号。}
 \end{figure}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \figasset[0.9\textwidth]{keyword_momentum.png}
   \caption{融合主题词近期动量。该指标比较 2024--2025 与 2022--2023 的相对变化, 不把 2026 年未完整数据纳入完整年度动量。}
 \end{figure}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \figasset[0.92\textwidth]{keyword_normalized_trends.png}
   \caption{代表性融合主题词年度归一化文档占比。归一化后仍持续上升的主题更可能反映真实研究关注变化。}
 \end{figure}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
+  \centering
+  \figasset[\textwidth]{keyword_cooccurrence_network.png}
+  \caption{关键词共现网络。节点大小表示共现加权度, 节点颜色表示关键词社区, 边宽表示同篇论文中的分数化共现强度。该图用于识别 RAG、knowledge graph、question answering、clinical search 等主题之间的结构连接。}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \figasset[0.92\textwidth]{keyword_lifecycle.png}
+  \caption{关键词生命周期阶段。横线表示首次出现、峰值年份和最近活跃年份的区间, 圆点大小表示融合文档支持度, 阶段分为 emergence、growth、maturity、decline。}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \figasset[0.92\textwidth]{keyword_burst_windows.png}
+  \caption{关键词年度突发窗口。该图标出年度增长、萌发或回落较强的主题词, 用于把“长期高频”与“近期突然变化”区分开。}
+\end{figure}
+
+\begin{figure}[H]
   \centering
   \figasset[0.92\textwidth]{topic_year_share.png}
   \caption{主题模型年度占比。主题模型用于检查热点词是否对应稳定的语义结构, 而不是孤立词频波动。}
@@ -66,10 +86,6 @@ Materials informatics & materials informatics、battery、catalyst discovery 等
 \end{tabularx}
 \end{center}
 
-\subsection{趋势表达原则}
-
 \begin{plainbox}
-本报告将热点判断表述为“上升信号”“稳定增长”“早期萌芽”或“可能噪声”, 不使用确定性预测。一个方向只有在频次、年度占比、主题模型和代表论文多个证据同时支持时, 才进入强上升候选。
+\textbf{趋势表达原则}: 本报告将热点判断表述为“上升信号”“稳定增长”“早期萌芽”或“可能噪声”, 不使用确定性预测。一个方向只有在频次、年度占比、共现结构、生命周期/突发窗口、主题模型和代表论文多个证据同时支持时, 才进入强上升候选。若某个词只在共现网络中靠近核心主题, 但年度占比和突发窗口不支持, 则只作为关联主题而非热点结论。
 \end{plainbox}
-
-\clearpage

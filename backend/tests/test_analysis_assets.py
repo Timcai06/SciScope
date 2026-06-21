@@ -194,6 +194,79 @@ def test_build_analysis_assets_creates_report_ready_tables(tmp_path):
     assert saved_summary == summary
 
 
+def test_build_analysis_assets_writes_taxonomy_layers(tmp_path):
+    raw_dir = tmp_path / "raw"
+    output_dir = tmp_path / "analysis"
+    for source in ("openalex", "arxiv", "doaj"):
+        (raw_dir / source).mkdir(parents=True)
+
+    openalex_record = {
+        "source": "openalex",
+        "source_id": "https://openalex.org/W1",
+        "field_seed": "computer science",
+        "raw": {
+            "id": "https://openalex.org/W1",
+            "display_name": "Large Language Models for Science",
+            "publication_year": 2024,
+            "authorships": [],
+            "primary_topic": {
+                "display_name": "Natural Language Processing Techniques",
+                "domain": {"display_name": "Physical Sciences"},
+                "field": {"display_name": "Computer Science"},
+                "subfield": {"display_name": "Artificial Intelligence"},
+            },
+            "keywords": [{"display_name": "Large Language Model"}],
+        },
+    }
+    arxiv_record = {
+        "source": "arxiv",
+        "source_id": "http://arxiv.org/abs/2401.00001",
+        "field_seed": "computer science",
+        "raw": {
+            "id": "http://arxiv.org/abs/2401.00001",
+            "title": "Vision Language Models",
+            "summary": "A study.",
+            "authors": ["Ada Chen"],
+            "published": "2024-01-01T00:00:00Z",
+            "categories": ["cs.CL", "cs.AI"],
+        },
+    }
+    doaj_record = {
+        "source": "doaj",
+        "source_id": "D1",
+        "field_seed": "materials science",
+        "raw": {
+            "id": "D1",
+            "bibjson": {
+                "title": "Catalyst Materials",
+                "abstract": "Catalyst discovery.",
+                "author": [{"name": "Bo Li"}],
+                "year": "2024",
+                "subject": [{"term": "Chemical technology"}, {"term": "Materials Science"}],
+                "keywords": ["catalyst discovery"],
+            },
+        },
+    }
+    for source, record in (("openalex", openalex_record), ("arxiv", arxiv_record), ("doaj", doaj_record)):
+        (raw_dir / source / f"{source}.jsonl").write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    summary = build_analysis_assets(raw_dir=raw_dir, output_dir=output_dir, sources=("openalex", "arxiv", "doaj"))
+
+    taxonomy = _read_csv(output_dir / "paper_taxonomy.csv")
+    assert summary["paper_taxonomy"] == 3
+    assert {row["taxonomy_source"] for row in taxonomy} == {
+        "openalex_primary_topic",
+        "arxiv_category",
+        "doaj_subject",
+    }
+    assert any(row["domain"] == "Computer Science" and row["subfield"] == "Natural Language Processing" for row in taxonomy)
+    assert any(row["domain"] == "Physical Sciences" and row["field"] == "Materials Science" for row in taxonomy)
+
+    coverage = _read_csv(output_dir / "source_taxonomy_coverage.csv")
+    assert any(row["source"] == "arxiv" and row["field"] == "Artificial Intelligence" for row in coverage)
+    assert any(row["source"] == "doaj" and row["field"] == "Materials Science" for row in coverage)
+
+
 def test_build_analysis_assets_outputs_trend_network_and_topic_layers(tmp_path):
     raw_dir = tmp_path / "raw"
     output_dir = tmp_path / "analysis"
@@ -254,6 +327,74 @@ def test_build_analysis_assets_outputs_trend_network_and_topic_layers(tmp_path):
     assert {row["model"] for row in comparison} == {"lda", "nmf"}
     topic_keywords = _read_csv(output_dir / "topic_keywords.csv")
     assert topic_keywords
+
+
+def test_build_analysis_assets_outputs_keyword_network_lifecycle_and_incremental_edge_cache(tmp_path):
+    raw_dir = tmp_path / "raw"
+    output_dir = tmp_path / "analysis"
+    pubmed_dir = raw_dir / "pubmed"
+    pubmed_dir.mkdir(parents=True)
+    rows = [
+        _wrapper(
+            "K1",
+            title="Retrieval Augmented Generation for Clinical Search",
+            year=2022,
+            authors=["Ada Chen", "Lin Wang"],
+            keywords=["Retrieval Augmented Generation", "Clinical Search"],
+        ),
+        _wrapper(
+            "K2",
+            title="Retrieval Augmented Generation with Knowledge Graph",
+            year=2023,
+            authors=["Ada Chen", "Bo Li"],
+            keywords=["Retrieval Augmented Generation", "Knowledge Graph"],
+        ),
+        _wrapper(
+            "K3",
+            title="Knowledge Graph Question Answering",
+            year=2024,
+            authors=["Bo Li", "Cam Zhao"],
+            keywords=["Knowledge Graph", "Question Answering"],
+        ),
+    ]
+    pubmed_dir.joinpath("pubmed.jsonl").write_text(
+        "\n".join(json.dumps(record, ensure_ascii=False) for record in rows) + "\n",
+        encoding="utf-8",
+    )
+
+    first_summary = build_analysis_assets(raw_dir=raw_dir, output_dir=output_dir, sources=("pubmed",))
+    second_summary = build_analysis_assets(raw_dir=raw_dir, output_dir=output_dir, sources=("pubmed",))
+
+    assert first_summary["keyword_edges"] >= 3
+    assert first_summary["keyword_lifecycle"] >= 3
+    assert first_summary["keyword_burst_windows"] >= 1
+    assert first_summary["keyword_tfidf_terms"] >= 1
+    assert second_summary["author_edge_cache_hits"] > 0
+    assert second_summary["keyword_edge_cache_hits"] > 0
+    assert (output_dir / ".incremental" / "author_edge_papers.jsonl").exists()
+    assert (output_dir / ".incremental" / "keyword_edge_papers.jsonl").exists()
+
+    keyword_edges = _read_csv(output_dir / "keyword_cooccurrence_edges.csv")
+    edge_pairs = {(row["keyword_a"], row["keyword_b"]) for row in keyword_edges}
+    assert ("clinical search", "retrieval augmented generation") in edge_pairs
+    assert ("knowledge graph", "retrieval augmented generation") in edge_pairs
+
+    keyword_metrics = _read_csv(output_dir / "keyword_metrics.csv")
+    rag_metric = next(row for row in keyword_metrics if row["keyword"] == "retrieval augmented generation")
+    assert "pagerank" in rag_metric
+    assert rag_metric["lifecycle_stage"] in {"emergence", "growth", "maturity", "decline"}
+
+    lifecycle = _read_csv(output_dir / "keyword_lifecycle.csv")
+    assert any(row["keyword"] == "retrieval augmented generation" for row in lifecycle)
+
+    bursts = _read_csv(output_dir / "keyword_burst_windows.csv")
+    assert any(row["keyword"] == "knowledge graph" and row["burst_state"] for row in bursts)
+
+    drift = _read_csv(output_dir / "keyword_semantic_drift.csv")
+    assert drift
+
+    extraction = _read_csv(output_dir / "keyword_extraction_diagnostics.csv")
+    assert {row["method"] for row in extraction} >= {"tfidf", "textrank", "keybert", "semantic_drift"}
 
 
 def test_build_analysis_assets_preserves_openalex_author_identity_and_affiliations(tmp_path):

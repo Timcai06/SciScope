@@ -34,9 +34,9 @@
   "text_coverage": {
     "abstract_records": 140183,
     "abstract_rate": 0.8322,
-    "full_text_records": 14895,
-    "full_text_rate": 0.0884,
-    "full_text_gap_to_15000": 105
+    "full_text_records": 15144,
+    "full_text_rate": 0.0899,
+    "full_text_gap_to_15000": 0
   },
   "rag_field_coverage": {
     "doi": {
@@ -76,8 +76,8 @@
       "rate": 1.0
     },
     "full_text": {
-      "count": 14895,
-      "rate": 0.0884
+      "count": 15144,
+      "rate": 0.0899
     }
   },
   "next_data_layer_tasks": [

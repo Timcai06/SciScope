@@ -679,6 +679,65 @@ def test_enrich_fulltext_stable_only_resolves_openalex_doi(tmp_path, monkeypatch
     assert record["raw"]["full_text_source"] == "openalex_doi_url"
 
 
+def test_enrich_fulltext_field_filter_matches_arxiv_categories(tmp_path, monkeypatch):
+    canonical_dir = tmp_path / "raw_canonical"
+    arxiv_dir = canonical_dir / "arxiv"
+    arxiv_dir.mkdir(parents=True)
+    path = arxiv_dir / "2024.jsonl"
+    records = [
+        {
+            "source": "arxiv",
+            "source_id": "http://arxiv.org/abs/2401.00001",
+            "field_seed": "computer science",
+            "raw": {
+                "id": "http://arxiv.org/abs/2401.00001",
+                "title": "Language models",
+                "summary": "A survey.",
+                "authors": ["Ada Chen"],
+                "published": "2024-01-01T00:00:00Z",
+                "categories": ["cs.CL"],
+            },
+        },
+        {
+            "source": "arxiv",
+            "source_id": "http://arxiv.org/abs/2401.00002",
+            "field_seed": "biomedicine",
+            "raw": {
+                "id": "http://arxiv.org/abs/2401.00002",
+                "title": "Quantitative biology",
+                "summary": "A survey.",
+                "authors": ["Lin Wang"],
+                "published": "2024-01-02T00:00:00Z",
+                "categories": ["q-bio.QM"],
+            },
+        },
+    ]
+    path.write_text("\n".join(json.dumps(record, ensure_ascii=False) for record in records) + "\n", encoding="utf-8")
+
+    fetched: list[str] = []
+
+    def fake_fetch(url, **_kwargs):
+        fetched.append(url)
+        return b"\\section{Introduction} " + b"category filtered full text " * 120
+
+    monkeypatch.setattr("src.harvest.fulltext_enrichment._fetch_bytes", fake_fetch)
+    monkeypatch.setattr("src.harvest.fulltext_enrichment.time.sleep", lambda _seconds: None)
+
+    summary = enrich_fulltext_in_place(
+        canonical_dir=canonical_dir,
+        source="arxiv",
+        years=["2024"],
+        limit=2,
+        field_filter="q-bio",
+    )
+
+    persisted = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert summary["records_enriched"] == 1
+    assert fetched == ["https://arxiv.org/e-print/2401.00002"]
+    assert "body_excerpt" not in persisted[0]["raw"]
+    assert "category filtered full text" in persisted[1]["raw"]["body_excerpt"]
+
+
 def test_openalex_work_to_paper_restores_abstract_and_metadata():
     paper = openalex_work_to_paper(_openalex_wrapper())
 

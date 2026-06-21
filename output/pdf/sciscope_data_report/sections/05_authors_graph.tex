@@ -13,7 +13,7 @@
   \item \textbf{过滤}: 中心性和正文主图排除作者数超过 12 的论文, 避免大型团队论文生成过多两两合作边。
 \end{itemize}
 
-在全量候选网络中, 作者实体合作边超过千万级。为了让静态报告图可解释, 本章只展示近五年窗口内的核心合作结构, 并采用分数计数降低长作者名单造成的网络虚高。中心性和社区发现用于识别候选核心作者和桥接作者, 不作为未经消歧核验的最终个人影响力排名。作者署名表、边表、指标表和诊断表分别输出为 \texttt{paper\_authors.csv}、\texttt{author\_collaboration\_edges.csv}、\texttt{author\_metrics.csv} 与 \texttt{author\_network\_diagnostics.csv}。
+在全量候选网络中, 作者实体合作边超过千万级。为了让静态报告图可解释, 本章采用两层展示: 核心图只保留一个高权重连通 component, 用于阅读核心合作骨架; 多组件概览图展示多个高权重 component, 用于观察作者合作生态的分散结构。中心性和社区发现用于识别候选核心作者和桥接作者, 不作为未经消歧核验的最终个人影响力排名。作者署名表、边表、指标表和诊断表分别输出为 \texttt{paper\_authors.csv}、\texttt{author\_collaboration\_edges.csv}、\texttt{author\_metrics.csv} 与 \texttt{author\_network\_diagnostics.csv}。
 
 \subsection{网络指标}
 
@@ -34,19 +34,25 @@ Temporal Activity & 作者活跃年份分布 & 判断节点是否仍处于近年
 
 \subsection{合作社区与高频合作}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
   \figasset[0.9\textwidth]{author_network_scale_funnel.png}
   \caption{作者合作网络规模漏斗。从近五年论文到核心合作图逐步压缩, 以保证网络图具有可读性。}
 \end{figure}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
   \centering
-  \figasset[0.88\textwidth]{author_collaboration_network.png}
-  \caption{核心作者实体合作网络。节点大小反映加权合作强度, 颜色表示 Louvain 社区, 边宽表示分数化合作边权。为保证可读性, 仅展示核心边表中的高权重合作关系。}
+  \figasset[\textwidth]{author_collaboration_network.png}
+  \caption{核心作者实体合作网络。节点大小反映加权合作强度, 颜色表示 Louvain 社区, 边宽表示分数化合作边权。为避免标签遮挡, 图中只外置标注少量核心/桥接作者。}
 \end{figure}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
+  \centering
+  \figasset[\textwidth]{author_component_overview.png}
+  \caption{作者合作多组件概览。每个小图表示一个高权重连通 component, 仅绘制局部强边并外置标注一个 anchor 作者; 节点颜色沿用核心网络的全局社区色, 用于补充核心单组件图无法覆盖的外围合作团簇。}
+\end{figure}
+
+\begin{figure}[H]
   \centering
   \figasset[0.9\textwidth]{top_author_collaborations.png}
   \caption{近五年高频作者合作关系。分数化权重用于降低长作者名单论文的影响。}

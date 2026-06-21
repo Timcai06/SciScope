@@ -37,6 +37,14 @@ FULLTEXT_ENRICH_FIELD_FILTER ?=
 FULLTEXT_ENRICH_RETRY_FAILED ?=
 FULLTEXT_ENRICH_NO_BROWSER_FALLBACK ?=
 FULLTEXT_ENRICH_STABLE_ONLY ?=
+FULLTEXT_ARXIV_QBIO_LIMIT ?= 250
+FULLTEXT_ARXIV_PHYSICS_LIMIT ?= 200
+FULLTEXT_ARXIV_MATH_LIMIT ?= 180
+FULLTEXT_PUBMED_BIOMED_LIMIT ?= 120
+FULLTEXT_OPENALEX_MEDICINE_PROBE_LIMIT ?= 50
+FULLTEXT_DOAJ_MEDICINE_PROBE_LIMIT ?= 50
+FULLTEXT_PRIORITY_MAX_ATTEMPTS ?= 700
+FULLTEXT_PROBE_MAX_ATTEMPTS ?= 300
 RAW_PAPERS_PATH ?= data/raw/openalex/works_sample.jsonl
 PROCESSED_PAPERS_PATH ?= data/processed/papers.json
 PROCESSED_CORPUS_PATH ?= data/processed/papers_corpus.json
@@ -72,7 +80,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -85,6 +93,12 @@ help:
 	@echo "  make harvest-balanced-years Harvest $(BALANCE_YEARS) by source/year for year balance"
 	@echo "  make harvest-fulltext-years Harvest PMC full-text excerpts by publication year"
 	@echo "  make fulltext-enrich-arxiv Enrich existing canonical arXiv partitions in place"
+	@echo "  make fulltext-enrich-arxiv-qbio Enrich existing arXiv q-bio full text in place"
+	@echo "  make fulltext-enrich-arxiv-physics Enrich existing arXiv physics full text in place"
+	@echo "  make fulltext-enrich-arxiv-math Enrich existing arXiv math full text in place"
+	@echo "  make fulltext-enrich-pubmed-biomed Enrich existing PubMed biomedicine full text in place"
+	@echo "  make fulltext-enrich-priority-fields Run q-bio, physics, math, and PubMed biomed full-text enrichment"
+	@echo "  make fulltext-enrich-low-yield-probes Probe OpenAlex/DOAJ medicine full-text yield"
 	@echo "  make raw-canonical  Merge raw files into source/year canonical JSONL partitions"
 	@echo "  make raw-governance Build canonical raw, archive old raw, and remove archive copy"
 	@echo "                         API-key enhanced sources: semantic_scholar, core"
@@ -161,6 +175,34 @@ fulltext-enrich-source:
 
 fulltext-enrich-arxiv:
 	$(MAKE) fulltext-enrich-source FULLTEXT_ENRICH_SOURCE=arxiv
+
+fulltext-enrich-arxiv-qbio:
+	$(MAKE) fulltext-enrich-source FULLTEXT_ENRICH_SOURCE=arxiv FULLTEXT_ENRICH_YEARS=2022,2023,2024,2025,2026 FULLTEXT_ENRICH_LIMIT=$(FULLTEXT_ARXIV_QBIO_LIMIT) FULLTEXT_ENRICH_SLEEP=0.2 FULLTEXT_ENRICH_TIMEOUT=25 FULLTEXT_ENRICH_MAX_ATTEMPTS=$(FULLTEXT_PRIORITY_MAX_ATTEMPTS) FULLTEXT_ENRICH_CHECKPOINT_EVERY=20 FULLTEXT_ENRICH_FIELD_FILTER="q-bio"
+
+fulltext-enrich-arxiv-physics:
+	$(MAKE) fulltext-enrich-source FULLTEXT_ENRICH_SOURCE=arxiv FULLTEXT_ENRICH_YEARS=2022,2023,2024,2025,2026 FULLTEXT_ENRICH_LIMIT=$(FULLTEXT_ARXIV_PHYSICS_LIMIT) FULLTEXT_ENRICH_SLEEP=0.2 FULLTEXT_ENRICH_TIMEOUT=25 FULLTEXT_ENRICH_MAX_ATTEMPTS=$(FULLTEXT_PRIORITY_MAX_ATTEMPTS) FULLTEXT_ENRICH_CHECKPOINT_EVERY=20 FULLTEXT_ENRICH_FIELD_FILTER="physics"
+
+fulltext-enrich-arxiv-math:
+	$(MAKE) fulltext-enrich-source FULLTEXT_ENRICH_SOURCE=arxiv FULLTEXT_ENRICH_YEARS=2022,2023,2024,2025,2026 FULLTEXT_ENRICH_LIMIT=$(FULLTEXT_ARXIV_MATH_LIMIT) FULLTEXT_ENRICH_SLEEP=0.2 FULLTEXT_ENRICH_TIMEOUT=25 FULLTEXT_ENRICH_MAX_ATTEMPTS=650 FULLTEXT_ENRICH_CHECKPOINT_EVERY=20 FULLTEXT_ENRICH_FIELD_FILTER="math"
+
+fulltext-enrich-pubmed-biomed:
+	$(MAKE) fulltext-enrich-source FULLTEXT_ENRICH_SOURCE=pubmed FULLTEXT_ENRICH_YEARS=2022,2023,2024,2025,2026 FULLTEXT_ENRICH_LIMIT=$(FULLTEXT_PUBMED_BIOMED_LIMIT) FULLTEXT_ENRICH_SLEEP=0.2 FULLTEXT_ENRICH_TIMEOUT=25 FULLTEXT_ENRICH_STABLE_ONLY=1 FULLTEXT_ENRICH_MAX_ATTEMPTS=$(FULLTEXT_PRIORITY_MAX_ATTEMPTS) FULLTEXT_ENRICH_CHECKPOINT_EVERY=20 FULLTEXT_ENRICH_FIELD_FILTER="biomedicine"
+
+fulltext-enrich-openalex-medicine-probe:
+	$(MAKE) fulltext-enrich-source FULLTEXT_ENRICH_SOURCE=openalex FULLTEXT_ENRICH_YEARS=2022,2023,2024,2025,2026 FULLTEXT_ENRICH_LIMIT=$(FULLTEXT_OPENALEX_MEDICINE_PROBE_LIMIT) FULLTEXT_ENRICH_SLEEP=0.5 FULLTEXT_ENRICH_TIMEOUT=25 FULLTEXT_ENRICH_STABLE_ONLY=1 FULLTEXT_ENRICH_MAX_ATTEMPTS=$(FULLTEXT_PROBE_MAX_ATTEMPTS) FULLTEXT_ENRICH_CHECKPOINT_EVERY=10 FULLTEXT_ENRICH_FIELD_FILTER="medicine"
+
+fulltext-enrich-doaj-medicine-probe:
+	$(MAKE) fulltext-enrich-source FULLTEXT_ENRICH_SOURCE=doaj FULLTEXT_ENRICH_YEARS=2022,2023,2024,2025,2026 FULLTEXT_ENRICH_LIMIT=$(FULLTEXT_DOAJ_MEDICINE_PROBE_LIMIT) FULLTEXT_ENRICH_SLEEP=0.5 FULLTEXT_ENRICH_TIMEOUT=25 FULLTEXT_ENRICH_STABLE_ONLY=1 FULLTEXT_ENRICH_MAX_ATTEMPTS=$(FULLTEXT_PROBE_MAX_ATTEMPTS) FULLTEXT_ENRICH_CHECKPOINT_EVERY=10 FULLTEXT_ENRICH_FIELD_FILTER="medicine"
+
+fulltext-enrich-priority-fields:
+	$(MAKE) fulltext-enrich-arxiv-qbio
+	$(MAKE) fulltext-enrich-arxiv-physics
+	$(MAKE) fulltext-enrich-arxiv-math
+	$(MAKE) fulltext-enrich-pubmed-biomed
+
+fulltext-enrich-low-yield-probes:
+	$(MAKE) fulltext-enrich-openalex-medicine-probe
+	$(MAKE) fulltext-enrich-doaj-medicine-probe
 
 raw-canonical:
 	$(PYTHON) -m src.harvest.cli raw-canonical --raw-dir $(RAW_SOURCE_DIR) --canonical-dir $(RAW_CANONICAL_DIR) --inventory $(RAW_INVENTORY_PATH) --summary $(RAW_CANONICAL_DIR)/summary.json --max-year $(RAW_MAX_YEAR)

@@ -38,19 +38,19 @@ REPRESENTATIVE_TREND_KEYWORDS = [
     "materials informatics",
     "drug discovery",
 ]
-BLACK = "#000000"
-CHARCOAL = "#2a272a"
-GRAPHITE = "#4b4a54"
-STEEL = "#677381"
-BLUEGREY = "#82a0aa"
-MINTGREY = "#a3cfcd"
+BLACK = "#1f252a"
+CHARCOAL = "#314247"
+GRAPHITE = "#56646e"
+STEEL = "#6f8795"
+BLUEGREY = "#8eb2b6"
+MINTGREY = "#bbd8d4"
 FILL_DARK = GRAPHITE
 FILL_MEDIUM = STEEL
 FILL_SOFT = BLUEGREY
 FILL_LIGHT = MINTGREY
-PURPLE = CHARCOAL
-BROWN = CHARCOAL
-BLUE = GRAPHITE
+PURPLE = "#6f607a"
+BROWN = "#8b735a"
+BLUE = "#3f7378"
 PURPLE_LIGHT = MINTGREY
 BROWN_LIGHT = BLUEGREY
 BLUE_LIGHT = STEEL
@@ -76,7 +76,14 @@ BUBBLE_FIELD_COLORS = {
     "Materials": MINTGREY,
     "Cross-field": BLUEGREY,
 }
-SERIES_COLORS = [CHARCOAL, GRAPHITE, STEEL, BLUEGREY, MINTGREY]
+SERIES_COLORS = [BLUE, GRAPHITE, STEEL, BLUEGREY, BROWN, PURPLE, MINTGREY]
+COMMUNITY_PALETTE = [GRAPHITE, STEEL, BLUEGREY, MINTGREY, BROWN, "#4c7c6f", PURPLE, CHARCOAL]
+LIFECYCLE_COLORS = {
+    "emergence": MINTGREY,
+    "growth": BLUEGREY,
+    "maturity": STEEL,
+    "decline": GRAPHITE,
+}
 
 
 def _single_color_cmap(name: str, color: str) -> LinearSegmentedColormap:
@@ -85,6 +92,17 @@ def _single_color_cmap(name: str, color: str) -> LinearSegmentedColormap:
 
 def _format_count(value: int | float) -> str:
     return f"{int(value):,}"
+
+
+def _community_color(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text or text.lower() == "unknown" or text == "nan":
+        return MUTED
+    try:
+        return COMMUNITY_PALETTE[int(float(text)) % len(COMMUNITY_PALETTE)]
+    except ValueError:
+        index = sum(ord(char) for char in text) % len(COMMUNITY_PALETTE)
+        return COMMUNITY_PALETTE[index]
 
 
 def _year_value(value: Any) -> int | None:
@@ -672,6 +690,247 @@ def _plot_keyword_normalized_trends(keyword_trends: pd.DataFrame, output_dir: Pa
     }
 
 
+def _plot_keyword_cooccurrence_network(
+    keyword_edges: pd.DataFrame,
+    keyword_metrics: pd.DataFrame,
+    output_dir: Path,
+    *,
+    max_edges: int = 140,
+    max_labels: int = 5,
+) -> dict[str, str]:
+    from matplotlib import pyplot as plt
+
+    data = keyword_edges.copy()
+    if data.empty:
+        raise ValueError("keyword_edges is empty")
+    data["weight"] = pd.to_numeric(data.get("weight"), errors="coerce").fillna(0)
+    data["paper_count"] = pd.to_numeric(data.get("paper_count"), errors="coerce").fillna(0)
+    data = data[(data["weight"] > 0) & (data["keyword_a"].astype(str) != data["keyword_b"].astype(str))]
+    filtered = data[data["keyword_a"].map(_is_report_keyword) & data["keyword_b"].map(_is_report_keyword)]
+    if not filtered.empty:
+        data = filtered
+    data = data.sort_values(["weight", "paper_count"], ascending=False).head(max_edges)
+
+    metric_rows = {}
+    if not keyword_metrics.empty:
+        metrics = keyword_metrics.copy()
+        for column in ("doc_count", "weighted_degree", "pagerank"):
+            if column in metrics.columns:
+                metrics[column] = pd.to_numeric(metrics[column], errors="coerce").fillna(0)
+        metric_rows = {str(row["keyword"]): row for _, row in metrics.iterrows() if str(row.get("keyword") or "").strip()}
+
+    graph = nx.Graph()
+    for _, row in data.iterrows():
+        graph.add_edge(str(row["keyword_a"]), str(row["keyword_b"]), weight=float(row["weight"]))
+    if graph.number_of_edges() == 0:
+        fig, ax = plt.subplots(figsize=(7.4, 4.4))
+        ax.axis("off")
+        ax.text(0.5, 0.5, "No keyword co-occurrence edges available", ha="center", va="center", color=MUTED)
+        save_figure(fig, output_dir / "keyword_cooccurrence_network.png")
+        return {
+            "figure_id": "keyword_cooccurrence_network",
+            "file": "keyword_cooccurrence_network.png",
+            "report_section": "关键词演化与热点趋势",
+            "source_table": "keyword_cooccurrence_edges.csv;keyword_metrics.csv",
+            "message": "关键词共现网络暂无可绘制边。",
+            "status": "empty",
+        }
+    components = sorted(nx.connected_components(graph), key=len, reverse=True)
+    if len(components) > 1:
+        graph = graph.subgraph(components[0]).copy()
+
+    pos = nx.spring_layout(
+        graph,
+        seed=43,
+        weight="weight",
+        k=1.85 / math.sqrt(max(graph.number_of_nodes(), 1)),
+        iterations=180,
+        scale=1.7,
+    )
+    graph_degree = dict(graph.degree(weight="weight"))
+    pagerank = {
+        node: float(metric_rows.get(node, {}).get("pagerank") or 0)
+        for node in graph.nodes
+    }
+    communities = {
+        node: str(metric_rows.get(node, {}).get("community_id") or "unknown")
+        for node in graph.nodes
+    }
+    max_weight = max((float(edge.get("weight") or 0) for _, _, edge in graph.edges(data=True)), default=1.0)
+    max_degree = max(graph_degree.values(), default=1.0) or 1.0
+
+    fig, ax = plt.subplots(figsize=(8.4, 6.1))
+    for source, target, edge_data in graph.edges(data=True):
+        weight = float(edge_data.get("weight") or 0)
+        ax.plot(
+            [pos[source][0], pos[target][0]],
+            [pos[source][1], pos[target][1]],
+            color=CHARCOAL,
+            alpha=0.14 + min(weight / max_weight, 1) * 0.34,
+            linewidth=0.45 + min(weight / max_weight, 1) * 2.2,
+            zorder=1,
+        )
+
+    xs = [pos[node][0] for node in graph.nodes]
+    ys = [pos[node][1] for node in graph.nodes]
+    sizes = [42 + 410 * math.sqrt(max(graph_degree.get(node, 0), 0) / max_degree) for node in graph.nodes]
+    colors = [_community_color(communities.get(node, "unknown")) for node in graph.nodes]
+    ax.scatter(xs, ys, s=sizes, c=colors, edgecolors="white", linewidths=0.55, alpha=0.92, zorder=3)
+
+    label_candidates = sorted(
+        graph.nodes,
+        key=lambda node: (pagerank.get(node, 0), graph_degree.get(node, 0)),
+        reverse=True,
+    )
+    center_x = float(np.mean(xs)) if xs else 0.0
+    center_y = float(np.mean(ys)) if ys else 0.0
+    placed_labels: list[tuple[float, float]] = []
+    for rank, node in enumerate(label_candidates):
+        if len(placed_labels) >= max_labels:
+            break
+        x, y = pos[node]
+        dx = x - center_x
+        dy = y - center_y
+        distance = math.hypot(dx, dy) or 1.0
+        label_radius = 0.22 + 0.05 * (rank % 3)
+        label_x = x + dx / distance * label_radius
+        label_y = y + dy / distance * label_radius
+        if any(math.hypot(label_x - other_x, label_y - other_y) < 0.42 for other_x, other_y in placed_labels):
+            continue
+        placed_labels.append((label_x, label_y))
+        ax.annotate(
+            _wrap_label(node, width=13),
+            xy=(x, y),
+            xytext=(label_x, label_y),
+            arrowprops={"arrowstyle": "-", "color": "0.45", "lw": 0.35, "alpha": 0.62},
+            bbox={"boxstyle": "round,pad=0.15", "fc": "white", "ec": "0.78", "lw": 0.3, "alpha": 0.84},
+            fontsize=5.2,
+            ha="center",
+            va="center",
+            color=BLACK,
+            zorder=5,
+        )
+    ax.set_title("Core Keyword Co-occurrence Network")
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_frame_on(False)
+    ax.margins(0.22)
+    ax.text(
+        0.01,
+        0.015,
+        "Node size: weighted co-occurrence degree. Color: keyword community. Edge width: fractional paper co-occurrence.",
+        transform=ax.transAxes,
+        fontsize=6.4,
+        color="0.25",
+    )
+    save_figure(fig, output_dir / "keyword_cooccurrence_network.png")
+    return {
+        "figure_id": "keyword_cooccurrence_network",
+        "file": "keyword_cooccurrence_network.png",
+        "report_section": "关键词演化与热点趋势",
+        "source_table": "keyword_cooccurrence_edges.csv;keyword_metrics.csv",
+        "message": "展示核心关键词共现 component, 节点颜色来自 Louvain 社区, 用于识别热点主题簇。",
+        "status": "final",
+    }
+
+
+def _plot_keyword_lifecycle(keyword_lifecycle: pd.DataFrame, output_dir: Path, *, top_n: int = 16) -> dict[str, str]:
+    from matplotlib import pyplot as plt
+
+    data = keyword_lifecycle.copy()
+    if data.empty:
+        raise ValueError("keyword_lifecycle is empty")
+    filtered = data[data["keyword"].map(_is_report_keyword)]
+    if not filtered.empty:
+        data = filtered
+    for column in ("doc_count", "first_year", "peak_year", "last_year", "peak_count"):
+        if column in data.columns:
+            data[column] = pd.to_numeric(data[column], errors="coerce")
+    data["doc_count"] = data.get("doc_count", pd.Series(dtype=float)).fillna(0)
+    data = data.sort_values("doc_count", ascending=False).head(top_n)
+    data = data.sort_values("doc_count", ascending=True)
+
+    fig, ax = plt.subplots(figsize=(7.8, 5.0))
+    positions = np.arange(len(data))
+    max_peak = float(data["doc_count"].max()) if not data.empty else 1.0
+    max_peak = max_peak or 1.0
+    for position, (_, row) in zip(positions, data.iterrows(), strict=False):
+        first_year = int(row.get("first_year") or RECENT_YEAR_START)
+        peak_year = int(row.get("peak_year") or first_year)
+        last_year = int(row.get("last_year") or peak_year)
+        stage = str(row.get("lifecycle_stage") or "maturity")
+        color = LIFECYCLE_COLORS.get(stage, MUTED)
+        ax.hlines(position, first_year, last_year, color=color, linewidth=3.0, alpha=0.48, zorder=1)
+        size = 38 + 250 * math.sqrt(float(row.get("doc_count") or 0) / max_peak)
+        ax.scatter([peak_year], [position], s=size, color=color, edgecolor="white", linewidth=0.55, zorder=3)
+        ax.text(last_year + 0.06, position, stage, va="center", fontsize=6.4, color="0.28")
+    ax.set_yticks(positions, [_wrap_label(str(keyword), width=28) for keyword in data["keyword"]])
+    years = list(range(RECENT_YEAR_START, RECENT_YEAR_END + 1))
+    ax.set_xticks(years, [f"{year} YTD" if year == RECENT_YEAR_END else str(year) for year in years])
+    ax.set_xlim(RECENT_YEAR_START - 0.4, RECENT_YEAR_END + 0.9)
+    ax.set_xlabel("First year - peak year - latest year")
+    ax.set_title("Keyword Lifecycle Stage Map")
+    ax.grid(axis="x", linestyle="--")
+    save_figure(fig, output_dir / "keyword_lifecycle.png")
+    return {
+        "figure_id": "keyword_lifecycle",
+        "file": "keyword_lifecycle.png",
+        "report_section": "关键词演化与热点趋势",
+        "source_table": "keyword_lifecycle.csv",
+        "message": "将关键词划分为 emergence、growth、maturity、decline 四类生命周期阶段。",
+        "status": "final",
+    }
+
+
+def _plot_keyword_burst_windows(keyword_bursts: pd.DataFrame, output_dir: Path, *, top_n: int = 14) -> dict[str, str]:
+    from matplotlib import pyplot as plt
+
+    data = keyword_bursts.copy()
+    if data.empty:
+        raise ValueError("keyword_bursts is empty")
+    filtered = data[data["keyword"].map(_is_report_keyword)]
+    if not filtered.empty:
+        data = filtered
+    for column in ("year", "growth_rate", "burst_score"):
+        if column in data.columns:
+            data[column] = pd.to_numeric(data[column], errors="coerce").fillna(0)
+    data = data.sort_values(["burst_score", "growth_rate"], ascending=False).head(top_n)
+    data = data.sort_values("burst_score", ascending=True)
+    labels = [
+        _wrap_label(f"{row['keyword']} ({int(row['year'])})", width=30)
+        for _, row in data.iterrows()
+    ]
+    colors = [LIFECYCLE_COLORS.get(str(row.get("burst_state") or ""), MUTED) for _, row in data.iterrows()]
+
+    fig, ax = plt.subplots(figsize=(7.7, 4.9))
+    positions = np.arange(len(data))
+    values = data["burst_score"].to_numpy(dtype=float)
+    ax.barh(positions, values, color=colors, height=0.58)
+    ax.set_yticks(positions, labels)
+    ax.set_xlabel("Burst score")
+    ax.set_title("Keyword Burst Windows")
+    ax.grid(axis="x", linestyle="--")
+    max_value = max(values) if len(values) else 1.0
+    for position, (_, row) in zip(positions, data.iterrows(), strict=False):
+        ax.text(
+            float(row["burst_score"]) + max_value * 0.012,
+            position,
+            f"{row.get('burst_state') or ''} / {float(row.get('growth_rate') or 0):.2f}",
+            va="center",
+            fontsize=6.3,
+            color="0.28",
+        )
+    save_figure(fig, output_dir / "keyword_burst_windows.png")
+    return {
+        "figure_id": "keyword_burst_windows",
+        "file": "keyword_burst_windows.png",
+        "report_section": "关键词演化与热点趋势",
+        "source_table": "keyword_burst_windows.csv",
+        "message": "标出关键词在年度窗口中的突发增长、萌发或回落变化。",
+        "status": "final",
+    }
+
+
 def _plot_topic_year_share(topic_year: pd.DataFrame, output_dir: Path, *, model: str = "nmf") -> dict[str, str]:
     from matplotlib import pyplot as plt
 
@@ -893,17 +1152,11 @@ def _plot_author_core_network(
             zorder=1,
         )
 
-    unique_communities = sorted({communities.get(node, "unknown") for node in graph.nodes})
-    palette = [CHARCOAL, GRAPHITE, STEEL, BLUEGREY, MINTGREY, "#735f4b", "#4c7c6f", "#816b8d"]
-    community_colors = {
-        community: palette[index % len(palette)]
-        for index, community in enumerate(unique_communities)
-    }
     max_degree = max(degree.values(), default=1.0) or 1.0
     xs = [pos[node][0] for node in graph.nodes]
     ys = [pos[node][1] for node in graph.nodes]
     sizes = [35 + 460 * math.sqrt(max(degree.get(node, 0), 0) / max_degree) for node in graph.nodes]
-    colors = [community_colors.get(communities.get(node, "unknown"), MUTED) for node in graph.nodes]
+    colors = [_community_color(communities.get(node, "unknown")) for node in graph.nodes]
     ax.scatter(xs, ys, s=sizes, c=colors, edgecolors="white", linewidths=0.55, alpha=0.92, zorder=3)
 
     label_nodes = sorted(
@@ -932,7 +1185,7 @@ def _plot_author_core_network(
             color=BLACK,
             zorder=5,
         )
-    ax.set_title(f"Core Author Collaboration Network (component {len(data):,}/{len(author_edges):,} edges)")
+    ax.set_title(f"Core Author Collaboration Network ({len(data):,} displayed edges)")
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_frame_on(False)
@@ -994,10 +1247,20 @@ def _component_plot_slices(
             weight = float(edge["plot_weight"])
             node_scores[str(edge["author_a_key"])] += weight
             node_scores[str(edge["author_b_key"])] += weight
-        selected_nodes = {
-            node
-            for node, _ in sorted(node_scores.items(), key=lambda item: item[1], reverse=True)[:max_nodes_per_component]
-        }
+        component_edges = component_edges.sort_values("plot_weight", ascending=False)
+        anchor_node = max(node_scores, key=lambda node: node_scores[node])
+        selected_nodes = {anchor_node}
+        while len(selected_nodes) < max_nodes_per_component:
+            next_edge = None
+            for _, edge in component_edges.iterrows():
+                source = str(edge["author_a_key"])
+                target = str(edge["author_b_key"])
+                if (source in selected_nodes) ^ (target in selected_nodes):
+                    next_edge = (source, target)
+                    break
+            if next_edge is None:
+                break
+            selected_nodes.update(next_edge)
         plot_edges = component_edges[
             component_edges["author_a_key"].isin(selected_nodes)
             & component_edges["author_b_key"].isin(selected_nodes)
@@ -1047,8 +1310,6 @@ def _plot_author_component_overview(
     rows = math.ceil(len(slices) / columns)
     fig, axes = plt.subplots(rows, columns, figsize=(8.6, 1.86 * rows + 0.55), squeeze=False)
     fig.suptitle("Author Collaboration Component Overview", fontsize=10)
-    palette = [CHARCOAL, GRAPHITE, STEEL, BLUEGREY, MINTGREY, "#735f4b", "#4c7c6f", "#816b8d"]
-
     for index, item in enumerate(slices):
         ax = axes[index // columns][index % columns]
         plot_edges = item["plot_edges"]
@@ -1088,30 +1349,33 @@ def _plot_author_component_overview(
                 zorder=1,
             )
 
-        unique_communities = sorted({communities.get(node, "unknown") for node in component_graph.nodes})
-        community_colors = {
-            community: palette[community_index % len(palette)]
-            for community_index, community in enumerate(unique_communities)
-        }
         node_scores = item["node_scores"]
         max_score = max((node_scores.get(str(node), 0) for node in component_graph.nodes), default=1.0) or 1.0
         xs = [pos[node][0] for node in component_graph.nodes]
         ys = [pos[node][1] for node in component_graph.nodes]
         sizes = [42 + 170 * math.sqrt(max(node_scores.get(str(node), 0), 0) / max_score) for node in component_graph.nodes]
-        colors = [community_colors.get(communities.get(node, "unknown"), MUTED) for node in component_graph.nodes]
+        colors = [_community_color(communities.get(node, "unknown")) for node in component_graph.nodes]
         ax.scatter(xs, ys, s=sizes, c=colors, edgecolors="white", linewidths=0.45, alpha=0.92, zorder=3)
 
         top_node = max(component_graph.nodes, key=lambda node: node_scores.get(str(node), 0))
         ax.set_title(f"C{index + 1}: {item['nodes_total']} nodes / {item['edges_total']} edges", fontsize=6.8)
-        ax.text(
-            0.02,
-            0.02,
-            _wrap_label(labels.get(top_node, top_node), width=18),
-            transform=ax.transAxes,
-            fontsize=5.6,
+        x, y = pos[top_node]
+        center_x = float(np.mean(xs)) if xs else 0.0
+        center_y = float(np.mean(ys)) if ys else 0.0
+        dx = x - center_x
+        dy = y - center_y
+        distance = math.hypot(dx, dy) or 1.0
+        ax.annotate(
+            _wrap_label(labels.get(top_node, top_node), width=16),
+            xy=(x, y),
+            xytext=(x + dx / distance * 0.18, y + dy / distance * 0.18),
+            arrowprops={"arrowstyle": "-", "color": "0.48", "lw": 0.3, "alpha": 0.62},
+            fontsize=5.2,
+            ha="center",
+            va="center",
             color=BLACK,
-            bbox={"boxstyle": "round,pad=0.14", "fc": "white", "ec": "0.82", "lw": 0.25, "alpha": 0.82},
-            zorder=4,
+            bbox={"boxstyle": "round,pad=0.13", "fc": "white", "ec": "0.82", "lw": 0.25, "alpha": 0.84},
+            zorder=5,
         )
         ax.set_xticks([])
         ax.set_yticks([])
@@ -1293,6 +1557,10 @@ def build_report_figures(
         keywords = _read_csv(analysis_path / "paper_keywords.csv")
     keyword_year = _read_csv(analysis_path / "keyword_year_matrix.csv")
     keyword_trends = _read_csv(analysis_path / "keyword_trends.csv")
+    keyword_edges = _read_csv(analysis_path / "keyword_cooccurrence_edges.csv")
+    keyword_metrics = _read_csv(analysis_path / "keyword_metrics.csv")
+    keyword_lifecycle = _read_csv(analysis_path / "keyword_lifecycle.csv")
+    keyword_bursts = _read_csv(analysis_path / "keyword_burst_windows.csv")
     topic_year = _read_csv(analysis_path / "topic_year_share.csv")
     author_edges = _read_csv(analysis_path / "author_collaboration_edges.csv")
     author_metrics = _read_csv(analysis_path / "author_metrics.csv")
@@ -1315,6 +1583,12 @@ def build_report_figures(
         manifest.append(_plot_keyword_momentum(keyword_year, output_path))
     if not keyword_trends.empty:
         manifest.append(_plot_keyword_normalized_trends(keyword_trends, output_path))
+    if not keyword_edges.empty:
+        manifest.append(_plot_keyword_cooccurrence_network(keyword_edges, keyword_metrics, output_path))
+    if not keyword_lifecycle.empty:
+        manifest.append(_plot_keyword_lifecycle(keyword_lifecycle, output_path))
+    if not keyword_bursts.empty:
+        manifest.append(_plot_keyword_burst_windows(keyword_bursts, output_path))
     if not topic_year.empty:
         manifest.append(_plot_topic_year_share(topic_year, output_path))
     if papers:
