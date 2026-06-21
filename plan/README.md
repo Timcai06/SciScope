@@ -1,45 +1,45 @@
 # SciScope Plan Index
 
-This directory contains the execution plan for the contest project:
+Execution plan for `面向科技文献智能分析的科研智能体构建`.
 
-`面向科技文献智能分析的科研智能体构建`
+The contest requires two outcomes:
 
-The plan is organized around the contest's two required outcomes:
+1. **数据分析报告** — literature distribution, keyword evolution, author
+   collaboration networks. **Status: substantially complete** (see
+   `data/analysis/`, `output/pdf/sciscope_data_report/`).
+2. **科研智能体模型** — Python code + model files for literature QA, trend
+   prediction, and paper recommendation. **Status: built** (this layer, see
+   below).
 
-- data analysis report.
-- research agent model and runnable system.
+## Current documents
 
-## Documents
+- [00-status-and-roadmap.md](00-status-and-roadmap.md) — where the project is
+  now and what remains.
+- [01-agent-model-layer.md](01-agent-model-layer.md) — architecture of the
+  research-agent model layer (service layer, embeddings, retrieval, trend,
+  recommend, graph, APIs).
 
-- [00-overview.md](00-overview.md): mission, current state, target architecture, and definition of done.
-- [01-milestones.md](01-milestones.md): phased roadmap from data source confirmation to final delivery.
-- [02-data-acquisition.md](02-data-acquisition.md): public data harvesting strategy and crawl plan.
-- [03-data-assets-and-schema.md](03-data-assets-and-schema.md): canonical schema, processed assets, graph files, PostgreSQL tables.
-- [04-analysis-report.md](04-analysis-report.md): report structure, required analyses, and report asset generation.
-- [05-models-and-algorithms.md](05-models-and-algorithms.md): retrieval, topic, trend, recommendation, graph, and LLM provider model plan.
-- [06-agent-and-api.md](06-agent-and-api.md): agentic workflow, agents, API roadmap, and response contracts.
-- [07-frontend-workspace.md](07-frontend-workspace.md): product workspace views and frontend acceptance.
-- [08-infra-and-runtime.md](08-infra-and-runtime.md): runtime profiles, PostgreSQL plan, DeepSeek/local vLLM strategy.
-- [09-delivery-and-acceptance.md](09-delivery-and-acceptance.md): final deliverables, scoring strategy, and acceptance checklist.
-- [10-next-sprint.md](10-next-sprint.md): immediate sprint to move from foundation slice to real public data.
-- [11-tonight-data-layer-sprint.md](11-tonight-data-layer-sprint.md): immediate data-layer sprint for year balance, full-text enrichment, and RAG schema readiness.
+## Architecture decision (current)
 
-## Immediate Next Step
-
-Start with [11-tonight-data-layer-sprint.md](11-tonight-data-layer-sprint.md).
-
-The next sprint goal is:
-
-> Improve the 50k data asset layer by balancing non-2026 years, increasing evidence text coverage, and preparing RAG/Agent-oriented fields.
-
-## Current Critical Decision
-
-Do not crawl 50k records directly into PostgreSQL first.
-
-Use:
+Reproducible pipeline, PostgreSQL as the serving layer:
 
 ```text
-raw JSONL -> processed Parquet -> analysis/model assets -> PostgreSQL serving layer
+raw JSONL -> processed corpus -> analysis/model assets
+          -> PostgreSQL + pgvector serving layer -> FastAPI -> Next.js
 ```
 
-This keeps the project reproducible and prevents early schema churn from corrupting the database.
+The research agent = Python code + reproducible model files:
+- pgvector embeddings (`chunk_embeddings`, `paper_embeddings`)
+- trend model files (`models/trends/`)
+- recommendation model (`models/recommend/` + `paper_embeddings`)
+- knowledge-graph exports (`graphs/`)
+- local embedder (`models/embedder/`)
+
+The LLM (local vLLM / LM Studio, OpenAI-compatible) is only the generation
+layer; corpus-specific intelligence lives in the local models and indices.
+
+## History
+
+Earlier planning documents (foundation slice through the data-layer sprints)
+are preserved in [archive/](archive/). They are historical and superseded by
+the two documents above.
