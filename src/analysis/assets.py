@@ -22,17 +22,154 @@ MAX_CORE_AUTHOR_GRAPH_EDGES = 25_000
 TOPIC_SAMPLE_LIMIT = 50_000
 
 KEYWORD_ALIASES = {
+    "ai": "artificial intelligence",
     "retrieval-augmented generation": "retrieval augmented generation",
     "retrieval augmented generation": "retrieval augmented generation",
     "rag": "retrieval augmented generation",
+    "large language model": "large language model",
     "large language models": "large language model",
+    "large-language model": "large language model",
     "large-language models": "large language model",
+    "llm": "large language model",
     "llms": "large language model",
     "g n n": "graph neural network",
+    "gnn": "graph neural network",
+    "graph neural nets": "graph neural network",
     "graph neural networks": "graph neural network",
     "knowledge graphs": "knowledge graph",
     "machine-learning": "machine learning",
     "deep-learning": "deep learning",
+    "vision-language model": "vision language model",
+    "vision-language models": "vision language model",
+    "vision language models": "vision language model",
+    "vlm": "vision language model",
+    "vlms": "vision language model",
+    "nlp": "natural language processing",
+    "natural language processing": "natural language processing",
+    "natural language processing nlp": "natural language processing",
+    "biomedical nlp": "biomedical nlp",
+    "covid19": "covid 19",
+    "covid-19": "covid 19",
+}
+
+TEXT_SIGNAL_TERMS = {
+    "artificial intelligence": (
+        r"\bartificial intelligence\b",
+        r"\bai\b",
+    ),
+    "battery": (
+        r"\bbatter(?:y|ies)\b",
+        r"\blithium ion\b",
+    ),
+    "biomedical nlp": (
+        r"\bbiomedical nlp\b",
+        r"\bbiomedical natural language processing\b",
+        r"\bclinical nlp\b",
+    ),
+    "cancer": (
+        r"\bcancer\b",
+        r"\btumo[u]?r\b",
+        r"\boncology\b",
+    ),
+    "catalyst discovery": (
+        r"\bcatalyst discovery\b",
+        r"\bcatalytic discovery\b",
+        r"\bcatalyst design\b",
+    ),
+    "clinical search": (
+        r"\bclinical search\b",
+        r"\bclinical retrieval\b",
+    ),
+    "computational biology": (
+        r"\bcomputational biology\b",
+        r"\bbioinformatics\b",
+    ),
+    "covid 19": (
+        r"\bcovid\s*19\b",
+        r"\bsars cov 2\b",
+    ),
+    "data science": (
+        r"\bdata science\b",
+    ),
+    "deep learning": (
+        r"\bdeep learning\b",
+        r"\bdeep neural network(?:s)?\b",
+    ),
+    "diffusion model": (
+        r"\bdiffusion model(?:s)?\b",
+        r"\bdenoising diffusion\b",
+    ),
+    "drug discovery": (
+        r"\bdrug discovery\b",
+        r"\bdrug design\b",
+        r"\bdrug repurposing\b",
+    ),
+    "graph neural network": (
+        r"\bgraph neural network(?:s)?\b",
+        r"\bgnn(?:s)?\b",
+    ),
+    "information retrieval": (
+        r"\binformation retrieval\b",
+        r"\bneural retrieval\b",
+    ),
+    "knowledge graph": (
+        r"\bknowledge graph(?:s)?\b",
+        r"\bknowledge graph embedding(?:s)?\b",
+    ),
+    "large language model": (
+        r"\blarge language model(?:s)?\b",
+        r"\bllm(?:s)?\b",
+        r"\bfoundation model(?:s)?\b",
+    ),
+    "machine learning": (
+        r"\bmachine learning\b",
+    ),
+    "materials informatics": (
+        r"\bmaterials informatics\b",
+        r"\bmaterial informatics\b",
+        r"\bmaterials discovery\b",
+    ),
+    "multimodal learning": (
+        r"\bmultimodal learning\b",
+        r"\bmultimodal model(?:s)?\b",
+        r"\bmultimodal large language model(?:s)?\b",
+    ),
+    "nanotechnology": (
+        r"\bnanotechnology\b",
+        r"\bnanomaterial(?:s)?\b",
+    ),
+    "natural language processing": (
+        r"\bnatural language processing\b",
+        r"\bnlp\b",
+    ),
+    "prompt engineering": (
+        r"\bprompt engineering\b",
+        r"\bprompt tuning\b",
+        r"\binstruction tuning\b",
+    ),
+    "question answering": (
+        r"\bquestion answering\b",
+        r"\bqa system(?:s)?\b",
+    ),
+    "retrieval augmented generation": (
+        r"\bretrieval augmented generation\b",
+        r"\bretrieval augmentation\b",
+        r"\bretrieval augmented\b",
+        r"\brag\b",
+    ),
+    "transformer": (
+        r"\btransformer(?:s)?\b",
+        r"\btransformer based\b",
+    ),
+    "vision language model": (
+        r"\bvision language model(?:s)?\b",
+        r"\bvision language pretraining\b",
+        r"\bvlm(?:s)?\b",
+    ),
+}
+TEXT_SIGNAL_PATTERNS = {
+    keyword: tuple(re.compile(pattern) for pattern in patterns)
+    for keyword, patterns in TEXT_SIGNAL_TERMS.items()
 }
 
 GENERIC_KEYWORDS = {
@@ -96,6 +233,7 @@ def _write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) ->
 
 def _paper_with_source(wrapper: dict[str, Any]) -> dict[str, Any]:
     paper = paper_wrapper_to_paper(wrapper)
+    raw_metadata = _raw_metadata(wrapper)
     year_status = str(wrapper.get("_sciscope_year_status") or "normal")
     if year_status == "future_year_suspect":
         paper = {
@@ -112,6 +250,7 @@ def _paper_with_source(wrapper: dict[str, Any]) -> dict[str, Any]:
         "field_seed": str(wrapper.get("field_seed") or ""),
         "crawled_at": str(wrapper.get("crawled_at") or ""),
         "text_for_analysis": _text_for_analysis(paper),
+        **raw_metadata,
     }
 
 
@@ -154,6 +293,30 @@ def _text_for_analysis(paper: dict[str, Any]) -> str:
     title = str(paper.get("title") or "").strip()
     abstract = str(paper.get("abstract") or "").strip()
     return re.sub(r"\s+", " ", f"{title} {title} {abstract}").strip()
+
+
+def _extract_text_signal_terms(paper: dict[str, Any]) -> set[str]:
+    text = str(paper.get("text_for_analysis") or "")
+    if not text:
+        text = _text_for_analysis(paper)
+    normalized_text = _normalize_keyword(text)
+    found: set[str] = set()
+    for keyword, patterns in TEXT_SIGNAL_PATTERNS.items():
+        if any(pattern.search(normalized_text) for pattern in patterns):
+            found.add(keyword)
+    return found
+
+
+def _raw_metadata(wrapper: dict[str, Any]) -> dict[str, str]:
+    raw = wrapper.get("raw") if isinstance(wrapper.get("raw"), dict) else {}
+    doi = str(raw.get("doi") or raw.get("DOI") or "").strip()
+    url = str(raw.get("url") or raw.get("URL") or raw.get("id") or raw.get("source_id") or wrapper.get("source_id") or "").strip()
+    return {
+        "doi": doi,
+        "url": url,
+        "full_text_source": str(raw.get("full_text_source") or "").strip(),
+        "full_text_url": str(raw.get("full_text_url") or "").strip(),
+    }
 
 
 def _raw_paths(raw_path: Path, sources: tuple[str, ...], filename_template: str | None) -> list[tuple[str, Path]]:
@@ -224,59 +387,98 @@ def _doc_key(paper: dict[str, Any]) -> str:
     return str(paper.get("paper_id") or paper.get("title") or id(paper))
 
 
-def _build_keyword_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+def _build_keyword_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     paper_keywords: list[dict[str, Any]] = []
+    paper_keyword_signals: list[dict[str, Any]] = []
     alias_rows: dict[str, str] = {}
-    keyword_year_docs: dict[tuple[str, int], set[str]] = defaultdict(set)
+    keyword_year_docs: dict[tuple[str, int], dict[str, set[str]]] = defaultdict(lambda: {"explicit": set(), "text": set(), "fused": set()})
     keyword_representatives: dict[str, dict[str, Any]] = {}
     docs_by_year = Counter(int(paper["year"]) for paper in papers if _is_recent_year(paper.get("year")))
+    analyzable_docs_by_year = Counter(
+        int(paper["year"])
+        for paper in papers
+        if _is_recent_year(paper.get("year")) and bool(str(paper.get("text_for_analysis") or "").strip())
+    )
 
     for paper in papers:
         year = _year_value(paper.get("year"))
         paper_id = _doc_key(paper)
-        seen_keywords: set[str] = set()
+        seen_explicit_keywords: set[str] = set()
+        paper_id_text = str(paper.get("paper_id") or "")
+        source = str(paper.get("source") or "")
+        paper_year = paper.get("year") or ""
         for raw_keyword in paper.get("keywords") or []:
             keyword = _normalize_keyword(raw_keyword)
-            if not keyword or not _is_keyword_signal(keyword) or keyword in seen_keywords:
+            if not keyword or not _is_keyword_signal(keyword) or keyword in seen_explicit_keywords:
                 continue
-            seen_keywords.add(keyword)
+            seen_explicit_keywords.add(keyword)
             alias_rows[str(raw_keyword).strip().lower()] = keyword
-            row = {"paper_id": str(paper.get("paper_id") or ""), "source": str(paper.get("source") or ""), "year": paper.get("year") or "", "keyword": keyword}
+            row = {"paper_id": paper_id_text, "source": source, "year": paper_year, "keyword": keyword}
             paper_keywords.append(row)
             if year is not None:
-                keyword_year_docs[(keyword, year)].add(paper_id)
+                docs = keyword_year_docs[(keyword, year)]
+                docs["explicit"].add(paper_id)
+                docs["fused"].add(paper_id)
+            paper_keyword_signals.append({**row, "signal_source": "explicit_keyword"})
+            if keyword not in keyword_representatives or _is_recent_year(paper.get("year")):
+                keyword_representatives[keyword] = paper
+
+        seen_text_terms = set()
+        for keyword in sorted(_extract_text_signal_terms(paper)):
+            if not keyword or not _is_keyword_signal(keyword) or keyword in seen_text_terms:
+                continue
+            seen_text_terms.add(keyword)
+            row = {"paper_id": paper_id_text, "source": source, "year": paper_year, "keyword": keyword}
+            if year is not None:
+                docs = keyword_year_docs[(keyword, year)]
+                docs["text"].add(paper_id)
+                docs["fused"].add(paper_id)
+            paper_keyword_signals.append({**row, "signal_source": "title_abstract"})
             if keyword not in keyword_representatives or _is_recent_year(paper.get("year")):
                 keyword_representatives[keyword] = paper
 
     keyword_year_rows: list[dict[str, Any]] = []
     years = list(range(RECENT_YEAR_START, RECENT_YEAR_END + 1))
-    for (keyword, year), docs in sorted(keyword_year_docs.items(), key=lambda item: (item[0][0], item[0][1])):
+    for (keyword, year), docs_by_signal in sorted(keyword_year_docs.items(), key=lambda item: (item[0][0], item[0][1])):
         total_docs = docs_by_year.get(year, 0)
-        count = len(docs)
+        analyzable_docs = analyzable_docs_by_year.get(year, total_docs)
+        explicit_count = len(docs_by_signal["explicit"])
+        text_signal_count = len(docs_by_signal["text"])
+        count = len(docs_by_signal["fused"])
         keyword_year_rows.append(
             {
                 "keyword": keyword,
                 "year": year,
                 "count": count,
+                "explicit_count": explicit_count,
+                "text_signal_count": text_signal_count,
                 "total_docs_in_year": total_docs,
-                "normalized_df": round(count / total_docs, 6) if total_docs else 0,
+                "analyzable_docs_in_year": analyzable_docs,
+                "normalized_df": round(count / analyzable_docs, 6) if analyzable_docs else 0,
             }
         )
 
     grouped_counts: dict[str, dict[int, int]] = defaultdict(dict)
+    grouped_explicit_counts: dict[str, dict[int, int]] = defaultdict(dict)
+    grouped_text_counts: dict[str, dict[int, int]] = defaultdict(dict)
     grouped_norms: dict[str, dict[int, float]] = defaultdict(dict)
     for row in keyword_year_rows:
         keyword = str(row["keyword"])
         year = int(row["year"])
         grouped_counts[keyword][year] = int(row["count"])
+        grouped_explicit_counts[keyword][year] = int(row["explicit_count"])
+        grouped_text_counts[keyword][year] = int(row["text_signal_count"])
         grouped_norms[keyword][year] = float(row["normalized_df"])
 
     trend_rows: list[dict[str, Any]] = []
     for keyword, year_counts in grouped_counts.items():
         recent_values = [grouped_norms[keyword].get(year, 0.0) for year in years]
         baseline = sum(recent_values[:2]) / 2
-        current = sum(recent_values[-2:]) / 2
+        current = grouped_norms[keyword].get(RECENT_YEAR_END - 1, 0.0)
+        ytd_value = grouped_norms[keyword].get(RECENT_YEAR_END, 0.0)
         doc_count = sum(year_counts.get(year, 0) for year in years)
+        explicit_doc_count = sum(grouped_explicit_counts[keyword].get(year, 0) for year in years)
+        text_signal_doc_count = sum(grouped_text_counts[keyword].get(year, 0) for year in years)
         if doc_count <= 0:
             continue
         growth_rate = (current - baseline) / baseline if baseline else (current if current else 0)
@@ -286,21 +488,26 @@ def _build_keyword_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, 
         row = {
             "keyword": keyword,
             "doc_count": doc_count,
+            "explicit_doc_count": explicit_doc_count,
+            "text_signal_doc_count": text_signal_doc_count,
             "normalized_df": round(sum(recent_values) / len(recent_values), 6),
             "growth_rate": round(growth_rate, 6),
             "momentum_score": round(momentum, 6),
             "burst_score": round(burst_score, 6),
+            "ytd_2026_normalized_df": round(ytd_value, 6),
             "representative_paper_id": representative.get("paper_id") or "",
             "representative_title": representative.get("title") or "",
             "representative_year": representative.get("year") or "",
         }
         for year in years:
             row[f"doc_count_{year}"] = year_counts.get(year, 0)
+            row[f"explicit_count_{year}"] = grouped_explicit_counts[keyword].get(year, 0)
+            row[f"text_signal_count_{year}"] = grouped_text_counts[keyword].get(year, 0)
             row[f"normalized_df_{year}"] = round(grouped_norms[keyword].get(year, 0.0), 6)
         trend_rows.append(row)
     trend_rows.sort(key=lambda row: (float(row["momentum_score"]), int(row["doc_count"])), reverse=True)
     alias_output = [{"raw_keyword": raw, "canonical_keyword": canonical} for raw, canonical in sorted(alias_rows.items()) if raw != canonical]
-    return paper_keywords, keyword_year_rows, trend_rows, alias_output
+    return paper_keywords, paper_keyword_signals, keyword_year_rows, trend_rows, alias_output
 
 
 def _build_author_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
@@ -562,7 +769,7 @@ def build_analysis_assets(
         seen.add(key)
         papers.append(paper)
 
-    paper_keywords, keyword_year_rows, keyword_trend_rows, keyword_alias_rows = _build_keyword_assets(papers)
+    paper_keywords, paper_keyword_signals, keyword_year_rows, keyword_trend_rows, keyword_alias_rows = _build_keyword_assets(papers)
     paper_authors, edge_rows, author_metrics_rows, author_metrics_by_year_rows, author_community_rows = _build_author_assets(papers)
     topic_comparison_rows, topic_keyword_rows, paper_topic_rows, topic_year_share_rows = _build_topic_assets(papers)
 
@@ -622,23 +829,47 @@ def build_analysis_assets(
         ["paper_id", "source", "year", "keyword"],
     )
     _write_csv(
+        output_path / "paper_keyword_signals.csv",
+        paper_keyword_signals,
+        ["paper_id", "source", "year", "keyword", "signal_source"],
+    )
+    _write_csv(
         output_path / "keyword_year_matrix.csv",
         keyword_year_rows,
-        ["keyword", "year", "count", "total_docs_in_year", "normalized_df"],
+        [
+            "keyword",
+            "year",
+            "count",
+            "explicit_count",
+            "text_signal_count",
+            "total_docs_in_year",
+            "analyzable_docs_in_year",
+            "normalized_df",
+        ],
     )
     keyword_trend_fields = [
         "keyword",
         "doc_count",
+        "explicit_doc_count",
+        "text_signal_doc_count",
         "normalized_df",
         "growth_rate",
         "momentum_score",
         "burst_score",
+        "ytd_2026_normalized_df",
         "representative_paper_id",
         "representative_title",
         "representative_year",
     ]
     for year in range(RECENT_YEAR_START, RECENT_YEAR_END + 1):
-        keyword_trend_fields.extend([f"doc_count_{year}", f"normalized_df_{year}"])
+        keyword_trend_fields.extend(
+            [
+                f"doc_count_{year}",
+                f"explicit_count_{year}",
+                f"text_signal_count_{year}",
+                f"normalized_df_{year}",
+            ]
+        )
     _write_csv(output_path / "keyword_trends.csv", keyword_trend_rows, keyword_trend_fields)
     _write_csv(output_path / "keyword_aliases.csv", keyword_alias_rows, ["raw_keyword", "canonical_keyword"])
     _write_csv(
@@ -708,6 +939,7 @@ def build_analysis_assets(
         "sources": sorted({paper.get("source") for paper in papers if paper.get("source")}),
         "paper_authors": len(paper_authors),
         "paper_keywords": len(paper_keywords),
+        "paper_keyword_signals": len(paper_keyword_signals),
         "keyword_year_rows": len(keyword_year_rows),
         "keyword_trends": len(keyword_trend_rows),
         "author_edges": len(edge_rows),

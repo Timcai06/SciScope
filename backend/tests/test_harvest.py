@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from src.harvest.fulltext_enrichment import enrich_fulltext_in_place
 from src.harvest.normalize import normalize_raw_jsonl, openalex_work_to_paper, paper_wrapper_to_paper
 from src.harvest.openalex_client import _query_params
 from src.harvest.public_sources import (
@@ -270,6 +271,361 @@ def test_pmc_summary_record_to_item_preserves_metadata_when_full_text_is_unavail
     assert item["raw"]["year"] == "2024"
     assert item["raw"]["authors"] == ["Ada Chen", "Lin Wang"]
     assert item["raw"]["doi"] == "10.5555/pmc.1"
+
+
+def test_arxiv_normalization_preserves_enriched_full_text():
+    paper = paper_wrapper_to_paper(
+        {
+            "source": "arxiv",
+            "source_id": "http://arxiv.org/abs/2401.00001v1",
+            "field_seed": "computer science",
+            "raw": {
+                "id": "http://arxiv.org/abs/2401.00001v1",
+                "title": "Agentic RAG for Scientific Discovery",
+                "summary": "A survey of agentic retrieval workflows.",
+                "authors": ["Ada Chen"],
+                "published": "2024-01-01T00:00:00Z",
+                "categories": ["cs.CL"],
+                "body_excerpt": "Full arXiv source text excerpt.",
+            },
+        }
+    )
+
+    assert paper["full_text"] == "Full arXiv source text excerpt."
+
+
+def test_doaj_normalization_preserves_enriched_full_text():
+    paper = paper_wrapper_to_paper(
+        {
+            "source": "doaj",
+            "source_id": "DOAJ-FT-1",
+            "field_seed": "biomedicine",
+            "raw": {
+                "id": "DOAJ-FT-1",
+                "bibjson": {
+                    "title": "Visible browser full text",
+                    "abstract": "Open access abstract.",
+                    "author": [{"name": "Ada Chen"}],
+                    "year": "2024",
+                    "keywords": ["open access"],
+                },
+                "body_excerpt": "Browser extracted DOAJ full text.",
+            },
+        }
+    )
+
+    assert paper["full_text"] == "Browser extracted DOAJ full text."
+
+
+def test_enrich_fulltext_updates_existing_arxiv_canonical_file_in_place(tmp_path, monkeypatch):
+    canonical_dir = tmp_path / "raw_canonical"
+    arxiv_dir = canonical_dir / "arxiv"
+    arxiv_dir.mkdir(parents=True)
+    path = arxiv_dir / "2024.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "source": "arxiv",
+                "source_id": "http://arxiv.org/abs/2401.00001v1",
+                "raw": {
+                    "id": "http://arxiv.org/abs/2401.00001v1",
+                    "title": "Agentic RAG for Scientific Discovery",
+                    "summary": "A survey.",
+                    "authors": ["Ada Chen"],
+                    "published": "2024-01-01T00:00:00Z",
+                    "categories": ["cs.CL"],
+                },
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "src.harvest.fulltext_enrichment._fetch_bytes",
+        lambda _url, **_kwargs: b"\\section{Introduction} " + b"full text evidence " * 120,
+    )
+    monkeypatch.setattr("src.harvest.fulltext_enrichment.time.sleep", lambda _seconds: None)
+
+    summary = enrich_fulltext_in_place(canonical_dir=canonical_dir, years=["2024"], limit=1)
+
+    assert summary["records_enriched"] == 1
+    assert list(arxiv_dir.glob("*.jsonl")) == [path]
+    assert not path.with_name("2024.jsonl.tmp").exists()
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert "full text evidence" in record["raw"]["body_excerpt"]
+    assert record["raw"]["full_text_source"] == "arxiv_eprint"
+
+
+def test_enrich_fulltext_updates_doaj_fulltext_link_in_place(tmp_path, monkeypatch):
+    canonical_dir = tmp_path / "raw_canonical"
+    doaj_dir = canonical_dir / "doaj"
+    doaj_dir.mkdir(parents=True)
+    path = doaj_dir / "2024.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "source": "doaj",
+                "source_id": "doaj-1",
+                "raw": {
+                    "id": "doaj-1",
+                    "bibjson": {
+                        "title": "Open access retrieval systems",
+                        "link": [
+                            {
+                                "type": "fulltext",
+                                "content_type": "text/html",
+                                "url": "https://example.org/fulltext",
+                            }
+                        ],
+                    },
+                },
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "src.harvest.fulltext_enrichment._fetch_bytes",
+        lambda _url, **_kwargs: b"<html><body><article><p>open access full text evidence </p>"
+        + b"<p>retrieval systems and scientific agents </p>" * 90
+        + b"</article></body></html>",
+    )
+    monkeypatch.setattr("src.harvest.fulltext_enrichment.time.sleep", lambda _seconds: None)
+
+    summary = enrich_fulltext_in_place(canonical_dir=canonical_dir, source="doaj", years=["2024"], limit=1)
+
+    assert summary["records_enriched"] == 1
+    assert list(doaj_dir.glob("*.jsonl")) == [path]
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert "retrieval systems and scientific agents" in record["raw"]["body_excerpt"]
+    assert record["raw"]["full_text_source"] == "doaj_fulltext_url"
+    assert record["raw"]["full_text_url"] == "https://example.org/fulltext"
+
+
+def test_enrich_fulltext_falls_back_to_browser_for_blocked_publisher(tmp_path, monkeypatch):
+    canonical_dir = tmp_path / "raw_canonical"
+    doaj_dir = canonical_dir / "doaj"
+    doaj_dir.mkdir(parents=True)
+    path = doaj_dir / "2024.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "source": "doaj",
+                "source_id": "mdpi-1",
+                "raw": {
+                    "id": "mdpi-1",
+                    "bibjson": {
+                        "title": "MDPI article with visible browser text",
+                        "link": [
+                            {
+                                "type": "fulltext",
+                                "content_type": "text/html",
+                                "url": "https://www.mdpi.com/2073-4409/11/19/3007",
+                            }
+                        ],
+                    },
+                },
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    def blocked_fetch(_url, **_kwargs):
+        raise OSError("403 forbidden")
+
+    monkeypatch.setattr("src.harvest.fulltext_enrichment._fetch_bytes", blocked_fetch)
+    monkeypatch.setattr(
+        "src.harvest.fulltext_enrichment._fetch_text_with_browser",
+        lambda _url, **_kwargs: "browser extracted mdpi article body " * 800,
+    )
+    monkeypatch.setattr("src.harvest.fulltext_enrichment.time.sleep", lambda _seconds: None)
+
+    summary = enrich_fulltext_in_place(canonical_dir=canonical_dir, source="doaj", years=["2024"], limit=1)
+
+    assert summary["records_enriched"] == 1
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert "browser extracted mdpi article body" in record["raw"]["body_excerpt"]
+    assert record["raw"]["full_text_source"] == "doaj_fulltext_url_browser"
+
+
+def test_enrich_fulltext_checkpoint_writes_successes_before_year_finishes(tmp_path, monkeypatch):
+    canonical_dir = tmp_path / "raw_canonical"
+    doaj_dir = canonical_dir / "doaj"
+    doaj_dir.mkdir(parents=True)
+    path = doaj_dir / "2024.jsonl"
+    records = [
+        {
+            "source": "doaj",
+            "source_id": f"doaj-{index}",
+            "raw": {
+                "id": f"doaj-{index}",
+                "bibjson": {
+                    "title": f"Article {index}",
+                    "link": [{"type": "fulltext", "url": f"https://example.org/{index}"}],
+                },
+            },
+        }
+        for index in range(2)
+    ]
+    path.write_text("\n".join(json.dumps(record, ensure_ascii=False) for record in records) + "\n", encoding="utf-8")
+
+    def fake_fetch(url, **_kwargs):
+        if url.endswith("/1"):
+            raise OSError("network failure")
+        return b"<html><body><article>" + b"checkpoint full text " * 120 + b"</article></body></html>"
+
+    monkeypatch.setattr("src.harvest.fulltext_enrichment._fetch_bytes", fake_fetch)
+    monkeypatch.setattr("src.harvest.fulltext_enrichment.time.sleep", lambda _seconds: None)
+
+    summary = enrich_fulltext_in_place(
+        canonical_dir=canonical_dir,
+        source="doaj",
+        years=["2024"],
+        limit=2,
+        checkpoint_every=1,
+    )
+
+    persisted = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert summary["records_enriched"] == 1
+    assert "checkpoint full text" in persisted[0]["raw"]["body_excerpt"]
+
+
+def test_enrich_fulltext_updates_crossref_fulltext_link_in_place(tmp_path, monkeypatch):
+    canonical_dir = tmp_path / "raw_canonical"
+    crossref_dir = canonical_dir / "crossref"
+    crossref_dir.mkdir(parents=True)
+    path = crossref_dir / "2024.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "source": "crossref",
+                "source_id": "10.5555/sciscope.1",
+                "raw": {
+                    "DOI": "10.5555/sciscope.1",
+                    "link": [
+                        {
+                            "URL": "https://example.org/article.html",
+                            "content-type": "text/html",
+                            "intended-application": "text-mining",
+                        }
+                    ],
+                },
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "src.harvest.fulltext_enrichment._fetch_bytes",
+        lambda _url, **_kwargs: b"<html><body><main><p>crossref linked full text </p>"
+        + b"<p>evidence for literature mining </p>" * 90
+        + b"</main></body></html>",
+    )
+    monkeypatch.setattr("src.harvest.fulltext_enrichment.time.sleep", lambda _seconds: None)
+
+    summary = enrich_fulltext_in_place(canonical_dir=canonical_dir, source="crossref", years=["2024"], limit=1)
+
+    assert summary["records_enriched"] == 1
+    assert list(crossref_dir.glob("*.jsonl")) == [path]
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert "evidence for literature mining" in record["raw"]["body_excerpt"]
+    assert record["raw"]["full_text_source"] == "crossref_fulltext_url"
+
+
+def test_enrich_fulltext_stops_after_max_attempts(tmp_path, monkeypatch):
+    canonical_dir = tmp_path / "raw_canonical"
+    crossref_dir = canonical_dir / "crossref"
+    crossref_dir.mkdir(parents=True)
+    path = crossref_dir / "2024.jsonl"
+    records = [
+        {
+            "source": "crossref",
+            "source_id": f"10.5555/sciscope.{index}",
+            "raw": {
+                "DOI": f"10.5555/sciscope.{index}",
+                "link": [{"URL": f"https://example.org/{index}.html", "content-type": "text/html"}],
+            },
+        }
+        for index in range(3)
+    ]
+    path.write_text("\n".join(json.dumps(record, ensure_ascii=False) for record in records) + "\n", encoding="utf-8")
+
+    def fail_fetch(_url, **_kwargs):
+        raise OSError("network failure")
+
+    monkeypatch.setattr("src.harvest.fulltext_enrichment._fetch_bytes", fail_fetch)
+
+    summary = enrich_fulltext_in_place(
+        canonical_dir=canonical_dir,
+        source="crossref",
+        years=["2024"],
+        limit=2,
+        max_attempts=2,
+    )
+
+    assert summary["records_seen"] == 2
+    assert summary["records_enriched"] == 0
+    assert summary["errors"] == 2
+
+
+def test_enrich_fulltext_stable_only_skips_low_yield_domains(tmp_path, monkeypatch):
+    canonical_dir = tmp_path / "raw_canonical"
+    doaj_dir = canonical_dir / "doaj"
+    doaj_dir.mkdir(parents=True)
+    path = doaj_dir / "2024.jsonl"
+    records = [
+        {
+            "source": "doaj",
+            "source_id": "ieee-1",
+            "raw": {
+                "id": "ieee-1",
+                "bibjson": {
+                    "title": "IEEE landing page",
+                    "link": [{"type": "fulltext", "url": "https://ieeexplore.ieee.org/document/9887960/"}],
+                },
+            },
+        },
+        {
+            "source": "doaj",
+            "source_id": "mdpi-1",
+            "raw": {
+                "id": "mdpi-1",
+                "bibjson": {
+                    "title": "MDPI full text",
+                    "link": [{"type": "fulltext", "url": "https://www.mdpi.com/2073-4409/11/19/3007"}],
+                },
+            },
+        },
+    ]
+    path.write_text("\n".join(json.dumps(record, ensure_ascii=False) for record in records) + "\n", encoding="utf-8")
+
+    fetched: list[str] = []
+
+    def fake_fetch(url, **_kwargs):
+        fetched.append(url)
+        return b"<html><body><article>" + b"stable full text " * 120 + b"</article></body></html>"
+
+    monkeypatch.setattr("src.harvest.fulltext_enrichment._fetch_bytes", fake_fetch)
+    monkeypatch.setattr("src.harvest.fulltext_enrichment.time.sleep", lambda _seconds: None)
+
+    summary = enrich_fulltext_in_place(
+        canonical_dir=canonical_dir,
+        source="doaj",
+        years=["2024"],
+        limit=1,
+        stable_only=True,
+    )
+
+    assert summary["records_enriched"] == 1
+    assert fetched == ["https://www.mdpi.com/2073-4409/11/19/3007"]
 
 
 def test_openalex_work_to_paper_restores_abstract_and_metadata():

@@ -1,14 +1,14 @@
 {
   "records": 168447,
   "recent_window": "2022-2026",
-  "recent_records": 159397,
+  "recent_records": 159382,
   "target_per_year": 10000,
   "year_counts": {
-    "2022": 30926,
-    "2023": 30278,
-    "2024": 30666,
-    "2025": 33126,
-    "2026": 34401
+    "2022": 31038,
+    "2023": 30320,
+    "2024": 30767,
+    "2025": 32980,
+    "2026": 34277
   },
   "year_deficits_to_target": {
     "2022": 0,
@@ -17,7 +17,7 @@
     "2025": 0,
     "2026": 0
   },
-  "year_balance_action": "Backfill 2022-2025 by year-filtered source queries and avoid adding more 2026-heavy batches until the non-2026 window approaches the target.",
+  "year_balance_action": "Year-balance target is met for the analysis window; prioritize source/field balance and text enrichment.",
   "source_counts": {
     "openalex": 41477,
     "arxiv": 29760,
@@ -27,41 +27,41 @@
     "doaj": 11320
   },
   "field_counts": {
-    "computer science": 75492,
-    "biomedicine": 64859,
+    "computer science": 75493,
+    "biomedicine": 64858,
     "materials science": 28096
   },
   "text_coverage": {
-    "abstract_records": 138071,
-    "abstract_rate": 0.8197,
-    "full_text_records": 11534,
-    "full_text_rate": 0.0685,
-    "full_text_gap_to_15000": 3466
+    "abstract_records": 140183,
+    "abstract_rate": 0.8322,
+    "full_text_records": 14154,
+    "full_text_rate": 0.084,
+    "full_text_gap_to_15000": 846
   },
   "rag_field_coverage": {
     "doi": {
-      "count": 0,
-      "rate": 0.0
+      "count": 129904,
+      "rate": 0.7712
     },
     "title": {
       "count": 168444,
       "rate": 1.0
     },
     "abstract": {
-      "count": 138071,
-      "rate": 0.8197
+      "count": 140183,
+      "rate": 0.8322
     },
     "authors": {
-      "count": 167765,
+      "count": 167781,
       "rate": 0.996
     },
     "year": {
-      "count": 168435,
-      "rate": 0.9999
+      "count": 167213,
+      "rate": 0.9927
     },
     "keywords": {
-      "count": 129142,
-      "rate": 0.7667
+      "count": 128924,
+      "rate": 0.7654
     },
     "field": {
       "count": 168447,
@@ -76,12 +76,12 @@
       "rate": 1.0
     },
     "full_text": {
-      "count": 11534,
-      "rate": 0.0685
+      "count": 14154,
+      "rate": 0.084
     }
   },
   "next_data_layer_tasks": [
-    "Year-balanced backfill for 2022, 2023, 2024, and 2025.",
+    "Maintain year-balance monitoring while prioritizing source and field balance.",
     "PMC/Unpaywall/CORE-oriented full-text enrichment and chunk generation.",
     "Schema enrichment for DOI, venue, URL, citation_count, institutions, author_ids, and text provenance.",
     "Deduplication upgrade using DOI first, then normalized title/year/source fallback.",

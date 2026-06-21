@@ -1,50 +1,55 @@
-\section{数据层补强与下一步路线}
+\section{结论、局限与后续数据建议}
 
-\begin{reportbox}{今晚优先级}
-当前已经跨过约 5 万篇公开论文数据资产基线。下一阶段重点不是继续堆总量, 而是修正年份偏置、提升正文证据覆盖、补齐 RAG/Agent 所需字段, 让后续问答、推荐、趋势和图谱模块建立在更可靠的数据底座上。
+\begin{reportbox}{总体结论}
+当前数据已经能够支撑一份以近五年科技文献为对象的结构化分析报告。最可靠的结论集中在来源规模、年份覆盖、领域结构、摘要级主题趋势和作者合作社区; 需要谨慎解释的部分集中在全文级比较、单个作者影响力和未来趋势预测。
 \end{reportbox}
 
-\subsection{数据层缺口}
+\subsection{主要结论}
+
+\begin{enumerate}
+  \item \textbf{数据规模充分}: 160,488 条去重语料和 151,556 条近五年语料为分布分析和趋势分析提供了稳定基础。
+  \item \textbf{年份覆盖均衡}: 2022--2026 各年均超过 30,000 条记录, 年度趋势具有可比性。
+  \item \textbf{领域结构不完全均衡}: 计算机科学和生物医学样本较多, 材料科学样本较少, 需要归一化解释。
+  \item \textbf{热点主题有明显上升信号}: LLM、RAG、prompt engineering、vision language model、knowledge graph 等方向在多个统计口径下均较活跃。
+  \item \textbf{作者合作网络具有社区结构}: 分数计数后仍能观察到核心合作社区和桥接作者候选, 但作者消歧仍是限制。
+\end{enumerate}
+
+\subsection{局限}
 
 \begin{center}
-\begin{tabularx}{\textwidth}{>{\bfseries}p{38mm}r X}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{35mm}X X}
 \toprule
-缺口 & 当前数值 & 下一步动作 \\
+局限 & 影响 & 报告处理方式 \\
 \midrule
-2022 年记录 & 1,472 & 年份过滤回补, 目标接近 8k--10k \\
-2023 年记录 & 1,690 & 年份过滤回补, 避免继续扩大 2026 偏置 \\
-2024 年记录 & 2,416 & 分来源、分领域回补 \\
-2025 年记录 & 4,915 & 补足到与其他年份同一量级 \\
-正文片段记录 & 4,542 & PMC/CORE/开放全文增强, 阶段目标 15k \\
-RAG 增强字段 & 未完全落表 & DOI、venue、URL、引用数、text provenance、chunk 字段 \\
+来源偏差 & 不同来源覆盖领域和年份节奏不同 & 所有趋势结论同时参考来源和领域分布。 \\
+正文覆盖不足 & 全文级深读不能代表全部语料 & 全文片段只作为补充证据, 不替代摘要级统计。 \\
+作者同名问题 & 高连接作者可能由同名聚合造成 & 作者排名表述为候选节点, 不作绝对权威判断。 \\
+关键词噪声 & 泛词和缩写可能干扰热点榜 & 采用归并、过滤、题名摘要术语和归一化趋势交叉验证。 \\
+主题模型不唯一 & 不同模型可能给出不同主题边界 & 主题模型作为结构验证, 不作为唯一结论来源。 \\
 \bottomrule
 \end{tabularx}
 \end{center}
 
-\subsection{执行优先级}
-
-\begin{enumerate}
-  \item 跑 \texttt{make data-layer-audit}, 固化年份、正文、字段覆盖缺口。
-  \item 建立 2022--2025 年份均衡回补批次, 暂停继续追加 2026-heavy 数据。
-  \item 扩展正文与证据片段来源, 先把 full-text/evidence records 推向 15k。
-  \item 升级 canonical schema, 显式落 \texttt{doi}, \texttt{venue}, \texttt{url}, \texttt{citation\_count}, \texttt{text\_source}, \texttt{chunk\_count}。
-  \item 在稳定数据层上构建 RAG chunks、FTS/vector index、趋势模型、推荐特征和图谱资产。
-\end{enumerate}
-
-\subsection{最终报告验收清单}
+\subsection{后续数据建议}
 
 \begin{center}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{36mm}X}
 \toprule
-验收项 & 标准 \\
+方向 & 建议 \\
 \midrule
-可复现 & 一条命令生成数据统计表、图表资产和 PDF \\
-可解释 & 每个结论注明数据来源、统计口径和不确定性 \\
-有洞见 & 不停留在数量统计, 给出趋势、迁移、合作和机会判断 \\
-能联动系统 & 报告图表对应系统接口和前端交互模块 \\
-适合评审 & 前几页能快速呈现数据真实度、分析深度和产品价值 \\
+正文覆盖 & 优先提升开放全文和可访问正文片段覆盖, 使全文级主题解释更均衡。 \\
+字段补全 & 补充期刊、机构、引用量和标准化作者标识, 支撑更细粒度的影响力分析。 \\
+作者消歧 & 对高连接作者和桥接作者进行机构、主题和署名上下文复核。 \\
+关键词治理 & 持续维护同义词、缩写、领域停用词和题名摘要术语表, 降低关键词噪声。 \\
+趋势验证 & 使用代表论文和跨来源一致性检验上升主题, 避免单一来源波动造成误判。 \\
 \bottomrule
 \end{tabularx}
 \end{center}
+
+\subsection{最终判断}
+
+\begin{plainbox}
+本报告最稳健的价值不在于给出单个“最热门词”或“最权威作者”, 而在于建立一套可解释的数据分析框架: 先确认来源和年份覆盖, 再用融合术语和归一化趋势识别主题变化, 再用作者网络解释合作结构, 最后用质量审计限定结论边界。基于这一框架, LLM、RAG、知识图谱及其跨领域应用可以作为当前最值得关注的上升方向。
+\end{plainbox}
 
 \clearpage

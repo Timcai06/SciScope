@@ -15,6 +15,10 @@ def test_build_paper_chunks_creates_abstract_full_text_and_keyword_chunks():
         "keywords": ["RAG", "knowledge graph"],
         "year": 2024,
         "field": "computer science",
+        "doi": "10.5555/demo",
+        "url": "https://example.org/paper",
+        "full_text_source": "arxiv_eprint",
+        "full_text_url": "https://arxiv.org/e-print/2401.00001",
     }
 
     chunks = build_paper_chunks(paper, max_chars=200, overlap_chars=20)
@@ -23,6 +27,10 @@ def test_build_paper_chunks_creates_abstract_full_text_and_keyword_chunks():
     assert {chunk["chunk_type"] for chunk in chunks} == {"title_abstract", "full_text", "keywords"}
     assert all(chunk["token_estimate"] > 0 for chunk in chunks)
     assert all(chunk["chunk_uid"] for chunk in chunks)
+    assert all(chunk["metadata"]["doi"] == "10.5555/demo" for chunk in chunks)
+    assert all(chunk["metadata"]["text_source"] == "arxiv_eprint" for chunk in chunks)
+    assert all(chunk["metadata"]["paper_chunk_count"] == len(chunks) for chunk in chunks)
+    assert all(chunk["metadata"]["full_text_chunk_count"] >= 1 for chunk in chunks)
 
 
 def test_split_text_uses_overlap_for_long_text():
@@ -63,6 +71,7 @@ def test_build_chunk_assets_writes_jsonl_and_summary(tmp_path):
     assert summary["input_papers"] == 1
     assert summary["chunks"] == len(rows)
     assert summary["chunks_by_type"]["title_abstract"] == 1
+    assert summary["papers_with_full_text_chunks"] == 0
     assert json.loads(summary_path.read_text(encoding="utf-8")) == summary
 
 

@@ -13,6 +13,7 @@ from typing import Any
 import networkx as nx
 import numpy as np
 import pandas as pd
+from matplotlib.colors import LinearSegmentedColormap
 
 from src.analysis.plotting import configure_plot_style, save_figure
 
@@ -27,6 +28,59 @@ QUALITY_FIELDS = [
 ]
 RECENT_YEAR_START = 2022
 RECENT_YEAR_END = 2026
+REPRESENTATIVE_TREND_KEYWORDS = [
+    "large language model",
+    "retrieval augmented generation",
+    "prompt engineering",
+    "vision language model",
+    "knowledge graph",
+    "graph neural network",
+    "materials informatics",
+    "drug discovery",
+]
+BLACK = "#000000"
+CHARCOAL = "#2a272a"
+GRAPHITE = "#4b4a54"
+STEEL = "#677381"
+BLUEGREY = "#82a0aa"
+MINTGREY = "#a3cfcd"
+FILL_DARK = GRAPHITE
+FILL_MEDIUM = STEEL
+FILL_SOFT = BLUEGREY
+FILL_LIGHT = MINTGREY
+PURPLE = CHARCOAL
+BROWN = CHARCOAL
+BLUE = GRAPHITE
+PURPLE_LIGHT = MINTGREY
+BROWN_LIGHT = BLUEGREY
+BLUE_LIGHT = STEEL
+INK = CHARCOAL
+MUTED = STEEL
+SOURCE_COLORS = {
+    "openalex": CHARCOAL,
+    "arxiv": GRAPHITE,
+    "pubmed": STEEL,
+    "pmc": BLUEGREY,
+    "crossref": MINTGREY,
+    "doaj": FILL_DARK,
+}
+FIELD_COLORS = {
+    "Computer Science": GRAPHITE,
+    "Biomedicine": STEEL,
+    "Materials": BLUEGREY,
+    "Cross-field": MINTGREY,
+}
+BUBBLE_FIELD_COLORS = {
+    "Computer Science": MINTGREY,
+    "Biomedicine": BLUEGREY,
+    "Materials": MINTGREY,
+    "Cross-field": BLUEGREY,
+}
+SERIES_COLORS = [CHARCOAL, GRAPHITE, STEEL, BLUEGREY, MINTGREY]
+
+
+def _single_color_cmap(name: str, color: str) -> LinearSegmentedColormap:
+    return LinearSegmentedColormap.from_list(name, ["#ffffff", color])
 
 
 def _format_count(value: int | float) -> str:
@@ -146,6 +200,7 @@ def _is_report_keyword(value: Any) -> bool:
     keyword = re.sub(r"\s+", " ", str(value or "").strip().lower())
     stopwords = {
         "article",
+        "biology",
         "chemistry",
         "computer science",
         "cureus",
@@ -157,6 +212,7 @@ def _is_report_keyword(value: Any) -> bool:
         "materials science",
         "medicine",
         "physical sciences",
+        "graph",
         "science",
         "scientific reports",
         "social sciences",
@@ -166,6 +222,25 @@ def _is_report_keyword(value: Any) -> bool:
         "models",
     }
     if len(keyword) < 4 or keyword in stopwords:
+        return False
+    if "journal" in keyword:
+        return False
+    if keyword.endswith((" rag", " llm", " llms")):
+        return False
+    if keyword.startswith(("cond mat", "cs ", "hep ", "math ", "physics ", "q bio", "stat ")):
+        return False
+    if any(
+        phrase in keyword
+        for phrase in (
+            "armed forces india",
+            "clinical orthopaedics",
+            "gynaecology",
+            "medical science educator",
+            "obstetrics",
+            "orthopaedic",
+            "population data science",
+        )
+    ):
         return False
     if re.match(r"^[a-z]{2,5}\.[a-z0-9-]{1,8}$", keyword):
         return False
@@ -217,7 +292,8 @@ def _plot_source_records(quality: pd.DataFrame, output_dir: Path) -> dict[str, s
     data = quality.sort_values("records", ascending=True)
     total_records = int(data["records"].sum())
     fig, ax = plt.subplots(figsize=(6.6, 3.2))
-    ax.barh(data["source"], data["records"], color="0.25", height=0.58)
+    colors = [SOURCE_COLORS.get(str(source).lower(), MUTED) for source in data["source"]]
+    ax.barh(data["source"], data["records"], color=colors, height=0.58)
     ax.set_title(f"Source Record Coverage (n={_format_count(total_records)})")
     ax.set_xlabel("Records")
     ax.grid(axis="x", linestyle="--")
@@ -244,7 +320,7 @@ def _plot_quality_matrix(quality: pd.DataFrame, output_dir: Path) -> dict[str, s
     matrix = np.nan_to_num(matrix)
 
     fig, ax = plt.subplots(figsize=(7.2, 3.8))
-    image = ax.imshow(matrix, cmap="Greys", vmin=0, vmax=1, aspect="auto")
+    image = ax.imshow(matrix, cmap=_single_color_cmap("purple_completeness", PURPLE), vmin=0, vmax=1, aspect="auto")
     ax.set_title("Field Completeness by Source")
     ax.set_xticks(range(len(QUALITY_FIELDS)), [label for _, label in QUALITY_FIELDS], rotation=30, ha="right")
     ax.set_yticks(range(len(data)), data["source"])
@@ -276,8 +352,8 @@ def _plot_year_distribution(papers: list[dict[str, Any]], output_dir: Path) -> d
     total_records = len(papers)
 
     fig, ax = plt.subplots(figsize=(7.2, 3.4))
-    ax.plot(ordered_years, values, color="black", linewidth=1.5, marker="o", markersize=2.8)
-    ax.fill_between(ordered_years, values, color="0.88")
+    ax.plot(ordered_years, values, color=PURPLE, linewidth=1.8, marker="o", markersize=3.2)
+    ax.fill_between(ordered_years, values, color=PURPLE_LIGHT)
     ax.set_title(
         f"Publication Years ({RECENT_YEAR_START}-{RECENT_YEAR_END}: "
         f"{_format_count(total_recent)} / {_format_count(total_records)} records)"
@@ -319,7 +395,7 @@ def _plot_source_year_heatmap(papers: list[dict[str, Any]], output_dir: Path) ->
     total_recent = int(matrix.sum())
 
     fig, ax = plt.subplots(figsize=(7.2, 3.8))
-    image = ax.imshow(matrix, cmap="Greys", aspect="auto")
+    image = ax.imshow(matrix, cmap=_single_color_cmap("blue_source_year", BLUE), aspect="auto")
     ax.set_title(
         f"Source-Year Coverage ({RECENT_YEAR_START}-{RECENT_YEAR_END}: "
         f"{_format_count(total_recent)} / {_format_count(total_records)} records)"
@@ -359,8 +435,8 @@ def _plot_field_distribution(papers: list[dict[str, Any]], output_dir: Path) -> 
 
     fig, ax = plt.subplots(figsize=(6.8, 3.4))
     positions = np.arange(len(labels))
-    shades = [str(value) for value in np.linspace(0.18, 0.78, max(len(labels), 1))]
-    ax.barh(positions, values, color=shades, edgecolor="black", linewidth=0.4)
+    colors = [FIELD_COLORS.get(label, MUTED) for label in labels]
+    ax.barh(positions, values, color=colors, edgecolor="white", linewidth=0.8)
     ax.set_yticks(positions, labels)
     ax.invert_yaxis()
     ax.set_xlabel("Records")
@@ -377,7 +453,7 @@ def _plot_field_distribution(papers: list[dict[str, Any]], output_dir: Path) -> 
         "file": "field_distribution.png",
         "report_section": "文献分布分析",
         "source_table": "papers_clean.json",
-        "message": "按赛题三大领域口径展示 5 万级语料结构。",
+        "message": "按赛题三大领域口径展示当前语料结构。",
         "status": "final",
     }
 
@@ -395,7 +471,7 @@ def _plot_field_year_heatmap(papers: list[dict[str, Any]], output_dir: Path) -> 
     total = int(matrix.sum())
 
     fig, ax = plt.subplots(figsize=(7.2, 2.9))
-    image = ax.imshow(matrix, cmap="Greys", aspect="auto")
+    image = ax.imshow(matrix, cmap=_single_color_cmap("brown_field_year", BROWN), aspect="auto")
     ax.set_title(
         f"Field-Year Coverage ({RECENT_YEAR_START}-{RECENT_YEAR_END}: "
         f"{_format_count(total)} / {_format_count(total_records)} records)"
@@ -428,11 +504,14 @@ def _plot_top_keywords(keywords: pd.DataFrame, output_dir: Path, *, top_n: int =
     data["year"] = pd.to_numeric(data["year"], errors="coerce")
     data = data[(data["year"] >= RECENT_YEAR_START) & (data["year"] <= RECENT_YEAR_END)]
     data = data[data["keyword"].map(_is_report_keyword)]
+    if "paper_id" in data.columns:
+        data = data.drop_duplicates(subset=["paper_id", "keyword"])
     counts = data["keyword"].dropna().astype(str).value_counts().head(top_n).sort_values(ascending=True)
     labels = [_wrap_label(label, width=28) for label in counts.index]
     fig, ax = plt.subplots(figsize=(7.0, 4.6))
-    ax.barh(labels, counts.values, color="0.2", height=0.6)
-    ax.set_title(f"Top Keywords ({RECENT_YEAR_START}-{RECENT_YEAR_END})")
+    colors = [SERIES_COLORS[index % len(SERIES_COLORS)] for index in range(len(labels))]
+    ax.barh(labels, counts.values, color=colors, height=0.6)
+    ax.set_title(f"Top Fused Keyword Signals ({RECENT_YEAR_START}-{RECENT_YEAR_END})")
     ax.set_xlabel("Papers")
     ax.grid(axis="x", linestyle="--")
     for index, value in enumerate(counts.values):
@@ -442,8 +521,8 @@ def _plot_top_keywords(keywords: pd.DataFrame, output_dir: Path, *, top_n: int =
         "figure_id": "top_keywords",
         "file": "top_keywords.png",
         "report_section": "关键词演化与热点趋势",
-        "source_table": "paper_keywords.csv",
-        "message": "呈现近五年样本中的高频研究主题。",
+        "source_table": "paper_keyword_signals.csv",
+        "message": "呈现显式关键词与题名摘要术语融合后的高频研究主题。",
         "status": "final",
     }
 
@@ -465,9 +544,10 @@ def _plot_keyword_year_heatmap(keyword_year: pd.DataFrame, output_dir: Path, *, 
     normalized = pivot.div(pivot.max(axis=1).replace(0, np.nan), axis=0).fillna(0)
 
     fig, ax = plt.subplots(figsize=(7.4, 4.4))
-    image = ax.imshow(normalized.values, cmap="Greys", vmin=0, vmax=1, aspect="auto")
-    ax.set_title(f"Keyword Evolution Heatmap ({RECENT_YEAR_START}-{RECENT_YEAR_END})")
-    ax.set_xticks(range(len(normalized.columns)), normalized.columns, rotation=45, ha="right")
+    image = ax.imshow(normalized.values, cmap=_single_color_cmap("purple_keyword_heat", PURPLE), vmin=0, vmax=1, aspect="auto")
+    ax.set_title(f"Fused Keyword Evolution Heatmap ({RECENT_YEAR_START}-{RECENT_YEAR_END})")
+    x_labels = [f"{int(year)} YTD" if int(year) == RECENT_YEAR_END else str(int(year)) for year in normalized.columns]
+    ax.set_xticks(range(len(normalized.columns)), x_labels, rotation=45, ha="right")
     ax.set_yticks(range(len(normalized.index)), [_wrap_label(item, width=24) for item in normalized.index])
     for row_index in range(normalized.shape[0]):
         for col_index in range(normalized.shape[1]):
@@ -482,7 +562,7 @@ def _plot_keyword_year_heatmap(keyword_year: pd.DataFrame, output_dir: Path, *, 
         "file": "keyword_evolution_heatmap.png",
         "report_section": "关键词演化与热点趋势",
         "source_table": "keyword_year_matrix.csv",
-        "message": "展示近五年高频关键词的年度热度变化, 支撑热点趋势分析。",
+        "message": "展示显式关键词与题名摘要术语融合后的年度热度变化。",
         "status": "final",
     }
 
@@ -498,7 +578,7 @@ def _plot_keyword_momentum(keyword_year: pd.DataFrame, output_dir: Path, *, top_
     data = data[(data["year"] >= RECENT_YEAR_START) & (data["year"] <= RECENT_YEAR_END)]
     data = data[data["keyword"].map(_is_report_keyword)]
     baseline = data[data["year"].between(RECENT_YEAR_START, RECENT_YEAR_START + 1)]
-    recent = data[data["year"].between(RECENT_YEAR_END - 2, RECENT_YEAR_END)]
+    recent = data[data["year"].between(RECENT_YEAR_END - 2, RECENT_YEAR_END - 1)]
     baseline_counts = baseline.groupby("keyword")["count"].sum()
     recent_counts = recent.groupby("keyword")["count"].sum()
     keywords = sorted(set(baseline_counts.index).union(set(recent_counts.index)))
@@ -507,6 +587,8 @@ def _plot_keyword_momentum(keyword_year: pd.DataFrame, output_dir: Path, *, top_
         baseline_value = float(baseline_counts.get(keyword, 0))
         recent_value = float(recent_counts.get(keyword, 0))
         if recent_value <= 0:
+            continue
+        if recent_value < 100:
             continue
         momentum = math.log1p(recent_value) - math.log1p(baseline_value)
         support = math.log1p(recent_value + baseline_value)
@@ -518,10 +600,11 @@ def _plot_keyword_momentum(keyword_year: pd.DataFrame, output_dir: Path, *, top_
     values = [score for _, score, _, _ in rows]
     fig, ax = plt.subplots(figsize=(7.4, 4.7))
     positions = np.arange(len(labels))
-    ax.barh(positions, values, color="0.24", height=0.6)
+    colors = [SERIES_COLORS[index % len(SERIES_COLORS)] for index in range(len(labels))]
+    ax.barh(positions, values, color=colors, height=0.6)
     ax.set_yticks(positions, labels)
     ax.set_xlabel("Momentum score")
-    ax.set_title(f"Emerging Keyword Momentum ({RECENT_YEAR_START}-{RECENT_YEAR_END})")
+    ax.set_title(f"Emerging Keyword Momentum ({RECENT_YEAR_START}-{RECENT_YEAR_END - 1}, 2026 YTD excluded)")
     ax.grid(axis="x", linestyle="--")
     max_value = max(values) if values else 1
     for position, (_, _, recent_value, baseline_value) in zip(positions, rows, strict=False):
@@ -538,7 +621,7 @@ def _plot_keyword_momentum(keyword_year: pd.DataFrame, output_dir: Path, *, top_
         "file": "keyword_momentum.png",
         "report_section": "关键词演化与热点趋势",
         "source_table": "keyword_year_matrix.csv",
-        "message": "比较近期窗口与早期窗口的关键词升温幅度, 形成热点趋势候选榜。",
+        "message": "比较完整近期窗口与早期窗口的融合关键词升温幅度。",
         "status": "final",
     }
 
@@ -552,18 +635,30 @@ def _plot_keyword_normalized_trends(keyword_trends: pd.DataFrame, output_dir: Pa
     data["momentum_score"] = pd.to_numeric(data.get("momentum_score"), errors="coerce").fillna(0)
     data["doc_count"] = pd.to_numeric(data.get("doc_count"), errors="coerce").fillna(0)
     data = data[data["keyword"].map(_is_report_keyword)]
-    data = data.sort_values(["momentum_score", "doc_count"], ascending=False).head(top_n)
+    preferred = data[data["keyword"].isin(REPRESENTATIVE_TREND_KEYWORDS)].copy()
+    if not preferred.empty:
+        preferred["keyword_order"] = preferred["keyword"].map({keyword: index for index, keyword in enumerate(REPRESENTATIVE_TREND_KEYWORDS)})
+        data = preferred.sort_values("keyword_order").head(top_n)
+    else:
+        data = data.sort_values(["momentum_score", "doc_count"], ascending=False).head(top_n)
     years = list(range(RECENT_YEAR_START, RECENT_YEAR_END + 1))
 
     fig, ax = plt.subplots(figsize=(7.5, 4.5))
-    shades = np.linspace(0.12, 0.72, max(len(data), 1))
-    for shade, (_, row) in zip(shades, data.iterrows(), strict=False):
+    for index, (_, row) in enumerate(data.iterrows()):
         values = [float(row.get(f"normalized_df_{year}") or 0) for year in years]
-        ax.plot(years, values, marker="o", linewidth=1.3, markersize=3.2, color=str(shade), label=_compact_topic(row["keyword"]))
-    ax.set_title("Normalized Keyword Document Share")
+        ax.plot(
+            years,
+            values,
+            marker="o",
+            linewidth=1.5,
+            markersize=3.2,
+            color=SERIES_COLORS[index % len(SERIES_COLORS)],
+            label=_compact_topic(row["keyword"]),
+        )
+    ax.set_title("Normalized Fused Keyword Document Share")
     ax.set_xlabel("Year")
-    ax.set_ylabel("Documents containing term / year documents")
-    ax.set_xticks(years)
+    ax.set_ylabel("Documents containing term / analyzable year documents")
+    ax.set_xticks(years, [f"{year} YTD" if year == RECENT_YEAR_END else str(year) for year in years])
     ax.grid(axis="y", linestyle="--")
     ax.legend(loc="center left", bbox_to_anchor=(1.0, 0.5), fontsize=6.8, frameon=False)
     save_figure(fig, output_dir / "keyword_normalized_trends.png")
@@ -572,7 +667,7 @@ def _plot_keyword_normalized_trends(keyword_trends: pd.DataFrame, output_dir: Pa
         "file": "keyword_normalized_trends.png",
         "report_section": "关键词演化与热点趋势",
         "source_table": "keyword_trends.csv",
-        "message": "使用年度文档占比展示关键词趋势, 避免年度总量变化误导 raw count。",
+        "message": "使用融合信号的年度文档占比展示关键词趋势, 避免关键词字段滞后误导。",
         "status": "final",
     }
 
@@ -595,10 +690,17 @@ def _plot_topic_year_share(topic_year: pd.DataFrame, output_dir: Path, *, model:
 
     fig, ax = plt.subplots(figsize=(7.4, 4.0))
     bottom = np.zeros(len(shares.index))
-    shades = np.linspace(0.18, 0.82, max(len(shares.columns), 1))
-    for shade, topic_id in zip(shades, shares.columns, strict=False):
+    for index, topic_id in enumerate(shares.columns):
         values = shares[topic_id].to_numpy()
-        ax.bar(shares.index.astype(str), values, bottom=bottom, color=str(shade), edgecolor="black", linewidth=0.25, label=f"T{topic_id}")
+        ax.bar(
+            [f"{int(year)} YTD" if int(year) == RECENT_YEAR_END else str(int(year)) for year in shares.index],
+            values,
+            bottom=bottom,
+            color=SERIES_COLORS[index % len(SERIES_COLORS)],
+            edgecolor="white",
+            linewidth=0.35,
+            label=f"T{topic_id}",
+        )
         bottom = bottom + values
     ax.set_title(f"Topic Year Share ({model.upper()} baseline)")
     ax.set_ylabel("Share within year")
@@ -696,14 +798,10 @@ def _plot_author_communities(
     used_labels: Counter[str] = Counter()
 
     fig, ax = plt.subplots(figsize=(8.2, 5.7))
-    shade_by_field = {
-        "Computer Science": "white",
-        "Biomedicine": "0.82",
-        "Materials": "0.62",
-        "Cross-field": "0.38",
-    }
+    shade_by_field = BUBBLE_FIELD_COLORS
     for x_index, field in enumerate(active_fields):
         field_rows = grouped.get(field, [])
+        fill_color = shade_by_field.get(field, "0.75")
         for y_index, row in enumerate(field_rows):
             y = (len(field_rows) - y_index) * 1.35
             size = 280 + min(row["papers"], 120) * 7 + min(row["strength"], 40) * 12
@@ -711,8 +809,8 @@ def _plot_author_communities(
                 x_index,
                 y,
                 s=size,
-                c=shade_by_field.get(field, "0.75"),
-                edgecolors="black",
+                c=fill_color,
+                edgecolors="white",
                 linewidths=0.9,
                 zorder=3,
             )
@@ -720,8 +818,17 @@ def _plot_author_communities(
             used_labels[topic] += 1
             if used_labels[topic] > 1:
                 topic = _compact_topic(row["fallback"])
-            label = f"{_wrap_label(topic, width=14)}\n{row['members']} authors / {row['papers']} papers"
-            ax.text(x_index, y, label, ha="center", va="center", fontsize=5.2, zorder=4)
+            label = f"{_wrap_label(topic, width=13)}\n{row['members']} authors\n{row['papers']} papers"
+            ax.text(
+                x_index,
+                y,
+                label,
+                ha="center",
+                va="center",
+                fontsize=5.0,
+                color=BLACK,
+                zorder=4,
+            )
     ax.set_title(f"Author Collaboration Communities (core {min(graph_edges, candidate_edges):,}/{candidate_edges:,} edges)")
     ax.set_xticks(range(len(active_fields)), active_fields)
     ax.set_yticks([])
@@ -773,7 +880,7 @@ def _plot_author_network_scale(papers: list[dict[str, Any]], output_dir: Path, *
     positions = np.arange(len(labels))
 
     fig, ax = plt.subplots(figsize=(7.2, 3.8))
-    ax.barh(positions, values, color=["0.82", "0.68", "0.5", "0.28", "0.1"], edgecolor="black", linewidth=0.4)
+    ax.barh(positions, values, color=[PURPLE_LIGHT, BLUE_LIGHT, BROWN_LIGHT, BLUE, PURPLE], edgecolor="white", linewidth=0.8)
     ax.set_yticks(positions, labels)
     ax.invert_yaxis()
     ax.set_xscale("log")
@@ -807,7 +914,8 @@ def _plot_top_author_collaborations(papers: list[dict[str, Any]], output_dir: Pa
 
     fig, ax = plt.subplots(figsize=(7.6, 6.2))
     positions = np.arange(len(labels))
-    ax.barh(positions, values, color="0.22", height=0.58)
+    colors = [SERIES_COLORS[index % len(SERIES_COLORS)] for index in range(len(labels))]
+    ax.barh(positions, values, color=colors, height=0.58)
     ax.set_yticks(positions, labels)
     ax.invert_yaxis()
     ax.set_xlabel("Fractional Collaboration Weight")
@@ -836,26 +944,42 @@ def _plot_text_coverage(quality: pd.DataFrame, output_dir: Path) -> dict[str, st
     data = quality.sort_values("source")
     abstract_rate = data["abstract_count"].astype(float) / data["records"].replace(0, np.nan).astype(float)
     full_text_rate = data["full_text_count"].astype(float) / data["records"].replace(0, np.nan).astype(float)
+    full_text_counts = data["full_text_count"].astype(int)
+    total_full_text = int(full_text_counts.sum())
+    total_records = int(data["records"].astype(int).sum())
     x = np.arange(len(data))
     width = 0.34
 
     fig, ax = plt.subplots(figsize=(7.0, 3.6))
-    ax.bar(x - width / 2, abstract_rate.fillna(0), width, label="Abstract", color="0.25")
-    ax.bar(x + width / 2, full_text_rate.fillna(0), width, label="Full text", color="0.72", edgecolor="black", linewidth=0.5)
-    ax.set_title("Abstract and Full-text Coverage")
+    ax.bar(x - width / 2, abstract_rate.fillna(0), width, label="Abstract", color=PURPLE)
+    ax.bar(x + width / 2, full_text_rate.fillna(0), width, label="Full text", color=BROWN, edgecolor="white", linewidth=0.6)
+    ax.set_title(f"Abstract and Full-text Coverage (full text n={_format_count(total_full_text)})")
     ax.set_ylabel("Coverage")
     ax.set_ylim(0, 1.08)
     ax.set_xticks(x, data["source"], rotation=25, ha="right")
     ax.set_yticks(np.linspace(0, 1, 6), [f"{int(value * 100)}%" for value in np.linspace(0, 1, 6)])
     ax.grid(axis="y", linestyle="--")
     ax.legend(loc="upper right")
+    for index, (rate, count) in enumerate(zip(full_text_rate.fillna(0), full_text_counts, strict=False)):
+        if count:
+            ax.text(
+                index + width / 2,
+                min(float(rate) + 0.035, 1.02),
+                _format_count(count),
+                ha="center",
+                va="bottom",
+                fontsize=7,
+            )
     save_figure(fig, output_dir / "abstract_fulltext_coverage.png")
     return {
         "figure_id": "text_coverage",
         "file": "abstract_fulltext_coverage.png",
         "report_section": "数据质量与可信度审计",
         "source_table": "source_quality_report.csv",
-        "message": "区分摘要级分析和全文级 RAG 的证据边界。",
+        "message": (
+            f"Full-text records: {_format_count(total_full_text)} / {_format_count(total_records)}. "
+            "区分摘要级分析和全文级 RAG 的证据边界。"
+        ),
         "status": "final",
     }
 
@@ -872,7 +996,9 @@ def build_report_figures(
 
     papers = _load_papers(analysis_path / "papers_clean.json")
     quality = _read_csv(analysis_path / "source_quality_report.csv")
-    keywords = _read_csv(analysis_path / "paper_keywords.csv")
+    keywords = _read_csv(analysis_path / "paper_keyword_signals.csv")
+    if keywords.empty:
+        keywords = _read_csv(analysis_path / "paper_keywords.csv")
     keyword_year = _read_csv(analysis_path / "keyword_year_matrix.csv")
     keyword_trends = _read_csv(analysis_path / "keyword_trends.csv")
     topic_year = _read_csv(analysis_path / "topic_year_share.csv")

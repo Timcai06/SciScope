@@ -62,6 +62,7 @@ def build_data_readiness_report(
         str(year): max(0, target_per_year - recent_counts[str(year)])
         for year in recent_years
     }
+    deficit_years = [year for year, deficit in year_deficits.items() if deficit > 0]
     field_counts = Counter(str(paper.get("field_seed") or paper.get("field") or "unknown").lower() for paper in papers)
     source_counts = Counter(str(paper.get("source") or "unknown").lower() for paper in papers)
 
@@ -82,8 +83,12 @@ def build_data_readiness_report(
         "year_counts": recent_counts,
         "year_deficits_to_target": year_deficits,
         "year_balance_action": (
-            "Backfill 2022-2025 by year-filtered source queries and avoid adding more 2026-heavy batches "
-            "until the non-2026 window approaches the target."
+            "Year-balance target is met for the analysis window; prioritize source/field balance and text enrichment."
+            if not deficit_years
+            else (
+                f"Backfill {', '.join(deficit_years)} by year-filtered source queries and avoid adding more "
+                "over-represented years until the window approaches the target."
+            )
         ),
         "source_counts": dict(source_counts.most_common()),
         "field_counts": dict(field_counts.most_common()),
@@ -96,7 +101,11 @@ def build_data_readiness_report(
         },
         "rag_field_coverage": rag_field_coverage,
         "next_data_layer_tasks": [
-            "Year-balanced backfill for 2022, 2023, 2024, and 2025.",
+            (
+                "Maintain year-balance monitoring while prioritizing source and field balance."
+                if not deficit_years
+                else f"Backfill year-deficit partitions: {', '.join(deficit_years)}."
+            ),
             "PMC/Unpaywall/CORE-oriented full-text enrichment and chunk generation.",
             "Schema enrichment for DOI, venue, URL, citation_count, institutions, author_ids, and text provenance.",
             "Deduplication upgrade using DOI first, then normalized title/year/source fallback.",

@@ -1,53 +1,71 @@
 \section{作者合作网络分析}
 
 \begin{reportbox}{分析目标}
-作者合作网络用于识别核心研究者、跨领域连接者和合作团簇。它是知识图谱查询和论文推荐解释的重要依据, 也是数据分析报告中最能体现“科研智能体”差异化的图分析部分。
+作者合作网络用于观察科研协作的组织方式。相比简单统计高产作者, 网络分析更关注作者之间如何连接、哪些作者处在社区内部核心位置、哪些作者连接不同主题或领域。
 \end{reportbox}
 
-\subsection{网络构建}
+\subsection{网络构建口径}
 
 \begin{itemize}
-  \item \textbf{节点}: 作者, 后续可扩展为机构、国家、领域、关键词。
+  \item \textbf{节点}: 作者姓名。
   \item \textbf{边}: 两位作者共同出现在同一篇论文中。
-  \item \textbf{边权}: 合作次数、近年合作次数、代表论文质量。
-  \item \textbf{节点属性}: 论文数、领域分布、活跃年份、中心性、社区编号。
+  \item \textbf{边权}: 同时考虑共同论文次数和分数化合作强度。
+  \item \textbf{过滤}: 正文主图排除作者数超过 12 的论文, 避免大型团队论文生成过多两两合作边。
 \end{itemize}
 
-\subsection{核心指标}
+在全量候选网络中, 作者合作边超过千万级。为了让静态报告图可解释, 本章只展示近五年窗口内的核心合作结构, 并采用分数计数降低长作者名单造成的网络虚高。中心性和社区发现用于识别候选核心作者和桥接作者, 不作为未经消歧的最终权威排名。
+
+\subsection{网络指标}
 
 \begin{center}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{32mm}X X}
 \toprule
-指标 & 含义 & 报告解释方式 \\
+指标 & 含义 & 解释方式 \\
 \midrule
-Degree & 作者直接合作人数 & 识别高合作度作者 \\
-Betweenness & 作者连接不同团簇的桥梁能力 & 识别跨领域连接者 \\
-Community & 合作社区编号 & 发现研究团队与方向群落 \\
-Temporal Activity & 作者按年份的活跃情况 & 判断作者是否仍处于活跃期 \\
+Degree & 作者直接合作人数 & 识别合作范围较广的作者。 \\
+Betweenness & 作者连接不同团簇的桥梁能力 & 识别跨主题或跨领域连接者。 \\
+Community & 网络社区划分结果 & 观察研究团队、主题群落和合作圈层。 \\
+Temporal Activity & 作者活跃年份分布 & 判断节点是否仍处于近年活跃状态。 \\
 \bottomrule
 \end{tabularx}
 \end{center}
 
-\subsection{合作社区与高频合作关系}
+\subsection{合作社区与高频合作}
 
 \begin{figure}[htbp]
   \centering
   \figasset[0.9\textwidth]{author_network_scale_funnel.png}
-  \caption{2022--2026 作者合作网络规模漏斗。}
+  \caption{作者合作网络规模漏斗。从近五年论文到核心合作图逐步压缩, 以保证网络图具有可读性。}
 \end{figure}
 
 \begin{figure}[htbp]
   \centering
   \figasset[0.88\textwidth]{author_collaboration_network.png}
-  \caption{2022--2026 近五年作者合作社区气泡图。}
+  \caption{作者合作社区气泡图。气泡位置表示主导领域, 大小综合反映社区论文数和合作强度; 浅色气泡用于保证社区标签可读。}
 \end{figure}
 
 \begin{figure}[htbp]
   \centering
   \figasset[0.9\textwidth]{top_author_collaborations.png}
-  \caption{2022--2026 近五年高频作者合作关系。}
+  \caption{近五年高频作者合作关系。分数化权重用于降低长作者名单论文的影响。}
 \end{figure}
 
-作者合作边由论文作者列表两两组合得到。为避免一篇大团队论文生成过多虚高边, 静态报告图仅纳入作者数不超过 12 的论文, 并对每篇论文内的合作关系使用分数化权重。当前作者社区图使用 25,000 条高权重合作边构建核心图, 既保留 50 万级候选边的规模依据, 又避免 PDF 静态图退化成不可读的全量网络。
+\subsection{核心作者与桥接作者候选}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{30mm}r r X}
+\toprule
+作者 & 论文数 & 合作者数 & 网络解释 \\
+\midrule
+Yangqiu Song & 44 & 121 & 计算机科学方向高合作度节点, 与多个知识表示和文本分析主题相连。 \\
+Halil Kilicoglu & 36 & 65 & 生物医学文本挖掘社区中的稳定节点, 合作关系集中但清晰。 \\
+Karin Verspoor & 35 & 294 & 生物医学文本挖掘方向连接度较高, 具备桥接作者特征。 \\
+Rui Zhang & 214 & 1,754 & 高产高连接节点, 需要警惕同名作者聚合。 \\
+Kai Wang & 138 & 901 & 合作范围较广, 同样需要结合机构和论文主题进一步复核。 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+上述作者应理解为“候选核心/桥接节点”。由于当前作者消歧主要依赖姓名标准化, 中文名、缩写名和同名作者可能被合并, 因而作者排名不宜被解释为精确个人影响力排名。
 
 \clearpage

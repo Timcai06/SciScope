@@ -37,7 +37,7 @@ def test_build_report_figures_creates_manifest_and_pdf_assets(tmp_path):
                 "authors_count": 2,
                 "year_count": 2,
                 "keywords_count": 1,
-                "full_text_count": 0,
+                "full_text_count": 1,
             },
             {
                 "source": "doaj",
@@ -104,5 +104,8 @@ def test_build_report_figures_creates_manifest_and_pdf_assets(tmp_path):
         "author_communities",
         "top_author_collaborations",
     }
+    text_coverage = next(row for row in manifest if row["figure_id"] == "text_coverage")
+    assert "Full-text records" in text_coverage["message"]
+    assert "1" in text_coverage["message"]
     for row in manifest:
         assert (output_dir / row["file"]).exists()

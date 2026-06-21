@@ -95,10 +95,19 @@ def build_paper_chunks(
                         "query": paper.get("query") or "",
                         "field_seed": paper.get("field_seed") or "",
                         "is_recent_window": bool(paper.get("is_recent_window")),
+                        "doi": paper.get("doi") or "",
+                        "url": paper.get("url") or paper.get("landing_url") or "",
+                        "text_source": paper.get("full_text_source") or paper.get("text_source") or "",
+                        "full_text_url": paper.get("full_text_url") or "",
                     },
                 }
             )
             chunk_index += 1
+    paper_chunk_count = len(chunks)
+    full_text_chunk_count = sum(1 for chunk in chunks if chunk["chunk_type"] == "full_text")
+    for chunk in chunks:
+        chunk["metadata"]["paper_chunk_count"] = paper_chunk_count
+        chunk["metadata"]["full_text_chunk_count"] = full_text_chunk_count
     return chunks
 
 
@@ -120,11 +129,13 @@ def build_chunk_assets(
     total_chunks = 0
     chunks_by_type: dict[str, int] = {}
     chunks_with_full_text = 0
+    papers_with_full_text_chunks = 0
     token_estimate = 0
 
     with output.open("w", encoding="utf-8") as handle:
         for paper in papers:
             chunks = build_paper_chunks(paper, max_chars=max_chars, overlap_chars=overlap_chars)
+            has_full_text_chunk = False
             for chunk in chunks:
                 handle.write(json.dumps(chunk, ensure_ascii=False) + "\n")
                 total_chunks += 1
@@ -132,12 +143,15 @@ def build_chunk_assets(
                 token_estimate += int(chunk["token_estimate"])
                 if chunk["chunk_type"] == "full_text":
                     chunks_with_full_text += 1
+                    has_full_text_chunk = True
+            papers_with_full_text_chunks += int(has_full_text_chunk)
 
     result = {
         "input_papers": len(papers),
         "chunks": total_chunks,
         "chunks_by_type": dict(sorted(chunks_by_type.items())),
         "full_text_chunks": chunks_with_full_text,
+        "papers_with_full_text_chunks": papers_with_full_text_chunks,
         "token_estimate": token_estimate,
         "output": str(output),
     }

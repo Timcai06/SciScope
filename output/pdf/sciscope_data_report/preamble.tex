@@ -1,5 +1,5 @@
 \usepackage{geometry}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
 \usepackage{tikz}
 \usepackage{graphicx}
 \usepackage{caption}
@@ -13,6 +13,18 @@
 \usepackage[most]{tcolorbox}
 \usetikzlibrary{arrows.meta,positioning,fit,calc}
 
+\definecolor{SciTealDark}{HTML}{000000}
+\definecolor{SciTeal}{HTML}{000000}
+\definecolor{SciMint}{HTML}{FFFFFF}
+\definecolor{SciClay}{HTML}{000000}
+\definecolor{SciGold}{HTML}{000000}
+\definecolor{SciMoss}{HTML}{000000}
+\definecolor{SciPlum}{HTML}{000000}
+\definecolor{SciInk}{HTML}{000000}
+\definecolor{SciMuted}{HTML}{000000}
+\definecolor{SciLine}{HTML}{000000}
+\definecolor{SciPanel}{HTML}{FFFFFF}
+
 \geometry{left=17mm,right=17mm,top=17mm,bottom=20mm,headheight=14pt}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{4.5pt}
@@ -23,31 +35,33 @@
 \hypersetup{hidelinks}
 \graphicspath{{../../assets/sciscope_data_report/}}
 \captionsetup{font={small,bf},labelfont=bf,labelsep=quad,skip=5pt}
+\arrayrulecolor{SciLine}
 
 \pagestyle{fancy}
 \fancyhf{}
-\lhead{\scriptsize\bfseries SciScope 数据分析报告}
-\rhead{\scriptsize 50,498 records · Distribution · Keywords · Collaboration}
-\cfoot{\scriptsize\thepage}
+\lhead{\scriptsize\bfseries\color{SciTealDark} SciScope 数据分析报告}
+\rhead{\scriptsize\color{SciMuted} 169,324 条记录 · 2022--2026 · 主题演化 · 合作网络}
+\cfoot{\scriptsize\color{SciMuted}\thepage}
 \renewcommand{\headrulewidth}{0.35pt}
 \renewcommand{\footrulewidth}{0pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{SciLine}\leaders\hrule height \headrulewidth\hfill}}
 
-\titleformat{\section}{\LARGE\bfseries\color{black}}{\thesection}{0.62em}{}
+\titleformat{\section}{\LARGE\bfseries\color{SciTealDark}}{\thesection}{0.62em}{}
 \titlespacing*{\section}{0pt}{2pt}{6pt}
-\titleformat{\subsection}{\large\bfseries\color{black}}{\thesubsection}{0.62em}{}
+\titleformat{\subsection}{\large\bfseries\color{SciInk}}{\thesubsection}{0.62em}{}
 \titlespacing*{\subsection}{0pt}{7pt}{3pt}
-\titleformat{\subsubsection}{\normalsize\bfseries\color{black}}{\thesubsubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{SciInk}}{\thesubsubsection}{0.6em}{}
 
 \newtcolorbox{reportbox}[2][]{
   enhanced,
   breakable,
-  colback=white,
-  colframe=black,
-  colbacktitle=black,
+  colback=SciPanel,
+  colframe=SciTealDark,
+  colbacktitle=SciTealDark,
   coltitle=white,
   fonttitle=\bfseries,
   title=#2,
-  boxrule=0.65pt,
+  boxrule=0.55pt,
   arc=1.2mm,
   left=2.8mm,
   right=2.8mm,
@@ -59,9 +73,9 @@
 \newtcolorbox{plainbox}[1][]{
   enhanced,
   breakable,
-  colback=white,
-  colframe=black,
-  boxrule=0.55pt,
+  colback=SciPanel,
+  colframe=SciLine,
+  boxrule=0.5pt,
   arc=1.2mm,
   left=2.8mm,
   right=2.8mm,
@@ -74,8 +88,8 @@
   \begin{tcolorbox}[
     enhanced,
     colback=white,
-    colframe=black,
-    boxrule=0.35pt,
+    colframe=SciLine,
+    boxrule=0.4pt,
     arc=1mm,
     left=1.4mm,
     right=1.4mm,
@@ -97,5 +111,5 @@
 }
 
 \newcommand{\statusmark}[1]{%
-  \tikz[baseline=(x.base)]\node[rounded corners=2pt,inner xsep=4pt,inner ysep=2pt,draw=black,fill=white,text=black,font=\scriptsize\bfseries] (x) {#1};%
+  \tikz[baseline=(x.base)]\node[rounded corners=2pt,inner xsep=4pt,inner ysep=2pt,draw=SciTealDark,fill=SciMint,text=SciTealDark,font=\scriptsize\bfseries] (x) {#1};%
 }

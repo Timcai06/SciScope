@@ -1,57 +1,75 @@
 \section{关键词演化与热点趋势}
 
 \begin{reportbox}{分析目标}
-关键词演化是本赛题最容易形成“洞见感”的部分。最终报告不只列 Top-K 关键词, 而要展示关键词如何出现、升温、迁移、分化, 并说明这些变化如何驱动智能体的热点预测和论文推荐。
+关键词和主题演化用于识别近五年科技文献中的热点变化。本章不只展示高频词, 还关注年度归一化占比、近期动量和主题模型是否给出一致证据, 以区分真实升温和样本规模变化造成的表观增长。
 \end{reportbox}
 
-\subsection{关键词处理策略}
+\subsection{处理口径}
 
 \begin{enumerate}
-  \item 统一大小写、连字符、复数和同义词, 例如 \texttt{retrieval-augmented generation} 与 \texttt{retrieval augmented generation} 归并。
-  \item 从标题、摘要、数据库关键词、OpenAlex concepts、arXiv categories 中构建候选词。
-  \item 使用领域词表过滤高频泛词, 例如 \texttt{study}, \texttt{method}, \texttt{model}。
-  \item 为每个关键词生成年度频次、增长率、突增分数和代表论文。
+  \item 对大小写、连字符、复数和常见同义表达进行归并, 例如 retrieval-augmented generation、RAG 与 retrieval augmented generation 视为同一方向。
+  \item 同时使用显式关键词和题名摘要中的受控术语信号, 避免新近论文因关键词尚未完整入库而被低估。
+  \item 过滤 study、method、model 等泛词, 避免高频但低信息量的词主导结论。
+  \item 对每个主题词同时计算融合文档数、显式关键词支持数、文本术语支持数、年度占比和近期动量。
 \end{enumerate}
 
-\subsection{当前图表}
+从整体结果看, retrieval augmented generation、large language model、prompt engineering、vision language model、knowledge graph 等方向同时具有较高频次和较强近期动量。它们不仅出现在词频统计中, 也能在年度归一化趋势和主题模型中得到支持, 因而比单纯高频词更适合作为热点候选。
+
+\begin{plainbox}
+2026 年需要单独解释: 截至 2026 年 6 月 21 日, 该年度尚未结束, 且新近论文的关键词和索引记录存在更新滞后。报告主图已使用显式关键词与题名摘要术语的融合信号进行修正: 2026 年融合信号比单看显式关键词增加约 22.7\%。因此 2026 年不再被简单视为“关键词缺失”, 但仍只作为未完整年度的早期信号, 不与完整年度作机械对比。
+\end{plainbox}
+
+\subsection{高频与升温主题}
 
 \begin{figure}[htbp]
   \centering
   \figasset[0.86\textwidth]{top_keywords.png}
-  \caption{2022--2026 近五年窗口内的高频关键词。}
+  \caption{2022--2026 年高频融合主题词。融合信号同时吸收显式关键词和题名摘要术语, 用于降低关键词字段滞后的影响。}
 \end{figure}
 
 \begin{figure}[htbp]
   \centering
   \figasset[0.94\textwidth]{keyword_evolution_heatmap.png}
-  \caption{2022--2026 高频关键词年度热度矩阵。每一行按自身最大值归一化, 用于观察主题升温和迁移。}
+  \caption{融合主题词年度热度矩阵。每一行按自身最大值归一化; 2026 年为截至 6 月 21 日的未完整年度, 只作为早期信号。}
 \end{figure}
 
 \begin{figure}[htbp]
   \centering
   \figasset[0.9\textwidth]{keyword_momentum.png}
-  \caption{2022--2026 关键词升温候选榜。}
+  \caption{融合主题词近期动量。该指标比较 2024--2025 与 2022--2023 的相对变化, 不把 2026 年未完整数据纳入完整年度动量。}
 \end{figure}
 
+\begin{figure}[htbp]
+  \centering
+  \figasset[0.92\textwidth]{keyword_normalized_trends.png}
+  \caption{代表性融合主题词年度归一化文档占比。归一化后仍持续上升的主题更可能反映真实研究关注变化。}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \figasset[0.92\textwidth]{topic_year_share.png}
+  \caption{主题模型年度占比。主题模型用于检查热点词是否对应稳定的语义结构, 而不是孤立词频波动。}
+\end{figure}
+
+\subsection{热点分层}
+
 \begin{center}
-\begin{tabularx}{\textwidth}{>{\bfseries}p{32mm}X X}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{31mm}X X}
 \toprule
-分析项 & 当前口径 & 评委看到的价值 \\
+候选方向 & 数据信号 & 解释边界 \\
 \midrule
-关键词 Top-K & 全局高频关键词与领域高频关键词 & 快速理解数据主题结构 \\
-关键词年度热力图 & 行为关键词, 列为年份, 值为频次或标准化热度 & 发现主题升温与降温 \\
-关键词升温榜 & 比较 2024--2026 与 2022--2023 的窗口差异 & 显示趋势预测能力 \\
-主题河流图 & 展示主题簇在年份上的占比变化 & 形成故事化趋势展示 \\
+RAG & 融合信号覆盖 5,579 篇候选文档, 其中 628 篇具有显式关键词支持, 题名摘要信号在近年明显增强 & 强上升信号, 但需要注意计算机和医学方向样本共同推动。 \\
+LLM & 融合信号覆盖 17,600 篇候选文档, 其中 2,081 篇具有显式关键词支持, 与 prompt engineering、multimodal learning 共同升温 & 稳定增长信号, 需区分通用模型热度和具体科研应用。 \\
+Knowledge graph & 融合信号覆盖 8,288 篇候选文档, 显式关键词和题名摘要均提供支持, 作者合作社区中也能观察到相关团簇 & 稳定主题结构, 更适合解释知识组织和跨学科连接。 \\
+Materials informatics & materials informatics、battery、catalyst discovery 等术语在材料方向具有持续信号, 但更多依赖题名摘要识别 & 样本规模低于计算机和生物医学, 应优先看归一化趋势。 \\
 \bottomrule
 \end{tabularx}
 \end{center}
 
-\subsection{热点预测口径}
-
-趋势预测不应直接声称“未来一定热门”。更稳妥的表达是:
+\subsection{趋势表达原则}
 
 \begin{plainbox}
-基于近年频次增长、跨领域扩散、代表论文质量、作者合作密度和引用信号, 将候选方向分成“强上升”“稳定增长”“早期萌芽”“可能噪声”四类。当前 PDF 已给出关键词升温候选榜, 后续系统侧将其接入趋势 API 与自然语言解释。
+本报告将热点判断表述为“上升信号”“稳定增长”“早期萌芽”或“可能噪声”, 不使用确定性预测。一个方向只有在频次、年度占比、主题模型和代表论文多个证据同时支持时, 才进入强上升候选。
 \end{plainbox}
 
 \clearpage

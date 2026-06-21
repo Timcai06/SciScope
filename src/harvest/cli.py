@@ -52,6 +52,27 @@ def _raw_canonical(args: argparse.Namespace) -> None:
     print(json.dumps(summary, ensure_ascii=False))
 
 
+def _enrich_fulltext(args: argparse.Namespace) -> None:
+    from src.harvest.fulltext_enrichment import enrich_fulltext_in_place
+
+    years = [year.strip() for year in args.years.split(",") if year.strip()]
+    summary = enrich_fulltext_in_place(
+        canonical_dir=args.canonical_dir,
+        source=args.source,
+        years=years,
+        limit=args.limit,
+        sleep_seconds=args.sleep_seconds,
+        text_limit=args.text_limit,
+        timeout_seconds=args.timeout_seconds,
+        max_download_bytes=args.max_download_bytes,
+        max_attempts=args.max_attempts,
+        checkpoint_every=args.checkpoint_every,
+        browser_fallback=not args.no_browser_fallback,
+        stable_only=args.stable_only,
+    )
+    print(json.dumps(summary, ensure_ascii=False))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="sciscope-harvest")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -84,6 +105,26 @@ def build_parser() -> argparse.ArgumentParser:
     raw_canonical.add_argument("--archive-dir", type=Path, default=Path("data/raw_archive"))
     raw_canonical.add_argument("--delete-archive", action="store_true")
     raw_canonical.set_defaults(func=_raw_canonical)
+
+    enrich_fulltext = subparsers.add_parser(
+        "enrich-fulltext",
+        help="Enrich existing canonical JSONL partitions in place without creating new raw files",
+    )
+    enrich_fulltext.add_argument("--canonical-dir", type=Path, default=Path("data/raw_canonical"))
+    from src.harvest.fulltext_enrichment import SUPPORTED_SOURCES as FULLTEXT_ENRICH_SOURCES
+
+    enrich_fulltext.add_argument("--source", default="arxiv", choices=FULLTEXT_ENRICH_SOURCES)
+    enrich_fulltext.add_argument("--years", default="2022,2023,2024,2025,2026")
+    enrich_fulltext.add_argument("--limit", type=int)
+    enrich_fulltext.add_argument("--sleep-seconds", type=float, default=3.0)
+    enrich_fulltext.add_argument("--text-limit", type=int, default=12_000)
+    enrich_fulltext.add_argument("--timeout-seconds", type=int, default=20)
+    enrich_fulltext.add_argument("--max-download-bytes", type=int, default=4_000_000)
+    enrich_fulltext.add_argument("--max-attempts", type=int)
+    enrich_fulltext.add_argument("--checkpoint-every", type=int, default=25)
+    enrich_fulltext.add_argument("--no-browser-fallback", action="store_true")
+    enrich_fulltext.add_argument("--stable-only", action="store_true")
+    enrich_fulltext.set_defaults(func=_enrich_fulltext)
 
     return parser
 

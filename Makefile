@@ -25,6 +25,16 @@ FULLTEXT_SOURCE ?= pmc
 FULLTEXT_YEAR ?= 2025
 FULLTEXT_YEARS ?= 2022 2023 2024 2025 2026
 FULLTEXT_LIMIT ?= 3000
+FULLTEXT_ENRICH_SOURCE ?= arxiv
+FULLTEXT_ENRICH_YEARS ?= 2022,2023,2024,2025,2026
+FULLTEXT_ENRICH_LIMIT ?= 200
+FULLTEXT_ENRICH_SLEEP ?= 3
+FULLTEXT_ENRICH_TIMEOUT ?= 20
+FULLTEXT_ENRICH_MAX_BYTES ?= 4000000
+FULLTEXT_ENRICH_MAX_ATTEMPTS ?=
+FULLTEXT_ENRICH_CHECKPOINT_EVERY ?= 25
+FULLTEXT_ENRICH_NO_BROWSER_FALLBACK ?=
+FULLTEXT_ENRICH_STABLE_ONLY ?=
 RAW_PAPERS_PATH ?= data/raw/openalex/works_sample.jsonl
 PROCESSED_PAPERS_PATH ?= data/processed/papers.json
 PROCESSED_CORPUS_PATH ?= data/processed/papers_corpus.json
@@ -60,7 +70,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -72,6 +82,7 @@ help:
 	@echo "  make harvest-year     Harvest one year into data/raw/<source>/<source>_<year>_<limit>.jsonl"
 	@echo "  make harvest-balanced-years Harvest $(BALANCE_YEARS) by source/year for year balance"
 	@echo "  make harvest-fulltext-years Harvest PMC full-text excerpts by publication year"
+	@echo "  make fulltext-enrich-arxiv Enrich existing canonical arXiv partitions in place"
 	@echo "  make raw-canonical  Merge raw files into source/year canonical JSONL partitions"
 	@echo "  make raw-governance Build canonical raw, archive old raw, and remove archive copy"
 	@echo "                         API-key enhanced sources: semantic_scholar, core"
@@ -142,6 +153,12 @@ harvest-fulltext-years:
 		echo "==> harvesting full text source=$(FULLTEXT_SOURCE) year=$$year limit=$(FULLTEXT_LIMIT)"; \
 		$(MAKE) harvest-fulltext-year FULLTEXT_SOURCE=$(FULLTEXT_SOURCE) FULLTEXT_YEAR=$$year FULLTEXT_LIMIT=$(FULLTEXT_LIMIT); \
 	done
+
+fulltext-enrich-source:
+	$(PYTHON) -m src.harvest.cli enrich-fulltext --canonical-dir $(RAW_CANONICAL_DIR) --source $(FULLTEXT_ENRICH_SOURCE) --years $(FULLTEXT_ENRICH_YEARS) --limit $(FULLTEXT_ENRICH_LIMIT) --sleep-seconds $(FULLTEXT_ENRICH_SLEEP) --timeout-seconds $(FULLTEXT_ENRICH_TIMEOUT) --max-download-bytes $(FULLTEXT_ENRICH_MAX_BYTES) --checkpoint-every $(FULLTEXT_ENRICH_CHECKPOINT_EVERY) $(if $(FULLTEXT_ENRICH_MAX_ATTEMPTS),--max-attempts $(FULLTEXT_ENRICH_MAX_ATTEMPTS),) $(if $(FULLTEXT_ENRICH_NO_BROWSER_FALLBACK),--no-browser-fallback,) $(if $(FULLTEXT_ENRICH_STABLE_ONLY),--stable-only,)
+
+fulltext-enrich-arxiv:
+	$(MAKE) fulltext-enrich-source FULLTEXT_ENRICH_SOURCE=arxiv
 
 raw-canonical:
 	$(PYTHON) -m src.harvest.cli raw-canonical --raw-dir $(RAW_SOURCE_DIR) --canonical-dir $(RAW_CANONICAL_DIR) --inventory $(RAW_INVENTORY_PATH) --summary $(RAW_CANONICAL_DIR)/summary.json --max-year $(RAW_MAX_YEAR)

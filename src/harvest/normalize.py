@@ -75,6 +75,10 @@ def _strip_markup(value: Any) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", str(value or ""))).strip()
 
 
+def _full_text(work: dict[str, Any]) -> str:
+    return str(work.get("body_excerpt") or work.get("fullText") or work.get("full_text") or "").strip()
+
+
 def _crossref_year(work: dict[str, Any]) -> int | None:
     for key in ("published-print", "published-online", "issued"):
         parts = (work.get(key) or {}).get("date-parts") or []
@@ -107,7 +111,7 @@ def openalex_work_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
             "year": work.get("publication_year"),
             "keywords": _keywords(work),
             "field": _field(work, str(wrapper.get("field_seed") or "unknown")),
-            "full_text": "",
+            "full_text": _full_text(work),
         }
     )
 
@@ -125,7 +129,7 @@ def arxiv_work_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
             "year": _year_from_date(work.get("published") or work.get("updated")),
             "keywords": work.get("categories") or [],
             "field": wrapper.get("field_seed") or "unknown",
-            "full_text": "",
+            "full_text": _full_text(work),
         }
     )
 
@@ -146,7 +150,7 @@ def simple_raw_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
             "year": work.get("year") or work.get("yearPublished") or _year_from_date(work.get("publishedDate")),
             "keywords": work.get("keywords") or work.get("topics") or [],
             "field": wrapper.get("field_seed") or "unknown",
-            "full_text": work.get("body_excerpt") or work.get("fullText") or "",
+            "full_text": _full_text(work),
         }
     )
 
@@ -162,7 +166,7 @@ def crossref_work_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
             "year": _crossref_year(work),
             "keywords": work.get("subject") or [],
             "field": wrapper.get("field_seed") or "unknown",
-            "full_text": "",
+            "full_text": _full_text(work),
         }
     )
 
@@ -180,7 +184,7 @@ def semantic_scholar_work_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
             "year": work.get("year"),
             "keywords": [keyword for keyword in keywords if keyword],
             "field": wrapper.get("field_seed") or "unknown",
-            "full_text": "",
+            "full_text": _full_text(work),
         }
     )
 
@@ -199,7 +203,7 @@ def doaj_work_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
             "year": bibjson.get("year") or _year_from_date(bibjson.get("month")),
             "keywords": [keyword for keyword in keywords if keyword],
             "field": wrapper.get("field_seed") or "unknown",
-            "full_text": "",
+            "full_text": _full_text(work),
         }
     )
 

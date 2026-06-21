@@ -88,11 +88,35 @@ def test_build_analysis_assets_creates_report_ready_tables(tmp_path):
     assert authors[0]["author_position"] == "1"
 
     keywords = _read_csv(output_dir / "paper_keywords.csv")
-    assert {row["keyword"] for row in keywords} == {"retrieval augmented generation", "knowledge graph"}
+    assert {row["keyword"] for row in keywords} == {"artificial intelligence", "retrieval augmented generation", "knowledge graph"}
+
+    keyword_signals = _read_csv(output_dir / "paper_keyword_signals.csv")
+    assert any(row["keyword"] == "retrieval augmented generation" and row["signal_source"] == "title_abstract" for row in keyword_signals)
+    assert any(row["keyword"] == "retrieval augmented generation" and row["signal_source"] == "explicit_keyword" for row in keyword_signals)
 
     keyword_year = _read_csv(output_dir / "keyword_year_matrix.csv")
-    assert {"keyword": "retrieval augmented generation", "year": "2024", "count": "1", "total_docs_in_year": "1", "normalized_df": "1.0"} in keyword_year
-    assert {"keyword": "retrieval augmented generation", "year": "2025", "count": "1", "total_docs_in_year": "1", "normalized_df": "1.0"} in keyword_year
+    assert any(
+        row["keyword"] == "retrieval augmented generation"
+        and row["year"] == "2024"
+        and row["count"] == "1"
+        and row["explicit_count"] == "1"
+        and row["text_signal_count"] == "1"
+        and row["total_docs_in_year"] == "1"
+        and row["analyzable_docs_in_year"] == "1"
+        and row["normalized_df"] == "1.0"
+        for row in keyword_year
+    )
+    assert any(
+        row["keyword"] == "retrieval augmented generation"
+        and row["year"] == "2025"
+        and row["count"] == "1"
+        and row["explicit_count"] == "1"
+        and row["text_signal_count"] == "0"
+        and row["total_docs_in_year"] == "1"
+        and row["analyzable_docs_in_year"] == "1"
+        and row["normalized_df"] == "1.0"
+        for row in keyword_year
+    )
 
     edges = _read_csv(output_dir / "author_collaboration_edges.csv")
     assert {"author_a": "Ada Chen", "author_b": "Lin Wang", "weight": "1", "paper_count": "1"} in [
