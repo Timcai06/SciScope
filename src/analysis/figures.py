@@ -38,19 +38,19 @@ REPRESENTATIVE_TREND_KEYWORDS = [
     "materials informatics",
     "drug discovery",
 ]
-BLACK = "#1f252a"
-CHARCOAL = "#314247"
-GRAPHITE = "#56646e"
-STEEL = "#6f8795"
-BLUEGREY = "#8eb2b6"
-MINTGREY = "#bbd8d4"
+BLACK = "#000000"
+CHARCOAL = "#2a272a"
+GRAPHITE = "#4b4a54"
+STEEL = "#677381"
+BLUEGREY = "#82a0aa"
+MINTGREY = "#a3cfcd"
 FILL_DARK = GRAPHITE
 FILL_MEDIUM = STEEL
 FILL_SOFT = BLUEGREY
 FILL_LIGHT = MINTGREY
-PURPLE = "#6f607a"
-BROWN = "#8b735a"
-BLUE = "#3f7378"
+PURPLE = CHARCOAL
+BROWN = CHARCOAL
+BLUE = GRAPHITE
 PURPLE_LIGHT = MINTGREY
 BROWN_LIGHT = BLUEGREY
 BLUE_LIGHT = STEEL
@@ -76,8 +76,8 @@ BUBBLE_FIELD_COLORS = {
     "Materials": MINTGREY,
     "Cross-field": BLUEGREY,
 }
-SERIES_COLORS = [BLUE, GRAPHITE, STEEL, BLUEGREY, BROWN, PURPLE, MINTGREY]
-COMMUNITY_PALETTE = [GRAPHITE, STEEL, BLUEGREY, MINTGREY, BROWN, "#4c7c6f", PURPLE, CHARCOAL]
+SERIES_COLORS = [CHARCOAL, GRAPHITE, STEEL, BLUEGREY, MINTGREY]
+COMMUNITY_PALETTE = [GRAPHITE, STEEL, BLUEGREY, MINTGREY, "#735f4b", "#4c7c6f", "#816b8d", CHARCOAL]
 LIFECYCLE_COLORS = {
     "emergence": MINTGREY,
     "growth": BLUEGREY,
@@ -214,57 +214,29 @@ def _topic_label(keywords: Counter[str], fallback: str) -> str:
     return fallback
 
 
+# Report-specific stopwords on top of the shared noise filter (generic single
+# words that are not category codes / venues but are still uninformative here).
+_REPORT_EXTRA_STOPWORDS = {
+    "article", "humans", "study", "models", "studies", "result", "results",
+    "approach", "paper", "review", "application", "applications", "based",
+}
+
+
 def _is_report_keyword(value: Any) -> bool:
+    """True if the keyword should appear in report charts.
+
+    Delegates noise detection to the shared filter (category codes, generic
+    discipline labels, journal/venue names) so report, trend, and graph outputs
+    stay consistent, plus a few report-specific generic stopwords.
+    """
+    from src.models.keyword_filter import is_noise_keyword
+
     keyword = re.sub(r"\s+", " ", str(value or "").strip().lower())
-    stopwords = {
-        "article",
-        "biology",
-        "chemistry",
-        "computer science",
-        "cureus",
-        "electronic computers. computer science",
-        "frontiers in immunology",
-        "health sciences",
-        "humans",
-        "life sciences",
-        "materials science",
-        "medicine",
-        "physical sciences",
-        "graph",
-        "science",
-        "scientific reports",
-        "social sciences",
-        "study",
-        "method",
-        "model",
-        "models",
-    }
-    if len(keyword) < 4 or keyword in stopwords:
+    if len(keyword) < 4:
         return False
-    if "journal" in keyword:
+    if keyword in _REPORT_EXTRA_STOPWORDS:
         return False
-    if keyword.endswith((" rag", " llm", " llms")):
-        return False
-    if keyword.startswith(("cond mat", "cs ", "hep ", "math ", "physics ", "q bio", "stat ")):
-        return False
-    if any(
-        phrase in keyword
-        for phrase in (
-            "armed forces india",
-            "clinical orthopaedics",
-            "gynaecology",
-            "medical science educator",
-            "obstetrics",
-            "orthopaedic",
-            "population data science",
-        )
-    ):
-        return False
-    if re.match(r"^[a-z]{2,5}\.[a-z0-9-]{1,8}$", keyword):
-        return False
-    if re.match(r"^[a-z]{2,5} [a-z]{2,5}$", keyword):
-        return False
-    if "." in keyword:
+    if is_noise_keyword(keyword):
         return False
     return True
 
@@ -370,8 +342,8 @@ def _plot_year_distribution(papers: list[dict[str, Any]], output_dir: Path) -> d
     total_records = len(papers)
 
     fig, ax = plt.subplots(figsize=(7.2, 3.4))
-    ax.plot(ordered_years, values, color=PURPLE, linewidth=1.8, marker="o", markersize=3.2)
-    ax.fill_between(ordered_years, values, color=PURPLE_LIGHT)
+    ax.plot(ordered_years, values, color=CHARCOAL, linewidth=1.8, marker="o", markersize=3.2)
+    ax.fill_between(ordered_years, values, color=GRAPHITE, alpha=0.22)
     ax.set_title(
         f"Publication Years ({RECENT_YEAR_START}-{RECENT_YEAR_END}: "
         f"{_format_count(total_recent)} / {_format_count(total_records)} records)"

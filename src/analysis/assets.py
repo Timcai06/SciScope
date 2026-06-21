@@ -1892,7 +1892,7 @@ def _build_author_assets(
     return paper_authors, edge_rows, metrics_rows, by_year_rows, communities, diagnostics, sensitivity_rows
 
 
-def _build_topic_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+def _build_topic_assets(papers: list[dict[str, Any]], *, max_topics: int = 8) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     docs = [
         paper
         for paper in papers
@@ -1907,7 +1907,7 @@ def _build_topic_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, An
         return [], [], [], []
 
     texts = [str(paper.get("text_for_analysis") or "") for paper in docs]
-    topic_count = max(2, min(8, len(docs) // 2))
+    topic_count = max(2, min(max_topics, len(docs) // 2))
     comparison_rows: list[dict[str, Any]] = []
     keyword_rows: list[dict[str, Any]] = []
     paper_topic_rows: list[dict[str, Any]] = []
@@ -2022,7 +2022,7 @@ def build_analysis_assets(
         author_network_diagnostics_rows,
         author_louvain_sensitivity_rows,
     ) = _build_author_assets(papers, edge_cache_dir=edge_cache_dir)
-    topic_comparison_rows, topic_keyword_rows, paper_topic_rows, topic_year_share_rows = _build_topic_assets(papers)
+    topic_comparison_rows, topic_keyword_rows, paper_topic_rows, topic_year_share_rows = _build_topic_assets(papers, max_topics=40)
     taxonomy_coverage_rows = _build_taxonomy_coverage(paper_taxonomy)
 
     quality_by_source: dict[str, dict[str, int | str]] = defaultdict(
