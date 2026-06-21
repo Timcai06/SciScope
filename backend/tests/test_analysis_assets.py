@@ -35,6 +35,65 @@ def _wrapper(source_id: str, *, title: str, year: int, authors: list[str], keywo
     }
 
 
+def _openalex_wrapper(
+    source_id: str,
+    *,
+    title: str,
+    year: int,
+    authorships: list[dict],
+    keywords: list[str] | None = None,
+):
+    return {
+        "source": "openalex",
+        "source_id": f"https://openalex.org/{source_id}",
+        "query": "knowledge graph",
+        "field_seed": "computer science",
+        "raw": {
+            "id": f"https://openalex.org/{source_id}",
+            "display_name": title,
+            "publication_year": year,
+            "authorships": authorships,
+            "keywords": [{"display_name": keyword} for keyword in (keywords or ["Knowledge Graph"])],
+        },
+    }
+
+
+def _openalex_authorship(
+    author_id: str,
+    display_name: str,
+    *,
+    raw_author_name: str | None = None,
+    orcid: str | None = None,
+    institution_id: str | None = None,
+    institution_name: str | None = None,
+    country_code: str | None = None,
+    position: str = "middle",
+):
+    institution = (
+        {
+            "id": institution_id,
+            "display_name": institution_name,
+            "country_code": country_code,
+        }
+        if institution_id
+        else {}
+    )
+    return {
+        "author": {
+            "id": f"https://openalex.org/{author_id}",
+            "display_name": display_name,
+            "orcid": orcid,
+        },
+        "raw_author_name": raw_author_name or display_name,
+        "raw_orcid": orcid,
+        "author_position": position,
+        "is_corresponding": position == "first",
+        "institutions": [institution] if institution else [],
+        "countries": [country_code] if country_code else [],
+        "raw_affiliation_strings": [institution_name] if institution_name else [],
+    }
+
+
 def _read_csv(path):
     with path.open(encoding="utf-8", newline="") as handle:
         return list(csv.DictReader(handle))
@@ -195,6 +254,91 @@ def test_build_analysis_assets_outputs_trend_network_and_topic_layers(tmp_path):
     assert {row["model"] for row in comparison} == {"lda", "nmf"}
     topic_keywords = _read_csv(output_dir / "topic_keywords.csv")
     assert topic_keywords
+
+
+def test_build_analysis_assets_preserves_openalex_author_identity_and_affiliations(tmp_path):
+    raw_dir = tmp_path / "raw"
+    output_dir = tmp_path / "analysis"
+    openalex_dir = raw_dir / "openalex"
+    openalex_dir.mkdir(parents=True)
+    rows = [
+        _openalex_wrapper(
+            "W1",
+            title="Knowledge Graph Paper One",
+            year=2024,
+            authorships=[
+                _openalex_authorship(
+                    "A1",
+                    "Rui Zhang",
+                    raw_author_name="Zhang, Rui",
+                    orcid="https://orcid.org/0000-0001-0000-0001",
+                    institution_id="https://openalex.org/I1",
+                    institution_name="Alpha University",
+                    country_code="US",
+                    position="first",
+                ),
+                _openalex_authorship(
+                    "A2",
+                    "Ada Chen",
+                    institution_id="https://openalex.org/I2",
+                    institution_name="Beta Lab",
+                    country_code="CN",
+                    position="last",
+                ),
+            ],
+        ),
+        _openalex_wrapper(
+            "W2",
+            title="Knowledge Graph Paper Two",
+            year=2024,
+            authorships=[
+                _openalex_authorship(
+                    "A3",
+                    "Rui Zhang",
+                    raw_author_name="R. Zhang",
+                    institution_id="https://openalex.org/I3",
+                    institution_name="Gamma Institute",
+                    country_code="GB",
+                    position="first",
+                ),
+                _openalex_authorship("A4", "Bo Li", position="last"),
+            ],
+        ),
+    ]
+    openalex_dir.joinpath("openalex.jsonl").write_text(
+        "\n".join(json.dumps(record, ensure_ascii=False) for record in rows) + "\n",
+        encoding="utf-8",
+    )
+
+    summary = build_analysis_assets(raw_dir=raw_dir, output_dir=output_dir, sources=("openalex",))
+
+    assert summary["papers"] == 2
+    authors = _read_csv(output_dir / "paper_authors.csv")
+    rui_rows = [row for row in authors if row["author"] == "Rui Zhang"]
+    assert {row["author_key"] for row in rui_rows} == {"https://openalex.org/A1", "https://openalex.org/A3"}
+    assert rui_rows[0]["raw_author_name"] == "Zhang, Rui"
+    assert rui_rows[0]["orcid"] == "https://orcid.org/0000-0001-0000-0001"
+    assert rui_rows[0]["institution_ids"] == "https://openalex.org/I1"
+    assert rui_rows[0]["institutions"] == "Alpha University"
+    assert rui_rows[0]["country_codes"] == "US"
+
+    edges = _read_csv(output_dir / "author_collaboration_edges.csv")
+    edge_keys = {(row["author_a_key"], row["author_b_key"]) for row in edges}
+    assert ("https://openalex.org/A1", "https://openalex.org/A2") in edge_keys
+    assert ("https://openalex.org/A3", "https://openalex.org/A4") in edge_keys
+    assert ("https://openalex.org/A1", "https://openalex.org/A3") not in edge_keys
+
+    metrics = _read_csv(output_dir / "author_metrics.csv")
+    assert {row["author_key"] for row in metrics if row["author"] == "Rui Zhang"} == {
+        "https://openalex.org/A1",
+        "https://openalex.org/A3",
+    }
+    assert "community_id" in metrics[0]
+
+    diagnostics = _read_csv(output_dir / "author_network_diagnostics.csv")
+    diagnostic_values = {row["metric"]: row["value"] for row in diagnostics}
+    assert diagnostic_values["author_mentions_with_id"] == "4"
+    assert diagnostic_values["unique_author_keys"] == "4"
 
 
 def test_build_analysis_assets_can_select_source_filename_template(tmp_path):

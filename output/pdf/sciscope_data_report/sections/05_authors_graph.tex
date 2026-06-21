@@ -7,13 +7,13 @@
 \subsection{网络构建口径}
 
 \begin{itemize}
-  \item \textbf{节点}: 作者姓名。
-  \item \textbf{边}: 两位作者共同出现在同一篇论文中。
-  \item \textbf{边权}: 同时考虑共同论文次数和分数化合作强度。
-  \item \textbf{过滤}: 正文主图排除作者数超过 12 的论文, 避免大型团队论文生成过多两两合作边。
+  \item \textbf{节点}: 作者实体。优先使用 OpenAlex author ID 和 ORCID, 缺失时退回标准化姓名键 \texttt{author\_key}。
+  \item \textbf{边}: 两个作者实体共同出现在同一篇论文中。
+  \item \textbf{边权}: 同时保留共同论文次数 \texttt{paper\_count} 和分数化边权 \texttt{weight\_fraction\_pair}; 对一篇含 $n$ 位作者的论文, 每条作者对边增加 $1/\binom{n}{2}$。
+  \item \textbf{过滤}: 中心性和正文主图排除作者数超过 12 的论文, 避免大型团队论文生成过多两两合作边。
 \end{itemize}
 
-在全量候选网络中, 作者合作边超过千万级。为了让静态报告图可解释, 本章只展示近五年窗口内的核心合作结构, 并采用分数计数降低长作者名单造成的网络虚高。中心性和社区发现用于识别候选核心作者和桥接作者, 不作为未经消歧的最终权威排名。
+在全量候选网络中, 作者实体合作边超过千万级。为了让静态报告图可解释, 本章只展示近五年窗口内的核心合作结构, 并采用分数计数降低长作者名单造成的网络虚高。中心性和社区发现用于识别候选核心作者和桥接作者, 不作为未经消歧核验的最终个人影响力排名。作者署名表、边表、指标表和诊断表分别输出为 \texttt{paper\_authors.csv}、\texttt{author\_collaboration\_edges.csv}、\texttt{author\_metrics.csv} 与 \texttt{author\_network\_diagnostics.csv}。
 
 \subsection{网络指标}
 
@@ -22,9 +22,11 @@
 \toprule
 指标 & 含义 & 解释方式 \\
 \midrule
-Degree & 作者直接合作人数 & 识别合作范围较广的作者。 \\
+Weighted Degree & 作者实体的分数化合作强度 & 区分稳定深度合作与一次性大团队合作。 \\
 Betweenness & 作者连接不同团簇的桥梁能力 & 识别跨主题或跨领域连接者。 \\
-Community & 网络社区划分结果 & 观察研究团队、主题群落和合作圈层。 \\
+PageRank / Eigenvector & 作者是否连接到高连接作者 & 识别核心圈层中的代表性节点。 \\
+k-core & 作者所处核心层级 & 比单纯度数更适合观察核心合作圈。 \\
+Community & Louvain 社区划分结果 & 观察研究团队、主题群落和合作圈层。 \\
 Temporal Activity & 作者活跃年份分布 & 判断节点是否仍处于近年活跃状态。 \\
 \bottomrule
 \end{tabularx}
@@ -41,7 +43,7 @@ Temporal Activity & 作者活跃年份分布 & 判断节点是否仍处于近年
 \begin{figure}[htbp]
   \centering
   \figasset[0.88\textwidth]{author_collaboration_network.png}
-  \caption{作者合作社区气泡图。气泡位置表示主导领域, 大小综合反映社区论文数和合作强度; 浅色气泡用于保证社区标签可读。}
+  \caption{核心作者实体合作网络。节点大小反映加权合作强度, 颜色表示 Louvain 社区, 边宽表示分数化合作边权。为保证可读性, 仅展示核心边表中的高权重合作关系。}
 \end{figure}
 
 \begin{figure}[htbp]
@@ -53,19 +55,22 @@ Temporal Activity & 作者活跃年份分布 & 判断节点是否仍处于近年
 \subsection{核心作者与桥接作者候选}
 
 \begin{center}
-\begin{tabularx}{\textwidth}{>{\bfseries}p{30mm}r r X}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{34mm}p{42mm}X}
 \toprule
-作者 & 论文数 & 合作者数 & 网络解释 \\
+角色类型 & 主要指标 & 网络解释 \\
 \midrule
-Yangqiu Song & 44 & 121 & 计算机科学方向高合作度节点, 与多个知识表示和文本分析主题相连。 \\
-Halil Kilicoglu & 36 & 65 & 生物医学文本挖掘社区中的稳定节点, 合作关系集中但清晰。 \\
-Karin Verspoor & 35 & 294 & 生物医学文本挖掘方向连接度较高, 具备桥接作者特征。 \\
-Rui Zhang & 214 & 1,754 & 高产高连接节点, 需要警惕同名作者聚合。 \\
-Kai Wang & 138 & 901 & 合作范围较广, 同样需要结合机构和论文主题进一步复核。 \\
+核心合作者 & Weighted Degree, PageRank, k-core & 与多个高权重合作边相连, 通常代表稳定团队或核心实验室/课题组。 \\
+桥接作者 & Betweenness, 跨社区边数 & 位于多个社区之间, 适合追踪跨主题、跨领域合作机会。 \\
+高产但需复核作者 & Paper Count, Collaborator Count, identity source & 若缺少 author ID 或机构信息, 高产姓名可能包含同名聚合, 应进入人工核验清单。 \\
+新近活跃作者 & Last Year, Active Years, 近年边权 & 可作为潜在合作对象或趋势跟踪对象, 但需要代表论文支撑。 \\
 \bottomrule
 \end{tabularx}
 \end{center}
 
-上述作者应理解为“候选核心/桥接节点”。由于当前作者消歧主要依赖姓名标准化, 中文名、缩写名和同名作者可能被合并, 因而作者排名不宜被解释为精确个人影响力排名。
+关键作者名单以 \texttt{author\_metrics.csv} 为准, 正文只解释角色判读方式。若作者实体来自 OpenAlex author ID 或 ORCID, 可信度高于仅由姓名生成的实体; 对中文常见名、缩写名和缺机构记录, 仍应结合机构、代表论文与主题标签进行抽样核验。
+
+\subsection{参数敏感性}
+
+社区发现采用 Louvain 算法, 并输出 \texttt{author\_louvain\_sensitivity.csv} 比较 resolution = 0.8、1.0、1.2 下的社区数和模块度。若核心社区、桥接作者候选和高权重合作边在不同分辨率下保持稳定, 则可作为报告中的结构性结论; 若差异较大, 只能作为候选信号进入附录和人工复核。
 
 \clearpage

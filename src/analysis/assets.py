@@ -510,7 +510,126 @@ def _build_keyword_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, 
     return paper_keywords, paper_keyword_signals, keyword_year_rows, trend_rows, alias_output
 
 
-def _build_author_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+def _author_name_key(value: Any) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", " ", str(value or "").strip().lower())
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return f"name:{normalized}" if normalized else ""
+
+
+def _as_list(value: Any) -> list[str]:
+    if isinstance(value, list | tuple | set):
+        return [str(item).strip() for item in value if str(item).strip()]
+    text = str(value or "").strip()
+    return [text] if text else []
+
+
+def _join_values(value: Any) -> str:
+    values = _as_list(value)
+    return "; ".join(dict.fromkeys(values))
+
+
+def _top_counter_value(counter: Counter[str]) -> str:
+    if not counter:
+        return ""
+    return sorted(counter.items(), key=lambda item: (-item[1], item[0]))[0][0]
+
+
+def _paper_author_entries(paper: dict[str, Any]) -> list[dict[str, Any]]:
+    structured = paper.get("authorships") if isinstance(paper.get("authorships"), list) else []
+    entries: list[dict[str, Any]] = []
+    if structured:
+        for index, authorship in enumerate(structured, start=1):
+            display_name = str(authorship.get("display_name") or authorship.get("author") or authorship.get("raw_author_name") or "").strip()
+            if not display_name:
+                continue
+            author_id = str(authorship.get("author_id") or "").strip()
+            orcid = str(authorship.get("orcid") or "").strip()
+            author_key = author_id or orcid or _author_name_key(display_name)
+            if not author_key:
+                continue
+            entries.append(
+                {
+                    "author_key": author_key,
+                    "author": display_name,
+                    "author_id": author_id,
+                    "raw_author_name": str(authorship.get("raw_author_name") or display_name).strip(),
+                    "orcid": orcid,
+                    "author_position": int(authorship.get("author_position_index") or index),
+                    "author_role": str(authorship.get("author_position") or "").strip(),
+                    "is_corresponding": bool(authorship.get("is_corresponding")),
+                    "institution_ids": _as_list(authorship.get("institution_ids")),
+                    "institutions": _as_list(authorship.get("institutions")),
+                    "country_codes": _as_list(authorship.get("country_codes")),
+                    "raw_affiliation_strings": _as_list(authorship.get("raw_affiliation_strings")),
+                    "identity_source": "author_id" if author_id else "orcid" if orcid else "name",
+                }
+            )
+        return entries
+
+    for index, author in enumerate(paper.get("authors") or [], start=1):
+        display_name = str(author).strip()
+        author_key = _author_name_key(display_name)
+        if not display_name or not author_key:
+            continue
+        entries.append(
+            {
+                "author_key": author_key,
+                "author": display_name,
+                "author_id": "",
+                "raw_author_name": display_name,
+                "orcid": "",
+                "author_position": index,
+                "author_role": "",
+                "is_corresponding": False,
+                "institution_ids": [],
+                "institutions": [],
+                "country_codes": [],
+                "raw_affiliation_strings": [],
+                "identity_source": "name",
+            }
+        )
+    return entries
+
+
+def _select_core_edge_rows(edge_rows: list[dict[str, Any]], nx_module: Any, *, max_edges: int) -> list[dict[str, Any]]:
+    candidates = [row for row in edge_rows if int(row.get("long_author_papers") or 0) == 0][:max_edges]
+    if not candidates or nx_module is None:
+        return candidates
+    pool_graph = nx_module.Graph()
+    for row in candidates:
+        pool_graph.add_edge(str(row["author_a_key"]), str(row["author_b_key"]))
+    components = sorted(nx_module.connected_components(pool_graph), key=len, reverse=True)
+    if not components:
+        return candidates
+    if len(components[0]) >= 30:
+        selected_nodes = set(components[0])
+    else:
+        selected_nodes: set[str] = set()
+        for component in components:
+            if len(component) < 2:
+                continue
+            selected_nodes.update(component)
+            if len(selected_nodes) >= 220:
+                break
+    selected = [
+        row
+        for row in candidates
+        if str(row["author_a_key"]) in selected_nodes and str(row["author_b_key"]) in selected_nodes
+    ]
+    return selected or candidates
+
+
+def _build_author_assets(
+    papers: list[dict[str, Any]],
+) -> tuple[
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
     try:
         import networkx as nx
     except ImportError:
@@ -521,32 +640,93 @@ def _build_author_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, A
     author_years: dict[str, Counter[int]] = defaultdict(Counter)
     author_fields: dict[str, Counter[str]] = defaultdict(Counter)
     author_collaborators: dict[str, set[str]] = defaultdict(set)
+    author_profiles: dict[str, dict[str, Any]] = {}
     skipped_long_author_papers = 0
+    papers_with_authors = 0
+    papers_with_structured_authorships = 0
+    author_mentions = 0
+    author_mentions_with_id = 0
 
     for paper in papers:
         paper_id = str(paper.get("paper_id") or "")
         source = str(paper.get("source") or "")
         year = _year_value(paper.get("year"))
-        authors = [str(author).strip() for author in paper.get("authors") or [] if str(author).strip()]
-        unique_authors = sorted(dict.fromkeys(authors))
-        for index, author in enumerate(authors, start=1):
-            paper_authors.append({"paper_id": paper_id, "source": source, "year": paper.get("year") or "", "author": author, "author_position": index})
+        author_entries = _paper_author_entries(paper)
+        if author_entries:
+            papers_with_authors += 1
+        if isinstance(paper.get("authorships"), list) and paper.get("authorships"):
+            papers_with_structured_authorships += 1
+        unique_by_key = {entry["author_key"]: entry for entry in author_entries}
+        unique_authors = [unique_by_key[key] for key in sorted(unique_by_key)]
+        for entry in author_entries:
+            author_mentions += 1
+            if entry["author_id"]:
+                author_mentions_with_id += 1
+            author_key = str(entry["author_key"])
+            profile = author_profiles.setdefault(
+                author_key,
+                {
+                    "author_key": author_key,
+                    "author": entry["author"],
+                    "author_id": entry["author_id"],
+                    "raw_author_names": Counter(),
+                    "orcid": entry["orcid"],
+                    "institution_ids": Counter(),
+                    "institutions": Counter(),
+                    "country_codes": Counter(),
+                    "raw_affiliation_strings": Counter(),
+                    "identity_source": entry["identity_source"],
+                },
+            )
+            profile["raw_author_names"][entry["raw_author_name"]] += int(bool(entry["raw_author_name"]))
+            for field_name in ("institution_ids", "institutions", "country_codes", "raw_affiliation_strings"):
+                profile[field_name].update(entry[field_name])
+            if not profile["orcid"] and entry["orcid"]:
+                profile["orcid"] = entry["orcid"]
+            if profile["identity_source"] == "name" and entry["identity_source"] != "name":
+                profile["identity_source"] = entry["identity_source"]
+            paper_authors.append(
+                {
+                    "paper_id": paper_id,
+                    "source": source,
+                    "year": paper.get("year") or "",
+                    "author_key": author_key,
+                    "author": entry["author"],
+                    "author_id": entry["author_id"],
+                    "raw_author_name": entry["raw_author_name"],
+                    "orcid": entry["orcid"],
+                    "author_position": entry["author_position"],
+                    "author_role": entry["author_role"],
+                    "is_corresponding": entry["is_corresponding"],
+                    "institution_ids": _join_values(entry["institution_ids"]),
+                    "institutions": _join_values(entry["institutions"]),
+                    "country_codes": _join_values(entry["country_codes"]),
+                    "raw_affiliation_strings": _join_values(entry["raw_affiliation_strings"]),
+                    "identity_source": entry["identity_source"],
+                }
+            )
             if year is not None:
-                author_years[author][year] += 1
-            author_fields[author][str(paper.get("field_seed") or paper.get("field") or "unknown")] += 1
+                author_years[author_key][year] += 1
+            author_fields[author_key][str(paper.get("field_seed") or paper.get("field") or "unknown")] += 1
         if len(unique_authors) > MAX_AUTHORS_FOR_CORE_NETWORK:
             skipped_long_author_papers += 1
         if len(unique_authors) < 2:
             continue
         pair_weight = 1 / math.comb(len(unique_authors), 2)
         author_weight = 1 / (len(unique_authors) - 1)
-        for author_a, author_b in combinations(unique_authors, 2):
-            key = (author_a, author_b)
+        for entry_a, entry_b in combinations(unique_authors, 2):
+            author_a_key = str(entry_a["author_key"])
+            author_b_key = str(entry_b["author_key"])
+            key = tuple(sorted((author_a_key, author_b_key)))
+            row_a = unique_by_key[key[0]]
+            row_b = unique_by_key[key[1]]
             stats = edge_stats.setdefault(
                 key,
                 {
-                    "author_a": author_a,
-                    "author_b": author_b,
+                    "author_a_key": key[0],
+                    "author_b_key": key[1],
+                    "author_a": row_a["author"],
+                    "author_b": row_b["author"],
                     "paper_count": 0,
                     "weight_full": 0.0,
                     "weight_fraction_pair": 0.0,
@@ -567,12 +747,14 @@ def _build_author_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, A
                 stats["last_year"] = max([item for item in (stats["last_year"], year) if item is not None])
             if len(unique_authors) > MAX_AUTHORS_FOR_CORE_NETWORK:
                 stats["long_author_papers"] += 1
-            author_collaborators[author_a].add(author_b)
-            author_collaborators[author_b].add(author_a)
+            author_collaborators[author_a_key].add(author_b_key)
+            author_collaborators[author_b_key].add(author_a_key)
 
     edge_rows: list[dict[str, Any]] = []
     for stats in edge_stats.values():
         row = {
+            "author_a_key": stats["author_a_key"],
+            "author_b_key": stats["author_b_key"],
             "author_a": stats["author_a"],
             "author_b": stats["author_b"],
             "weight": int(stats["paper_count"]),
@@ -586,18 +768,20 @@ def _build_author_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, A
             "long_author_papers": int(stats["long_author_papers"]),
         }
         edge_rows.append(row)
-    edge_rows.sort(key=lambda row: (-float(row["weight_fraction_pair"]), -int(row["paper_count"]), row["author_a"], row["author_b"]))
+    edge_rows.sort(
+        key=lambda row: (
+            -float(row["weight_fraction_pair"]),
+            -int(row["paper_count"]),
+            row["author_a_key"],
+            row["author_b_key"],
+        )
+    )
     graph = nx.Graph() if nx is not None else None
     if graph is not None:
-        core_edges = 0
-        for row in edge_rows:
-            if int(row["long_author_papers"]) != 0:
-                continue
+        core_rows = _select_core_edge_rows(edge_rows, nx, max_edges=MAX_CORE_AUTHOR_GRAPH_EDGES)
+        for row in core_rows:
             weight = float(row["weight_fraction_pair"])
-            graph.add_edge(str(row["author_a"]), str(row["author_b"]), weight=weight, distance=1 / weight if weight else 1)
-            core_edges += 1
-            if core_edges >= MAX_CORE_AUTHOR_GRAPH_EDGES:
-                break
+            graph.add_edge(str(row["author_a_key"]), str(row["author_b_key"]), weight=weight, distance=1 / weight if weight else 1)
 
     degree = dict(graph.degree(weight="weight")) if graph is not None and graph.number_of_nodes() else {}
     betweenness = (
@@ -609,61 +793,125 @@ def _build_author_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, A
         eigenvector = nx.eigenvector_centrality(graph, weight="weight", max_iter=300) if nx is not None and graph is not None and graph.number_of_nodes() > 1 else {}
     except Exception:
         eigenvector = {}
-
-    metrics_rows: list[dict[str, Any]] = []
-    for author in sorted(set(author_years).union(author_collaborators)):
-        years = author_years.get(author, Counter())
-        fields = author_fields.get(author, Counter())
-        metrics_rows.append(
-            {
-                "author": author,
-                "paper_count": sum(years.values()),
-                "collaborator_count": len(author_collaborators.get(author, set())),
-                "degree": round(float(degree.get(author, 0)), 6),
-                "betweenness": round(float(betweenness.get(author, 0)), 6),
-                "eigenvector": round(float(eigenvector.get(author, 0)), 6),
-                "first_year": min(years) if years else "",
-                "last_year": max(years) if years else "",
-                "active_years": len(years),
-                "dominant_field": fields.most_common(1)[0][0] if fields else "",
-            }
-        )
-    metrics_rows.sort(key=lambda row: (-float(row["betweenness"]), -float(row["degree"]), -int(row["paper_count"]), row["author"]))
-
-    by_year_rows = [
-        {"author": author, "year": year, "paper_count": count}
-        for author, years in sorted(author_years.items())
-        for year, count in sorted(years.items())
-    ]
+    pagerank = (
+        nx.pagerank(graph, weight="weight")
+        if nx is not None and graph is not None and graph.number_of_nodes() > 1
+        else {}
+    )
+    try:
+        core_number = nx.core_number(graph) if nx is not None and graph is not None and graph.number_of_edges() else {}
+    except Exception:
+        core_number = {}
 
     communities = []
+    sensitivity_rows: list[dict[str, Any]] = []
+    community_by_author: dict[str, int] = {}
     best_resolution = ""
+    best_modularity = 0.0
     if nx is not None and graph is not None and graph.number_of_edges():
         best_score = (-1.0, 0)
         best_communities: list[set[str]] = []
         for resolution in (0.8, 1.0, 1.2):
             found = list(nx.algorithms.community.louvain_communities(graph, weight="weight", resolution=resolution, seed=42))
             modularity = nx.algorithms.community.modularity(graph, found, weight="weight") if found else 0.0
+            sensitivity_rows.append(
+                {
+                    "resolution": resolution,
+                    "communities": len(found),
+                    "modularity": round(float(modularity), 6),
+                }
+            )
             score = (modularity, -abs(len(found) - math.sqrt(max(graph.number_of_nodes(), 1))))
             if score > best_score:
                 best_score = score
                 best_communities = [set(item) for item in found]
                 best_resolution = str(resolution)
+                best_modularity = float(modularity)
         for community_id, community in enumerate(best_communities):
+            for author_key in community:
+                community_by_author[author_key] = community_id
             subgraph = graph.subgraph(community)
-            top_authors = sorted(subgraph.degree(weight="weight"), key=lambda item: item[1], reverse=True)[:5]
+            top_author_keys = sorted(subgraph.degree(weight="weight"), key=lambda item: item[1], reverse=True)[:5]
+            top_authors = [str(author_profiles.get(author_key, {}).get("author") or author_key) for author_key, _ in top_author_keys]
             communities.append(
                 {
                     "community_id": community_id,
                     "resolution": best_resolution,
+                    "modularity": round(best_modularity, 6),
                     "author_count": len(community),
                     "edge_count": subgraph.number_of_edges(),
                     "total_weight": round(sum(float(data.get("weight") or 0) for _, _, data in subgraph.edges(data=True)), 6),
-                    "top_authors": "; ".join(author for author, _ in top_authors),
+                    "top_authors": "; ".join(top_authors),
                 }
             )
     communities.sort(key=lambda row: (-int(row["author_count"]), -float(row["total_weight"])))
-    return paper_authors, edge_rows, metrics_rows, by_year_rows, communities
+
+    metrics_rows: list[dict[str, Any]] = []
+    for author in sorted(set(author_years).union(author_collaborators)):
+        years = author_years.get(author, Counter())
+        fields = author_fields.get(author, Counter())
+        profile = author_profiles.get(author, {})
+        metrics_rows.append(
+            {
+                "author_key": author,
+                "author": profile.get("author", author),
+                "author_id": profile.get("author_id", ""),
+                "orcid": profile.get("orcid", ""),
+                "raw_author_names": "; ".join(name for name, _ in profile.get("raw_author_names", Counter()).most_common(3)),
+                "paper_count": sum(years.values()),
+                "collaborator_count": len(author_collaborators.get(author, set())),
+                "degree": round(float(degree.get(author, 0)), 6),
+                "weighted_degree": round(float(degree.get(author, 0)), 6),
+                "betweenness": round(float(betweenness.get(author, 0)), 6),
+                "eigenvector": round(float(eigenvector.get(author, 0)), 6),
+                "pagerank": round(float(pagerank.get(author, 0)), 6),
+                "core_number": int(core_number.get(author, 0)),
+                "community_id": community_by_author.get(author, ""),
+                "first_year": min(years) if years else "",
+                "last_year": max(years) if years else "",
+                "active_years": len(years),
+                "dominant_field": _top_counter_value(fields),
+                "institution_ids": "; ".join(value for value, _ in profile.get("institution_ids", Counter()).most_common(3)),
+                "institutions": "; ".join(value for value, _ in profile.get("institutions", Counter()).most_common(3)),
+                "country_codes": "; ".join(value for value, _ in profile.get("country_codes", Counter()).most_common(3)),
+                "identity_source": profile.get("identity_source", "name"),
+            }
+        )
+    metrics_rows.sort(key=lambda row: (-float(row["betweenness"]), -float(row["degree"]), -int(row["paper_count"]), row["author"]))
+
+    by_year_rows = [
+        {"author_key": author, "author": str(author_profiles.get(author, {}).get("author") or author), "year": year, "paper_count": count}
+        for author, years in sorted(author_years.items())
+        for year, count in sorted(years.items())
+    ]
+
+    diagnostics = [
+        {"metric": "papers_with_authors", "value": papers_with_authors, "note": "Records with at least one usable author."},
+        {
+            "metric": "papers_with_structured_authorships",
+            "value": papers_with_structured_authorships,
+            "note": "Records carrying source-level authorship metadata.",
+        },
+        {"metric": "author_mentions", "value": author_mentions, "note": "Paper-author rows before per-paper deduplication."},
+        {"metric": "author_mentions_with_id", "value": author_mentions_with_id, "note": "Author mentions backed by persistent source IDs."},
+        {"metric": "unique_author_keys", "value": len(author_profiles), "note": "Distinct author entities after ID/name keying."},
+        {"metric": "coauthor_edges", "value": len(edge_rows), "note": "Distinct coauthor entity pairs."},
+        {"metric": "long_author_papers", "value": skipped_long_author_papers, "note": "Papers above the core-network author threshold."},
+        {
+            "metric": "core_graph_edges",
+            "value": graph.number_of_edges() if graph is not None else 0,
+            "note": "Edges used for centrality and community diagnostics.",
+        },
+        {
+            "metric": "core_graph_nodes",
+            "value": graph.number_of_nodes() if graph is not None else 0,
+            "note": "Author entities present in the core graph.",
+        },
+        {"metric": "louvain_resolution", "value": best_resolution, "note": "Selected by modularity over tested resolutions."},
+        {"metric": "louvain_modularity", "value": round(best_modularity, 6), "note": "Modularity of selected Louvain partition."},
+        {"metric": "louvain_communities", "value": len(communities), "note": "Communities in selected core graph partition."},
+    ]
+    return paper_authors, edge_rows, metrics_rows, by_year_rows, communities, diagnostics, sensitivity_rows
 
 
 def _build_topic_assets(papers: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
@@ -770,7 +1018,15 @@ def build_analysis_assets(
         papers.append(paper)
 
     paper_keywords, paper_keyword_signals, keyword_year_rows, keyword_trend_rows, keyword_alias_rows = _build_keyword_assets(papers)
-    paper_authors, edge_rows, author_metrics_rows, author_metrics_by_year_rows, author_community_rows = _build_author_assets(papers)
+    (
+        paper_authors,
+        edge_rows,
+        author_metrics_rows,
+        author_metrics_by_year_rows,
+        author_community_rows,
+        author_network_diagnostics_rows,
+        author_louvain_sensitivity_rows,
+    ) = _build_author_assets(papers)
     topic_comparison_rows, topic_keyword_rows, paper_topic_rows, topic_year_share_rows = _build_topic_assets(papers)
 
     quality_by_source: dict[str, dict[str, int | str]] = defaultdict(
@@ -821,7 +1077,24 @@ def build_analysis_assets(
     _write_csv(
         output_path / "paper_authors.csv",
         paper_authors,
-        ["paper_id", "source", "year", "author", "author_position"],
+        [
+            "paper_id",
+            "source",
+            "year",
+            "author_key",
+            "author",
+            "author_id",
+            "raw_author_name",
+            "orcid",
+            "author_position",
+            "author_role",
+            "is_corresponding",
+            "institution_ids",
+            "institutions",
+            "country_codes",
+            "raw_affiliation_strings",
+            "identity_source",
+        ],
     )
     _write_csv(
         output_path / "paper_keywords.csv",
@@ -876,6 +1149,8 @@ def build_analysis_assets(
         output_path / "author_collaboration_edges.csv",
         edge_rows,
         [
+            "author_a_key",
+            "author_b_key",
             "author_a",
             "author_b",
             "weight",
@@ -893,24 +1168,38 @@ def build_analysis_assets(
         output_path / "author_metrics.csv",
         author_metrics_rows,
         [
+            "author_key",
             "author",
+            "author_id",
+            "orcid",
+            "raw_author_names",
             "paper_count",
             "collaborator_count",
             "degree",
+            "weighted_degree",
             "betweenness",
             "eigenvector",
+            "pagerank",
+            "core_number",
+            "community_id",
             "first_year",
             "last_year",
             "active_years",
             "dominant_field",
+            "institution_ids",
+            "institutions",
+            "country_codes",
+            "identity_source",
         ],
     )
-    _write_csv(output_path / "author_metrics_by_year.csv", author_metrics_by_year_rows, ["author", "year", "paper_count"])
+    _write_csv(output_path / "author_metrics_by_year.csv", author_metrics_by_year_rows, ["author_key", "author", "year", "paper_count"])
     _write_csv(
         output_path / "author_communities.csv",
         author_community_rows,
-        ["community_id", "resolution", "author_count", "edge_count", "total_weight", "top_authors"],
+        ["community_id", "resolution", "modularity", "author_count", "edge_count", "total_weight", "top_authors"],
     )
+    _write_csv(output_path / "author_network_diagnostics.csv", author_network_diagnostics_rows, ["metric", "value", "note"])
+    _write_csv(output_path / "author_louvain_sensitivity.csv", author_louvain_sensitivity_rows, ["resolution", "communities", "modularity"])
     _write_csv(output_path / "topic_model_comparison.csv", topic_comparison_rows, ["model", "topics", "documents", "vocabulary", "quality_proxy"])
     _write_csv(output_path / "topic_keywords.csv", topic_keyword_rows, ["model", "topic_id", "ranked_keywords"])
     _write_csv(output_path / "paper_topics.csv", paper_topic_rows, ["paper_id", "source", "year", "model", "topic_id", "topic_weight"])
@@ -945,6 +1234,8 @@ def build_analysis_assets(
         "author_edges": len(edge_rows),
         "author_metrics": len(author_metrics_rows),
         "author_communities": len(author_community_rows),
+        "author_network_diagnostics": len(author_network_diagnostics_rows),
+        "author_louvain_sensitivity": len(author_louvain_sensitivity_rows),
         "topic_models": len(topic_comparison_rows),
         "topic_keywords": len(topic_keyword_rows),
         "recent_year_start": RECENT_YEAR_START,

@@ -33,6 +33,8 @@ FULLTEXT_ENRICH_TIMEOUT ?= 20
 FULLTEXT_ENRICH_MAX_BYTES ?= 4000000
 FULLTEXT_ENRICH_MAX_ATTEMPTS ?=
 FULLTEXT_ENRICH_CHECKPOINT_EVERY ?= 25
+FULLTEXT_ENRICH_FIELD_FILTER ?=
+FULLTEXT_ENRICH_RETRY_FAILED ?=
 FULLTEXT_ENRICH_NO_BROWSER_FALLBACK ?=
 FULLTEXT_ENRICH_STABLE_ONLY ?=
 RAW_PAPERS_PATH ?= data/raw/openalex/works_sample.jsonl
@@ -155,7 +157,7 @@ harvest-fulltext-years:
 	done
 
 fulltext-enrich-source:
-	$(PYTHON) -m src.harvest.cli enrich-fulltext --canonical-dir $(RAW_CANONICAL_DIR) --source $(FULLTEXT_ENRICH_SOURCE) --years $(FULLTEXT_ENRICH_YEARS) --limit $(FULLTEXT_ENRICH_LIMIT) --sleep-seconds $(FULLTEXT_ENRICH_SLEEP) --timeout-seconds $(FULLTEXT_ENRICH_TIMEOUT) --max-download-bytes $(FULLTEXT_ENRICH_MAX_BYTES) --checkpoint-every $(FULLTEXT_ENRICH_CHECKPOINT_EVERY) $(if $(FULLTEXT_ENRICH_MAX_ATTEMPTS),--max-attempts $(FULLTEXT_ENRICH_MAX_ATTEMPTS),) $(if $(FULLTEXT_ENRICH_NO_BROWSER_FALLBACK),--no-browser-fallback,) $(if $(FULLTEXT_ENRICH_STABLE_ONLY),--stable-only,)
+	$(PYTHON) -m src.harvest.cli enrich-fulltext --canonical-dir $(RAW_CANONICAL_DIR) --source $(FULLTEXT_ENRICH_SOURCE) --years $(FULLTEXT_ENRICH_YEARS) --limit $(FULLTEXT_ENRICH_LIMIT) --sleep-seconds $(FULLTEXT_ENRICH_SLEEP) --timeout-seconds $(FULLTEXT_ENRICH_TIMEOUT) --max-download-bytes $(FULLTEXT_ENRICH_MAX_BYTES) --checkpoint-every $(FULLTEXT_ENRICH_CHECKPOINT_EVERY) $(if $(FULLTEXT_ENRICH_MAX_ATTEMPTS),--max-attempts $(FULLTEXT_ENRICH_MAX_ATTEMPTS),) $(if $(FULLTEXT_ENRICH_FIELD_FILTER),--field-filter "$(FULLTEXT_ENRICH_FIELD_FILTER)",) $(if $(FULLTEXT_ENRICH_RETRY_FAILED),--retry-failed,) $(if $(FULLTEXT_ENRICH_NO_BROWSER_FALLBACK),--no-browser-fallback,) $(if $(FULLTEXT_ENRICH_STABLE_ONLY),--stable-only,)
 
 fulltext-enrich-arxiv:
 	$(MAKE) fulltext-enrich-source FULLTEXT_ENRICH_SOURCE=arxiv

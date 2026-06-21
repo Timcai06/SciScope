@@ -628,6 +628,57 @@ def test_enrich_fulltext_stable_only_skips_low_yield_domains(tmp_path, monkeypat
     assert fetched == ["https://www.mdpi.com/2073-4409/11/19/3007"]
 
 
+def test_enrich_fulltext_stable_only_resolves_openalex_doi(tmp_path, monkeypatch):
+    canonical_dir = tmp_path / "raw_canonical"
+    openalex_dir = canonical_dir / "openalex"
+    openalex_dir.mkdir(parents=True)
+    path = openalex_dir / "2024.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "source": "openalex",
+                "source_id": "https://openalex.org/W1",
+                "raw": {
+                    "id": "https://openalex.org/W1",
+                    "doi": "https://doi.org/10.3390/cells11193007",
+                    "display_name": "MDPI article through DOI",
+                },
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    fetched: list[str] = []
+
+    monkeypatch.setattr(
+        "src.harvest.fulltext_enrichment._resolve_redirect_url",
+        lambda _url, **_kwargs: "https://www.mdpi.com/2073-4409/11/19/3007",
+    )
+
+    def fake_fetch(url, **_kwargs):
+        fetched.append(url)
+        return b"<html><body><article>" + b"resolved doi full text " * 120 + b"</article></body></html>"
+
+    monkeypatch.setattr("src.harvest.fulltext_enrichment._fetch_bytes", fake_fetch)
+    monkeypatch.setattr("src.harvest.fulltext_enrichment.time.sleep", lambda _seconds: None)
+
+    summary = enrich_fulltext_in_place(
+        canonical_dir=canonical_dir,
+        source="openalex",
+        years=["2024"],
+        limit=1,
+        stable_only=True,
+    )
+
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert summary["records_enriched"] == 1
+    assert fetched == ["https://www.mdpi.com/2073-4409/11/19/3007"]
+    assert record["raw"]["full_text_url"] == "https://www.mdpi.com/2073-4409/11/19/3007"
+    assert record["raw"]["full_text_source"] == "openalex_doi_url"
+
+
 def test_openalex_work_to_paper_restores_abstract_and_metadata():
     paper = openalex_work_to_paper(_openalex_wrapper())
 

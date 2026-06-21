@@ -94,6 +94,47 @@ def _has_full_text(wrapper: dict[str, Any]) -> bool:
     )
 
 
+def _matches_field_filter(wrapper: dict[str, Any], field_filter: str | None) -> bool:
+    if not field_filter:
+        return True
+    needle = field_filter.strip().lower()
+    if not needle:
+        return True
+    raw = wrapper.get("raw") if isinstance(wrapper.get("raw"), dict) else {}
+    haystack = " ".join(
+        str(value or "")
+        for value in (
+            wrapper.get("field_seed"),
+            wrapper.get("query"),
+            raw.get("field"),
+            raw.get("category"),
+        )
+    ).lower()
+    return needle in haystack
+
+
+def _has_failed_fulltext_attempt(wrapper: dict[str, Any], source: str) -> bool:
+    raw = wrapper.get("raw") if isinstance(wrapper.get("raw"), dict) else {}
+    return (
+        str(raw.get("full_text_attempt_source") or "") == source
+        and str(raw.get("full_text_attempt_status") or "") in {"failed", "no_fulltext"}
+    )
+
+
+def _mark_fulltext_attempt(wrapper: dict[str, Any], *, source: str, status: str, reason: str) -> dict[str, Any]:
+    raw = wrapper.get("raw") if isinstance(wrapper.get("raw"), dict) else {}
+    return {
+        **wrapper,
+        "raw": {
+            **raw,
+            "full_text_attempt_source": source,
+            "full_text_attempt_status": status,
+            "full_text_attempt_reason": reason,
+            "full_text_attempted_at": _utc_now(),
+        },
+    }
+
+
 def _arxiv_id(wrapper: dict[str, Any]) -> str:
     raw = wrapper.get("raw") if isinstance(wrapper.get("raw"), dict) else {}
     value = str(raw.get("id") or raw.get("source_id") or wrapper.get("source_id") or "").strip()
@@ -106,23 +147,24 @@ def _progress(message: str) -> None:
     print(f"[fulltext] {message}", file=sys.stderr, flush=True)
 
 
+def _request_headers() -> dict[str, str]:
+    return {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+
+
 def _fetch_bytes(
     url: str,
     *,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
     max_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES,
 ) -> bytes:
-    request = Request(
-        url,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
-            ),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-        },
-    )
+    request = Request(url, headers=_request_headers())
     with urlopen(request, timeout=timeout) as response:
         chunks: list[bytes] = []
         total = 0
@@ -229,9 +271,19 @@ def _host(url: str) -> str:
     return urlparse(url).netloc.lower().removeprefix("www.")
 
 
+def _is_doi_url(url: str) -> bool:
+    return _host(url) in {"doi.org", "dx.doi.org"}
+
+
 def _is_stable_fulltext_url(url: str) -> bool:
     host = _host(url)
     return any(host == domain or host.endswith(f".{domain}") for domain in STABLE_FULLTEXT_DOMAINS)
+
+
+def _resolve_redirect_url(url: str, *, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> str:
+    request = Request(url, headers=_request_headers())
+    with urlopen(request, timeout=timeout_seconds) as response:
+        return str(response.geturl() or url)
 
 
 def _browser_fetch_script() -> Path:
@@ -389,23 +441,31 @@ def _enrich_url_record(
     if _has_full_text(wrapper):
         return wrapper, False
     for url, reason in _candidate_urls(wrapper, source):
+        fetch_url = url
         if stable_only and not _is_stable_fulltext_url(url):
-            continue
+            if not _is_doi_url(url):
+                continue
+            try:
+                fetch_url = _resolve_redirect_url(url, timeout_seconds=timeout_seconds)
+            except (HTTPError, URLError, TimeoutError, OSError):
+                continue
+            if not _is_stable_fulltext_url(fetch_url):
+                continue
         text = ""
         source_reason = reason
         try:
-            payload = _fetch_bytes(url, timeout=timeout_seconds, max_bytes=max_download_bytes)
-            text = _text_from_url_payload(payload, url)
+            payload = _fetch_bytes(fetch_url, timeout=timeout_seconds, max_bytes=max_download_bytes)
+            text = _text_from_url_payload(payload, fetch_url)
         except (HTTPError, URLError, TimeoutError, OSError):
-            if browser_fallback and _should_try_browser(url):
-                text = _fetch_text_with_browser(url, timeout_seconds=max(timeout_seconds, DEFAULT_BROWSER_TIMEOUT_SECONDS))
+            if browser_fallback and _should_try_browser(fetch_url):
+                text = _fetch_text_with_browser(fetch_url, timeout_seconds=max(timeout_seconds, DEFAULT_BROWSER_TIMEOUT_SECONDS))
                 source_reason = f"{reason}_browser"
             else:
                 continue
         if len(text.split()) < 80:
-            if browser_fallback and source_reason == reason and _should_try_browser(url):
+            if browser_fallback and source_reason == reason and _should_try_browser(fetch_url):
                 browser_text = _fetch_text_with_browser(
-                    url,
+                    fetch_url,
                     timeout_seconds=max(timeout_seconds, DEFAULT_BROWSER_TIMEOUT_SECONDS),
                 )
                 if len(browser_text.split()) >= 80:
@@ -425,7 +485,7 @@ def _enrich_url_record(
                 "body_excerpt": text[:text_limit],
                 "fullText": text[:text_limit],
                 "full_text_source": source_reason,
-                "full_text_url": url,
+                "full_text_url": fetch_url,
                 "full_text_enriched_at": _utc_now(),
             },
         }
@@ -479,6 +539,8 @@ def enrich_fulltext_in_place(
     checkpoint_every: int = 25,
     browser_fallback: bool = True,
     stable_only: bool = False,
+    field_filter: str | None = None,
+    retry_failed: bool = False,
 ) -> dict[str, Any]:
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"Unsupported source for in-place full-text enrichment: {source}")
@@ -509,14 +571,19 @@ def enrich_fulltext_in_place(
                 break
             if remaining_attempts is not None and remaining_attempts <= 0:
                 break
+            if not _matches_field_filter(record, field_filter):
+                continue
             summary.records_seen += 1
             had_full_text = _has_full_text(record)
             summary.records_with_full_text_before += int(had_full_text)
             if had_full_text:
                 summary.records_with_full_text_after += 1
                 continue
+            if not retry_failed and _has_failed_fulltext_attempt(record, source):
+                continue
             if remaining_attempts is not None:
                 remaining_attempts -= 1
+            did_enrich = False
             try:
                 if source == "arxiv":
                     paper_id = _arxiv_id(record)
@@ -539,8 +606,15 @@ def enrich_fulltext_in_place(
                         stable_only=stable_only,
                     )
             except (HTTPError, URLError, TimeoutError, OSError):
+                records[index] = _mark_fulltext_attempt(record, source=source, status="failed", reason="fetch_error")
+                changed = True
+                changed_since_checkpoint += 1
                 summary.errors += 1
                 _progress(f"{path.name}: failed seen={summary.records_seen} errors={summary.errors}")
+                if checkpoint_every > 0 and changed_since_checkpoint >= checkpoint_every:
+                    _write_jsonl_atomic(path, records)
+                    changed_since_checkpoint = 0
+                    _progress(f"{path.name}: checkpoint enriched={summary.records_enriched}")
                 continue
             if did_enrich:
                 records[index] = enriched
@@ -556,8 +630,16 @@ def enrich_fulltext_in_place(
                     changed_since_checkpoint = 0
                     _progress(f"{path.name}: checkpoint enriched={summary.records_enriched}")
                 time.sleep(sleep_seconds)
-            elif source != "arxiv":
-                summary.errors += 1
+            else:
+                records[index] = _mark_fulltext_attempt(record, source=source, status="no_fulltext", reason="no_extractable_text")
+                changed = True
+                changed_since_checkpoint += 1
+                if source != "arxiv":
+                    summary.errors += 1
+                if checkpoint_every > 0 and changed_since_checkpoint >= checkpoint_every:
+                    _write_jsonl_atomic(path, records)
+                    changed_since_checkpoint = 0
+                    _progress(f"{path.name}: checkpoint enriched={summary.records_enriched}")
         if changed:
             _write_jsonl_atomic(path, records)
         if remaining is not None and remaining <= 0:
@@ -580,6 +662,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-download-bytes", type=int, default=DEFAULT_MAX_DOWNLOAD_BYTES)
     parser.add_argument("--max-attempts", type=int)
     parser.add_argument("--checkpoint-every", type=int, default=25)
+    parser.add_argument("--field-filter")
+    parser.add_argument("--retry-failed", action="store_true")
     parser.add_argument("--no-browser-fallback", action="store_true")
     parser.add_argument("--stable-only", action="store_true")
     return parser
@@ -601,6 +685,8 @@ def main() -> None:
         checkpoint_every=args.checkpoint_every,
         browser_fallback=not args.no_browser_fallback,
         stable_only=args.stable_only,
+        field_filter=args.field_filter,
+        retry_failed=args.retry_failed,
     )
     print(json.dumps(summary, ensure_ascii=False))
 

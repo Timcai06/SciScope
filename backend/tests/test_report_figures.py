@@ -82,10 +82,118 @@ def test_build_report_figures_creates_manifest_and_pdf_assets(tmp_path):
     _write_csv(
         analysis_dir / "author_collaboration_edges.csv",
         [
-            {"author_a": "Ada Chen", "author_b": "Lin Wang", "weight": 2},
-            {"author_a": "Ada Chen", "author_b": "Bo Li", "weight": 1},
+            {
+                "author_a_key": "name:ada",
+                "author_b_key": "name:lin",
+                "author_a": "Ada Chen",
+                "author_b": "Lin Wang",
+                "weight": 5,
+                "paper_count": 5,
+                "weight_fraction_pair": 3.5,
+            },
+            {
+                "author_a_key": "name:ada",
+                "author_b_key": "name:bo",
+                "author_a": "Ada Chen",
+                "author_b": "Bo Li",
+                "weight": 4,
+                "paper_count": 4,
+                "weight_fraction_pair": 2.5,
+            },
+            {
+                "author_a_key": "name:cam",
+                "author_b_key": "name:dee",
+                "author_a": "Cam Zhao",
+                "author_b": "Dee Sun",
+                "weight": 3,
+                "paper_count": 3,
+                "weight_fraction_pair": 2.0,
+            },
         ],
-        ["author_a", "author_b", "weight"],
+        ["author_a_key", "author_b_key", "author_a", "author_b", "weight", "paper_count", "weight_fraction_pair"],
+    )
+    _write_csv(
+        analysis_dir / "author_metrics.csv",
+        [
+            {
+                "author_key": "name:ada",
+                "author": "Ada Chen",
+                "paper_count": 3,
+                "collaborator_count": 2,
+                "degree": 6.0,
+                "betweenness": 0.4,
+                "eigenvector": 0.7,
+                "pagerank": 0.5,
+                "core_number": 2,
+                "community_id": 0,
+                "dominant_field": "computer science",
+            },
+            {
+                "author_key": "name:lin",
+                "author": "Lin Wang",
+                "paper_count": 2,
+                "collaborator_count": 1,
+                "degree": 3.5,
+                "betweenness": 0.1,
+                "eigenvector": 0.5,
+                "pagerank": 0.3,
+                "core_number": 1,
+                "community_id": 0,
+                "dominant_field": "computer science",
+            },
+            {
+                "author_key": "name:bo",
+                "author": "Bo Li",
+                "paper_count": 2,
+                "collaborator_count": 1,
+                "degree": 2.5,
+                "betweenness": 0.1,
+                "eigenvector": 0.4,
+                "pagerank": 0.2,
+                "core_number": 1,
+                "community_id": 1,
+                "dominant_field": "computer science",
+            },
+            {
+                "author_key": "name:cam",
+                "author": "Cam Zhao",
+                "paper_count": 2,
+                "collaborator_count": 1,
+                "degree": 2.0,
+                "betweenness": 0.0,
+                "eigenvector": 0.3,
+                "pagerank": 0.2,
+                "core_number": 1,
+                "community_id": 2,
+                "dominant_field": "materials",
+            },
+            {
+                "author_key": "name:dee",
+                "author": "Dee Sun",
+                "paper_count": 2,
+                "collaborator_count": 1,
+                "degree": 2.0,
+                "betweenness": 0.0,
+                "eigenvector": 0.3,
+                "pagerank": 0.2,
+                "core_number": 1,
+                "community_id": 2,
+                "dominant_field": "materials",
+            },
+        ],
+        [
+            "author_key",
+            "author",
+            "paper_count",
+            "collaborator_count",
+            "degree",
+            "betweenness",
+            "eigenvector",
+            "pagerank",
+            "core_number",
+            "community_id",
+            "dominant_field",
+        ],
     )
 
     summary = build_report_figures(analysis_dir=analysis_dir, output_dir=output_dir)
@@ -101,9 +209,13 @@ def test_build_report_figures_creates_manifest_and_pdf_assets(tmp_path):
         "keyword_evolution",
         "keyword_momentum",
         "author_network_scale",
-        "author_communities",
+        "author_core_network",
         "top_author_collaborations",
     }
+    author_graph = next(row for row in manifest if row["figure_id"] == "author_core_network")
+    assert author_graph["source_table"] == "author_collaboration_edges.csv;author_metrics.csv"
+    top_collaborations = next(row for row in manifest if row["figure_id"] == "top_author_collaborations")
+    assert top_collaborations["source_table"] == "author_collaboration_edges.csv"
     text_coverage = next(row for row in manifest if row["figure_id"] == "text_coverage")
     assert "Full-text records" in text_coverage["message"]
     assert "1" in text_coverage["message"]

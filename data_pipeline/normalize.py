@@ -39,7 +39,7 @@ def normalize_paper(raw: dict[str, Any]) -> dict[str, Any]:
     year_value = raw.get("year")
     year = int(year_value) if str(year_value).strip().isdigit() else None
     field = str(raw.get("field") or "unknown").strip().lower() or "unknown"
-    return {
+    paper = {
         "paper_id": _clean_text(raw.get("paper_id")),
         "title": _clean_text(raw.get("title")),
         "abstract": _clean_text(raw.get("abstract")),
@@ -49,3 +49,6 @@ def normalize_paper(raw: dict[str, Any]) -> dict[str, Any]:
         "field": field,
         "full_text": _clean_text(raw.get("full_text")),
     }
+    if isinstance(raw.get("authorships"), list):
+        paper["authorships"] = raw["authorships"]
+    return paper

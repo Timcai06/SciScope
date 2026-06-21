@@ -69,6 +69,8 @@ def _enrich_fulltext(args: argparse.Namespace) -> None:
         checkpoint_every=args.checkpoint_every,
         browser_fallback=not args.no_browser_fallback,
         stable_only=args.stable_only,
+        field_filter=args.field_filter,
+        retry_failed=args.retry_failed,
     )
     print(json.dumps(summary, ensure_ascii=False))
 
@@ -122,6 +124,8 @@ def build_parser() -> argparse.ArgumentParser:
     enrich_fulltext.add_argument("--max-download-bytes", type=int, default=4_000_000)
     enrich_fulltext.add_argument("--max-attempts", type=int)
     enrich_fulltext.add_argument("--checkpoint-every", type=int, default=25)
+    enrich_fulltext.add_argument("--field-filter")
+    enrich_fulltext.add_argument("--retry-failed", action="store_true")
     enrich_fulltext.add_argument("--no-browser-fallback", action="store_true")
     enrich_fulltext.add_argument("--stable-only", action="store_true")
     enrich_fulltext.set_defaults(func=_enrich_fulltext)

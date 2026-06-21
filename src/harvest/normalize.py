@@ -28,6 +28,60 @@ def _author_names(work: dict[str, Any]) -> list[str]:
     return names
 
 
+def _unique_text(values: list[Any]) -> list[str]:
+    seen: set[str] = set()
+    results: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if text and text not in seen:
+            seen.add(text)
+            results.append(text)
+    return results
+
+
+def _openalex_authorships(work: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for index, authorship in enumerate(work.get("authorships") or [], start=1):
+        author = authorship.get("author") or {}
+        institutions = authorship.get("institutions") or []
+        affiliations = authorship.get("affiliations") or []
+        institution_ids = _unique_text(
+            [institution.get("id") for institution in institutions if isinstance(institution, dict)]
+            + [
+                institution_id
+                for affiliation in affiliations
+                if isinstance(affiliation, dict)
+                for institution_id in affiliation.get("institution_ids") or []
+            ]
+        )
+        institution_names = _unique_text(
+            [institution.get("display_name") for institution in institutions if isinstance(institution, dict)]
+        )
+        country_codes = _unique_text(
+            list(authorship.get("countries") or [])
+            + [institution.get("country_code") for institution in institutions if isinstance(institution, dict)]
+        )
+        display_name = str(author.get("display_name") or authorship.get("raw_author_name") or "").strip()
+        if not display_name:
+            continue
+        rows.append(
+            {
+                "author_id": str(author.get("id") or "").strip(),
+                "display_name": display_name,
+                "raw_author_name": str(authorship.get("raw_author_name") or "").strip(),
+                "orcid": str(author.get("orcid") or authorship.get("raw_orcid") or "").strip(),
+                "author_position": str(authorship.get("author_position") or index).strip(),
+                "author_position_index": index,
+                "is_corresponding": bool(authorship.get("is_corresponding")),
+                "institution_ids": institution_ids,
+                "institutions": institution_names,
+                "country_codes": country_codes,
+                "raw_affiliation_strings": _unique_text(list(authorship.get("raw_affiliation_strings") or [])),
+            }
+        )
+    return rows
+
+
 def _keywords(work: dict[str, Any]) -> list[str]:
     values: list[str] = []
     for keyword in work.get("keywords") or []:
@@ -108,6 +162,7 @@ def openalex_work_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
             "title": work.get("display_name") or work.get("title") or "",
             "abstract": _restore_openalex_abstract(work.get("abstract_inverted_index")),
             "authors": _author_names(work),
+            "authorships": _openalex_authorships(work),
             "year": work.get("publication_year"),
             "keywords": _keywords(work),
             "field": _field(work, str(wrapper.get("field_seed") or "unknown")),

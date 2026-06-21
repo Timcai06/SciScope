@@ -718,157 +718,447 @@ def _plot_topic_year_share(topic_year: pd.DataFrame, output_dir: Path, *, model:
     }
 
 
-def _plot_author_communities(
-    papers: list[dict[str, Any]],
+def _numeric_series(data: pd.DataFrame, column: str, default: float = 0.0) -> pd.Series:
+    if column not in data:
+        return pd.Series([default] * len(data), index=data.index)
+    return pd.to_numeric(data[column], errors="coerce").fillna(default)
+
+
+def _prepare_author_plot_edges(author_edges: pd.DataFrame) -> pd.DataFrame:
+    if author_edges.attrs.get("author_plot_edges_prepared"):
+        return author_edges
+
+    data = author_edges.copy()
+    if data.empty:
+        return data
+    if "author_a_key" not in data:
+        data["author_a_key"] = data["author_a"]
+    if "author_b_key" not in data:
+        data["author_b_key"] = data["author_b"]
+    if "author_a" not in data:
+        data["author_a"] = data["author_a_key"]
+    if "author_b" not in data:
+        data["author_b"] = data["author_b_key"]
+
+    data["author_a_key"] = data["author_a_key"].astype(str)
+    data["author_b_key"] = data["author_b_key"].astype(str)
+    data["author_a"] = data["author_a"].astype(str)
+    data["author_b"] = data["author_b"].astype(str)
+    if "long_author_papers" in data:
+        core_data = data[_numeric_series(data, "long_author_papers", 0.0) == 0].copy()
+        if not core_data.empty:
+            data = core_data
+    data["plot_weight"] = _numeric_series(data, "weight_fraction_pair", 0.0)
+    if not float(data["plot_weight"].max() or 0):
+        data["plot_weight"] = _numeric_series(data, "weight", 0.0)
+    sort_columns = ["plot_weight"]
+    if "paper_count" in data:
+        sort_columns.append("paper_count")
+    data = data.sort_values(sort_columns, ascending=False)
+    data.attrs["author_plot_edges_prepared"] = True
+    return data
+
+
+def _author_metric_lookup(author_metrics: pd.DataFrame) -> dict[str, Any]:
+    if author_metrics.empty:
+        return {}
+    metrics = author_metrics.copy()
+    if "author_key" not in metrics:
+        metrics["author_key"] = metrics["author"]
+    return {str(row["author_key"]): row for _, row in metrics.iterrows()}
+
+
+def _metric_float(metric: Any, column: str, default: float = 0.0) -> float:
+    if metric is None:
+        return default
+    value = pd.to_numeric(metric.get(column), errors="coerce")
+    if pd.isna(value):
+        return default
+    return float(value)
+
+
+def _metric_text(metric: Any, column: str, default: str = "") -> str:
+    if metric is None:
+        return default
+    value = metric.get(column)
+    if pd.isna(value):
+        return default
+    text = str(value).strip()
+    return text or default
+
+
+def _select_core_component_edges(data: pd.DataFrame, *, max_pool_edges: int = 25_000) -> pd.DataFrame:
+    pool = data.head(max_pool_edges).copy()
+    if pool.empty:
+        return pool
+    graph = nx.Graph()
+    for _, row in pool.iterrows():
+        graph.add_edge(str(row["author_a_key"]), str(row["author_b_key"]))
+    components = sorted(nx.connected_components(graph), key=len, reverse=True)
+    if not components:
+        return pool
+    if len(components[0]) >= 30:
+        selected_nodes = set(components[0])
+    else:
+        selected_nodes: set[str] = set()
+        for component in components:
+            if len(component) < 2:
+                continue
+            selected_nodes.update(component)
+            if len(selected_nodes) >= 220:
+                break
+    selected = pool[
+        pool["author_a_key"].astype(str).isin(selected_nodes)
+        & pool["author_b_key"].astype(str).isin(selected_nodes)
+    ].copy()
+    return selected if not selected.empty else pool
+
+
+def _plot_author_core_network(
+    author_edges: pd.DataFrame,
+    author_metrics: pd.DataFrame,
     output_dir: Path,
     *,
-    graph_edges: int = 25_000,
-    communities_per_field: int = 5,
+    max_edges: int = 220,
+    max_labels: int = 8,
 ) -> dict[str, str]:
     from matplotlib import pyplot as plt
 
-    scope = _recent_author_scope(papers)
-    edge_counts = scope["edge_counts"]
-    candidate_edges = len(edge_counts)
-    candidate_authors = len(scope["authors"])
-    valid_papers = int(scope["valid_papers"])
+    data = _prepare_author_plot_edges(author_edges)
+    if data.empty:
+        fig, ax = plt.subplots(figsize=(7.4, 4.4))
+        ax.axis("off")
+        ax.text(0.5, 0.5, "No author collaboration edges available", ha="center", va="center", color=MUTED)
+        save_figure(fig, output_dir / "author_collaboration_network.png")
+        return {
+            "figure_id": "author_core_network",
+            "file": "author_collaboration_network.png",
+            "report_section": "作者合作网络分析",
+            "source_table": "author_collaboration_edges.csv;author_metrics.csv",
+            "message": "作者合作核心网络暂无可绘制边。",
+            "status": "empty",
+        }
+
+    component_edges = _select_core_component_edges(data)
+    data = component_edges.head(max_edges)
+
+    metric_rows = _author_metric_lookup(author_metrics)
+
     graph = nx.Graph()
-    for (author_a, author_b), weight in edge_counts.most_common(graph_edges):
-        graph.add_edge(author_a, author_b, weight=float(weight))
+    labels: dict[str, str] = {}
+    communities: dict[str, str] = {}
+    pagerank: dict[str, float] = {}
+    betweenness: dict[str, float] = {}
+    degree: dict[str, float] = {}
+    for _, row in data.iterrows():
+        source = str(row["author_a_key"])
+        target = str(row["author_b_key"])
+        labels[source] = str(row.get("author_a") or source)
+        labels[target] = str(row.get("author_b") or target)
+        graph.add_edge(source, target, weight=float(row["plot_weight"]))
+    for node in graph.nodes:
+        metric = metric_rows.get(node)
+        if metric is not None:
+            labels[node] = _metric_text(metric, "author", labels.get(node) or node)
+            communities[node] = _metric_text(metric, "community_id", "unknown")
+            pagerank[node] = _metric_float(metric, "pagerank")
+            betweenness[node] = _metric_float(metric, "betweenness")
+            degree[node] = _metric_float(metric, "degree")
+        else:
+            communities[node] = "unknown"
+            degree[node] = float(graph.degree(node, weight="weight"))
 
-    communities = (
-        list(nx.algorithms.community.louvain_communities(graph, weight="weight", seed=42))
-        if graph.number_of_edges()
-        else []
-    )
-    author_to_community = {
-        author: index
-        for index, community in enumerate(communities)
-        for author in community
+    fig, ax = plt.subplots(figsize=(8.6, 6.5))
+    if graph.number_of_edges():
+        pos = nx.spring_layout(
+            graph,
+            seed=42,
+            weight="weight",
+            k=1.05 / math.sqrt(max(graph.number_of_nodes(), 1)),
+            iterations=160,
+            scale=1.35,
+        )
+    else:
+        pos = nx.circular_layout(graph)
+
+    max_weight = max((float(data.get("weight") or 0) for _, _, data in graph.edges(data=True)), default=1.0)
+    for source, target, edge_data in graph.edges(data=True):
+        weight = float(edge_data.get("weight") or 0)
+        ax.plot(
+            [pos[source][0], pos[target][0]],
+            [pos[source][1], pos[target][1]],
+            color=CHARCOAL,
+            alpha=0.16 + min(weight / max_weight, 1) * 0.3,
+            linewidth=0.45 + min(weight / max_weight, 1) * 2.1,
+            zorder=1,
+        )
+
+    unique_communities = sorted({communities.get(node, "unknown") for node in graph.nodes})
+    palette = [CHARCOAL, GRAPHITE, STEEL, BLUEGREY, MINTGREY, "#735f4b", "#4c7c6f", "#816b8d"]
+    community_colors = {
+        community: palette[index % len(palette)]
+        for index, community in enumerate(unique_communities)
     }
+    max_degree = max(degree.values(), default=1.0) or 1.0
+    xs = [pos[node][0] for node in graph.nodes]
+    ys = [pos[node][1] for node in graph.nodes]
+    sizes = [35 + 460 * math.sqrt(max(degree.get(node, 0), 0) / max_degree) for node in graph.nodes]
+    colors = [community_colors.get(communities.get(node, "unknown"), MUTED) for node in graph.nodes]
+    ax.scatter(xs, ys, s=sizes, c=colors, edgecolors="white", linewidths=0.55, alpha=0.92, zorder=3)
 
-    community_keywords: dict[int, Counter[str]] = defaultdict(Counter)
-    community_fields: dict[int, Counter[str]] = defaultdict(Counter)
-    community_papers: dict[int, set[str]] = defaultdict(set)
-    for paper in _recent_papers(papers):
-        authors = {str(author).strip() for author in paper.get("authors") or []}
-        community_ids = {author_to_community[author] for author in authors if author in author_to_community}
-        if not community_ids:
-            continue
-        paper_key = str(paper.get("paper_id") or paper.get("title") or id(paper))
-        for community_id in community_ids:
-            community_papers[community_id].add(paper_key)
-            community_fields[community_id][_contest_field_label(paper)] += 1
-            for keyword in paper.get("keywords") or []:
-                community_keywords[community_id][str(keyword).strip().lower()] += 1
-
-    rows: list[dict[str, Any]] = []
-    for community_id, community in enumerate(communities):
-        subgraph = graph.subgraph(community)
-        strength = sum(float(data.get("weight") or 0) for _, _, data in subgraph.edges(data=True))
-        if strength <= 0:
-            continue
-        dominant_field = (
-            community_fields[community_id].most_common(1)[0][0]
-            if community_fields.get(community_id)
-            else "Cross-field"
+    label_nodes = sorted(
+        graph.nodes,
+        key=lambda node: (betweenness.get(node, 0), pagerank.get(node, 0), degree.get(node, 0)),
+        reverse=True,
+    )[:max_labels]
+    for node in label_nodes:
+        x, y = pos[node]
+        center_x = float(np.mean(xs)) if xs else 0.0
+        center_y = float(np.mean(ys)) if ys else 0.0
+        dx = x - center_x
+        dy = y - center_y
+        distance = math.hypot(dx, dy) or 1.0
+        label_x = x + dx / distance * 0.14
+        label_y = y + dy / distance * 0.14
+        ax.annotate(
+            _wrap_label(labels.get(node, node), width=16),
+            xy=(x, y),
+            xytext=(label_x, label_y),
+            arrowprops={"arrowstyle": "-", "color": "0.45", "lw": 0.35, "alpha": 0.65},
+            bbox={"boxstyle": "round,pad=0.16", "fc": "white", "ec": "0.75", "lw": 0.35, "alpha": 0.84},
+            fontsize=5.4,
+            ha="center",
+            va="center",
+            color=BLACK,
+            zorder=5,
         )
-        top_members = sorted(subgraph.degree(weight="weight"), key=lambda item: item[1], reverse=True)[:2]
-        fallback = " / ".join(author for author, _ in top_members) or "author community"
-        rows.append(
-            {
-                "community_id": community_id,
-                "field": dominant_field,
-                "members": len(community),
-                "papers": len(community_papers.get(community_id, set())),
-                "strength": strength,
-                "topic": _topic_label(community_keywords[community_id], fallback),
-                "fallback": fallback,
-            }
-        )
-
-    field_order = ["Computer Science", "Biomedicine", "Materials", "Cross-field"]
-    grouped: dict[str, list[dict[str, Any]]] = {field: [] for field in field_order}
-    for row in sorted(rows, key=lambda item: (-item["papers"], -item["strength"])):
-        bucket = grouped.setdefault(row["field"], [])
-        if len(bucket) < communities_per_field:
-            bucket.append(row)
-
-    active_fields = [field for field in field_order if grouped.get(field)]
-    used_labels: Counter[str] = Counter()
-
-    fig, ax = plt.subplots(figsize=(8.2, 5.7))
-    shade_by_field = BUBBLE_FIELD_COLORS
-    for x_index, field in enumerate(active_fields):
-        field_rows = grouped.get(field, [])
-        fill_color = shade_by_field.get(field, "0.75")
-        for y_index, row in enumerate(field_rows):
-            y = (len(field_rows) - y_index) * 1.35
-            size = 280 + min(row["papers"], 120) * 7 + min(row["strength"], 40) * 12
-            ax.scatter(
-                x_index,
-                y,
-                s=size,
-                c=fill_color,
-                edgecolors="white",
-                linewidths=0.9,
-                zorder=3,
-            )
-            topic = _compact_topic(row["topic"])
-            used_labels[topic] += 1
-            if used_labels[topic] > 1:
-                topic = _compact_topic(row["fallback"])
-            label = f"{_wrap_label(topic, width=13)}\n{row['members']} authors\n{row['papers']} papers"
-            ax.text(
-                x_index,
-                y,
-                label,
-                ha="center",
-                va="center",
-                fontsize=5.0,
-                color=BLACK,
-                zorder=4,
-            )
-    ax.set_title(f"Author Collaboration Communities (core {min(graph_edges, candidate_edges):,}/{candidate_edges:,} edges)")
-    ax.set_xticks(range(len(active_fields)), active_fields)
+    ax.set_title(f"Core Author Collaboration Network (component {len(data):,}/{len(author_edges):,} edges)")
+    ax.set_xticks([])
     ax.set_yticks([])
-    ax.grid(axis="x", linestyle="--", color="0.86")
-    ax.set_xlim(-0.6, max(len(active_fields) - 0.4, 0.6))
-    max_rows = max((len(items) for items in grouped.values()), default=1)
-    ax.set_ylim(0.3, max_rows * 1.35 + 0.9)
-    ax.set_xlabel("Dominant Community Field")
+    ax.set_frame_on(False)
+    ax.margins(0.14)
     ax.text(
         0.01,
         0.015,
-        f"Window: {len(_recent_papers(papers)):,}/{len(papers):,} records. "
-        f"Scope: {valid_papers:,} papers, {candidate_authors:,} authors, {candidate_edges:,} weighted coauthor edges.",
+        "Labels show the top bridge/core authors only. Node size: weighted degree/PageRank proxy. Edge width: fractional coauthor weight.",
         transform=ax.transAxes,
-        fontsize=6.8,
+        fontsize=6.5,
         color="0.25",
     )
     save_figure(fig, output_dir / "author_collaboration_network.png")
     return {
-        "figure_id": "author_communities",
+        "figure_id": "author_core_network",
         "file": "author_collaboration_network.png",
         "report_section": "作者合作网络分析",
-        "source_table": "papers_clean.json",
-        "message": "将近五年合作网络聚合为主题社区气泡, 避免静态全量网络不可读。",
+        "source_table": "author_collaboration_edges.csv;author_metrics.csv",
+        "message": "展示核心作者实体合作网络, 节点颜色来自 Louvain 社区, 边宽来自分数化合作权重。",
         "status": "final",
     }
 
 
-def _plot_author_network_scale(papers: list[dict[str, Any]], output_dir: Path, *, graph_edges: int = 25_000) -> dict[str, str]:
+def _component_plot_slices(
+    data: pd.DataFrame,
+    *,
+    max_pool_edges: int = 60_000,
+    max_components: int = 16,
+    max_nodes_per_component: int = 10,
+    max_edges_per_component: int = 16,
+) -> list[dict[str, Any]]:
+    pool = data.head(max_pool_edges).copy()
+    if pool.empty:
+        return []
+
+    graph = nx.Graph()
+    for _, row in pool.iterrows():
+        source = str(row["author_a_key"])
+        target = str(row["author_b_key"])
+        if not source or not target or source == target:
+            continue
+        graph.add_edge(source, target, weight=float(row["plot_weight"]))
+    if graph.number_of_edges() == 0:
+        return []
+
+    slices: list[dict[str, Any]] = []
+    for component in nx.connected_components(graph):
+        if len(component) < 2:
+            continue
+        component_nodes = set(component)
+        component_edges = pool[
+            pool["author_a_key"].isin(component_nodes)
+            & pool["author_b_key"].isin(component_nodes)
+        ].copy()
+        if component_edges.empty:
+            continue
+        node_scores: Counter[str] = Counter()
+        for _, edge in component_edges.iterrows():
+            weight = float(edge["plot_weight"])
+            node_scores[str(edge["author_a_key"])] += weight
+            node_scores[str(edge["author_b_key"])] += weight
+        selected_nodes = {
+            node
+            for node, _ in sorted(node_scores.items(), key=lambda item: item[1], reverse=True)[:max_nodes_per_component]
+        }
+        plot_edges = component_edges[
+            component_edges["author_a_key"].isin(selected_nodes)
+            & component_edges["author_b_key"].isin(selected_nodes)
+        ].head(max_edges_per_component)
+        if plot_edges.empty:
+            plot_edges = component_edges.head(1)
+        slices.append(
+            {
+                "nodes_total": len(component_nodes),
+                "edges_total": len(component_edges),
+                "total_weight": float(component_edges["plot_weight"].sum()),
+                "plot_edges": plot_edges,
+                "node_scores": node_scores,
+            }
+        )
+    return sorted(slices, key=lambda item: (item["total_weight"], item["nodes_total"]), reverse=True)[:max_components]
+
+
+def _plot_author_component_overview(
+    author_edges: pd.DataFrame,
+    author_metrics: pd.DataFrame,
+    output_dir: Path,
+    *,
+    max_components: int = 16,
+) -> dict[str, str]:
     from matplotlib import pyplot as plt
 
-    scope = _recent_author_scope(papers)
+    data = _prepare_author_plot_edges(author_edges)
+    slices = _component_plot_slices(data, max_components=max_components)
+    output_file = output_dir / "author_component_overview.png"
+    if not slices:
+        fig, ax = plt.subplots(figsize=(7.4, 4.4))
+        ax.axis("off")
+        ax.text(0.5, 0.5, "No author collaboration components available", ha="center", va="center", color=MUTED)
+        save_figure(fig, output_file)
+        return {
+            "figure_id": "author_component_overview",
+            "file": output_file.name,
+            "report_section": "作者合作网络分析",
+            "source_table": "author_collaboration_edges.csv;author_metrics.csv",
+            "message": "author component overview 暂无可绘制组件。",
+            "status": "empty",
+        }
+
+    metric_rows = _author_metric_lookup(author_metrics)
+    columns = 4
+    rows = math.ceil(len(slices) / columns)
+    fig, axes = plt.subplots(rows, columns, figsize=(8.6, 1.86 * rows + 0.55), squeeze=False)
+    fig.suptitle("Author Collaboration Component Overview", fontsize=10)
+    palette = [CHARCOAL, GRAPHITE, STEEL, BLUEGREY, MINTGREY, "#735f4b", "#4c7c6f", "#816b8d"]
+
+    for index, item in enumerate(slices):
+        ax = axes[index // columns][index % columns]
+        plot_edges = item["plot_edges"]
+        component_graph = nx.Graph()
+        labels: dict[str, str] = {}
+        communities: dict[str, str] = {}
+        for _, edge in plot_edges.iterrows():
+            source = str(edge["author_a_key"])
+            target = str(edge["author_b_key"])
+            component_graph.add_edge(source, target, weight=float(edge["plot_weight"]))
+            labels[source] = str(edge.get("author_a") or source)
+            labels[target] = str(edge.get("author_b") or target)
+        for node in component_graph.nodes:
+            metric = metric_rows.get(node)
+            labels[node] = _metric_text(metric, "author", labels.get(node, node))
+            communities[node] = _metric_text(metric, "community_id", "unknown")
+
+        if component_graph.number_of_nodes() <= 2:
+            pos = nx.circular_layout(component_graph)
+        else:
+            pos = nx.spring_layout(
+                component_graph,
+                seed=42 + index,
+                weight="weight",
+                k=0.95 / math.sqrt(max(component_graph.number_of_nodes(), 1)),
+                iterations=90,
+            )
+        max_weight = max((float(edge.get("weight") or 0) for _, _, edge in component_graph.edges(data=True)), default=1.0)
+        for source, target, edge_data in component_graph.edges(data=True):
+            weight = float(edge_data.get("weight") or 0)
+            ax.plot(
+                [pos[source][0], pos[target][0]],
+                [pos[source][1], pos[target][1]],
+                color=CHARCOAL,
+                alpha=0.28 + min(weight / max_weight, 1) * 0.28,
+                linewidth=0.5 + min(weight / max_weight, 1) * 1.7,
+                zorder=1,
+            )
+
+        unique_communities = sorted({communities.get(node, "unknown") for node in component_graph.nodes})
+        community_colors = {
+            community: palette[community_index % len(palette)]
+            for community_index, community in enumerate(unique_communities)
+        }
+        node_scores = item["node_scores"]
+        max_score = max((node_scores.get(str(node), 0) for node in component_graph.nodes), default=1.0) or 1.0
+        xs = [pos[node][0] for node in component_graph.nodes]
+        ys = [pos[node][1] for node in component_graph.nodes]
+        sizes = [42 + 170 * math.sqrt(max(node_scores.get(str(node), 0), 0) / max_score) for node in component_graph.nodes]
+        colors = [community_colors.get(communities.get(node, "unknown"), MUTED) for node in component_graph.nodes]
+        ax.scatter(xs, ys, s=sizes, c=colors, edgecolors="white", linewidths=0.45, alpha=0.92, zorder=3)
+
+        top_node = max(component_graph.nodes, key=lambda node: node_scores.get(str(node), 0))
+        ax.set_title(f"C{index + 1}: {item['nodes_total']} nodes / {item['edges_total']} edges", fontsize=6.8)
+        ax.text(
+            0.02,
+            0.02,
+            _wrap_label(labels.get(top_node, top_node), width=18),
+            transform=ax.transAxes,
+            fontsize=5.6,
+            color=BLACK,
+            bbox={"boxstyle": "round,pad=0.14", "fc": "white", "ec": "0.82", "lw": 0.25, "alpha": 0.82},
+            zorder=4,
+        )
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_frame_on(False)
+        ax.margins(0.18)
+
+    for index in range(len(slices), rows * columns):
+        axes[index // columns][index % columns].axis("off")
+    fig.text(
+        0.01,
+        0.01,
+        "Each panel is a high-weight connected component; only its strongest local edges and one anchor author are labeled.",
+        fontsize=6.4,
+        color="0.25",
+    )
+    save_figure(fig, output_file)
+    return {
+        "figure_id": "author_component_overview",
+        "file": output_file.name,
+        "report_section": "作者合作网络分析",
+        "source_table": "author_collaboration_edges.csv;author_metrics.csv",
+        "message": f"author component overview 展示 {len(slices)} 个高权重合作组件, 用于补充核心单组件网络。",
+        "status": "final",
+    }
+
+
+def _plot_author_network_scale(
+    papers: list[dict[str, Any]],
+    output_dir: Path,
+    diagnostics: pd.DataFrame | None = None,
+    *,
+    graph_edges: int = 25_000,
+) -> dict[str, str]:
+    from matplotlib import pyplot as plt
+
+    diagnostic_map = {}
+    if diagnostics is not None and not diagnostics.empty:
+        diagnostic_map = {str(row["metric"]): row["value"] for _, row in diagnostics.iterrows()}
+    scope = _recent_author_scope(papers) if not diagnostic_map else {}
     recent_papers = len(_recent_papers(papers))
     total_records = len(papers)
     values = [
         recent_papers,
-        int(scope["valid_papers"]),
-        len(scope["authors"]),
-        len(scope["edge_counts"]),
-        min(graph_edges, len(scope["edge_counts"])),
+        int(diagnostic_map.get("papers_with_authors") or scope.get("valid_papers") or 0),
+        int(diagnostic_map.get("unique_author_keys") or len(scope.get("authors", []))),
+        int(diagnostic_map.get("coauthor_edges") or len(scope.get("edge_counts", []))),
+        int(diagnostic_map.get("core_graph_edges") or min(graph_edges, len(scope.get("edge_counts", [])))),
     ]
     labels = [
         "Recent papers",
@@ -903,14 +1193,16 @@ def _plot_author_network_scale(papers: list[dict[str, Any]], output_dir: Path, *
     }
 
 
-def _plot_top_author_collaborations(papers: list[dict[str, Any]], output_dir: Path, *, top_n: int = 20) -> dict[str, str]:
+def _plot_top_author_collaborations(author_edges: pd.DataFrame, output_dir: Path, *, top_n: int = 20) -> dict[str, str]:
     from matplotlib import pyplot as plt
 
-    edge_counts = _recent_author_edges(papers)
-    candidate_edges = len(edge_counts)
-    top_edges = edge_counts.most_common(top_n)
-    labels = [_wrap_label(f"{author_a} / {author_b}", width=32) for (author_a, author_b), _ in top_edges]
-    values = [weight for _, weight in top_edges]
+    data = _prepare_author_plot_edges(author_edges)
+    if data.empty:
+        data = pd.DataFrame(columns=["author_a", "author_b", "plot_weight"])
+    data = data.head(top_n)
+    candidate_edges = len(author_edges)
+    labels = [_wrap_label(f"{row['author_a']} / {row['author_b']}", width=32) for _, row in data.iterrows()]
+    values = [float(value) for value in data["plot_weight"]]
 
     fig, ax = plt.subplots(figsize=(7.6, 6.2))
     positions = np.arange(len(labels))
@@ -921,7 +1213,7 @@ def _plot_top_author_collaborations(papers: list[dict[str, Any]], output_dir: Pa
     ax.set_xlabel("Fractional Collaboration Weight")
     ax.set_title(
         f"Top Repeated Author Collaborations "
-        f"(top {len(top_edges)}/{_format_count(candidate_edges)} weighted edges)"
+        f"(top {len(data)}/{_format_count(candidate_edges)} weighted edges)"
     )
     ax.grid(axis="x", linestyle="--")
     max_value = max(values) if values else 1
@@ -932,8 +1224,8 @@ def _plot_top_author_collaborations(papers: list[dict[str, Any]], output_dir: Pa
         "figure_id": "top_author_collaborations",
         "file": "top_author_collaborations.png",
         "report_section": "作者合作网络分析",
-        "source_table": "papers_clean.json",
-        "message": "列出近五年重复出现的高权重作者合作关系, 解释合作边权来源。",
+        "source_table": "author_collaboration_edges.csv",
+        "message": "列出高权重作者实体合作关系, 使用分析表中的分数化边权。",
         "status": "final",
     }
 
@@ -1002,6 +1294,9 @@ def build_report_figures(
     keyword_year = _read_csv(analysis_path / "keyword_year_matrix.csv")
     keyword_trends = _read_csv(analysis_path / "keyword_trends.csv")
     topic_year = _read_csv(analysis_path / "topic_year_share.csv")
+    author_edges = _read_csv(analysis_path / "author_collaboration_edges.csv")
+    author_metrics = _read_csv(analysis_path / "author_metrics.csv")
+    author_diagnostics = _read_csv(analysis_path / "author_network_diagnostics.csv")
 
     manifest: list[dict[str, str]] = []
     if not quality.empty:
@@ -1023,9 +1318,12 @@ def build_report_figures(
     if not topic_year.empty:
         manifest.append(_plot_topic_year_share(topic_year, output_path))
     if papers:
-        manifest.append(_plot_author_network_scale(papers, output_path))
-        manifest.append(_plot_author_communities(papers, output_path))
-        manifest.append(_plot_top_author_collaborations(papers, output_path))
+        manifest.append(_plot_author_network_scale(papers, output_path, author_diagnostics))
+    if not author_edges.empty:
+        author_plot_edges = _prepare_author_plot_edges(author_edges)
+        manifest.append(_plot_author_core_network(author_plot_edges, author_metrics, output_path))
+        manifest.append(_plot_author_component_overview(author_plot_edges, author_metrics, output_path))
+        manifest.append(_plot_top_author_collaborations(author_plot_edges, output_path))
 
     _write_manifest(output_path / "figure_manifest.csv", manifest)
     return {

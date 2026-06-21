@@ -1,7 +1,7 @@
 figure_id,file,report_section,source_table,message,status
 source_records,source_records_bar.png,数据底座与采集状态,source_quality_report.csv,展示当前六个公开来源的基线采集规模。,final
 source_quality,source_quality_matrix.png,数据底座与采集状态,source_quality_report.csv,"比较各来源关键字段完整度, 支撑数据可信度说明。",final
-text_coverage,abstract_fulltext_coverage.png,数据质量与可信度审计,source_quality_report.csv,"Full-text records: 14,154 / 168,447. 区分摘要级分析和全文级 RAG 的证据边界。",final
+text_coverage,abstract_fulltext_coverage.png,数据质量与可信度审计,source_quality_report.csv,"Full-text records: 14,895 / 168,447. 区分摘要级分析和全文级 RAG 的证据边界。",final
 year_distribution,year_distribution.png,文献分布分析,papers_clean.json,"聚焦近五年有效年份, 过滤历史和未来年份噪声。",final
 source_year_heatmap,source_year_heatmap.png,文献分布分析,papers_clean.json,"展示近五年来源-年份覆盖规模, 直接暴露采集年份偏置。",final
 field_distribution,field_distribution.png,文献分布分析,papers_clean.json,按赛题三大领域口径展示当前语料结构。,final
@@ -12,5 +12,5 @@ keyword_momentum,keyword_momentum.png,关键词演化与热点趋势,keyword_yea
 keyword_normalized_trends,keyword_normalized_trends.png,关键词演化与热点趋势,keyword_trends.csv,"使用融合信号的年度文档占比展示关键词趋势, 避免关键词字段滞后误导。",final
 topic_year_share,topic_year_share.png,关键词演化与热点趋势,topic_year_share.csv,展示主题模型基线中各主题在年度语料中的占比变化。,final
 author_network_scale,author_network_scale_funnel.png,作者合作网络分析,papers_clean.json,展示从近五年论文到核心作者合作图的规模压缩过程。,final
-author_communities,author_collaboration_network.png,作者合作网络分析,papers_clean.json,"将近五年合作网络聚合为主题社区气泡, 避免静态全量网络不可读。",final
-top_author_collaborations,top_author_collaborations.png,作者合作网络分析,papers_clean.json,"列出近五年重复出现的高权重作者合作关系, 解释合作边权来源。",final
+author_core_network,author_collaboration_network.png,作者合作网络分析,author_collaboration_edges.csv;author_metrics.csv,"展示核心作者实体合作网络, 节点颜色来自 Louvain 社区, 边宽来自分数化合作权重。",final
+top_author_collaborations,top_author_collaborations.png,作者合作网络分析,author_collaboration_edges.csv,"列出高权重作者实体合作关系, 使用分析表中的分数化边权。",final
