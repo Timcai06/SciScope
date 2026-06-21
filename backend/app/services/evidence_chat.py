@@ -2,6 +2,7 @@ import re
 from typing import Any
 
 from backend.app.models.schemas import ChatResponse, EvidenceItem
+from backend.app.services import retrieval_service
 from backend.app.services.deepseek_provider import LLMProvider, get_llm_provider
 
 EVIDENCE_LIMIT = 3
@@ -13,7 +14,11 @@ def answer_question(
     papers: list[dict[str, Any]],
     provider: LLMProvider | None = None,
 ) -> ChatResponse:
-    evidence = _retrieve_evidence(question, papers, limit=EVIDENCE_LIMIT)
+    evidence = _hybrid_evidence(question, limit=EVIDENCE_LIMIT)
+    if evidence is None:
+        # Fall back to the in-memory matcher (sample corpus / DB unavailable).
+        evidence = _retrieve_evidence(question, papers, limit=EVIDENCE_LIMIT)
+
     if not evidence:
         return ChatResponse(
             answer="No matching evidence found for this question in the current corpus.",
@@ -26,6 +31,28 @@ def answer_question(
     answer = llm.complete(prompt)
 
     return ChatResponse(answer=answer, evidence=evidence, confidence="medium")
+
+
+def _hybrid_evidence(question: str, limit: int) -> list[EvidenceItem] | None:
+    """Use the PostgreSQL + pgvector hybrid retriever when available.
+
+    Returns ``None`` (not an empty list) when the service layer is unavailable,
+    so the caller can fall back to the in-memory matcher.
+    """
+    if not retrieval_service.is_available():
+        return None
+    retrieved = retrieval_service.search(question, limit=limit)
+    return [
+        EvidenceItem(
+            paper_id=item.paper_id,
+            title=item.title,
+            year=item.year,
+            reason=f"Matched via {', '.join(item.matched_by)} (score {item.score})",
+            authors=item.authors,
+            snippet=item.snippet,
+        )
+        for item in retrieved
+    ]
 
 
 def _retrieve_evidence(
@@ -61,11 +88,18 @@ def _retrieve_evidence(
 
 
 def _build_prompt(question: str, evidence: list[EvidenceItem]) -> str:
-    evidence_lines = [
-        f"- {item.title} ({item.year or 'unknown year'}): {item.reason}" for item in evidence
-    ]
+    evidence_lines = []
+    for index, item in enumerate(evidence, start=1):
+        snippet = (item.snippet or item.reason).strip()
+        evidence_lines.append(
+            f"[{index}] {item.title} ({item.year or 'unknown year'}): {snippet}"
+        )
     evidence_block = "\n".join(evidence_lines) if evidence_lines else "- No matching evidence"
-    return f"Question: {question}\nEvidence:\n{evidence_block}\nAnswer with citations in mind."
+    return (
+        "You are answering a research question grounded ONLY in the evidence below. "
+        "Cite sources as [n]. If the evidence is insufficient, say so.\n\n"
+        f"Question: {question}\n\nEvidence:\n{evidence_block}\n\nGrounded answer:"
+    )
 
 
 def _text_terms(text: str) -> set[str]:

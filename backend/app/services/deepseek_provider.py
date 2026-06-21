@@ -50,6 +50,7 @@ class LocalOpenAIProvider:
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0.2,
+            "max_tokens": 512,
         }
         headers = {"Content-Type": "application/json"}
         if self.settings.local_llm_api_key:

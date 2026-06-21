@@ -17,6 +17,8 @@ class Settings:
     local_llm_model: str
     local_llm_api_key: str
     use_mock_llm: bool
+    db_dsn: str
+    embedding_model: str
 
 
 def _parse_bool(value: str | None, default: bool) -> bool:
@@ -51,4 +53,6 @@ def get_settings() -> Settings:
         local_llm_model=os.getenv("LOCAL_LLM_MODEL", "mlx-community/Qwen2.5-7B-Instruct-4bit"),
         local_llm_api_key=os.getenv("LOCAL_LLM_API_KEY", ""),
         use_mock_llm=_parse_bool(os.getenv("SCISCOPE_USE_MOCK_LLM"), default=True),
+        db_dsn=os.getenv("SCISCOPE_DB_DSN", os.getenv("SCISCOPE_DATABASE_URL", "")),
+        embedding_model=os.getenv("SCISCOPE_EMBEDDING_MODEL", "intfloat/multilingual-e5-base"),
     )
