@@ -10,6 +10,7 @@ from src.infra.chunks import paper_uid, stable_uid
 
 
 DEFAULT_BATCH_SIZE = 1000
+DEFAULT_MAX_AUTHORS_FOR_EDGES = 50
 
 
 class PostgresDependencyError(RuntimeError):
@@ -18,6 +19,12 @@ class PostgresDependencyError(RuntimeError):
 
 def normalized_name(value: str) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+
+def _sanitize_row(row: tuple[Any, ...]) -> tuple[Any, ...]:
+    # PostgreSQL text/jsonb columns reject NUL (0x00) bytes that occasionally
+    # survive in scraped full text. Strip them from every string element.
+    return tuple(value.replace("\x00", "") if isinstance(value, str) else value for value in row)
 
 
 def author_uid(name: str) -> str:
@@ -55,6 +62,7 @@ def import_postgres(
     papers_path: str | Path = "data/processed/papers_corpus.json",
     chunks_path: str | Path = "data/processed/paper_chunks.jsonl",
     batch_size: int = DEFAULT_BATCH_SIZE,
+    max_authors_for_edges: int = DEFAULT_MAX_AUTHORS_FOR_EDGES,
 ) -> dict[str, int]:
     try:
         import psycopg
@@ -107,7 +115,13 @@ def import_postgres(
                     keyword_rows[k_uid] = (k_uid, str(keyword), norm)
                     paper_keyword_rows.append((p_uid, k_uid))
 
-                for author_a, author_b in combinations(sorted(set(author_ids)), 2):
+                unique_author_ids = sorted(set(author_ids))
+                if len(unique_author_ids) > max_authors_for_edges:
+                    # Skip pathological mega-author papers (e.g. 2900+ authors) whose
+                    # pairwise combinations would explode the coauthor edge table.
+                    continue
+
+                for author_a, author_b in combinations(unique_author_ids, 2):
                     key = (author_a, author_b)
                     edge = edge_weights.setdefault(key, {"weight": 0, "first_year": year, "last_year": year})
                     edge["weight"] = int(edge["weight"] or 0) + 1
@@ -149,7 +163,7 @@ def import_postgres(
 
 def _paper_row(paper: dict[str, Any]) -> tuple[Any, ...]:
     uid = paper_uid(paper)
-    return (
+    return _sanitize_row((
         uid,
         str(paper.get("source") or ""),
         str(paper.get("source_id") or paper.get("paper_id") or uid),
@@ -171,11 +185,11 @@ def _paper_row(paper: dict[str, Any]) -> tuple[Any, ...]:
             },
             ensure_ascii=False,
         ),
-    )
+    ))
 
 
 def _chunk_row(chunk: dict[str, Any]) -> tuple[Any, ...]:
-    return (
+    return _sanitize_row((
         str(chunk.get("chunk_uid") or ""),
         str(chunk.get("paper_uid") or ""),
         int(chunk.get("chunk_index") or 0),
@@ -184,7 +198,7 @@ def _chunk_row(chunk: dict[str, Any]) -> tuple[Any, ...]:
         str(chunk.get("text") or ""),
         int(chunk.get("token_estimate") or 0),
         json.dumps(chunk.get("metadata") or {}, ensure_ascii=False),
-    )
+    ))
 
 
 def _doi_from_paper(paper: dict[str, Any]) -> str | None:

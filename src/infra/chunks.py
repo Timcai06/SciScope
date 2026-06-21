@@ -59,6 +59,21 @@ def split_text(text: str, *, max_chars: int = DEFAULT_MAX_CHARS, overlap_chars: 
     return [chunk for chunk in chunks if chunk]
 
 
+_PDF_GARBAGE_RE = re.compile(r"\d+\s+0\s+obj|endobj|/Type\s*/|stream\s.*endstream|xref\b", re.DOTALL)
+
+
+def looks_like_pdf_garbage(text: str) -> bool:
+    """True when 'full text' is actually raw PDF structure (failed extraction).
+
+    Such text (object tables, xref, streams) pollutes chunks/embeddings and makes
+    small LLMs regurgitate binary noise, so it must not be chunked.
+    """
+    if not text:
+        return False
+    head = text[:4000]
+    return bool(_PDF_GARBAGE_RE.search(head))
+
+
 def build_paper_chunks(
     paper: dict[str, Any],
     *,
@@ -67,9 +82,12 @@ def build_paper_chunks(
 ) -> list[dict[str, Any]]:
     uid = paper_uid(paper)
     chunks: list[dict[str, Any]] = []
+    full_text = paper.get("full_text") or ""
+    if looks_like_pdf_garbage(str(full_text)):
+        full_text = ""  # drop failed-extraction PDF binary so it is never chunked
     candidates = [
         ("title_abstract", "abstract", "\n".join(part for part in [paper.get("title"), paper.get("abstract")] if part)),
-        ("full_text", "full_text", paper.get("full_text") or ""),
+        ("full_text", "full_text", full_text),
         ("keywords", "keywords", ", ".join(str(keyword) for keyword in paper.get("keywords") or [] if keyword)),
     ]
 
