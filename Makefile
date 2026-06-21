@@ -53,6 +53,11 @@ ANALYSIS_OUTPUT_DIR ?= data/analysis
 REPORT_ASSETS_DIR ?= output/assets/sciscope_data_report
 YEAR_BALANCE_TARGET ?= 10000
 POSTGRES_DSN ?= postgresql://tim@localhost:5432/sciscope
+EMBEDDING_MODEL ?= intfloat/multilingual-e5-base
+EMBEDDER_PATH ?= models/embedder_local/multilingual-e5-base
+EMBED_BATCH_SIZE ?= 256
+TOPIC_COUNT ?= 40
+EVAL_SAMPLE ?= 200
 RAG_CHUNKS_PATH ?= data/processed/paper_chunks.jsonl
 RAG_CHUNKS_SUMMARY_PATH ?= data/processed/paper_chunks.summary.json
 VLLM_HOST ?= 127.0.0.1
@@ -80,7 +85,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build chat topic-model eval-retrieval report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -133,7 +138,7 @@ install: install-backend install-frontend
 
 install-backend:
 	$(PYTHON) -m pip install --upgrade pip
-	$(PYTHON) -m pip install fastapi uvicorn pydantic pandas numpy scikit-learn networkx matplotlib pytest httpx 'psycopg[binary]'
+	$(PYTHON) -m pip install fastapi uvicorn pydantic pandas numpy scikit-learn networkx matplotlib pytest httpx 'psycopg[binary]' pgvector sentence-transformers
 
 install-frontend:
 	cd frontend && npm install
@@ -248,6 +253,36 @@ postgres-load: rag-chunks
 	$(PYTHON) -m src.infra.cli load-postgres --dsn $(POSTGRES_DSN) --papers $(PROCESSED_CORPUS_PATH) --chunks $(RAG_CHUNKS_PATH)
 
 postgres-refresh: data-layer-refresh postgres-schema postgres-load
+
+pgvector-schema:
+	psql "$(POSTGRES_DSN)" -v ON_ERROR_STOP=1 -f infra/postgres/pgvector.sql
+
+embeddings:
+	$(PYTHON) -m src.models.build_embeddings --dsn $(POSTGRES_DSN) --chunks $(RAG_CHUNKS_PATH) --batch-size $(EMBED_BATCH_SIZE)
+
+trend-model:
+	$(PYTHON) -m src.models.trends --analysis-dir $(ANALYSIS_OUTPUT_DIR) --output-dir models/trends
+
+recommend-model:
+	$(PYTHON) -m src.models.recommend --dsn $(POSTGRES_DSN) --model $(EMBEDDING_MODEL)
+
+graph-export:
+	$(PYTHON) -m src.models.graph_export --analysis-dir $(ANALYSIS_OUTPUT_DIR) --output-dir graphs
+
+# Full agent model-layer build (assumes corpus already loaded into PostgreSQL).
+agent-build: embeddings recommend-model trend-model graph-export
+
+# Interactive terminal chat with the agent (auto-detects the local LLM on :8001).
+chat:
+	$(PYTHON) scripts/chat_cli.py
+
+# Rebuild only the topic-model assets at finer granularity (default 40 topics).
+topic-model:
+	$(PYTHON) -m src.analysis.rebuild_topics --papers $(ANALYSIS_OUTPUT_DIR)/papers_clean.json --output-dir $(ANALYSIS_OUTPUT_DIR) --max-topics $(TOPIC_COUNT)
+
+# Self-retrieval evaluation of hybrid search (recall@k, MRR, latency).
+eval-retrieval:
+	SCISCOPE_DB_DSN=$(POSTGRES_DSN) SCISCOPE_EMBEDDER_PATH=$(EMBEDDER_PATH) $(PYTHON) -m src.models.eval_retrieval --dsn $(POSTGRES_DSN) --sample $(EVAL_SAMPLE)
 
 report-figures:
 	@mkdir -p .cache/matplotlib
