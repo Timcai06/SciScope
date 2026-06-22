@@ -230,6 +230,35 @@ def _clean_query(query: str) -> str:
     return cleaned if len(cleaned) >= 2 else query
 
 
+def _rerank(query: str, pool: list, meta: dict, limit: int) -> list:
+    """Bi-encoder rerank: blend normalized RRF with query<->paper cosine.
+
+    Uses the local embedder (no extra model) to score topical match of each
+    candidate's title+snippet against the query, demoting lexical-only noise.
+    Falls back to the RRF order if the embedder is unavailable.
+    """
+    if not pool:
+        return []
+    try:
+        from src.models.embeddings import get_embedder
+        import numpy as np
+
+        emb = get_embedder()
+        q = emb.encode_query(query)
+        texts = [f"{meta.get(uid, {}).get('title', '')} {info.get('snippet', '')}"[:400] for uid, info in pool]
+        vecs = emb.encode_passages(texts)
+        max_rrf = max(info["score"] for _, info in pool) or 1e-9
+        scored = []
+        for (uid, info), vec in zip(pool, vecs):
+            cos = float(np.dot(q, vec))
+            blended = 0.5 * (info["score"] / max_rrf) + 0.5 * cos
+            scored.append((blended, uid, info))
+        scored.sort(reverse=True, key=lambda x: x[0])
+        return [(uid, info) for _, uid, info in scored[:limit]]
+    except Exception:
+        return [(uid, info) for uid, info in pool[:limit]]
+
+
 def search(query: str, limit: int = 10, field: str | None = None, year: int | None = None) -> list[RetrievedPaper]:
     query = (query or "").strip()
     if not query or not get_settings().db_dsn:
@@ -246,8 +275,12 @@ def search(query: str, limit: int = 10, field: str | None = None, year: int | No
         fused = _rrf_fuse(lexical, semantic)
         if not fused:
             return []
-        top = sorted(fused.items(), key=lambda kv: kv[1]["score"], reverse=True)[:limit]
-        meta = _hydrate(conn, [paper_uid for paper_uid, _ in top])
+        # Pull a larger pool, then bi-encoder rerank it by query<->paper cosine
+        # so lexical-only off-topic hits get demoted before we cut to `limit`.
+        pool_n = min(len(fused), max(limit * 3, 20))
+        pool = sorted(fused.items(), key=lambda kv: kv[1]["score"], reverse=True)[:pool_n]
+        meta = _hydrate(conn, [paper_uid for paper_uid, _ in pool])
+        top = _rerank(query, pool, meta, limit)
 
     results: list[RetrievedPaper] = []
     for paper_uid, info in top:
