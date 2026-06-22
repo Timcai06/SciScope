@@ -54,9 +54,10 @@ def main() -> None:
 
     mode = f"local LLM ({model})" if model else "MOCK (no local LLM on :8001)"
     print(f"SciScope terminal chat — generation: {mode}")
-    print("Type a question (中文/English). Ctrl-C or empty line to quit.\n")
+    print("多轮对话已开启(支持追问)。Type a question (中文/English). 空行或 Ctrl-C 退出。\n")
 
     corpus = []  # only used by the in-memory fallback when DB is unavailable
+    history: list[dict] = []  # multi-turn conversation memory
 
     while True:
         try:
@@ -68,10 +69,14 @@ def main() -> None:
             break
 
         try:
-            response = answer_question(question, corpus)
+            response = answer_question(question, corpus, history=history)
         except Exception as exc:  # noqa: BLE001
             print(f"[error] {exc}\n")
             continue
+
+        history.append({"role": "user", "content": question})
+        history.append({"role": "assistant", "content": response.answer})
+        history[:] = history[-8:]  # keep last 4 turns
 
         print(f"\n[confidence: {response.confidence}]")
         print(f"AI> {response.answer}\n")

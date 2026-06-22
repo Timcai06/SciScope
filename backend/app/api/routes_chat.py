@@ -9,4 +9,5 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 @router.post("", response_model=ChatResponse)
 def chat(request: ChatRequest) -> ChatResponse:
-    return answer_question(request.question, get_corpus())
+    history = [{"role": t.role, "content": t.content} for t in request.history]
+    return answer_question(request.question, get_corpus(), history=history)

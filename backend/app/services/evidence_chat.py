@@ -9,28 +9,54 @@ EVIDENCE_LIMIT = 3
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 
+# Explicit reference/anaphora markers — only these trigger context prepend, so a
+# short *new-topic* follow-up ("大语言模型呢") is NOT merged with the old topic.
+_ANAPHORA = ("它", "它们", "他们", "这个", "这些", "那个", "那些", "上述", "上面",
+             "前面", "刚才", "该方法", "继续", "还有呢", "其中",
+             "its", " it ", " it?", "they", "them", "this one", "those", "the above", "keep going")
+
+
+def _retrieval_query(question: str, history: list[dict] | None) -> str:
+    """Resolve anaphoric follow-ups by prepending the previous user topic.
+
+    Only triggers on explicit reference words; a short query that names a new
+    topic is left as-is so its topic is not diluted by the prior turn.
+    """
+    if not history:
+        return question
+    q = question.strip()
+    last_user = next((h["content"] for h in reversed(history) if h.get("role") == "user"), "")
+    if not last_user:
+        return question
+    ql = " " + q.lower() + " "
+    anaphoric = any(a in (q if "一" <= a[0] <= "鿿" else ql) for a in _ANAPHORA)
+    return f"{last_user} {question}" if anaphoric else question
+
+
 def answer_question(
     question: str,
     papers: list[dict[str, Any]],
     provider: LLMProvider | None = None,
+    history: list[dict] | None = None,
 ) -> ChatResponse:
     entities: list[str] = []
     neighbors: list[str] = []
     evidence = None
+    retrieval_q = _retrieval_query(question, history)
     if retrieval_service.is_available():
         # GraphRAG: expand the query along the keyword co-occurrence graph so the
         # knowledge graph actively participates in retrieval (query expansion).
         from backend.app.services import graphrag
 
-        expansion = graphrag.expand(question)
+        expansion = graphrag.expand(retrieval_q)
         entities, neighbors = expansion.entities, expansion.neighbours
-        search_query = graphrag.expanded_query(question, expansion)
+        search_query = graphrag.expanded_query(retrieval_q, expansion)
         evidence = [
             _to_evidence(item) for item in retrieval_service.search(search_query, limit=EVIDENCE_LIMIT)
         ]
     if evidence is None:
         # Fall back to the in-memory matcher (sample corpus / DB unavailable).
-        evidence = _retrieve_evidence(question, papers, limit=EVIDENCE_LIMIT)
+        evidence = _retrieve_evidence(retrieval_q, papers, limit=EVIDENCE_LIMIT)
 
     if not evidence:
         return ChatResponse(
@@ -41,7 +67,7 @@ def answer_question(
             graph_neighbors=neighbors,
         )
 
-    prompt = _build_prompt(question, evidence)
+    prompt = _build_prompt(question, evidence, history)
     llm = provider or get_llm_provider()
     answer = llm.complete(prompt)
 
@@ -136,7 +162,17 @@ def _is_chinese(text: str) -> bool:
     return any("一" <= ch <= "鿿" for ch in text)
 
 
-def _build_prompt(question: str, evidence: list[EvidenceItem]) -> str:
+def _history_block(history: list[dict] | None, chinese: bool) -> str:
+    if not history:
+        return ""
+    recent = history[-4:]  # last 2 turns
+    label_u, label_a = ("用户", "助手") if chinese else ("User", "Assistant")
+    lines = [f"{label_u if h.get('role') == 'user' else label_a}: {h.get('content', '')}" for h in recent]
+    header = "对话历史(供理解追问的上下文):" if chinese else "Conversation so far (context for follow-ups):"
+    return header + "\n" + "\n".join(lines) + "\n\n"
+
+
+def _build_prompt(question: str, evidence: list[EvidenceItem], history: list[dict] | None = None) -> str:
     evidence_lines = []
     for index, item in enumerate(evidence, start=1):
         snippet = (item.snippet or item.reason).strip()
@@ -144,22 +180,24 @@ def _build_prompt(question: str, evidence: list[EvidenceItem]) -> str:
             f"[{index}] {item.title} ({item.year or 'unknown year'}): {snippet}"
         )
     evidence_block = "\n".join(evidence_lines) if evidence_lines else "- No matching evidence"
-    if _is_chinese(question):
+    chinese = _is_chinese(question)
+    history_block = _history_block(history, chinese)
+    if chinese:
         lang = "请用中文回答。"
         instruct = (
-            "你是科研文献助手。仅依据下面的证据回答问题,用 [n] 标注引用。"
+            "你是科研文献助手。结合对话历史理解当前问题,但仅依据下面的证据作答,用 [n] 标注引用。"
             "要综合归纳成 2-4 句话,不要照抄标题;证据不足时明确说明。"
         )
         tail = "基于证据的中文回答:"
     else:
         lang = "Answer in English."
         instruct = (
-            "You are a research literature assistant. Answer using ONLY the evidence below, "
-            "cite as [n]. Synthesize into 2-4 sentences; do not just copy titles. "
-            "If evidence is insufficient, say so."
+            "You are a research literature assistant. Use the conversation history to understand "
+            "the current question, but answer using ONLY the evidence below, cite as [n]. "
+            "Synthesize into 2-4 sentences; do not just copy titles. If evidence is insufficient, say so."
         )
         tail = "Grounded answer:"
-    return f"{instruct} {lang}\n\nQuestion: {question}\n\nEvidence:\n{evidence_block}\n\n{tail}"
+    return f"{instruct} {lang}\n\n{history_block}Question: {question}\n\nEvidence:\n{evidence_block}\n\n{tail}"
 
 
 def _text_terms(text: str) -> set[str]:
