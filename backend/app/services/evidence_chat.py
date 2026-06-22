@@ -80,16 +80,20 @@ def _verify_answer(answer: str, evidence: list[EvidenceItem]) -> str:
     text (titles + snippets). Low overlap → the answer may be ungrounded → lower
     confidence so the UI can flag it.
     """
+    # Citation signal: does the answer reference evidence indices [n]?
+    cited = {int(m) for m in re.findall(r"\[(\d+)\]", answer) if 0 < int(m) <= len(evidence)}
+
     answer_terms = {t for t in _text_terms(answer) if t not in _STOP and len(t) > 2}
-    if not answer_terms:
-        return "low"
     evidence_text = " ".join(f"{e.title} {e.snippet}" for e in evidence)
     evidence_terms = _text_terms(evidence_text)
     supported = sum(1 for t in answer_terms if t in evidence_terms)
-    support_ratio = supported / len(answer_terms)
-    if support_ratio >= 0.5:
+    support_ratio = supported / len(answer_terms) if answer_terms else 0.0
+
+    # Lexical overlap fails cross-lingually (Chinese answer vs English evidence),
+    # so a valid citation also counts as grounding evidence.
+    if support_ratio >= 0.5 or (cited and support_ratio >= 0.2):
         return "high"
-    if support_ratio >= 0.25:
+    if support_ratio >= 0.25 or cited:
         return "medium"
     return "low"
 
