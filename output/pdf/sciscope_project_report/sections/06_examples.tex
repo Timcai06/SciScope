@@ -1,0 +1,56 @@
+\section{示例问答与测试用例}
+
+下列为系统在真实 16 万篇语料上的\textbf{实际输出}(非示意),用于直观展示检索、跨语言、推荐与证据接地能力。
+
+\subsection{用例一:英文混合检索(双臂命中)}
+\begin{plainbox}
+\textbf{查询}:\texttt{graph neural network materials discovery}\par\vspace{2pt}
+\textbf{返回}(\statusbadge{lexical}+\statusbadge{semantic} 双臂命中):
+\begin{enumerate}
+\item Accelerated Discovery of Energy Materials via Graph Neural Networks \hfill(2025)
+\item CTGNN: Crystal Transformer Graph Neural Network for Crystal Materials \hfill(2024)
+\item DeepCrysTet: A Deep Learning Approach Using Tetrahedral Mesh \hfill(2023)
+\end{enumerate}
+\end{plainbox}
+
+\subsection{用例二:中文跨语言检索(命中英文文献)}
+\begin{plainbox}
+\textbf{查询}:\texttt{大语言模型的检索增强生成}(中文)\par\vspace{2pt}
+\textbf{返回}(\statusbadge{semantic} 语义臂,跨语言命中英文论文):
+\begin{enumerate}
+\item Retrieval-Augmented Retrieval: Large Language Models are Strong Zero-Shot Retrievers \hfill(2024)
+\item LExT: Towards Evaluating Trustworthiness of Natural Language Explanations \hfill(2025)
+\item A Comprehensive Study of Jailbreak Attack versus Defense for LLMs \hfill(2024)
+\end{enumerate}
+\end{plainbox}
+
+\subsection{用例三:可解释论文推荐}
+\begin{plainbox}
+\textbf{种子论文}:\texttt{PMC13273979}(AI 药物发现方向)\par\vspace{2pt}
+\textbf{推荐}(每条附可解释因子 semantic / keyword / author / recency):
+\begin{center}
+\begin{tabularx}{\textwidth}{Xccc}
+\toprule
+\textbf{推荐论文} & \textbf{年份} & \textbf{语义相似} & \textbf{融合因子} \\
+\midrule
+Generative AI in drug discovery and development & 2024 & 0.941 & sem .56 / kw .10 \\
+Editorial: Advancing drug discovery with AI & 2025 & 0.934 & sem .56 / kw .10 \\
+Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem .55 / kw .10 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+\end{plainbox}
+
+\subsection{用例四:趋势热点(模型输出)}
+\begin{plainbox}
+\textbf{\texttt{/api/trends} 新兴热点排行}(关键词清洗后):
+\texttt{retrieval augmented generation} → \texttt{large language model} → \texttt{gene delivery} → \dots\par\vspace{2pt}
+与 2022--2026 年科研态势吻合,RAG 与大语言模型领跑。
+\end{plainbox}
+
+\subsection{用例五:证据接地问答}
+\begin{plainbox}
+\textbf{提问}:图神经网络在材料发现中有哪些应用?\par\vspace{2pt}
+\textbf{系统流程}:混合检索 → 取 Top 证据(如 \emph{A review on the applications of GNNs in materials science}、\emph{crystal graph convolutional neural network})→ 本地大模型\textbf{仅基于证据}生成回答,并标注引用 [n]。\par\vspace{2pt}
+\textbf{关键特性}:回答可追溯到具体论文;证据不足时如实说明,不臆造。
+\end{plainbox}
