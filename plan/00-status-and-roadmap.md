@@ -24,18 +24,15 @@ See [01-agent-model-layer.md](01-agent-model-layer.md) for architecture.
 
 ## Known gaps / follow-ups
 
-1. **Chunk embeddings are partial.** The local embedder
-   (`intfloat/multilingual-e5-base`, 768-dim) is downloaded to
-   `models/embedder_local/multilingual-e5-base` (point `SCISCOPE_EMBEDDER_PATH`
-   at it). Embedded so far: all `full_text` chunks (20,709) + ~18k mixed from an
-   earlier partial run → ~38.5k vectors, `paper_embeddings` for 17,975 papers.
-   The semantic arm and `/api/recommend` are live and cross-lingual (Chinese
-   query → English paper) is verified. Full coverage (all 341k chunks) was
-   deferred for thermal reasons — it is a ~4h MPS job. To finish later
-   (resumable, skips done): `SCISCOPE_EMBEDDER_PATH=models/embedder_local/multilingual-e5-base make embeddings && make recommend-model`.
-   Note from mainland China the HF download needs the mirror
-   (`HF_ENDPOINT=https://hf-mirror.com`); `aria2c -c --file-allocation=none` is
-   the reliable path (size = real bytes; verify a tail tensor is non-zero).
+1. **Embeddings — full coverage (done).** Local embedder
+   `intfloat/multilingual-e5-base` (768-dim) at
+   `models/embedder_local/multilingual-e5-base` (`SCISCOPE_EMBEDDER_PATH`).
+   Current: **226,434** chunk vectors — `title_abstract` 100% (197,639) and
+   `full_text` 100% (20,663); `keywords` chunks intentionally not embedded
+   (low value, covered by FTS). **`paper_embeddings` = 159,190 (every paper)**;
+   the earlier CS-coverage bias (CS had only 87 vectors) is fixed (CS now 58,038).
+   Semantic + cross-lingual retrieval and `/api/recommend` cover the whole corpus.
+   Keyword chunks can be embedded later if desired but are not recommended.
 2. **Keyword extraction noise** in the analysis layer leaks into trend rankings
    (journal/affiliation fragments, arXiv category codes). Cleaning extraction
    would improve trends and the keyword graph.

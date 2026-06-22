@@ -1,0 +1,48 @@
+{
+  "generated_at": "2026-06-22T04:43:33.320330+00:00",
+  "retrieval": {
+    "sample_papers": 200,
+    "limit": 10,
+    "by_title": {
+      "queries": 200,
+      "found_in_topk": 197,
+      "recall@1": 0.94,
+      "recall@5": 0.985,
+      "recall@10": 0.985,
+      "mrr@10": 0.9583,
+      "mean_latency_ms": 141.6
+    },
+    "by_keywords": {
+      "queries": 149,
+      "found_in_topk": 111,
+      "recall@1": 0.6913,
+      "recall@5": 0.7248,
+      "recall@10": 0.745,
+      "mrr@10": 0.7045,
+      "mean_latency_ms": 84.2
+    }
+  },
+  "trend_backtest": {
+    "keywords_evaluated": 1998,
+    "train_years": [
+      2022,
+      2023,
+      2024
+    ],
+    "target_year": 2025,
+    "mae": 0.000385,
+    "rmse": 0.0015,
+    "naive_persistence_mae": 0.000348,
+    "mae_improvement_vs_naive": -0.106,
+    "pearson_pred_vs_actual": 0.9756,
+    "directional_accuracy": 0.4074
+  },
+  "recommendation": {
+    "seeds_sampled": 150,
+    "seeds_with_recs": 150,
+    "total_recommendations": 750,
+    "same_field_rate": 0.6733,
+    "shared_keyword_rate": 0.6013,
+    "mean_semantic_similarity": 0.8918
+  }
+}

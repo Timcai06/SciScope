@@ -88,7 +88,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build chat topic-model eval-retrieval backfill-abstracts dedupe-db report-figures data-report-pdf project-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build chat topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures data-report-pdf project-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -294,6 +294,10 @@ dedupe-db:
 # Self-retrieval evaluation of hybrid search (recall@k, MRR, latency).
 eval-retrieval:
 	SCISCOPE_DB_DSN=$(POSTGRES_DSN) SCISCOPE_EMBEDDER_PATH=$(EMBEDDER_PATH) $(PYTHON) -m src.models.eval_retrieval --dsn $(POSTGRES_DSN) --sample $(EVAL_SAMPLE)
+
+# Full evaluation evidence pack -> output/eval/ (retrieval + trend backtest + recommend).
+eval-all:
+	SCISCOPE_DB_DSN=$(POSTGRES_DSN) SCISCOPE_EMBEDDER_PATH=$(EMBEDDER_PATH) SCISCOPE_EMBED_FP16=1 $(PYTHON) -m src.models.eval_all
 
 report-figures:
 	@mkdir -p .cache/matplotlib

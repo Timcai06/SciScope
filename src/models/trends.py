@@ -56,7 +56,11 @@ def _fit_forecast(years: np.ndarray, values: np.ndarray) -> dict[str, float]:
     r2 = max(0.0, 1.0 - ss_res / ss_tot)
 
     next_year = int(years.max()) + 1
-    forecast = float(slope * next_year + intercept)
+    # Damped trend: anchor on the actual last value and add a damped slope.
+    # A 3-point OLS slope extrapolated raw overshoots (worse than persistence);
+    # damping (phi<1) keeps the forecast between persistence and full linear.
+    phi = 0.5
+    forecast = float(values[-1] + phi * slope * (next_year - years[-1]))
     # Rough prediction std from residuals (small-sample, advisory only).
     dof = max(1, n - 2)
     se = float(np.sqrt(ss_res / dof))
