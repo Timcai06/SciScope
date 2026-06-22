@@ -70,6 +70,7 @@ VLLM_MODEL ?= mlx-community/Qwen2.5-7B-Instruct-4bit
 VLLM_VENV ?= $(HOME)/.venv-vllm-metal
 VLLM_MAX_MODEL_LEN ?= 8192
 VLLM_EXTRA_ARGS ?=
+LLM_LOCAL_DIR ?= models/llm_local/Qwen2.5-3B-Instruct-4bit
 
 export SCISCOPE_APP_NAME ?= SciScope
 export SCISCOPE_ENV ?= local
@@ -88,7 +89,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build chat topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures data-report-pdf project-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build chat topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures data-report-pdf project-report-pdf report backend frontend dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -128,6 +129,8 @@ help:
 	@echo "  make frontend         Start Next.js frontend on localhost:$(FRONTEND_PORT)"
 	@echo "  make dev              Start backend and frontend together"
 	@echo "  make vllm-serve       Start local vLLM-Metal server on $(VLLM_BASE_URL)"
+	@echo "  make llm             Start local LLM (3B, offline) on $(VLLM_BASE_URL)"
+	@echo "  make llm-stop        Stop the local LLM"
 	@echo "  make dev-vllm         Start app using local vLLM/Metal OpenAI-compatible server"
 	@echo "  make vllm-smoke       Check local vLLM OpenAI-compatible endpoint"
 	@echo "  make test             Run backend tests and frontend typecheck/build"
@@ -347,6 +350,15 @@ dev:
 
 dev-vllm:
 	@$(MAKE) dev SCISCOPE_USE_MOCK_LLM=false SCISCOPE_LLM_PROVIDER=vllm LOCAL_LLM_BASE_URL=$(VLLM_BASE_URL) LOCAL_LLM_MODEL=$(VLLM_MODEL)
+
+llm:
+	@echo "Starting local LLM (offline): $(LLM_LOCAL_DIR) on $(VLLM_BASE_URL)"
+	@echo "Stop with Ctrl-C (or 'make llm-stop'). Then run 'make chat' in another shell."
+	HF_HUB_OFFLINE=1 VLLM_HOST_IP=$(VLLM_HOST) $(VLLM_VENV)/bin/vllm serve $(LLM_LOCAL_DIR) \
+		--host $(VLLM_HOST) --port $(VLLM_PORT) --max-model-len $(VLLM_MAX_MODEL_LEN)
+
+llm-stop:
+	@pkill -f "vllm serve" 2>/dev/null && echo "stopped local LLM" || echo "no local LLM running"
 
 vllm-serve:
 	@echo "Starting vLLM-Metal: $(VLLM_MODEL)"
