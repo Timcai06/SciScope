@@ -61,13 +61,25 @@ def backfill(
     sleep_seconds: float = 0.2,
     timeout: int = 25,
 ) -> dict[str, int]:
+    import socket
+
+    # Hard cap so a stalled connection can't hang the whole crawl indefinitely.
+    socket.setdefaulttimeout(timeout)
+
     stats = {"scanned": 0, "needed": 0, "filled": 0, "missed": 0}
     remaining = limit
+
+    def _flush(path: Path, records: list) -> None:
+        tmp = path.with_suffix(".jsonl.tmp")
+        tmp.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records) + "\n", encoding="utf-8")
+        tmp.replace(path)
+
     for path in _iter_files(canonical_dir, source):
         if remaining <= 0:
             break
         records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
         changed = False
+        since_ckpt = 0
         for record in records:
             stats["scanned"] += 1
             if _existing_abstract(record) or record.get("_sciscope_abstract_attempt"):
@@ -87,14 +99,17 @@ def backfill(
                 record.setdefault("raw", {})["abstract"] = abstract
                 record["_sciscope_abstract_source"] = "openalex_doi"
                 stats["filled"] += 1
-                changed = True
             else:
                 stats["missed"] += 1
             changed = True
+            since_ckpt += 1
+            # Incremental checkpoint so a later stall doesn't lose progress.
+            if since_ckpt >= 200:
+                _flush(path, records)
+                since_ckpt = 0
+                print(f"  checkpoint {path.name}: filled={stats['filled']} missed={stats['missed']}", flush=True)
         if changed:
-            tmp = path.with_suffix(".jsonl.tmp")
-            tmp.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records) + "\n", encoding="utf-8")
-            tmp.replace(path)
+            _flush(path, records)
     return stats
 
 
