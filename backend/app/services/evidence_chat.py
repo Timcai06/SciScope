@@ -30,7 +30,36 @@ def answer_question(
     llm = provider or get_llm_provider()
     answer = llm.complete(prompt)
 
-    return ChatResponse(answer=answer, evidence=evidence, confidence="medium")
+    confidence = _verify_answer(answer, evidence)
+    return ChatResponse(answer=answer, evidence=evidence, confidence=confidence)
+
+
+# Common words to ignore when measuring answer-evidence support.
+_STOP = {
+    "the", "a", "an", "of", "and", "or", "in", "on", "for", "to", "is", "are",
+    "with", "by", "as", "that", "this", "from", "using", "based", "via", "can",
+}
+
+
+def _verify_answer(answer: str, evidence: list[EvidenceItem]) -> str:
+    """Lightweight faithfulness check: is the answer supported by the evidence?
+
+    Measures the share of the answer's content words that appear in the evidence
+    text (titles + snippets). Low overlap → the answer may be ungrounded → lower
+    confidence so the UI can flag it.
+    """
+    answer_terms = {t for t in _text_terms(answer) if t not in _STOP and len(t) > 2}
+    if not answer_terms:
+        return "low"
+    evidence_text = " ".join(f"{e.title} {e.snippet}" for e in evidence)
+    evidence_terms = _text_terms(evidence_text)
+    supported = sum(1 for t in answer_terms if t in evidence_terms)
+    support_ratio = supported / len(answer_terms)
+    if support_ratio >= 0.5:
+        return "high"
+    if support_ratio >= 0.25:
+        return "medium"
+    return "low"
 
 
 def _hybrid_evidence(question: str, limit: int) -> list[EvidenceItem] | None:
@@ -87,6 +116,10 @@ def _retrieve_evidence(
     return [item for _, _, item in ranked[:limit]]
 
 
+def _is_chinese(text: str) -> bool:
+    return any("一" <= ch <= "鿿" for ch in text)
+
+
 def _build_prompt(question: str, evidence: list[EvidenceItem]) -> str:
     evidence_lines = []
     for index, item in enumerate(evidence, start=1):
@@ -95,11 +128,22 @@ def _build_prompt(question: str, evidence: list[EvidenceItem]) -> str:
             f"[{index}] {item.title} ({item.year or 'unknown year'}): {snippet}"
         )
     evidence_block = "\n".join(evidence_lines) if evidence_lines else "- No matching evidence"
-    return (
-        "You are answering a research question grounded ONLY in the evidence below. "
-        "Cite sources as [n]. If the evidence is insufficient, say so.\n\n"
-        f"Question: {question}\n\nEvidence:\n{evidence_block}\n\nGrounded answer:"
-    )
+    if _is_chinese(question):
+        lang = "请用中文回答。"
+        instruct = (
+            "你是科研文献助手。仅依据下面的证据回答问题,用 [n] 标注引用。"
+            "要综合归纳成 2-4 句话,不要照抄标题;证据不足时明确说明。"
+        )
+        tail = "基于证据的中文回答:"
+    else:
+        lang = "Answer in English."
+        instruct = (
+            "You are a research literature assistant. Answer using ONLY the evidence below, "
+            "cite as [n]. Synthesize into 2-4 sentences; do not just copy titles. "
+            "If evidence is insufficient, say so."
+        )
+        tail = "Grounded answer:"
+    return f"{instruct} {lang}\n\nQuestion: {question}\n\nEvidence:\n{evidence_block}\n\n{tail}"
 
 
 def _text_terms(text: str) -> set[str]:

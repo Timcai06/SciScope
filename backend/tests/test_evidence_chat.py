@@ -30,7 +30,7 @@ def test_answer_question_returns_evidence():
 
     assert "RAG" in response.answer or "retrieval" in response.answer
     assert len(response.evidence) >= 1
-    assert response.confidence == "medium"
+    assert response.confidence in {"high", "medium"}
 
 
 def test_answer_question_matches_keyword_evidence():

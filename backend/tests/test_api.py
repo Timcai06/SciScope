@@ -36,7 +36,7 @@ def test_chat_endpoint_returns_answer_and_evidence(client):
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["confidence"] == "medium"
+    assert payload["confidence"] in {"high", "medium"}
     assert payload["evidence"]
     assert "answer" in payload
 
