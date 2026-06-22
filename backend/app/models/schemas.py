@@ -54,6 +54,8 @@ class ChatResponse(BaseModel):
     answer: str
     evidence: list[EvidenceItem]
     confidence: str
+    graph_entities: list[str] = Field(default_factory=list)
+    graph_neighbors: list[str] = Field(default_factory=list)
 
 
 class SearchResultItem(BaseModel):

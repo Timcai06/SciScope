@@ -14,7 +14,20 @@ def answer_question(
     papers: list[dict[str, Any]],
     provider: LLMProvider | None = None,
 ) -> ChatResponse:
-    evidence = _hybrid_evidence(question, limit=EVIDENCE_LIMIT)
+    entities: list[str] = []
+    neighbors: list[str] = []
+    evidence = None
+    if retrieval_service.is_available():
+        # GraphRAG: expand the query along the keyword co-occurrence graph so the
+        # knowledge graph actively participates in retrieval (query expansion).
+        from backend.app.services import graphrag
+
+        expansion = graphrag.expand(question)
+        entities, neighbors = expansion.entities, expansion.neighbours
+        search_query = graphrag.expanded_query(question, expansion)
+        evidence = [
+            _to_evidence(item) for item in retrieval_service.search(search_query, limit=EVIDENCE_LIMIT)
+        ]
     if evidence is None:
         # Fall back to the in-memory matcher (sample corpus / DB unavailable).
         evidence = _retrieve_evidence(question, papers, limit=EVIDENCE_LIMIT)
@@ -24,6 +37,8 @@ def answer_question(
             answer="No matching evidence found for this question in the current corpus.",
             evidence=[],
             confidence="low",
+            graph_entities=entities,
+            graph_neighbors=neighbors,
         )
 
     prompt = _build_prompt(question, evidence)
@@ -31,7 +46,24 @@ def answer_question(
     answer = llm.complete(prompt)
 
     confidence = _verify_answer(answer, evidence)
-    return ChatResponse(answer=answer, evidence=evidence, confidence=confidence)
+    return ChatResponse(
+        answer=answer,
+        evidence=evidence,
+        confidence=confidence,
+        graph_entities=entities,
+        graph_neighbors=neighbors,
+    )
+
+
+def _to_evidence(item) -> EvidenceItem:
+    return EvidenceItem(
+        paper_id=item.paper_id,
+        title=item.title,
+        year=item.year,
+        reason=f"Matched via {', '.join(item.matched_by)} (score {item.score})",
+        authors=item.authors,
+        snippet=item.snippet,
+    )
 
 
 # Common words to ignore when measuring answer-evidence support.
@@ -62,26 +94,6 @@ def _verify_answer(answer: str, evidence: list[EvidenceItem]) -> str:
     return "low"
 
 
-def _hybrid_evidence(question: str, limit: int) -> list[EvidenceItem] | None:
-    """Use the PostgreSQL + pgvector hybrid retriever when available.
-
-    Returns ``None`` (not an empty list) when the service layer is unavailable,
-    so the caller can fall back to the in-memory matcher.
-    """
-    if not retrieval_service.is_available():
-        return None
-    retrieved = retrieval_service.search(question, limit=limit)
-    return [
-        EvidenceItem(
-            paper_id=item.paper_id,
-            title=item.title,
-            year=item.year,
-            reason=f"Matched via {', '.join(item.matched_by)} (score {item.score})",
-            authors=item.authors,
-            snippet=item.snippet,
-        )
-        for item in retrieved
-    ]
 
 
 def _retrieve_evidence(
