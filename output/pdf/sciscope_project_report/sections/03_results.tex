@@ -47,6 +47,13 @@
 
 修复后语义检索与推荐\textbf{覆盖全部 16 万篇全领域},中文问句可跨语言命中英文文献。
 
+\subsection{趋势预测回测与推荐评估(评测证据包)}
+完整评测可由 \texttt{make eval-all} 复现,结果固化于 \texttt{output/eval/eval\_report.\{json,md\}}。
+
+\textbf{趋势预测回测}(拟合 2022--2024 → 预测 2025,1{,}998 个关键词):预测与真实的 Pearson 相关 \textbf{0.976}(能准确\textbf{排序}哪些关键词更活跃);点预测 MAE 与 naive 持平基线相当(归一化词频年际噪声大、近均值回归),故采用阻尼外推并附不确定带,谨慎解读。模型价值在排序与多年动量/burst。
+
+\textbf{推荐离线评估}(150 篇种子,top-5):同领域率 \textbf{0.67}、共享关键词率 \textbf{0.60}、平均语义相似 \textbf{0.89}——远高于随机基线,且每条附可解释因子。
+
 \subsection{数据治理成效}
 \begin{center}
 \begin{tabularx}{0.94\textwidth}{Xcc}

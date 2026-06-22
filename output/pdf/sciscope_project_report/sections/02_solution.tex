@@ -74,7 +74,7 @@
 
 \subsection{方案功能}
 \begin{itemize}
-\item \textbf{文献问答 \texttt{/api/chat}}:混合检索证据 → 本地大模型基于证据生成带引用回答。
+\item \textbf{文献问答 \texttt{/api/chat}}:\textbf{GraphRAG}(查询抽取关键词实体 → 沿共现图扩展邻居 → query expansion)+ 混合检索证据 → 本地大模型据证生成带引用回答 → \textbf{答案可被证据支撑性校验}(低置信明确提示)。
 \item \textbf{混合检索 \texttt{/api/search}}:FTS + 向量 + RRF 融合,去重到论文级,返回命中片段。
 \item \textbf{趋势预测 \texttt{/api/trends}}:关键词/主题的增长率、burst、生命周期与下一年线性外推(含不确定区间)。
 \item \textbf{论文推荐 \texttt{/api/recommend}}:语义相似 + 关键词重叠 + 作者关系 + 时近性融合,输出\textbf{可解释因子}。
