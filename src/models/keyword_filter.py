@@ -32,6 +32,9 @@ _SPACE_CODE_RE = re.compile(
     r"^(?:" + "|".join(a.replace(" ", r"\s") for a in _ARXIV_ARCHIVES) + r")(?:\s[a-z]{1,3})?$"
 )
 
+# OpenAlex concept disambiguation suffix, e.g. "context (archaeology)".
+_DISAMBIG_RE = re.compile(r"\([a-z][a-z \-/]{2,30}\)\s*$")
+
 # Journal / venue name fragments — these leak from source "concept" fields.
 _VENUE_SUBSTRINGS = (
     "journal of", "frontiers in", "international journal", "transactions on",
@@ -83,5 +86,13 @@ def is_noise_keyword(keyword: str) -> bool:
     if any(frag in kw for frag in _VENUE_SUBSTRINGS):
         return True
     if any(frag in kw for frag in _VENUE_SUBSTRINGS_EXTRA):
+        return True
+    # OpenAlex concept disambiguation, e.g. "pattern recognition (psychology)",
+    # "context (archaeology)" — drop the parenthetical-discipline form.
+    if _DISAMBIG_RE.search(kw):
+        return True
+    # Library-of-Congress style concatenated category labels, e.g.
+    # "electronic computers. computer science" — research keywords don't use ". ".
+    if ". " in kw:
         return True
     return False
