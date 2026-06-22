@@ -208,6 +208,9 @@ def search(query: str, limit: int = 10, field: str | None = None, year: int | No
     if not query or not get_settings().db_dsn:
         return []
     query = _clean_query(query)
+    from src.models.bilingual import expand_bilingual
+
+    query = expand_bilingual(query)
     with _connect() as conn:
         lexical = _lexical_candidates(conn, query, field, year)
         semantic = _semantic_candidates(conn, query, field, year)
