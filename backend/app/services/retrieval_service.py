@@ -178,10 +178,36 @@ def _hydrate(conn, paper_uids: list[str]) -> dict[str, dict[str, Any]]:
     return meta
 
 
+import re as _re
+
+# Conversational/instruction filler stripped before retrieval so the topical
+# core drives matching (e.g. "给我一篇最新的计算机视觉论文" -> "计算机视觉").
+_FILLER = [
+    "请帮我", "帮我", "请", "给我", "我想知道", "我想看看", "我想看", "告诉我", "麻烦",
+    "推荐一下", "推荐", "介绍一下", "介绍", "列举", "列出", "找一下", "找", "查一下", "查",
+    "最新的", "最新", "最近的", "最近", "一篇", "几篇", "一些", "一下", "若干",
+    "有哪些", "是什么", "怎么样", "如何", "的研究", "的论文", "的文献",
+    "论文", "文献", "相关", "方面", "请问",
+    "recommend a", "recommend", "give me", "show me", "please", "find me", "find",
+    "latest", "recent", "a paper on", "papers on", "paper about", "papers about",
+    "tell me about", "what are", "list",
+]
+
+
+def _clean_query(query: str) -> str:
+    cleaned = query
+    for f in _FILLER:
+        cleaned = cleaned.replace(f, " ")
+    cleaned = _re.sub(r"\s+", " ", cleaned).strip()
+    # If stripping removed almost everything, keep the original query.
+    return cleaned if len(cleaned) >= 2 else query
+
+
 def search(query: str, limit: int = 10, field: str | None = None, year: int | None = None) -> list[RetrievedPaper]:
     query = (query or "").strip()
     if not query or not get_settings().db_dsn:
         return []
+    query = _clean_query(query)
     with _connect() as conn:
         lexical = _lexical_candidates(conn, query, field, year)
         semantic = _semantic_candidates(conn, query, field, year)
