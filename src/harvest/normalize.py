@@ -126,7 +126,12 @@ def _first(value: Any) -> Any:
 
 
 def _strip_markup(value: Any) -> str:
-    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", str(value or ""))).strip()
+    # Unescape HTML entities first (titles arrive with &lt;b&gt; ... &lt;/b&gt;),
+    # then strip the resulting tags and collapse whitespace.
+    import html as _html
+
+    text = _html.unescape(str(value or ""))
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text)).strip()
 
 
 def _full_text(work: dict[str, Any]) -> str:
@@ -266,18 +271,24 @@ def doaj_work_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
 def paper_wrapper_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
     source = str(wrapper.get("source") or "openalex")
     if source == "openalex":
-        return openalex_work_to_paper(wrapper)
-    if source == "arxiv":
-        return arxiv_work_to_paper(wrapper)
-    if source in {"pubmed", "pmc", "core"}:
-        return simple_raw_to_paper(wrapper)
-    if source == "crossref":
-        return crossref_work_to_paper(wrapper)
-    if source == "semantic_scholar":
-        return semantic_scholar_work_to_paper(wrapper)
-    if source == "doaj":
-        return doaj_work_to_paper(wrapper)
-    raise ValueError(f"Unsupported source: {source}")
+        paper = openalex_work_to_paper(wrapper)
+    elif source == "arxiv":
+        paper = arxiv_work_to_paper(wrapper)
+    elif source in {"pubmed", "pmc", "core"}:
+        paper = simple_raw_to_paper(wrapper)
+    elif source == "crossref":
+        paper = crossref_work_to_paper(wrapper)
+    elif source == "semantic_scholar":
+        paper = semantic_scholar_work_to_paper(wrapper)
+    elif source == "doaj":
+        paper = doaj_work_to_paper(wrapper)
+    else:
+        raise ValueError(f"Unsupported source: {source}")
+    # Centrally clean HTML markup/entities from display fields so no source can
+    # leak <b>..</b> or &lt;..&gt; into titles/abstracts.
+    paper["title"] = _strip_markup(paper.get("title"))
+    paper["abstract"] = _strip_markup(paper.get("abstract"))
+    return paper
 
 
 def normalize_raw_jsonl(input_path: str | Path, output_path: str | Path) -> dict[str, int]:
