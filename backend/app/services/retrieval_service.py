@@ -94,18 +94,15 @@ def _or_tsquery(query: str) -> str:
     return " | ".join(uniq)
 
 
-def _lexical_candidates(conn, query: str, field: str | None, year: int | None) -> list[tuple[str, str]]:
-    tsq = _or_tsquery(query)
-    if not tsq:
-        return []
-    params: list[Any] = [tsq]
+def _fts_query(conn, tsquery_sql: str, query_text: str, field: str | None, year: int | None) -> list[tuple[str, str]]:
+    params: list[Any] = [query_text]
     filters = _filter_clause(field, year, params)
     params.append(CHUNK_POOL)
     sql = f"""
         SELECT pc.paper_uid, pc.text
         FROM paper_chunks pc
         JOIN papers p ON p.paper_uid = pc.paper_uid
-        , to_tsquery('simple', %s) q
+        , {tsquery_sql}('simple', %s) q
         WHERE pc.search_document @@ q{filters}
         ORDER BY ts_rank(pc.search_document, q) DESC
         LIMIT %s
@@ -113,6 +110,25 @@ def _lexical_candidates(conn, query: str, field: str | None, year: int | None) -
     with conn.cursor() as cur:
         cur.execute(sql, params)
         return [(row[0], row[1]) for row in cur.fetchall()]
+
+
+def _lexical_candidates(conn, query: str, field: str | None, year: int | None) -> list[tuple[str, str]]:
+    # Precision-first: AND/phrase matches (websearch) lead so an exact title
+    # query keeps its paper at rank 1; then OR matches fill in for recall on
+    # multi-term queries (which AND alone would miss).
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for uid, text in _fts_query(conn, "websearch_to_tsquery", query, field, year):
+        if uid not in seen:
+            seen.add(uid)
+            out.append((uid, text))
+    tsq = _or_tsquery(query)
+    if tsq:
+        for uid, text in _fts_query(conn, "to_tsquery", tsq, field, year):
+            if uid not in seen:
+                seen.add(uid)
+                out.append((uid, text))
+    return out[:CHUNK_POOL]
 
 
 def _semantic_candidates(conn, query: str, field: str | None, year: int | None) -> list[tuple[str, str]]:
