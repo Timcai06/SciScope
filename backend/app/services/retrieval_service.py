@@ -76,15 +76,36 @@ def _filter_clause(field: str | None, year: int | None, params: list[Any]) -> st
     return clauses
 
 
+_TS_STOP = {"the", "a", "an", "of", "and", "or", "in", "on", "for", "to", "is",
+            "are", "with", "by", "as", "what", "how", "which"}
+
+
+def _or_tsquery(query: str) -> str:
+    """Build an OR tsquery so multi-term queries don't require ALL terms.
+
+    websearch_to_tsquery ANDs terms, which fails when a query lists several words
+    (a paper rarely contains every one). OR + ts_rank keeps recall while still
+    ranking papers that match more/stronger terms higher.
+    """
+    terms = [t for t in _re.findall(r"[\w]+", query.lower(), _re.UNICODE) if len(t) > 1 and t not in _TS_STOP]
+    # de-dup preserving order, cap to keep the query small
+    seen: set[str] = set()
+    uniq = [t for t in terms if not (t in seen or seen.add(t))][:12]
+    return " | ".join(uniq)
+
+
 def _lexical_candidates(conn, query: str, field: str | None, year: int | None) -> list[tuple[str, str]]:
-    params: list[Any] = [query]
+    tsq = _or_tsquery(query)
+    if not tsq:
+        return []
+    params: list[Any] = [tsq]
     filters = _filter_clause(field, year, params)
     params.append(CHUNK_POOL)
     sql = f"""
         SELECT pc.paper_uid, pc.text
         FROM paper_chunks pc
         JOIN papers p ON p.paper_uid = pc.paper_uid
-        , websearch_to_tsquery('simple', %s) q
+        , to_tsquery('simple', %s) q
         WHERE pc.search_document @@ q{filters}
         ORDER BY ts_rank(pc.search_document, q) DESC
         LIMIT %s
@@ -182,22 +203,28 @@ import re as _re
 
 # Conversational/instruction filler stripped before retrieval so the topical
 # core drives matching (e.g. "给我一篇最新的计算机视觉论文" -> "计算机视觉").
-_FILLER = [
-    "请帮我", "帮我", "请", "给我", "我想知道", "我想看看", "我想看", "告诉我", "麻烦",
-    "推荐一下", "推荐", "介绍一下", "介绍", "列举", "列出", "找一下", "找", "查一下", "查",
+# Chinese fillers (substring-removed) and English fillers (word-boundary-removed,
+# so 'recommend' does NOT mangle 'recommender'/'recommendation').
+_FILLER_CN = [
+    "请帮我", "帮我", "给我", "我想知道", "我想看看", "我想看", "告诉我", "麻烦",
+    "推荐一下", "推荐", "介绍一下", "介绍", "列举", "列出", "找一下", "查一下",
     "最新的", "最新", "最近的", "最近", "一篇", "几篇", "一些", "一下", "若干",
-    "有哪些", "是什么", "怎么样", "如何", "的研究", "的论文", "的文献",
-    "论文", "文献", "相关", "方面", "请问",
-    "recommend a", "recommend", "give me", "show me", "please", "find me", "find",
-    "latest", "recent", "a paper on", "papers on", "paper about", "papers about",
-    "tell me about", "what are", "list",
+    "有哪些", "是什么", "怎么样", "的研究", "的论文", "的文献",
+    "论文", "文献", "请问", "请",
+]
+_FILLER_EN = [
+    "recommend a paper on", "recommend a paper about", "a paper on", "papers on",
+    "paper about", "papers about", "tell me about", "give me", "show me", "find me",
+    "what are", "recommend", "please", "latest", "recent", "list",
 ]
 
 
 def _clean_query(query: str) -> str:
     cleaned = query
-    for f in _FILLER:
+    for f in _FILLER_CN:
         cleaned = cleaned.replace(f, " ")
+    for f in _FILLER_EN:
+        cleaned = _re.sub(rf"\b{_re.escape(f)}\b", " ", cleaned, flags=_re.IGNORECASE)
     cleaned = _re.sub(r"\s+", " ", cleaned).strip()
     # If stripping removed almost everything, keep the original query.
     return cleaned if len(cleaned) >= 2 else query
@@ -207,10 +234,12 @@ def search(query: str, limit: int = 10, field: str | None = None, year: int | No
     query = (query or "").strip()
     if not query or not get_settings().db_dsn:
         return []
-    query = _clean_query(query)
     from src.models.bilingual import expand_bilingual
 
+    # Map known Chinese terms to English BEFORE stripping filler, so topical
+    # terms like '推荐系统' aren't broken by the filler word '推荐'.
     query = expand_bilingual(query)
+    query = _clean_query(query)
     with _connect() as conn:
         lexical = _lexical_candidates(conn, query, field, year)
         semantic = _semantic_candidates(conn, query, field, year)

@@ -69,16 +69,23 @@ CN_EN = {
 
 
 def expand_bilingual(query: str) -> str:
-    """Append English equivalents of any known Chinese terms in the query."""
+    """Replace known Chinese research terms with their English equivalents.
+
+    Replacement (not append) avoids two failure modes: the FTS arm AND-failing on
+    an unmatchable Chinese token, and the semantic arm being dragged toward
+    Chinese-titled papers by the Chinese prefix. Untranslated Chinese is kept and
+    handled cross-lingually by the embedder. The English equivalent is also
+    appended once so the original intent is preserved.
+    """
     if not query or not any("一" <= ch <= "鿿" for ch in query):
         return query
+    out = query
     additions = []
-    seen = set()
     # Longest terms first so '大语言模型' wins over '语言模型'.
     for cn in sorted(CN_EN, key=len, reverse=True):
-        if cn in query and cn not in seen:
+        if cn in out:
+            out = out.replace(cn, " " + CN_EN[cn] + " ")
             additions.append(CN_EN[cn])
-            seen.add(cn)
     if not additions:
         return query
-    return query + " " + " ".join(additions)
+    return " ".join(out.split())
