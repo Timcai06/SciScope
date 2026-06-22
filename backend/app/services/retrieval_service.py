@@ -246,12 +246,17 @@ def _clean_query(query: str) -> str:
     return cleaned if len(cleaned) >= 2 else query
 
 
+_RECENCY = ("最新", "最近", "近期", "今年", "newest", "latest", "recent", "most recent")
+
+
 def search(query: str, limit: int = 10, field: str | None = None, year: int | None = None) -> list[RetrievedPaper]:
     query = (query or "").strip()
     if not query or not get_settings().db_dsn:
         return []
     from src.models.bilingual import expand_bilingual
 
+    # Detect recency intent before filler stripping removes '最新'/'latest'.
+    recency = any(r in query.lower() for r in _RECENCY)
     # Map known Chinese terms to English BEFORE stripping filler, so topical
     # terms like '推荐系统' aren't broken by the filler word '推荐'.
     query = expand_bilingual(query)
@@ -262,8 +267,17 @@ def search(query: str, limit: int = 10, field: str | None = None, year: int | No
         fused = _rrf_fuse(lexical, semantic)
         if not fused:
             return []
-        top = sorted(fused.items(), key=lambda kv: kv[1]["score"], reverse=True)[:limit]
-        meta = _hydrate(conn, [paper_uid for paper_uid, _ in top])
+        ranked = sorted(fused.items(), key=lambda kv: kv[1]["score"], reverse=True)
+        if recency:
+            # Among the top relevant pool, prefer the most recent papers.
+            pool = ranked[: max(limit * 3, 15)]
+            meta_pool = _hydrate(conn, [uid for uid, _ in pool])
+            pool.sort(key=lambda kv: (meta_pool.get(kv[0], {}).get("year") or 0), reverse=True)
+            top = pool[:limit]
+            meta = meta_pool
+        else:
+            top = ranked[:limit]
+            meta = _hydrate(conn, [paper_uid for paper_uid, _ in top])
 
     results: list[RetrievedPaper] = []
     for paper_uid, info in top:
