@@ -60,8 +60,10 @@ def backfill(
     mailto: str = "",
     sleep_seconds: float = 0.2,
     timeout: int = 25,
+    workers: int = 5,
 ) -> dict[str, int]:
     import socket
+    from concurrent.futures import ThreadPoolExecutor
 
     # Hard cap so a stalled connection can't hang the whole crawl indefinitely.
     socket.setdefaulttimeout(timeout)
@@ -74,42 +76,41 @@ def backfill(
         tmp.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records) + "\n", encoding="utf-8")
         tmp.replace(path)
 
-    for path in _iter_files(canonical_dir, source):
-        if remaining <= 0:
-            break
-        records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-        changed = False
-        since_ckpt = 0
-        for record in records:
-            stats["scanned"] += 1
-            if _existing_abstract(record) or record.get("_sciscope_abstract_attempt"):
-                continue
-            doi = _doi(record)
-            if not doi:
-                continue
-            stats["needed"] += 1
+    def _apply(record: dict, data: dict | None) -> None:
+        record["_sciscope_abstract_attempt"] = True
+        abstract = _restore_openalex_abstract((data or {}).get("abstract_inverted_index")) if data else ""
+        if abstract:
+            record.setdefault("raw", {})["abstract"] = abstract
+            record["_sciscope_abstract_source"] = "openalex_doi"
+            stats["filled"] += 1
+        else:
+            stats["missed"] += 1
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for path in _iter_files(canonical_dir, source):
             if remaining <= 0:
                 break
-            remaining -= 1
-            data = _fetch_openalex(doi, mailto, timeout)
-            time.sleep(sleep_seconds)
-            record["_sciscope_abstract_attempt"] = True
-            abstract = _restore_openalex_abstract((data or {}).get("abstract_inverted_index")) if data else ""
-            if abstract:
-                record.setdefault("raw", {})["abstract"] = abstract
-                record["_sciscope_abstract_source"] = "openalex_doi"
-                stats["filled"] += 1
-            else:
-                stats["missed"] += 1
-            changed = True
-            since_ckpt += 1
-            # Incremental checkpoint so a later stall doesn't lose progress.
-            if since_ckpt >= 200:
+            records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+            pending = [r for r in records if not _existing_abstract(r) and not r.get("_sciscope_abstract_attempt") and _doi(r)]
+            stats["scanned"] += len(records)
+            if not pending:
+                continue
+            if remaining < len(pending):
+                pending = pending[:remaining]
+            # Process in checkpointed batches; each batch fires `workers` requests
+            # concurrently (OpenAlex polite pool tolerates this with a mailto).
+            batch = max(workers * 8, 40)
+            for start in range(0, len(pending), batch):
+                group = pending[start : start + batch]
+                stats["needed"] += len(group)
+                remaining -= len(group)
+                results = list(pool.map(lambda r: _fetch_openalex(_doi(r), mailto, timeout), group))
+                for record, data in zip(group, results):
+                    _apply(record, data)
                 _flush(path, records)
-                since_ckpt = 0
                 print(f"  checkpoint {path.name}: filled={stats['filled']} missed={stats['missed']}", flush=True)
-        if changed:
-            _flush(path, records)
+                if sleep_seconds:
+                    time.sleep(sleep_seconds)
     return stats
 
 
@@ -121,10 +122,12 @@ def main() -> None:
     parser.add_argument("--mailto", default="")
     parser.add_argument("--sleep-seconds", type=float, default=0.2)
     parser.add_argument("--timeout", type=int, default=25)
+    parser.add_argument("--workers", type=int, default=5)
     args = parser.parse_args()
     stats = backfill(
         source=args.source, canonical_dir=args.canonical_dir, limit=args.limit,
         mailto=args.mailto, sleep_seconds=args.sleep_seconds, timeout=args.timeout,
+        workers=args.workers,
     )
     print(json.dumps(stats, ensure_ascii=False))
 
