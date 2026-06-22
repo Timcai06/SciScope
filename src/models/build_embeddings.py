@@ -78,6 +78,12 @@ def build_embeddings(
                 )
                 existing = {row[0] for row in cur.fetchall()}
 
+        # Only embed chunks that still exist in paper_chunks (dedup may have
+        # removed some); embedding a missing chunk_uid violates the FK.
+        with conn.cursor() as cur:
+            cur.execute("SELECT chunk_uid FROM paper_chunks WHERE chunk_type = ANY(%s)", (list(selected),))
+            valid: set[str] = {row[0] for row in cur.fetchall()}
+
         upsert_sql = """
             INSERT INTO chunk_embeddings (chunk_uid, embedding_model, embedding)
             VALUES (%s, %s, %s)
@@ -89,7 +95,7 @@ def build_embeddings(
         since_commit = 0
         for batch in _batched(iter_chunks(chunks_path, selected), batch_size):
             stats["total_seen"] += len(batch)
-            pending = [c for c in batch if c["chunk_uid"] not in existing]
+            pending = [c for c in batch if c["chunk_uid"] in valid and c["chunk_uid"] not in existing]
             stats["skipped"] += len(batch) - len(pending)
             if not pending:
                 continue
