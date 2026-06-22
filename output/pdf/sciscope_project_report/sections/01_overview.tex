@@ -1,0 +1,30 @@
+\section{项目概述}
+
+\subsection{项目背景}
+科研文献数量爆炸式增长,科研人员在文献调研、知识提取、研究趋势分析等环节面临巨大挑战。
+传统关键词检索是\textbf{字面匹配},难以满足细粒度、多维度、个性化、跨语言的知识需求;
+而直接使用通用大模型问答又存在\textbf{幻觉、无出处、不可复现}等问题,无法支撑严肃的科研决策。
+本项目构建\textbf{SciScope 科研智能体},自动解析文献、提取关键信息、构建知识图谱,
+并支持自然语言问答与研究方向推荐,在\textbf{每个结论都附可追溯证据}的前提下提升科研效率与知识管理水平。
+
+\subsection{应用行业}
+高校与科研院所、企业研发部门、科技情报与图书馆机构、科研管理与基金评审部门。
+典型场景:研究热点定位、领域脉络梳理、潜在合作者识别、文献调研提速、立项查新与综述辅助。
+
+\subsection{主要工作}
+\begin{itemize}
+\item \textbf{数据底座}:从 arXiv、PubMed、PMC、OpenAlex、Crossref、DOAJ 6 个公开来源采集、清洗、规范化、去重,形成 159{,}190 篇、跨计算机/生物医学/材料等多领域、主窗口 2022--2026 的可复现语料。
+\item \textbf{数据分析报告}(交付物①):文献分布、关键词演化、作者合作网络、主题模型、趋势统计(见同级交付物 \texttt{sciscope\_data\_report})。
+\item \textbf{科研智能体模型}(交付物②):本地嵌入索引、混合检索、趋势预测、论文推荐、知识图谱五大模型,配套 FastAPI 服务与 Next.js 工作台。
+\item \textbf{系统工程}:PostgreSQL + pgvector 服务层、本地大模型(vLLM/MLX)生成层、一键复现的 Makefile 流水线与自动化测试。
+\end{itemize}
+
+\subsection{创新点}
+\begin{reportbox}{四个核心创新}
+\begin{enumerate}
+\item \textbf{大模型无关的证据接地架构(LLM-agnostic, evidence-grounded)}:大模型只负责"用人话写答案",领域智能沉淀在本地可复现的索引/模型文件中;换任意大模型系统照常工作,每条回答均附引用论文,杜绝幻觉、可审计。
+\item \textbf{字面 + 语义混合检索(Hybrid Retrieval)}:PostgreSQL 全文检索(FTS)与 pgvector 向量检索双路并行,用 RRF(倒数排名融合)合并,兼顾精确匹配与语义/跨语言理解(中文问句可命中英文文献)。
+\item \textbf{"模型文件"即可复现资产}:不依赖黑盒训练权重,而是用本项目代码从本项目语料\textbf{计算/拟合}出的嵌入索引、趋势模型、推荐向量、知识图谱;\texttt{make agent-build} 可一键重建,知识产权清晰、评委可复现。
+\item \textbf{数据质量工程}:标题优先去重 + 期刊 front-matter 剔除 + PDF 垃圾过滤 + 关键词噪声过滤(剔除 arXiv 分类码与超泛学科标签),显著提升检索、趋势与图谱的信噪比。
+\end{enumerate}
+\end{reportbox}

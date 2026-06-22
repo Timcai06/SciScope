@@ -1,0 +1,51 @@
+\section{解决方案}
+
+\subsection{总体方案设计}
+系统采用\textbf{可复现流水线 + PostgreSQL 服务层}的分层架构,数据自左向右逐层加工为"可问答系统":
+
+\begin{plainbox}
+\ttfamily\small
+原始采集(raw) → 清洗规范化/去重(processed) → 分析资产(analysis)\\
+\hphantom{原始采集} ↘ RAG/模型层 → PostgreSQL + pgvector 服务层 → FastAPI → Next.js 工作台
+\end{plainbox}
+
+\textbf{设计原则}:① 离线可复现(每层产物由 \texttt{make} 目标生成);② 大模型可替换(生成层走 OpenAI 兼容接口);③ 证据可追溯(回答必带引用);④ 本地优先(数据与索引均在本地,支持涉密场景)。
+
+\subsection{方案功能}
+\begin{itemize}
+\item \textbf{文献问答 \texttt{/api/chat}}:中/英文提问 → 混合检索证据 → 本地大模型基于证据生成带引用的回答。
+\item \textbf{混合检索 \texttt{/api/search}}:FTS + 向量 + RRF 融合,返回去重到论文级的结果与命中片段。
+\item \textbf{趋势预测 \texttt{/api/trends}}:关键词/主题的增长率、burst、生命周期与下一年线性外推(含不确定区间)。
+\item \textbf{论文推荐 \texttt{/api/recommend}}:给定种子论文,融合语义相似 + 关键词重叠 + 作者关系 + 时近性,输出\textbf{带可解释因子}的推荐。
+\item \textbf{知识图谱 \texttt{/api/graph}}:作者合作图、关键词共现图、论文-主题图;作者支持基于数据库的实时 ego 子图。
+\item \textbf{交互工作台}:Next.js 仪表盘 + 检索/趋势/推荐/图谱/问答五大面板。
+\end{itemize}
+
+\subsection{关键技术}
+\begin{itemize}
+\item \textbf{向量化}:本地 \texttt{multilingual-e5-base}(768 维,中英跨语言),fp16 加速,可断点续传;向量写入 pgvector \texttt{chunk\_embeddings}。
+\item \textbf{混合检索与 RRF}:\texttt{tsvector} 全文索引 + \texttt{ivfflat} 余弦向量索引;两路结果按 $1/(k+\text{rank})$ 融合(k=60),去重至论文级并回填标题/年份/作者/片段。
+\item \textbf{趋势模型}:在逐年归一化词频上做最小二乘外推,残差估计不确定带;主题模型 LDA/NMF 各 40 个主题。
+\item \textbf{推荐模型}:论文级平均向量(pgvector \texttt{avg})+ 多信号加权融合,每条推荐给出 semantic/keyword/author/recency 因子。
+\item \textbf{知识图谱}:NetworkX 计算中心度/社区,导出前端友好 JSON;百万级边表按中心度剪枝,作者 ego 图走 SQL 实时查询。
+\item \textbf{生成层}:OpenAI 兼容本地服务(vLLM-Metal / LM Studio),输出限长防失控;可平滑切换更大模型或远程模型。
+\end{itemize}
+
+\subsection{实现过程}
+\subsubsection{数据生成与采集}
+通过统一采集器从 6 个公开来源按领域、年份抓取元数据与部分全文;原始数据落 \texttt{data/raw\_canonical/} 按"来源/年份"分区的 JSONL。
+
+\subsubsection{数据组织与治理}
+规范化统一字段(标题/摘要/作者/年份/关键词/正文/来源);治理环节修复三类质量问题:
+\textbf{(a) 去重}——长标题(≥25 字)优先于 DOI 的去重键,合并跨源/预印本-正式版同篇,每组保留信息最全的一条,并剔除期刊 front-matter;
+\textbf{(b) PDF 垃圾过滤}——剔除提取失败、混入 PDF 对象字节的"伪正文";
+\textbf{(c) NUL 字节清洗}——保证入库稳定。
+治理后 160{,}488 → 159{,}190 篇,残留长标题重复组归零。
+
+\subsubsection{信息汲取与建模}
+将语料切分为检索片段(标题摘要/正文/关键词),灌入 PostgreSQL;计算片段向量与论文级向量,拟合趋势、推荐、图谱与主题模型;
+关键词环节统一过滤 arXiv 分类码(\texttt{cs.lg} 等)、超泛学科标签与期刊名,显著提升趋势与图谱质量。
+所有模型产物由 \texttt{make agent-build} 一键重建。
+
+\subsubsection{服务与交互}
+FastAPI 暴露五大接口,前端工作台可视化;问答链路在数据库不可用时自动回退内存检索,保证演示鲁棒。

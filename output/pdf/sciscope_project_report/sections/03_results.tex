@@ -1,0 +1,82 @@
+\section{结果分析}
+
+\subsection{数据底座规模与分布}
+治理去重后语料 159{,}190 篇,主窗口 2022--2026 年分布均衡,领域以计算机科学、生物医学、物理、材料为主。
+
+\begin{figure}[H]
+\figasset[0.78\textwidth]{field_distribution.png}
+\caption{领域分布:计算机科学、生物医学、物理科学、材料科学为四大主力领域}
+\end{figure}
+
+\begin{figure}[H]
+\figasset[0.78\textwidth]{year_distribution.png}
+\caption{年份分布:主窗口 2022--2026 年每年约 3 万篇,近五年覆盖充分}
+\end{figure}
+
+\subsection{检索质量与效率(测试结果)}
+采用\textbf{自检索协议}(以论文自身的标题/关键词为查询,检验能否检回该文)在全库 100 篇随机样本上评测:
+
+\begin{center}
+\begin{tabularx}{0.92\textwidth}{Xcccc}
+\toprule
+\textbf{查询方式} & \textbf{recall@1} & \textbf{recall@10} & \textbf{MRR@10} & \textbf{平均延迟} \\
+\midrule
+按标题(含语义臂) & 0.94 & \textbf{0.99} & 0.965 & $\sim$250\,ms \\
+按关键词 & 0.60 & 0.69 & 0.63 & $\sim$100\,ms \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+标题查询近乎总能将目标论文排进前列(recall@10=0.99),延迟亚秒级,体现混合检索的\textbf{效果与效率}。
+关键词查询指标偏低,反映的是全库真实难度(含摘要稀疏论文),为后续优化指明方向,数据真实不回避。
+
+\subsection{语义覆盖修复(消融对比)}
+初版仅对"有全文"的论文嵌入,导致语义检索严重偏向生物医学、对最大领域计算机科学近乎失明;
+通过\textbf{全量标题摘要嵌入}修复后,论文级向量从 17{,}913 跃升至 159{,}190,计算机科学覆盖如下:
+
+\begin{center}
+\begin{tabularx}{0.78\textwidth}{Xcc}
+\toprule
+\textbf{领域} & \textbf{修复前(论文级向量)} & \textbf{修复后} \\
+\midrule
+computer science & 87 & \textbf{58{,}038} \\
+biomedicine & 9{,}668 & 46{,}405 \\
+physical sciences & 5{,}646 & 28{,}098 \\
+materials science & 20 & 14{,}572 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+修复后语义检索与推荐\textbf{覆盖全部 16 万篇全领域},中文问句可跨语言命中英文文献。
+
+\subsection{趋势预测结果}
+关键词清洗后,热点排行回归真实研究主题:\textbf{retrieval augmented generation}、\textbf{large language model}
+位居新兴前列,与 2022--2026 年科研态势吻合;主题模型(40 主题)清晰区分出 LLM、RAG、图神经网络、锂电池、蛋白结构、知识图谱、催化等领域。
+
+\begin{figure}[H]
+\figasset[0.82\textwidth]{keyword_momentum.png}
+\caption{关键词动量/趋势:清洗噪声(arXiv 分类码、期刊名)后呈现真实研究热点}
+\end{figure}
+
+\subsection{知识图谱与合作网络}
+作者合作网络与关键词共现网络可视化领域结构,支持以某作者/关键词为中心的子图查询,辅助识别潜在合作者与研究社区。
+
+\begin{figure}[H]
+\figasset[0.74\textwidth]{author_collaboration_network.png}
+\caption{作者合作网络:揭示研究社区与潜在合作关系}
+\end{figure}
+
+\subsection{模型资产规模}
+\begin{center}
+\begin{tabularx}{0.92\textwidth}{Xc}
+\toprule
+\textbf{模型文件 / 索引} & \textbf{规模} \\
+\midrule
+片段向量 \texttt{chunk\_embeddings}(pgvector) & 226{,}434 \\
+论文级向量 \texttt{paper\_embeddings} & 159{,}190 \\
+主题模型(LDA + NMF) & 40 主题 / 模型 \\
+知识图谱(作者/关键词/主题) & 前端友好 JSON \\
+后端自动化测试 & 92 项全部通过 \\
+\bottomrule
+\end{tabularx}
+\end{center}

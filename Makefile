@@ -88,7 +88,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build chat topic-model eval-retrieval backfill-abstracts dedupe-db report-figures data-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build chat topic-model eval-retrieval backfill-abstracts dedupe-db report-figures data-report-pdf project-report-pdf report backend frontend dev dev-vllm vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -311,6 +311,19 @@ data-report-pdf:
 		output/pdf/sciscope_data_report/main.synctex.gz \
 		output/pdf/sciscope_data_report/main.toc \
 		output/pdf/sciscope_data_report/main.xdv
+
+project-report-pdf:
+	python3 /Users/tim/.codex/plugins/cache/openai-bundled/latex/0.2.3/scripts/compile_latex.py $(CURDIR)/output/pdf/sciscope_project_report/main.tex --engine xelatex
+	cp output/pdf/sciscope_project_report/main.pdf output/pdf/sciscope_project_report/sciscope_project_report.pdf
+	rm -f output/pdf/sciscope_project_report/main.aux \
+		output/pdf/sciscope_project_report/main.fdb_latexmk \
+		output/pdf/sciscope_project_report/main.fls \
+		output/pdf/sciscope_project_report/main.log \
+		output/pdf/sciscope_project_report/main.out \
+		output/pdf/sciscope_project_report/main.pdf \
+		output/pdf/sciscope_project_report/main.synctex.gz \
+		output/pdf/sciscope_project_report/main.toc \
+		output/pdf/sciscope_project_report/main.xdv
 
 report: analysis-assets processed-corpus report-figures data-report-pdf
 
