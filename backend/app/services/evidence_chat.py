@@ -100,28 +100,55 @@ _STOP = {
 
 
 def _verify_answer(answer: str, evidence: list[EvidenceItem]) -> str:
-    """Lightweight faithfulness check: is the answer supported by the evidence?
+    """Faithfulness check: is the answer supported by the evidence?
 
-    Measures the share of the answer's content words that appear in the evidence
-    text (titles + snippets). Low overlap → the answer may be ungrounded → lower
-    confidence so the UI can flag it.
+    Prefers a cross-lingual *semantic* match (embed answer vs evidence) so a
+    correct Chinese answer grounded in English papers is not wrongly flagged.
+    Falls back to lexical overlap + citation signal when the embedder is not
+    available (e.g. unit tests / no DB).
     """
-    # Citation signal: does the answer reference evidence indices [n]?
     cited = {int(m) for m in re.findall(r"\[(\d+)\]", answer) if 0 < int(m) <= len(evidence)}
-
-    answer_terms = {t for t in _text_terms(answer) if t not in _STOP and len(t) > 2}
     evidence_text = " ".join(f"{e.title} {e.snippet}" for e in evidence)
+
+    sim = _semantic_support(answer, evidence_text)
+    if sim is not None:
+        if sim >= 0.80 or (sim >= 0.70 and cited):
+            return "high"
+        if sim >= 0.62 or cited:
+            return "medium"
+        return "low"
+
+    # Lexical fallback (cross-lingual unaware) — citation also counts as grounding.
+    answer_terms = {t for t in _text_terms(answer) if t not in _STOP and len(t) > 2}
     evidence_terms = _text_terms(evidence_text)
     supported = sum(1 for t in answer_terms if t in evidence_terms)
     support_ratio = supported / len(answer_terms) if answer_terms else 0.0
-
-    # Lexical overlap fails cross-lingually (Chinese answer vs English evidence),
-    # so a valid citation also counts as grounding evidence.
     if support_ratio >= 0.5 or (cited and support_ratio >= 0.2):
         return "high"
     if support_ratio >= 0.25 or cited:
         return "medium"
     return "low"
+
+
+def _semantic_support(answer: str, evidence_text: str) -> float | None:
+    """Cosine similarity between answer and evidence via the local embedder.
+
+    Returns None when the embedder/service layer is unavailable so the caller
+    can fall back to lexical scoring.
+    """
+    if not answer.strip() or not evidence_text.strip() or not retrieval_service.is_available():
+        return None
+    try:
+        from src.models.embeddings import get_embedder
+
+        emb = get_embedder()
+        import numpy as np
+
+        a = emb.encode_passages([answer[:1200]])[0]
+        e = emb.encode_passages([evidence_text[:1500]])[0]
+        return float(np.dot(a, e))  # both are L2-normalized
+    except Exception:
+        return None
 
 
 
