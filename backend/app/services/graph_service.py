@@ -105,7 +105,12 @@ def graph(graph_type: str, center: str | None = None, limit: int = 100) -> dict[
     full = _load(graph_type)
     if center:
         return _ego_filter(full, center, limit)
-    # Overview: cap edges/nodes for payload size.
+    # Overview: cap edges/nodes for payload size; include community themes.
     nodes = full.get("nodes", [])
     edges = full.get("edges", [])[:limit] if limit else full.get("edges", [])
-    return {"type": full.get("type", graph_type), "nodes": nodes, "edges": edges}
+    return {
+        "type": full.get("type", graph_type),
+        "nodes": nodes,
+        "edges": edges,
+        "communities": full.get("communities", []),
+    }

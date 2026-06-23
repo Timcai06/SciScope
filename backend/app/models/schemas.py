@@ -147,11 +147,18 @@ class GraphEdge(BaseModel):
     weight: int = 1
 
 
+class GraphCommunity(BaseModel):
+    community: float | int | str | None = None
+    size: int
+    top_terms: list[str] = Field(default_factory=list)
+
+
 class GraphResponse(BaseModel):
     type: str
     center: str | None = None
     nodes: list[GraphNode]
     edges: list[GraphEdge]
+    communities: list[GraphCommunity] = Field(default_factory=list)
 
 
 class IngestStatusResponse(BaseModel):

@@ -79,6 +79,33 @@ def build_author_graph(analysis_dir: Path) -> dict[str, Any]:
     return {"type": "author", "nodes": nodes, "edges": edges}
 
 
+def _community_summaries(nodes: list[dict[str, Any]], top_k: int = 8) -> list[dict[str, Any]]:
+    """Turn raw community ids into interpretable research-theme summaries.
+
+    Groups nodes by community and lists each community's most central members, so
+    a numeric community id becomes a readable theme (e.g. {LLM, RAG, transformer}).
+    """
+    from collections import defaultdict
+
+    groups: dict[Any, list[dict[str, Any]]] = defaultdict(list)
+    for node in nodes:
+        cid = node.get("community")
+        if cid is not None:
+            groups[cid].append(node)
+    summaries = []
+    for cid, members in groups.items():
+        members.sort(key=lambda n: n.get("pagerank", 0) or 0, reverse=True)
+        summaries.append(
+            {
+                "community": _safe(cid),
+                "size": len(members),
+                "top_terms": [m["label"] for m in members[:top_k]],
+            }
+        )
+    summaries.sort(key=lambda s: s["size"], reverse=True)
+    return summaries
+
+
 def build_keyword_graph(analysis_dir: Path) -> dict[str, Any]:
     metrics = pd.read_csv(
         analysis_dir / "keyword_metrics.csv",
@@ -102,7 +129,7 @@ def build_keyword_graph(analysis_dir: Path) -> dict[str, Any]:
         analysis_dir / "keyword_cooccurrence_edges.csv",
         "keyword_a", "keyword_b", "weight", allowed, 1,
     )
-    return {"type": "keyword", "nodes": nodes, "edges": edges}
+    return {"type": "keyword", "nodes": nodes, "edges": edges, "communities": _community_summaries(nodes)}
 
 
 def build_paper_topic_graph(analysis_dir: Path) -> dict[str, Any]:
@@ -149,7 +176,8 @@ def run(analysis_dir: Path = ANALYSIS_DIR, output_dir: Path = OUTPUT_DIR) -> dic
     metrics = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "author": {"nodes": len(author["nodes"]), "edges": len(author["edges"]), "top_n": TOP_AUTHORS},
-        "keyword": {"nodes": len(keyword["nodes"]), "edges": len(keyword["edges"]), "top_n": TOP_KEYWORDS},
+        "keyword": {"nodes": len(keyword["nodes"]), "edges": len(keyword["edges"]), "top_n": TOP_KEYWORDS,
+                    "communities": len(keyword.get("communities", []))},
         "paper_topic": {"nodes": len(topic["nodes"]), "edges": len(topic["edges"]), "model": topic["model"]},
         "note": "Overview graphs are pruned to top-centrality nodes; per-author ego graphs are served live from coauthor_edges.",
     }
