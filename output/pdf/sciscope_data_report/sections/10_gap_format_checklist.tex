@@ -1,0 +1,84 @@
+\section{补充分析与格式规范清查}
+
+\begin{reportbox}{改到高分版的补强方向}
+现有报告已经覆盖分布、关键词演化、主题模型、作者网络和质量边界。若继续冲刺高分, 重点不是堆更多图, 而是补上“可行动结论”和“评分维度闭环”: 哪些方向值得关注, 哪些方向正在衰退, 哪些跨领域组合可能产生科研和产业价值。
+\end{reportbox}
+
+\subsection{建议补充的高价值分析}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{34mm}X X}
+\toprule
+缺失分析 & 新图或新表定义 & 评分价值 \\
+\midrule
+领域交叉趋势 & 领域-关键词桥接热力图: 行为领域, 列为共享热点词, 值为领域内归一化占比; 需用 \texttt{paper\_taxonomy.csv} 与 \texttt{paper\_keyword\_signals.csv} 核对。 & 支撑社会效益中的跨学科治理和技术创新中的融合分析。 \\
+新兴与衰退主题对比 & 新兴/衰退主题 Top 表: 关键词、生命周期、动量、burst、代表论文; 需用 \texttt{keyword\_lifecycle.csv} 和 \texttt{keyword\_burst\_windows.csv} 核对。 & 把热点识别从“高频榜”升级为“机会与风险清单”。 \\
+不同来源主题偏向 & 来源-主题偏向矩阵: 行为来源, 列为主题, 值为来源内主题占比; 需用 \texttt{papers\_clean.json} 与 \texttt{paper\_topics.csv} 核对。 & 解释来源偏差, 提高格式规范和可信度。 \\
+关键词出现到爆发时滞 & 时滞箱线图: x 为领域或主题类, y 为首次出现到 burst 年份差; 需用 \texttt{keyword\_lifecycle.csv} 与 \texttt{keyword\_burst\_windows.csv} 核对。 & 体现预测性情报能力, 服务经济效益。 \\
+下一年热点候选 Top10 & 候选热点表: 关键词、历史趋势、2026 YTD 信号、动量、burst、置信等级; 需用 \texttt{keyword\_trends.csv} 核对。 & 提供可行动的前沿监测清单, 但必须写成候选而非确定预测。 \\
+主题模型一致性验证 & LDA/NMF 对齐表: 模型、主题标签、关键词重叠、代表论文; 需用 \texttt{topic\_keywords.csv} 与 \texttt{topic\_model\_comparison.csv} 核对。 & 增强技术创新的稳健性说明。 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{图表改写统一模板}
+
+每张图后的解释建议统一采用“数据 -- 发现 -- 解读 -- 启示”四段式。该模板可降低报告中的描述性语句比例, 让图表直接服务结论。
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{25mm}X}
+\toprule
+段落 & 写法 \\
+\midrule
+数据 & 说明图表来自哪张分析表、统计窗口、归一化方式和异常处理; 涉及数字处标注需用 \texttt{data/analysis/} 核对。 \\
+发现 & 用一句话指出图中最重要的结构、上升、下降、偏差或分层。 \\
+解读 & 解释该现象为什么出现, 是否可能受来源偏差、字段缺失或模型参数影响。 \\
+启示 & 回到科研管理、科技情报、产业研发或政策制定, 说明该图能支持什么行动。 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{格式规范 Checklist}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{31mm}X X}
+\toprule
+检查项 & 当前风险 & 修改建议 \\
+\midrule
+标题层级 & 发现、启示、结论部分存在少量重复 & 保留“核心发现”和“结论”, 中间章节末尾统一写应用启示。 \\
+图表编号 & 图很多, 若正文不逐一引用会显得堆图 & 每张图在正文首次出现前写“见图 X”, 图注写清数据来源和读图口径。 \\
+图注完整性 & 部分图注偏“图中有什么” & 图注补充数据来源、统计窗口、归一化口径、核心结论。 \\
+术语统一 & 中英文术语较多 & 首次使用写“检索增强生成(RAG)”“大语言模型(LLM)”, 后文保持缩写一致。 \\
+中英文混排 & 英文缩写、文件名、方法名密集 & 英文缩写前后留空格; 文件名统一用 \texttt{} 标注。 \\
+参考来源 & 算法和公开数据来源需要可追溯 & 为 OpenAlex、PubMed、PMC、Crossref、DOAJ、arXiv 及 LDA/NMF、Louvain、PageRank 增加参考来源。 \\
+摘要结论闭环 & 摘要已列发现, 价值和创新不足 & 摘要中增加社会效益、经济效益和技术创新各一句。 \\
+页眉页脚 & 当前已有页眉页脚 & 保持报告名、分析窗口和页码; 封面不显示页码。 \\
+目录 & 章节较多 & 目录保留到二级标题, 避免三级标题过碎。 \\
+数字核对 & 报告内已有多处具体数字 & 最终提交前逐项核对 \texttt{summary.json}、\texttt{source\_quality\_report.csv}、\texttt{keyword\_trends.csv} 等。 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\subsection{高分版章节结构建议}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{36mm}X}
+\toprule
+章节 & 核心结论一句话 \\
+\midrule
+摘要 & 本报告用多来源文献数据识别近五年科研热点、合作结构和可信边界。 \\
+数据范围与分析口径 & 数据覆盖可支撑年度趋势, 但来源偏差和字段完整度必须显性控制。 \\
+数据质量与可信度审计 & 摘要级趋势可信, 全文级结论需限定证据范围。 \\
+文献分布与领域结构 & 计算机科学和生物医学构成主要样本, 材料科学需用归一化口径解释。 \\
+关键词演化与热点识别 & LLM、RAG、知识图谱等方向在多证据口径下呈现上升信号; 具体数字需用 \texttt{data/analysis/} 核对。 \\
+主题结构与学科融合 & 主题模型和领域交叉分析可揭示 AI 方法向生物医学、材料科学迁移的路径。 \\
+作者合作网络与知识流动 & 合作网络可识别核心团队、桥接作者和潜在跨领域合作机会, 但个人排名需消歧复核。 \\
+新兴方向与下一年候选热点 & 用生命周期、burst、动量和代表论文构建可解释的前沿机会清单。 \\
+社会效益与经济效益 & 报告可服务科研管理、科技情报、产业研发、投资尽调和政策制定。 \\
+技术创新与可复现性 & 创新点在于融合关键词信号、归一化趋势、生命周期、共现网络、主题模型和质量审计的一体化框架。 \\
+结论、局限与后续工作 & 当前最可靠的是结构性趋势判断, 后续应补强全文覆盖、作者消歧、来源偏差校正和代表论文证据链。 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\clearpage
