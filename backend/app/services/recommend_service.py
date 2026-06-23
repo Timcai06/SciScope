@@ -17,6 +17,7 @@ W_SEMANTIC = 0.6
 W_KEYWORD = 0.2
 W_AUTHOR = 0.1
 W_RECENCY = 0.1
+MMR_LAMBDA = 0.7  # relevance vs diversity trade-off for the final selection
 
 
 @dataclass
@@ -88,10 +89,10 @@ def recommend(paper_id: str, limit: int = 10) -> list[Recommendation]:
             seed_keywords = _keywords(cur, seed_uid)
             seed_authors = _authors(cur, seed_uid)
 
-            # Semantic candidate pool.
+            # Semantic candidate pool (fetch vectors too, for MMR diversity).
             cur.execute(
                 """
-                SELECT pe.paper_uid, 1 - (pe.embedding <=> %s) AS sim
+                SELECT pe.paper_uid, 1 - (pe.embedding <=> %s) AS sim, pe.embedding
                 FROM paper_embeddings pe
                 WHERE pe.paper_uid <> %s
                 ORDER BY pe.embedding <=> %s
@@ -105,11 +106,12 @@ def recommend(paper_id: str, limit: int = 10) -> list[Recommendation]:
 
             cand_uids = [c[0] for c in candidates]
             sim_by_uid = {c[0]: float(c[1]) for c in candidates}
+            vec_by_uid = {c[0]: c[2] for c in candidates}
             meta = _hydrate(cur, cand_uids)
             kw_by_uid = _keywords_bulk(cur, cand_uids)
             auth_by_uid = _authors_bulk(cur, cand_uids)
 
-    results: list[Recommendation] = []
+    rec_by_uid: dict[str, Recommendation] = {}
     for uid in cand_uids:
         info = meta.get(uid)
         if not info:
@@ -121,26 +123,58 @@ def recommend(paper_id: str, limit: int = 10) -> list[Recommendation]:
         au_score = 1.0 if shared_au else 0.0
         rec_score = _recency(info.get("year"), seed_year)
         total = W_SEMANTIC * sim + W_KEYWORD * kw_score + W_AUTHOR * au_score + W_RECENCY * rec_score
-        results.append(
-            Recommendation(
-                paper_id=str(info.get("paper_id") or uid),
-                title=str(info.get("title") or ""),
-                year=info.get("year"),
-                field=str(info.get("field") or "unknown"),
-                score=round(total, 6),
-                semantic_similarity=round(sim, 6),
-                shared_keywords=shared_kw[:10],
-                shared_authors=shared_au[:5],
-                factors={
-                    "semantic": round(W_SEMANTIC * sim, 6),
-                    "keyword_overlap": round(W_KEYWORD * kw_score, 6),
-                    "author_overlap": round(W_AUTHOR * au_score, 6),
-                    "recency": round(W_RECENCY * rec_score, 6),
-                },
-            )
+        rec_by_uid[uid] = Recommendation(
+            paper_id=str(info.get("paper_id") or uid),
+            title=str(info.get("title") or ""),
+            year=info.get("year"),
+            field=str(info.get("field") or "unknown"),
+            score=round(total, 6),
+            semantic_similarity=round(sim, 6),
+            shared_keywords=shared_kw[:10],
+            shared_authors=shared_au[:5],
+            factors={
+                "semantic": round(W_SEMANTIC * sim, 6),
+                "keyword_overlap": round(W_KEYWORD * kw_score, 6),
+                "author_overlap": round(W_AUTHOR * au_score, 6),
+                "recency": round(W_RECENCY * rec_score, 6),
+            },
         )
-    results.sort(key=lambda r: r.score, reverse=True)
-    return results[:limit]
+
+    # MMR selection: balance relevance with diversity so the list isn't a cluster
+    # of near-identical papers. Re-ranks the scored pool, not just top-by-score.
+    ordered_uids = _mmr_select(
+        {uid: rec_by_uid[uid].score for uid in rec_by_uid},
+        {uid: vec_by_uid[uid] for uid in rec_by_uid},
+        limit,
+    )
+    return [rec_by_uid[uid] for uid in ordered_uids]
+
+
+def _mmr_select(score_by_uid: dict[str, float], vec_by_uid: dict, limit: int, lam: float = MMR_LAMBDA) -> list[str]:
+    import numpy as np
+
+    uids = list(score_by_uid)
+    if not uids:
+        return []
+    vecs = {u: np.asarray(vec_by_uid[u], dtype=float) for u in uids}
+    norms = {u: (float(np.linalg.norm(v)) or 1e-9) for u, v in vecs.items()}
+
+    def cos(a: str, b: str) -> float:
+        return float(np.dot(vecs[a], vecs[b]) / (norms[a] * norms[b]))
+
+    selected: list[str] = []
+    remaining = sorted(uids, key=lambda u: score_by_uid[u], reverse=True)
+    while remaining and len(selected) < limit:
+        if not selected:
+            best = remaining[0]
+        else:
+            best = max(
+                remaining,
+                key=lambda u: lam * score_by_uid[u] - (1 - lam) * max(cos(u, s) for s in selected),
+            )
+        selected.append(best)
+        remaining.remove(best)
+    return selected
 
 
 def _recency(year: int | None, seed_year: int | None) -> float:
