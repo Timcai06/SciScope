@@ -108,6 +108,19 @@ def _drain(gen: Iterator[tuple[str, Any]], forward) -> tuple[str, list[dict]]:
         forward(kind, payload)
 
 
+def _compact(messages: list[dict], budget_chars: int = 20000) -> None:
+    """Lightweight context 'snip' (à la Claude Code): if the running transcript
+    grows past budget, truncate older tool results in place — keep structure and
+    the most recent turns intact so we never overflow the 8k window.
+    """
+    total = sum(len(str(m.get("content") or "")) for m in messages)
+    if total <= budget_chars:
+        return
+    for m in messages[1:-4]:  # keep system + last 4 messages full
+        if m.get("role") == "tool" and len(str(m.get("content") or "")) > 400:
+            m["content"] = str(m["content"])[:400] + " …(结果已压缩)"
+
+
 def _run_tools(tool_calls: list[dict]) -> list[str]:
     """Execute a step's tool calls in parallel (all SciScope tools are read-only)."""
     def one(tc: dict) -> str:
@@ -145,6 +158,7 @@ def stream_agent(
     forward = lambda k, p: text_events.append((k, p))  # noqa: E731
 
     for _ in range(MAX_STEPS):
+        _compact(messages)
         text_events.clear()
         full_text, tool_calls = _drain(_stream_chat(messages, model, TOOL_SCHEMAS), forward)
         for ev in text_events:
