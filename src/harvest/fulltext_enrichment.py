@@ -21,6 +21,7 @@ from urllib.request import Request, urlopen
 
 
 ARXIV_EPRINT_URL = "https://arxiv.org/e-print/{paper_id}"
+ARXIV_PDF_URL = "https://export.arxiv.org/pdf/{paper_id}"
 PMC_FULLTEXT_URL = "https://pmc.ncbi.nlm.nih.gov/articles/{pmcid}/"
 DEFAULT_TEXT_LIMIT = 12_000
 DEFAULT_TIMEOUT_SECONDS = 20
@@ -547,10 +548,20 @@ def _enrich_arxiv_record(
     paper_id = _arxiv_id(wrapper)
     if not paper_id:
         return wrapper, False
-    url = ARXIV_EPRINT_URL.format(paper_id=paper_id)
-    payload = _fetch_bytes(url, timeout=timeout_seconds, max_bytes=max_download_bytes)
-    text = _text_from_arxiv_payload(payload)
-    if not text:
+    # Prefer the PDF mirror: arxiv heavily rate-limits/blocks automated e-print
+    # (LaTeX source) downloads, while export.arxiv.org/pdf serves reliably and
+    # parses cleanly with fitz.
+    pdf_url = ARXIV_PDF_URL.format(paper_id=paper_id)
+    payload = _fetch_bytes(pdf_url, timeout=timeout_seconds, max_bytes=max_download_bytes)
+    text = _text_from_pdf(payload) if payload else ""
+    source, url = "arxiv_pdf", pdf_url
+    if len(text.split()) < 80:
+        # Fallback to the e-print source tarball.
+        url = ARXIV_EPRINT_URL.format(paper_id=paper_id)
+        payload = _fetch_bytes(url, timeout=timeout_seconds, max_bytes=max_download_bytes)
+        text = _text_from_arxiv_payload(payload)
+        source = "arxiv_eprint"
+    if not text or len(text.split()) < 80:
         return wrapper, False
     raw = wrapper.get("raw") if isinstance(wrapper.get("raw"), dict) else {}
     enriched = {
@@ -559,7 +570,7 @@ def _enrich_arxiv_record(
             **raw,
             "body_excerpt": text[:text_limit],
             "fullText": text[:text_limit],
-            "full_text_source": "arxiv_eprint",
+            "full_text_source": source,
             "full_text_url": url,
             "full_text_enriched_at": _utc_now(),
         },
