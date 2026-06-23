@@ -70,7 +70,7 @@ VLLM_MODEL ?= mlx-community/Qwen2.5-7B-Instruct-4bit
 VLLM_VENV ?= $(HOME)/.venv-vllm-metal
 VLLM_MAX_MODEL_LEN ?= 8192
 VLLM_EXTRA_ARGS ?=
-LLM_LOCAL_DIR ?= models/llm_local/Qwen2.5-3B-Instruct-4bit
+LLM_LOCAL_DIR ?= models/llm_local/Qwen2.5-7B-Instruct-4bit
 
 export SCISCOPE_APP_NAME ?= SciScope
 export SCISCOPE_ENV ?= local
