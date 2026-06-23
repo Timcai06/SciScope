@@ -7,7 +7,7 @@ recall@k, MRR, and mean latency so retrieval "效果与效率" can be shown
 quantitatively.
 
 Usage:
-    python -m src.models.eval_retrieval --dsn postgresql://tim@localhost:5432/sciscope --sample 200
+    python -m evaluation.eval_retrieval --dsn postgresql://tim@localhost:5432/sciscope --sample 200
 """
 
 from __future__ import annotations

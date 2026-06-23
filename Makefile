@@ -321,11 +321,11 @@ dedupe-db:
 
 # Self-retrieval evaluation of hybrid search (recall@k, MRR, latency).
 eval-retrieval:
-	SCISCOPE_DB_DSN=$(POSTGRES_DSN) SCISCOPE_EMBEDDER_PATH=$(EMBEDDER_PATH) $(PYTHON) -m src.models.eval_retrieval --dsn $(POSTGRES_DSN) --sample $(EVAL_SAMPLE)
+	SCISCOPE_DB_DSN=$(POSTGRES_DSN) SCISCOPE_EMBEDDER_PATH=$(EMBEDDER_PATH) $(PYTHON) -m evaluation.eval_retrieval --dsn $(POSTGRES_DSN) --sample $(EVAL_SAMPLE)
 
 # Full evaluation evidence pack -> output/eval/ (retrieval + trend backtest + recommend).
 eval-all:
-	SCISCOPE_DB_DSN=$(POSTGRES_DSN) SCISCOPE_EMBEDDER_PATH=$(EMBEDDER_PATH) SCISCOPE_EMBED_FP16=1 $(PYTHON) -m src.models.eval_all
+	SCISCOPE_DB_DSN=$(POSTGRES_DSN) SCISCOPE_EMBEDDER_PATH=$(EMBEDDER_PATH) SCISCOPE_EMBED_FP16=1 $(PYTHON) -m evaluation.eval_all
 
 report-figures:
 	@mkdir -p .cache/matplotlib

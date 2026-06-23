@@ -7,7 +7,7 @@ output/eval/eval_report.md (human-readable) covering:
   - recommendation offline evaluation (same-field / shared-keyword rate)
 
 Usage:
-    SCISCOPE_DB_DSN=... SCISCOPE_EMBEDDER_PATH=... python -m src.models.eval_all
+    SCISCOPE_DB_DSN=... SCISCOPE_EMBEDDER_PATH=... python -m evaluation.eval_all
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ OUT_DIR = Path("output/eval")
 
 
 def run() -> dict:
-    from src.models import eval_recommend, eval_retrieval, eval_trends
+    from evaluation import eval_recommend, eval_retrieval, eval_trends
 
     dsn = os.getenv("SCISCOPE_DB_DSN") or os.getenv("SCISCOPE_DATABASE_URL", "postgresql://tim@localhost:5432/sciscope")
     report = {
