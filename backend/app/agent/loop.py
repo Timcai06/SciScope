@@ -26,17 +26,44 @@ from typing import Any, Callable, Iterator
 from backend.app.agent.tools import TOOL_SCHEMAS, execute_tool
 
 LLM_BASE = os.getenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:8001/v1")
-MAX_STEPS = 5
+MAX_STEPS = 6
+MAX_RETRIES = 1  # reflect -> retry budget per question
 
 SYSTEM_PROMPT = (
     "你是 SciScope 科研文献智能体,可访问一个 16 万篇科技文献的知识库。"
     "你拥有以下工具:search_literature(检索论文)、get_trends(研究趋势)、"
-    "recommend_papers(相似论文推荐,需 paper_id)、query_knowledge_graph(知识图谱/研究社区)。"
-    "请根据用户问题自主选择并调用合适的工具(可多步:如先检索拿到 paper_id 再推荐);"
-    "拿到工具结果后,用中文综合归纳作答,引用论文标题,只依据工具返回的真实数据,"
-    "不要编造;若工具未返回有用信息,如实说明。"
-    "注意:检索结果里的「摘要片段」是论文摘要节选,「作者」才是作者,不要把摘要当作者。"
+    "recommend_papers(相似论文推荐,需 paper_id)、get_paper(论文详情)、"
+    "query_knowledge_graph(知识图谱/研究社区)。"
+    "工作方式:① 对复杂问题先规划需要哪些检索步骤,再依次调用工具(可多步:如先检索拿到 "
+    "paper_id 再推荐/取详情);② 凡涉及文献事实的问题,必须先调用工具检索证据,不能凭记忆直接回答;"
+    "③ 拿到工具结果后用中文综合归纳作答,引用论文标题,只依据工具返回的真实数据,不编造;"
+    "证据不足时如实说明。注意:检索结果里的「摘要片段」是论文摘要节选,「作者」才是作者。"
 )
+
+# Answers that signal the retrieval/answer was inadequate — trigger one retry.
+_WEAK_ANSWER = ("没有找到", "未找到", "未检索到", "无法回答", "无法确定", "抱歉",
+                "没有相关", "缺乏", "无相关信息", "i don't", "cannot find", "no relevant")
+# Greetings / meta / capability questions that legitimately need no tools.
+_META = ("你好", "您好", "你是谁", "你是什么", "你能做什么", "你能干什么", "你会什么",
+         "自我介绍", "介绍一下你", "怎么用", "如何使用", "帮助", "谢谢", "多谢", "再见",
+         "hello", "hi ", "who are you", "what can you", "help", "thanks")
+
+
+def _reflect_reason(answer: str, tools_used: int, question: str) -> str | None:
+    """Decide whether to self-correct: returns a retry instruction, or None.
+
+    Two failure modes worth one retry: (a) a *fact-seeking* question answered with
+    zero tool calls (possible hallucination), (b) the answer admits it lacked
+    evidence. Greetings / meta / capability questions are exempt (no tools needed).
+    """
+    a = (answer or "").lower()
+    q = question.strip().lower()
+    is_meta = len(q) < 4 or any(m in q for m in _META)
+    if tools_used == 0 and not is_meta:
+        return "你没有调用任何工具就回答了。请先用 search_literature 等工具检索证据,再据实回答。"
+    if any(w in a for w in _WEAK_ANSWER):
+        return "上次检索证据不足。请换用不同的关键词(或英文术语)重新检索,再回答。"
+    return None
 
 
 def _detect_model() -> str | None:
@@ -157,6 +184,8 @@ def stream_agent(
 
     text_events: list[tuple[str, Any]] = []
     forward = lambda k, p: text_events.append((k, p))  # noqa: E731
+    tools_total = 0
+    retries = 0
 
     for _ in range(MAX_STEPS):
         _compact(messages)
@@ -165,9 +194,18 @@ def stream_agent(
         for ev in text_events:
             yield ev
         if not tool_calls:
+            # Reflect: self-correct once if the answer is ungrounded/insufficient.
+            reason = _reflect_reason(full_text, tools_total, question) if retries < MAX_RETRIES else None
+            if reason:
+                retries += 1
+                yield ("reflect", reason)
+                messages.append({"role": "assistant", "content": full_text})
+                messages.append({"role": "user", "content": reason})
+                continue
             yield ("final", full_text)
             return
         messages.append({"role": "assistant", "content": full_text, "tool_calls": tool_calls})
+        tools_total += len(tool_calls)
         for tc in tool_calls:
             try:
                 args = json.loads(tc["function"].get("arguments") or "{}")

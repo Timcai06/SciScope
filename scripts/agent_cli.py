@@ -104,6 +104,14 @@ def main() -> None:
                     status.start()
                 elif kind == "tool_result":
                     pass  # results feed the model; keep the UI clean
+                elif kind == "reflect":
+                    if live is not None:
+                        live.stop()
+                        live = None
+                    answer = ""  # discard the rejected attempt
+                    console.print(f"  [accent]🔄 自我纠错:[/][muted]{payload[:48]}…[/]")
+                    status = console.status("[muted]重新检索…[/]", spinner="dots")
+                    status.start()
                 elif kind == "text":
                     if live is None:
                         status.stop()
