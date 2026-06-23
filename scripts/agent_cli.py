@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""SciScope agentic terminal assistant.
+"""SciScope agentic terminal assistant (streaming, rich TUI).
 
-Unlike `chat_cli.py` (fixed retrieval->answer), this drives the agent LOOP: the
-local LLM autonomously calls tools (search / trends / recommend / graph) and then
-synthesises a grounded answer. Tool calls are shown inline so you can see the
-agent's reasoning steps.
+Drives the agent LOOP: the local LLM autonomously calls tools (search / trends /
+recommend / graph), streams its reasoning, and synthesises a grounded answer.
+Tool calls are shown live as the agent decides them; the final answer streams in
+token-by-token — the stream/act/observe loop the way OpenCode / Claude Code do it.
 
 Run:
-    make agent          (or)    python scripts/agent_cli.py
+    make agent      (or)    python scripts/agent_cli.py
+Requires `make llm` (tool-calling enabled) on :8001.
 """
 
 from __future__ import annotations
@@ -21,44 +22,59 @@ sys.path.insert(0, REPO)
 os.environ.setdefault("SCISCOPE_DB_DSN", "postgresql://tim@localhost:5432/sciscope")
 os.environ.setdefault("SCISCOPE_EMBEDDER_PATH", os.path.join(REPO, "models/embedder_local/multilingual-e5-base"))
 
+from rich.console import Console  # noqa: E402
 
-def _on_event(kind: str, payload: dict) -> None:
-    if kind == "tool_call":
-        args = ", ".join(f"{k}={v}" for k, v in payload["args"].items())
-        print(f"  \033[36m⚙ 调用 {payload['name']}({args})\033[0m")
-    elif kind == "tool_result":
-        preview = payload["result"].replace("\n", " ")[:90]
-        print(f"  \033[90m← {preview}…\033[0m")
+console = Console()
 
 
 def main() -> None:
-    from backend.app.agent.loop import run_agent, _detect_model
+    from backend.app.agent.loop import _detect_model, stream_agent
 
     model = _detect_model()
     if not model:
-        print("⚠ 本地大模型未在 :8001 运行。请先在另一终端 `make llm`。")
+        console.print("[yellow]⚠ 本地大模型未在 :8001 运行。请先在另一终端 `make llm`。[/]")
         return
-    print(f"SciScope 科研智能体(agent 模式)— 模型: {model}")
-    print("自主调用 检索/趋势/推荐/图谱 工具作答。空行或 Ctrl-C 退出。\n")
+    console.print(f"[bold]SciScope 科研智能体[/] [dim](agent 模式 · {model})[/]")
+    console.print("[dim]自主调用 检索/趋势/推荐/图谱 工具作答。空行或 Ctrl-C 退出。[/]\n")
 
     history: list[dict] = []
     while True:
         try:
-            q = input("你> ").strip()
+            q = console.input("[bold green]你>[/] ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nbye")
+            console.print("\nbye")
             break
         if not q:
             break
+
+        answer = ""
+        in_answer = False
+        used: list[str] = []
         try:
-            result = run_agent(q, history=history, model=model, on_event=_on_event)
+            for kind, payload in stream_agent(q, history=history, model=model):
+                if kind == "tool_call":
+                    args = ", ".join(f"{k}={v}" for k, v in payload["args"].items() if v not in (None, "", 0))
+                    console.print(f"  [cyan]⚙ {payload['name']}[/]([dim]{args}[/])")
+                    used.append(payload["name"])
+                elif kind == "tool_result":
+                    preview = payload["result"].replace("\n", " ")[:80]
+                    console.print(f"  [dim]← {preview}…[/]")
+                elif kind == "text":
+                    if not in_answer:
+                        console.print("[bold blue]AI>[/] ", end="")
+                        in_answer = True
+                    console.print(payload, end="", style="default")
+                    answer += payload
+                elif kind == "final":
+                    if not in_answer and payload:
+                        console.print(f"[bold blue]AI>[/] {payload}", end="")
+                        answer = payload
         except Exception as exc:  # noqa: BLE001
-            print(f"[error] {exc}\n")
+            console.print(f"\n[red][error] {exc}[/]\n")
             continue
-        answer = result["answer"]
-        used = ", ".join(dict.fromkeys(t["name"] for t in result.get("tools_used", []))) or "无"
-        print(f"\nAI> {answer}")
-        print(f"\033[90m[工具: {used} · {result['steps']} 步]\033[0m\n")
+
+        tools_line = ", ".join(dict.fromkeys(used)) or "无"
+        console.print(f"\n[dim][工具: {tools_line}][/]\n")
         history.append({"role": "user", "content": q})
         history.append({"role": "assistant", "content": answer})
         history[:] = history[-8:]

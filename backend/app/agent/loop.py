@@ -1,9 +1,18 @@
 """Agentic loop: the LLM orchestrates SciScope tools to answer a question.
 
-Unlike the fixed RAG pipeline in ``evidence_chat``, here the model itself decides
-which tools to call (search / trends / recommend / graph), in how many steps, and
-then writes a grounded final answer. This is the "research agent" core for the
-terminal assistant.
+Architecture mirrors OpenCode / Claude Code (verified against their source, not
+guessed):
+  * stream -> act -> observe -> repeat (Claude Code's heartbeat)
+  * the loop is a generator that yields typed events (text / tool_call /
+    tool_result / final) — OpenCode's ``fullStream`` of typed parts, which the
+    TUI consumes for live rendering.
+  * tools are read-only, so a step's tool calls run in parallel (Claude Code's
+    "partition by safety, run reads in parallel").
+  * termination: the model emits no tool calls (natural completion) or the step
+    cap is hit.
+
+Unlike ``evidence_chat`` (fixed retrieve->answer pipeline), the model itself
+chooses which tools to call and in how many steps.
 """
 
 from __future__ import annotations
@@ -11,7 +20,8 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
-from typing import Any, Callable
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Callable, Iterator
 
 from backend.app.agent.tools import TOOL_SCHEMAS, execute_tool
 
@@ -36,8 +46,14 @@ def _detect_model() -> str | None:
         return None
 
 
-def _chat(messages: list[dict], model: str, tools: list | None) -> dict:
-    body: dict[str, Any] = {"model": model, "messages": messages, "temperature": 0.1, "max_tokens": 700}
+def _stream_chat(messages: list[dict], model: str, tools: list | None) -> Iterator[tuple[str, Any]]:
+    """Stream a chat completion. Yields ('text', delta); returns (full_text, tool_calls).
+
+    Accumulates streamed tool-call deltas (name + argument fragments) by index,
+    the way the OpenAI streaming protocol delivers them.
+    """
+    body: dict[str, Any] = {"model": model, "messages": messages, "stream": True,
+                            "temperature": 0.1, "max_tokens": 700}
     if tools:
         body["tools"] = tools
         body["tool_choice"] = "auto"
@@ -46,8 +62,115 @@ def _chat(messages: list[dict], model: str, tools: list | None) -> dict:
         data=json.dumps(body).encode(),
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return json.loads(resp.read().decode())
+    full_text = ""
+    acc: dict[int, dict[str, Any]] = {}
+    with urllib.request.urlopen(req, timeout=180) as resp:
+        for raw in resp:
+            line = raw.decode("utf-8").strip()
+            if not line.startswith("data:"):
+                continue
+            data = line[len("data:"):].strip()
+            if data == "[DONE]":
+                break
+            try:
+                delta = json.loads(data)["choices"][0]["delta"]
+            except (json.JSONDecodeError, KeyError, IndexError):
+                continue
+            if delta.get("content"):
+                full_text += delta["content"]
+                yield ("text", delta["content"])
+            for tc in delta.get("tool_calls") or []:
+                idx = tc.get("index", 0)
+                slot = acc.setdefault(idx, {"id": None, "name": None, "arguments": ""})
+                if tc.get("id"):
+                    slot["id"] = tc["id"]
+                fn = tc.get("function") or {}
+                if fn.get("name"):
+                    slot["name"] = fn["name"]
+                if fn.get("arguments"):
+                    slot["arguments"] += fn["arguments"]
+    tool_calls = [
+        {"id": s["id"] or s["name"], "type": "function",
+         "function": {"name": s["name"], "arguments": s["arguments"]}}
+        for s in (acc[i] for i in sorted(acc))
+        if s["name"]
+    ]
+    return full_text, tool_calls
+
+
+def _drain(gen: Iterator[tuple[str, Any]], forward) -> tuple[str, list[dict]]:
+    """Forward 'text' events via `forward`, return the generator's (text, tool_calls)."""
+    while True:
+        try:
+            kind, payload = next(gen)
+        except StopIteration as stop:
+            return stop.value
+        forward(kind, payload)
+
+
+def _run_tools(tool_calls: list[dict]) -> list[str]:
+    """Execute a step's tool calls in parallel (all SciScope tools are read-only)."""
+    def one(tc: dict) -> str:
+        try:
+            args = json.loads(tc["function"].get("arguments") or "{}")
+        except json.JSONDecodeError:
+            args = {}
+        return execute_tool(tc["function"]["name"], args)
+
+    if len(tool_calls) == 1:
+        return [one(tool_calls[0])]
+    with ThreadPoolExecutor(max_workers=min(4, len(tool_calls))) as pool:
+        return list(pool.map(one, tool_calls))
+
+
+def stream_agent(
+    question: str,
+    history: list[dict] | None = None,
+    model: str | None = None,
+) -> Iterator[tuple[str, Any]]:
+    """Event stream for the agentic loop. Yields:
+    ('text', delta) | ('tool_call', {name,args}) | ('tool_result', {name,result})
+    | ('final', answer).
+    """
+    model = model or _detect_model()
+    if not model:
+        yield ("final", "本地大模型未运行(:8001)。请先 `make llm`。")
+        return
+
+    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages.extend(history or [])
+    messages.append({"role": "user", "content": question})
+
+    text_events: list[tuple[str, Any]] = []
+    forward = lambda k, p: text_events.append((k, p))  # noqa: E731
+
+    for _ in range(MAX_STEPS):
+        text_events.clear()
+        full_text, tool_calls = _drain(_stream_chat(messages, model, TOOL_SCHEMAS), forward)
+        for ev in text_events:
+            yield ev
+        if not tool_calls:
+            yield ("final", full_text)
+            return
+        messages.append({"role": "assistant", "content": full_text, "tool_calls": tool_calls})
+        for tc in tool_calls:
+            try:
+                args = json.loads(tc["function"].get("arguments") or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            yield ("tool_call", {"name": tc["function"]["name"], "args": args})
+        results = _run_tools(tool_calls)
+        for tc, result in zip(tool_calls, results):
+            yield ("tool_result", {"name": tc["function"]["name"], "result": result})
+            messages.append({"role": "tool", "tool_call_id": tc.get("id", tc["function"]["name"]), "content": result})
+
+    # Step cap reached — force a final synthesis without more tools.
+    messages.append({"role": "user", "content": "请基于以上工具结果,用中文给出最终回答。"})
+    text_events.clear()
+    full_text, _ = _drain(_stream_chat(messages, model, None), forward)
+    for ev in text_events:
+        yield ev
+    yield ("final", full_text)
 
 
 def run_agent(
@@ -56,45 +179,18 @@ def run_agent(
     model: str | None = None,
     on_event: Callable[[str, dict], None] | None = None,
 ) -> dict[str, Any]:
-    """Run the tool-using loop. Returns {answer, steps, model, messages}.
-
-    ``on_event(kind, payload)`` is called for UI feedback: kind in
-    {"tool_call", "tool_result", "thinking"}.
-    """
-    model = model or _detect_model()
-    if not model:
-        return {"answer": "本地大模型未运行(:8001)。请先 `make llm`。", "steps": 0, "model": None, "messages": []}
-
-    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages.extend(history or [])
-    messages.append({"role": "user", "content": question})
-
-    tool_trace: list[dict] = []
-    for step in range(MAX_STEPS):
-        resp = _chat(messages, model, tools=TOOL_SCHEMAS)
-        msg = resp["choices"][0]["message"]
-        tool_calls = msg.get("tool_calls") or []
-        if not tool_calls:
-            return {"answer": msg.get("content") or "", "steps": step, "model": model,
-                    "messages": messages, "tools_used": tool_trace}
-        # Record the assistant tool-call turn verbatim (required for the next round).
-        messages.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": tool_calls})
-        for tc in tool_calls:
-            name = tc["function"]["name"]
-            try:
-                args = json.loads(tc["function"].get("arguments") or "{}")
-            except json.JSONDecodeError:
-                args = {}
+    """Non-streaming convenience wrapper (drains stream_agent)."""
+    answer = ""
+    tools_used: list[dict] = []
+    steps = 0
+    for kind, payload in stream_agent(question, history, model):
+        if kind == "final":
+            answer = payload
+        elif kind == "tool_call":
+            steps += 1
+            tools_used.append({"name": payload["name"], "args": payload["args"]})
             if on_event:
-                on_event("tool_call", {"name": name, "args": args})
-            result = execute_tool(name, args)
-            tool_trace.append({"name": name, "args": args})
-            if on_event:
-                on_event("tool_result", {"name": name, "result": result[:300]})
-            messages.append({"role": "tool", "tool_call_id": tc.get("id", name), "content": result})
-
-    # Hit the step cap — ask for a final synthesis without more tools.
-    messages.append({"role": "user", "content": "请基于以上工具结果,用中文给出最终回答。"})
-    resp = _chat(messages, model, tools=None)
-    return {"answer": resp["choices"][0]["message"].get("content") or "", "steps": MAX_STEPS,
-            "model": model, "messages": messages, "tools_used": tool_trace}
+                on_event("tool_call", payload)
+        elif kind == "tool_result" and on_event:
+            on_event("tool_result", payload)
+    return {"answer": answer, "steps": steps, "tools_used": tools_used, "model": model or _detect_model()}

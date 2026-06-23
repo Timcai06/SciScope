@@ -120,44 +120,75 @@ def _search(args: dict[str, Any]) -> str:
     return json.dumps(items, ensure_ascii=False)
 
 
+def _kw_match(rows: list[dict], keyword: str) -> list[dict]:
+    """Substring matches, exact keyword first, then by descending doc_count."""
+    hits = [r for r in rows if keyword in str(r.get("keyword", "")).lower()]
+
+    def rank(r: dict) -> tuple:
+        exact = str(r.get("keyword", "")).lower() == keyword
+        try:
+            dc = int(r.get("doc_count") or 0)
+        except (TypeError, ValueError):
+            dc = 0
+        return (exact, dc)
+
+    return sorted(hits, key=rank, reverse=True)
+
+
 def _trends(args: dict[str, Any]) -> str:
+    import csv
+
     keyword = str(args.get("keyword") or "").strip().lower()
     if not keyword:
         return "get_trends: keyword 为空"
-    path = Path("models/trends/hot_keywords.csv")
-    if not path.exists():
-        return "趋势模型未构建(models/trends/hot_keywords.csv 缺失)。"
-    import csv
 
-    rows = list(csv.DictReader(path.open(encoding="utf-8")))
-    matches = [r for r in rows if keyword in str(r.get("keyword", "")).lower()]
-    if not matches:
-        # fall back to nearest by token overlap
-        toks = set(keyword.split())
-        matches = sorted(
-            rows,
-            key=lambda r: len(toks & set(str(r.get("keyword", "")).lower().split())),
-            reverse=True,
-        )[:1]
-        matches = [m for m in matches if toks & set(str(m.get("keyword", "")).lower().split())]
-    if not matches:
-        return f"未找到与 '{keyword}' 匹配的趋势关键词。"
-    out = []
-    for r in matches[:3]:
-        out.append(
-            {
-                "关键词": r.get("keyword"),
-                "累计论文数": r.get("doc_count"),
-                "趋势判定": r.get("mk_trend"),  # rising / falling / increasing / no-trend
-                "稳健斜率Sen": r.get("sen_slope"),
-                "动量分": r.get("momentum_score"),
-                "爆发分": r.get("burst_score"),
-                "预测目标年份": r.get("forecast_next_year"),  # 这是年份,非数量
-                "该年预测归一化词频": r.get("forecast_normalized_df"),
-                "生命周期阶段": r.get("lifecycle_stage"),
-            }
-        )
-    return json.dumps(out, ensure_ascii=False)
+    # 1) Top-tracked keywords — full stats incl. Mann-Kendall / Sen's slope.
+    hot = Path("models/trends/hot_keywords.csv")
+    if hot.exists():
+        matches = _kw_match(list(csv.DictReader(hot.open(encoding="utf-8"))), keyword)
+        if matches:
+            out = [
+                {
+                    "关键词": r.get("keyword"),
+                    "累计论文数": r.get("doc_count"),
+                    "趋势判定": r.get("mk_trend"),
+                    "稳健斜率Sen": r.get("sen_slope"),
+                    "动量分": r.get("momentum_score"),
+                    "爆发分": r.get("burst_score"),
+                    "预测目标年份": r.get("forecast_next_year"),  # 年份,非数量
+                    "该年预测归一化词频": r.get("forecast_normalized_df"),
+                    "生命周期阶段": r.get("lifecycle_stage"),
+                }
+                for r in matches[:3]
+            ]
+            return json.dumps(out, ensure_ascii=False)
+
+    # 2) Full keyword universe — basic momentum/burst/growth (no MK).
+    full = Path("data/analysis/keyword_trends.csv")
+    if full.exists():
+        with full.open(encoding="utf-8") as f:
+            matches = _kw_match(list(csv.DictReader(f)), keyword)
+        if matches:
+            out = []
+            for r in matches[:3]:
+                try:
+                    growth = float(r.get("growth_rate") or 0)
+                except (TypeError, ValueError):
+                    growth = 0.0
+                out.append(
+                    {
+                        "关键词": r.get("keyword"),
+                        "累计论文数": r.get("doc_count"),
+                        "趋势判定": "rising" if growth > 0.05 else ("falling" if growth < -0.05 else "stable"),
+                        "增长率": r.get("growth_rate"),
+                        "动量分": r.get("momentum_score"),
+                        "爆发分": r.get("burst_score"),
+                        "说明": "来自全量关键词趋势(非 top 热点,无 MK 检验)",
+                    }
+                )
+            return json.dumps(out, ensure_ascii=False)
+
+    return f"未找到与 '{keyword}' 匹配的趋势数据(可能不是被收录的关键词)。"
 
 
 def _recommend(args: dict[str, Any]) -> str:
