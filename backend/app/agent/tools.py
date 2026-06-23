@@ -73,6 +73,42 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "summarize_field",
+            "description": "针对某主题检索一批代表论文,作为撰写'领域小综述/研究现状'的素材。用于'综述/研究现状/概览/有哪些进展'类任务。",
+            "parameters": {
+                "type": "object",
+                "properties": {"topic": {"type": "string", "description": "领域/主题"}},
+                "required": ["topic"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "compare_papers",
+            "description": "取两篇论文的详情用于对比。用于'对比/比较 A 与 B 两篇论文'。需要两个 paper_id(可先用 search 拿到)。",
+            "parameters": {
+                "type": "object",
+                "properties": {"paper_id_a": {"type": "string"}, "paper_id_b": {"type": "string"}},
+                "required": ["paper_id_a", "paper_id_b"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "export_bibliography",
+            "description": "把若干 paper_id 导出为 BibTeX 引文条目。用于'导出引用/参考文献/BibTeX'。",
+            "parameters": {
+                "type": "object",
+                "properties": {"paper_ids": {"type": "array", "items": {"type": "string"}}},
+                "required": ["paper_ids"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "query_knowledge_graph",
             "description": (
                 "查询知识图谱。type=community 返回研究社区主题(各社区的代表关键词);"
@@ -102,6 +138,12 @@ def execute_tool(name: str, args: dict[str, Any]) -> str:
             return _recommend(args)
         if name == "get_paper":
             return _get_paper(args)
+        if name == "summarize_field":
+            return _summarize_field(args)
+        if name == "compare_papers":
+            return _compare_papers(args)
+        if name == "export_bibliography":
+            return _export_bibliography(args)
         if name == "query_knowledge_graph":
             return _graph(args)
         return f"未知工具: {name}"
@@ -234,6 +276,87 @@ def _recommend(args: dict[str, Any]) -> str:
         for r in recs
     ]
     return json.dumps(items, ensure_ascii=False)
+
+
+def _summarize_field(args: dict[str, Any]) -> str:
+    from backend.app.services import retrieval_service
+
+    topic = str(args.get("topic") or "").strip()
+    if not topic:
+        return "summarize_field: topic 为空"
+    results = retrieval_service.search(topic, limit=10)
+    if not results:
+        return f"未检索到关于 '{topic}' 的论文。"
+    items = []
+    for r in results:
+        snippet = (r.snippet or "").strip()
+        title = (r.title or "").strip()
+        if title and snippet.lower().startswith(title.lower()):
+            snippet = snippet[len(title):].lstrip(" .。:：-—")
+        items.append({"标题": title, "年份": r.year, "摘要片段": snippet[:160]})
+    return json.dumps({"主题": topic, "素材论文": items, "提示": "请据此综述研究现状,引用标题"}, ensure_ascii=False)
+
+
+def _compare_papers(args: dict[str, Any]) -> str:
+    a = _get_paper({"paper_id": args.get("paper_id_a", "")})
+    b = _get_paper({"paper_id": args.get("paper_id_b", "")})
+    return json.dumps({"论文A": _maybe_json(a), "论文B": _maybe_json(b),
+                       "提示": "请从方法/数据/结论等维度对比两篇论文"}, ensure_ascii=False)
+
+
+def _export_bibliography(args: dict[str, Any]) -> str:
+    from backend.app.core.config import get_settings
+
+    ids = args.get("paper_ids") or []
+    if isinstance(ids, str):
+        ids = [ids]
+    ids = [str(x).strip() for x in ids if str(x).strip()]
+    if not ids:
+        return "export_bibliography: paper_ids 为空"
+    dsn = get_settings().db_dsn
+    if not dsn:
+        return "数据库不可用。"
+    import psycopg
+
+    entries = []
+    with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        for pid in ids[:20]:
+            cur.execute(
+                """
+                SELECT p.paper_uid, p.title, p.year,
+                       coalesce(p.metadata->>'paper_id', p.source_id) AS pid
+                FROM papers p
+                WHERE p.paper_uid = %(id)s OR p.source_id = %(id)s OR p.metadata->>'paper_id' = %(id)s
+                LIMIT 1
+                """,
+                {"id": pid},
+            )
+            row = cur.fetchone()
+            if not row:
+                continue
+            uid, title, year, real_pid = row
+            cur.execute(
+                "SELECT a.name FROM paper_authors pa JOIN authors a ON a.author_uid=pa.author_uid "
+                "WHERE pa.paper_uid=%s ORDER BY pa.author_position LIMIT 10",
+                (uid,),
+            )
+            authors = [r[0] for r in cur.fetchall()]
+            surname = (authors[0].split()[-1] if authors else "anon").lower()
+            key = f"{surname}{year or ''}"
+            auth = " and ".join(authors) if authors else "Unknown"
+            entries.append(
+                f"@article{{{key},\n  title={{{title}}},\n  author={{{auth}}},\n  year={{{year or 'n.d.'}}},\n  note={{{real_pid}}}\n}}"
+            )
+    if not entries:
+        return "未找到这些 paper_id 对应的论文。"
+    return "\n\n".join(entries)
+
+
+def _maybe_json(s: str):
+    try:
+        return json.loads(s)
+    except (json.JSONDecodeError, TypeError):
+        return s
 
 
 def _get_paper(args: dict[str, Any]) -> str:
