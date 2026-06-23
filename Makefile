@@ -375,7 +375,8 @@ llm:
 	@echo "Starting local LLM (offline): $(LLM_LOCAL_DIR) on $(VLLM_BASE_URL)"
 	@echo "Stop with Ctrl-C (or 'make llm-stop'). Then run 'make chat' in another shell."
 	HF_HUB_OFFLINE=1 VLLM_HOST_IP=$(VLLM_HOST) $(VLLM_VENV)/bin/vllm serve $(LLM_LOCAL_DIR) \
-		--host $(VLLM_HOST) --port $(VLLM_PORT) --max-model-len $(VLLM_MAX_MODEL_LEN)
+		--host $(VLLM_HOST) --port $(VLLM_PORT) --max-model-len $(VLLM_MAX_MODEL_LEN) \
+		--enable-auto-tool-choice --tool-call-parser hermes
 
 llm-stop:
 	@pkill -f "vllm serve" 2>/dev/null && echo "stopped local LLM" || echo "no local LLM running"
