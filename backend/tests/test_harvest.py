@@ -733,7 +733,12 @@ def test_enrich_fulltext_field_filter_matches_arxiv_categories(tmp_path, monkeyp
 
     persisted = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert summary["records_enriched"] == 1
-    assert fetched == ["https://arxiv.org/e-print/2401.00002"]
+    # PDF mirror is tried first; the fake payload isn't a valid PDF so it falls
+    # back to the e-print source tarball (which the fake LaTeX text satisfies).
+    assert fetched == [
+        "https://export.arxiv.org/pdf/2401.00002",
+        "https://arxiv.org/e-print/2401.00002",
+    ]
     assert "body_excerpt" not in persisted[0]["raw"]
     assert "category filtered full text" in persisted[1]["raw"]["body_excerpt"]
 

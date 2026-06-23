@@ -257,6 +257,7 @@ def search(query: str, limit: int = 10, field: str | None = None, year: int | No
 
     # Detect recency intent before filler stripping removes '最新'/'latest'.
     recency = any(r in query.lower() for r in _RECENCY)
+    raw_query = query  # kept for the cross-encoder, which handles natural queries
     # Map known Chinese terms to English BEFORE stripping filler, so topical
     # terms like '推荐系统' aren't broken by the filler word '推荐'.
     query = expand_bilingual(query)
@@ -268,13 +269,25 @@ def search(query: str, limit: int = 10, field: str | None = None, year: int | No
         if not fused:
             return []
         ranked = sorted(fused.items(), key=lambda kv: kv[1]["score"], reverse=True)
-        if recency:
-            # Among the top relevant pool, prefer the most recent papers.
-            pool = ranked[: max(limit * 3, 15)]
-            meta_pool = _hydrate(conn, [uid for uid, _ in pool])
-            pool.sort(key=lambda kv: (meta_pool.get(kv[0], {}).get("year") or 0), reverse=True)
+        from src.models import reranker
+
+        use_rerank = reranker.is_available()
+        if use_rerank or recency:
+            # Take a larger pool, hydrate, then cross-encoder rerank by relevance.
+            pool = ranked[: max(limit * 3, 25)]
+            meta = _hydrate(conn, [uid for uid, _ in pool])
+            if use_rerank:
+                pool = reranker.rerank(
+                    raw_query,
+                    pool,
+                    text_of=lambda kv: f"{meta.get(kv[0], {}).get('title', '')} {kv[1].get('snippet', '')}"[:512],
+                )
+            if recency:
+                # Among the most relevant, prefer the most recent papers.
+                head = pool[: max(limit * 2, 10)]
+                head.sort(key=lambda kv: (meta.get(kv[0], {}).get("year") or 0), reverse=True)
+                pool = head + pool[max(limit * 2, 10):]
             top = pool[:limit]
-            meta = meta_pool
         else:
             top = ranked[:limit]
             meta = _hydrate(conn, [paper_uid for paper_uid, _ in top])
