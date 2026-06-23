@@ -33,6 +33,51 @@ def _retrieval_query(question: str, history: list[dict] | None) -> str:
     return f"{last_user} {question}" if anaphoric else question
 
 
+# Comparative / temporal questions that benefit from multi-hop decomposition.
+_MULTIHOP = ("对比", "比较", "区别", "差异", "相比", "异同", " vs ", "versus",
+             "compare", "comparison", "difference between", "演进", "演变",
+             "发展历程", "发展趋势", "变化趋势", "evolution of", "evolve")
+_MULTIHOP_EVIDENCE_CAP = 6
+
+
+def _is_multihop(question: str) -> bool:
+    q = question.lower()
+    return any(m in q for m in _MULTIHOP)
+
+
+def _plan_subqueries(question: str, llm: LLMProvider) -> list[str]:
+    """Decompose a comparative/temporal question into focused retrieval sub-queries.
+
+    Comparative questions ("A 和 B 的区别") retrieve poorly as one query — one side
+    dominates. We ask the LLM to split into 1-3 sub-queries so each facet gets its
+    own evidence. Falls back to the original question on any failure.
+    """
+    chinese = _is_chinese(question)
+    if chinese:
+        prompt = (
+            "把下面的科研问题分解成 1-3 个用于文献检索的子查询(对比类问题拆成各个方面,"
+            "演进类问题拆成不同阶段/方向),每行一个,只输出子查询本身,不要编号、解释或多余文字。\n\n"
+            f"问题:{question}\n\n子查询:"
+        )
+    else:
+        prompt = (
+            "Decompose the research question into 1-3 focused retrieval sub-queries "
+            "(split comparisons into each side). One per line, output only the sub-queries.\n\n"
+            f"Question: {question}\n\nSub-queries:"
+        )
+    try:
+        out = llm.complete(prompt)
+    except Exception:
+        return [question]
+    subs = []
+    for line in out.splitlines():
+        s = line.strip().lstrip("-*·•0123456789.、) ").strip()
+        if len(s) >= 2 and s.lower() not in ("sub-queries", "子查询"):
+            subs.append(s)
+    subs = subs[:3]
+    return subs or [question]
+
+
 def answer_question(
     question: str,
     papers: list[dict[str, Any]],
@@ -43,17 +88,30 @@ def answer_question(
     neighbors: list[str] = []
     evidence = None
     retrieval_q = _retrieval_query(question, history)
+    llm = provider or get_llm_provider()
     if retrieval_service.is_available():
-        # GraphRAG: expand the query along the keyword co-occurrence graph so the
+        # GraphRAG: expand each query along the keyword co-occurrence graph so the
         # knowledge graph actively participates in retrieval (query expansion).
         from backend.app.services import graphrag
 
-        expansion = graphrag.expand(retrieval_q)
-        entities, neighbors = expansion.entities, expansion.neighbours
-        search_query = graphrag.expanded_query(retrieval_q, expansion)
-        evidence = [
-            _to_evidence(item) for item in retrieval_service.search(search_query, limit=EVIDENCE_LIMIT)
-        ]
+        # Multi-hop: split comparative/temporal questions into sub-queries and
+        # merge their evidence so both sides of a comparison are represented.
+        multihop = _is_multihop(question)
+        subqueries = _plan_subqueries(question, llm) if multihop else [retrieval_q]
+        per = EVIDENCE_LIMIT if len(subqueries) == 1 else max(2, _MULTIHOP_EVIDENCE_CAP // len(subqueries))
+        evidence = []
+        seen_ids: set[str] = set()
+        for sq in subqueries:
+            expansion = graphrag.expand(sq)
+            if not entities:
+                entities, neighbors = expansion.entities, expansion.neighbours
+            search_query = graphrag.expanded_query(sq, expansion)
+            for item in retrieval_service.search(search_query, limit=per):
+                if item.paper_id in seen_ids:
+                    continue
+                seen_ids.add(item.paper_id)
+                evidence.append(_to_evidence(item))
+        evidence = evidence[:_MULTIHOP_EVIDENCE_CAP]
     if evidence is None:
         # Fall back to the in-memory matcher (sample corpus / DB unavailable).
         evidence = _retrieve_evidence(retrieval_q, papers, limit=EVIDENCE_LIMIT)
@@ -68,7 +126,6 @@ def answer_question(
         )
 
     prompt = _build_prompt(question, evidence, history)
-    llm = provider or get_llm_provider()
     answer = llm.complete(prompt)
 
     confidence = _verify_answer(answer, evidence)
