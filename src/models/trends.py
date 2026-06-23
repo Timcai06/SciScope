@@ -41,12 +41,54 @@ def _year_columns(df: pd.DataFrame) -> list[tuple[int, str]]:
     return sorted(pairs)
 
 
+def _mann_kendall(values: np.ndarray) -> dict[str, float | str]:
+    """Non-parametric monotonic-trend test: MK tau/p + Sen's slope.
+
+    More robust than OLS for short, noisy yearly series — Sen's slope (median of
+    pairwise slopes) resists the year-to-date outlier and gives a reliable trend
+    direction, which is what matters for "is this keyword rising/falling".
+    """
+    n = len(values)
+    if n < 3:
+        return {"mk_tau": 0.0, "mk_p": 1.0, "mk_trend": "no-trend", "sen_slope": 0.0}
+    s = 0.0
+    for i in range(n - 1):
+        s += float(np.sign(values[i + 1 :] - values[i]).sum())
+    var_s = n * (n - 1) * (2 * n + 5) / 18.0
+    if s > 0:
+        z = (s - 1) / np.sqrt(var_s)
+    elif s < 0:
+        z = (s + 1) / np.sqrt(var_s)
+    else:
+        z = 0.0
+    from math import erfc, sqrt
+
+    p = float(erfc(abs(z) / sqrt(2)))
+    tau = s / (0.5 * n * (n - 1))
+    slopes = [
+        (values[j] - values[i]) / (j - i) for i in range(n - 1) for j in range(i + 1, n)
+    ]
+    sen = float(np.median(slopes)) if slopes else 0.0
+    if p < 0.1 and s > 0:
+        trend = "increasing"
+    elif p < 0.1 and s < 0:
+        trend = "decreasing"
+    else:
+        trend = "rising" if sen > 0 else ("falling" if sen < 0 else "no-trend")
+    return {"mk_tau": round(float(tau), 4), "mk_p": round(p, 4), "mk_trend": trend, "sen_slope": round(sen, 8)}
+
+
 def _fit_forecast(years: np.ndarray, values: np.ndarray) -> dict[str, float]:
-    """Linear least-squares forecast of the next year with a rough 95% band."""
+    """Next-year forecast: damped extrapolation on Sen's (robust) slope + MK trend.
+
+    Reports OLS r2 for fit quality but extrapolates with Sen's slope, which is
+    far less sensitive to a single noisy year than the OLS slope.
+    """
     n = len(years)
+    mk = _mann_kendall(values) if n >= 3 else {"mk_tau": 0.0, "mk_p": 1.0, "mk_trend": "no-trend", "sen_slope": 0.0}
     if n < 2 or np.allclose(values, values[0]):
         flat = float(values[-1]) if n else 0.0
-        return {"slope": 0.0, "r2": 0.0, "forecast": flat, "low": flat, "high": flat}
+        return {"slope": 0.0, "r2": 0.0, "forecast": flat, "low": flat, "high": flat, **mk}
 
     slope, intercept = np.polyfit(years, values, 1)
     pred = slope * years + intercept
@@ -56,12 +98,11 @@ def _fit_forecast(years: np.ndarray, values: np.ndarray) -> dict[str, float]:
     r2 = max(0.0, 1.0 - ss_res / ss_tot)
 
     next_year = int(years.max()) + 1
-    # Damped trend: anchor on the actual last value and add a damped slope.
-    # A 3-point OLS slope extrapolated raw overshoots (worse than persistence);
-    # damping (phi<1) keeps the forecast between persistence and full linear.
+    # Damped trend on Sen's slope: anchor on the last value, add a damped robust
+    # slope. Sen's slope resists the year-to-date outlier that skews raw OLS.
     phi = 0.5
-    forecast = float(values[-1] + phi * slope * (next_year - years[-1]))
-    # Rough prediction std from residuals (small-sample, advisory only).
+    sen_slope = float(mk["sen_slope"]) or float(slope)
+    forecast = float(values[-1] + phi * sen_slope * (next_year - years[-1]))
     dof = max(1, n - 2)
     se = float(np.sqrt(ss_res / dof))
     margin = 1.96 * se
@@ -72,6 +113,7 @@ def _fit_forecast(years: np.ndarray, values: np.ndarray) -> dict[str, float]:
         "low": max(0.0, round(forecast - margin, 8)),
         "high": round(forecast + margin, 8),
         "next_year": next_year,
+        **mk,
     }
 
 
@@ -105,6 +147,10 @@ def build_keyword_trends(analysis_dir: Path) -> pd.DataFrame:
     trends["forecast_high"] = fc["high"]
     trends["trend_slope"] = fc["slope"]
     trends["trend_r2"] = fc["r2"]
+    trends["sen_slope"] = fc["sen_slope"]
+    trends["mk_trend"] = fc["mk_trend"]
+    trends["mk_tau"] = fc["mk_tau"]
+    trends["mk_p"] = fc["mk_p"]
 
     # Optional lifecycle context.
     lifecycle_path = analysis_dir / "keyword_lifecycle.csv"
@@ -116,7 +162,7 @@ def build_keyword_trends(analysis_dir: Path) -> pd.DataFrame:
     trends["trend_score"] = (
         0.5 * _minmax(trends["momentum_score"].fillna(0))
         + 0.3 * _minmax(trends["burst_score"].fillna(0))
-        + 0.2 * _minmax(trends["trend_slope"].fillna(0))
+        + 0.2 * _minmax(trends["sen_slope"].fillna(0))  # robust slope, not OLS
     ).round(6)
     return trends.sort_values("trend_score", ascending=False)
 
@@ -147,21 +193,23 @@ def _scores_summary(keywords: pd.DataFrame, years: list[int]) -> dict:
     def top(df: pd.DataFrame, n=20) -> list[dict]:
         cols = [
             "keyword", "doc_count", "normalized_df", "momentum_score", "burst_score",
-            "trend_slope", "forecast_normalized_df", "forecast_low", "forecast_high",
+            "trend_slope", "sen_slope", "mk_trend", "mk_tau", "forecast_normalized_df",
+            "forecast_low", "forecast_high",
             "trend_r2", "trend_score", "lifecycle_stage", "representative_title", "representative_year",
         ]
         cols = [c for c in cols if c in df.columns]
         return df[cols].head(n).to_dict(orient="records")
 
-    emerging = keywords[keywords["trend_slope"] > 0].sort_values("trend_score", ascending=False)
-    declining = keywords.sort_values("trend_slope").head(20)
+    emerging = keywords[keywords["sen_slope"] > 0].sort_values("trend_score", ascending=False)
+    declining = keywords.sort_values("sen_slope").head(20)
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "fit_years": years,
         "min_doc_count": MIN_DOC_COUNT,
         "keywords_modeled": int(len(keywords)),
-        "method": "linear least-squares on full-year normalized document frequency; "
-        "latest (partial) year excluded from fit; 95% band from residual std (small-sample, advisory).",
+        "method": "Mann-Kendall trend test + Sen's robust slope on full-year normalized "
+        "document frequency (latest partial year excluded); damped Sen's-slope next-year "
+        "extrapolation; OLS r2 reported for fit quality; 95% band from residual std (advisory).",
         "uncertainty_note": "Forecasts use 4-5 yearly points; treat bands as indicative, not statistical guarantees.",
         "top_hot": top(keywords, 30),
         "top_emerging": top(emerging, 20),
@@ -177,7 +225,8 @@ def run(analysis_dir: Path = ANALYSIS_DIR, output_dir: Path = OUTPUT_DIR) -> dic
 
     hot_cols = [
         "keyword", "doc_count", "normalized_df", "growth_rate", "momentum_score", "burst_score",
-        "trend_slope", "trend_r2", "forecast_next_year", "forecast_normalized_df",
+        "trend_slope", "sen_slope", "mk_trend", "mk_tau", "mk_p", "trend_r2",
+        "forecast_next_year", "forecast_normalized_df",
         "forecast_low", "forecast_high", "trend_score", "lifecycle_stage", "peak_year",
         "representative_paper_id", "representative_title", "representative_year",
     ]
