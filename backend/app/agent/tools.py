@@ -121,16 +121,24 @@ def _search(args: dict[str, Any]) -> str:
     results = retrieval_service.search(query, limit=6, year=int(year) if year else None)
     if not results:
         return "未检索到相关论文。"
-    items = [
-        {
-            "paper_id": r.paper_id,
-            "title": r.title,
-            "year": r.year,
-            "authors": (r.authors or [])[:3],
-            "snippet": (r.snippet or "")[:200],
-        }
-        for r in results
-    ]
+    items = []
+    for r in results:
+        # snippet is the matched chunk ("title. abstract…") — strip the leading
+        # title so it reads as a pure abstract excerpt and is never confused with
+        # author names by the model.
+        snippet = (r.snippet or "").strip()
+        title = (r.title or "").strip()
+        if title and snippet.lower().startswith(title.lower()):
+            snippet = snippet[len(title):].lstrip(" .。:：-—")
+        items.append(
+            {
+                "paper_id": r.paper_id,
+                "标题": title,
+                "年份": r.year,
+                "作者": (r.authors or [])[:3],
+                "摘要片段": snippet[:200],
+            }
+        )
     return json.dumps(items, ensure_ascii=False)
 
 
