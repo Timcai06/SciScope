@@ -89,7 +89,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build chat topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures data-report-pdf project-report-pdf report backend frontend dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild chat topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures data-report-pdf project-report-pdf report backend frontend dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -277,6 +277,25 @@ graph-export:
 
 # Full agent model-layer build (assumes corpus already loaded into PostgreSQL).
 agent-build: embeddings recommend-model trend-model graph-export
+
+# One-shot rebuild after data-layer enrichment (backfilled abstracts / full text):
+# refresh analysis assets, reload DB (UPSERT), embed only NEW chunks (resume),
+# rebuild recommend/trend/graph models, then refresh the data report (non-fatal,
+# last). Run with SCISCOPE_EMBEDDER_PATH + SCISCOPE_EMBED_FP16 exported so the
+# embedder loads locally instead of downloading.
+full-rebuild:
+	$(MAKE) analysis-assets-all
+	$(MAKE) processed-corpus
+	$(MAKE) rag-chunks
+	$(MAKE) postgres-schema
+	$(PYTHON) -m src.infra.cli load-postgres --dsn $(POSTGRES_DSN) --papers $(PROCESSED_CORPUS_PATH) --chunks $(RAG_CHUNKS_PATH)
+	$(MAKE) embeddings
+	$(MAKE) recommend-model
+	$(MAKE) trend-model
+	$(MAKE) graph-export
+	-$(MAKE) report-figures
+	-$(MAKE) data-report-pdf
+	@echo "[full-rebuild] complete"
 
 # Interactive terminal chat with the agent (auto-detects the local LLM on :8001).
 chat:
