@@ -288,6 +288,7 @@ full-rebuild:
 	$(MAKE) processed-corpus
 	$(MAKE) rag-chunks
 	$(MAKE) postgres-schema
+	psql "$(POSTGRES_DSN)" -v ON_ERROR_STOP=1 -c "TRUNCATE paper_chunks CASCADE;"
 	$(PYTHON) -m src.infra.cli load-postgres --dsn $(POSTGRES_DSN) --papers $(PROCESSED_CORPUS_PATH) --chunks $(RAG_CHUNKS_PATH)
 	$(MAKE) embeddings
 	$(MAKE) recommend-model
