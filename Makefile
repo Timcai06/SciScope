@@ -89,7 +89,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild chat topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures data-report-pdf project-report-pdf report backend frontend dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild chat agent topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures data-report-pdf project-report-pdf report backend frontend dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -301,6 +301,11 @@ full-rebuild:
 # Interactive terminal chat with the agent (auto-detects the local LLM on :8001).
 chat:
 	$(PYTHON) scripts/chat_cli.py
+
+# Agentic terminal assistant: the LLM autonomously calls search/trends/recommend/
+# graph tools. Requires `make llm` (tool-calling enabled) running on :8001.
+agent:
+	$(PYTHON) scripts/agent_cli.py
 
 # Rebuild only the topic-model assets at finer granularity (default 40 topics).
 topic-model:
