@@ -8,6 +8,11 @@ class ChatTurn(BaseModel):
     content: str
 
 
+class AgentRequest(BaseModel):
+    question: str = Field(min_length=1)
+    history: list[ChatTurn] = Field(default_factory=list)
+
+
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1)
     history: list[ChatTurn] = Field(default_factory=list)

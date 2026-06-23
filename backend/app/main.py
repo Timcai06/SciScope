@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.api.routes_agent import router as agent_router
 from backend.app.api.routes_chat import router as chat_router
 from backend.app.api.routes_dashboard import router as dashboard_router
 from backend.app.api.routes_ingest import router as ingest_router
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(trends_router)
     app.include_router(recommend_router)
     app.include_router(graph_router)
+    app.include_router(agent_router)
 
     return app
 
