@@ -43,6 +43,22 @@ def test_self_critique_returns_reason_on_retry(monkeypatch):
     assert reason == "缺少对方法细节的检索"
 
 
+def test_run_tools_dedups_identical_repeats(monkeypatch):
+    """An identical (name, args) repeat is short-circuited, not re-executed."""
+    calls = []
+    monkeypatch.setattr(loop, "execute_tool",
+                        lambda name, args: calls.append((name, args)) or f"ran {name}")
+    executed: dict = {}
+    tc = {"function": {"name": "get_trends", "arguments": '{"keyword": "rag"}'}}
+
+    first = loop._run_tools([tc], executed)
+    repeat = loop._run_tools([tc], executed)
+
+    assert first == ["ran get_trends"]
+    assert repeat == [loop._REPEAT_NOTE]
+    assert len(calls) == 1  # executed exactly once despite two identical calls
+
+
 class _FixedProvider:
     def complete(self, prompt: str) -> str:
         return "RAG improves generation with retrieved evidence [1]."

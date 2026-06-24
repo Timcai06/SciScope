@@ -34,8 +34,10 @@ SYSTEM_PROMPT = (
     "你拥有以下工具:search_literature(检索论文)、get_trends(研究趋势)、"
     "recommend_papers(相似论文推荐,需 paper_id)、get_paper(论文详情)、"
     "query_knowledge_graph(知识图谱/研究社区)、verify_claim(用语义接地度核查论断是否有文献支持)。"
-    "工作方式:① 对复杂问题先规划需要哪些检索步骤,再依次调用工具(可多步:如先检索拿到 "
-    "paper_id 再推荐/取详情);② 凡涉及文献事实的问题,必须先调用工具检索证据,不能凭记忆直接回答;"
+    "工作方式:① 对复杂问题先规划需要哪些检索步骤,再依次调用工具(可多步);"
+    "recommend_papers/get_paper/compare_papers 需要真实 paper_id——必须先用 search_literature 拿到,"
+    "严禁编造 paper_id;② 凡涉及文献事实的问题,必须先调用工具检索证据,不能凭记忆直接回答;"
+    "若同一工具同参数已调用过,不要重复调用,改用不同参数或据已有结果作答;"
     "③ 拿到工具结果后用中文综合归纳作答,引用论文标题,只依据工具返回的真实数据,不编造;"
     "证据不足时如实说明。注意:检索结果里的「摘要片段」是论文摘要节选,「作者」才是作者。"
 )
@@ -149,14 +151,28 @@ def _compact(messages: list[dict], budget_chars: int = 20000) -> None:
             m["content"] = str(m["content"])[:400] + " …(结果已压缩)"
 
 
-def _run_tools(tool_calls: list[dict]) -> list[str]:
-    """Execute a step's tool calls in parallel (all SciScope tools are read-only)."""
+_REPEAT_NOTE = "(已用相同参数调用过该工具,结果同上。请改用不同参数或其他工具,或据已有结果作答,不要重复调用。)"
+
+
+def _run_tools(tool_calls: list[dict], executed: dict[str, str]) -> list[str]:
+    """Execute a step's tool calls in parallel (all SciScope tools are read-only).
+
+    ``executed`` caches results by (name, arguments) signature across steps: an
+    identical repeat is short-circuited with a note instead of re-running, which
+    breaks the failure mode where the model re-issues the same broken call (e.g. a
+    fabricated paper_id) every step until the step cap.
+    """
     def one(tc: dict) -> str:
+        sig = tc["function"]["name"] + "|" + (tc["function"].get("arguments") or "{}")
+        if sig in executed:
+            return _REPEAT_NOTE
         try:
             args = json.loads(tc["function"].get("arguments") or "{}")
         except json.JSONDecodeError:
             args = {}
-        return execute_tool(tc["function"]["name"], args)
+        result = execute_tool(tc["function"]["name"], args)
+        executed[sig] = result
+        return result
 
     if len(tool_calls) == 1:
         return [one(tool_calls[0])]
@@ -208,6 +224,8 @@ def _make_plan(question: str, model: str) -> list[str]:
             "get_paper(论文详情)、summarize_field(领域综述)、compare_papers(论文对比)、"
             "query_knowledge_graph(知识图谱)、verify_claim(论断核查)。\n"
             "不要使用 Google Scholar、Web of Science 等外部工具。"
+            "注意:recommend_papers/get_paper/compare_papers 依赖 paper_id,必须先安排一步 "
+            "search_literature 才能拿到 id,不能直接对主题词调用它们。"
             "每行一步,只输出步骤本身,不要解释、不要编号前缀。\n\n"
             f"问题:{question}\n\n步骤:"
         )},
@@ -274,6 +292,7 @@ def stream_agent(
     forward = lambda k, p: text_events.append((k, p))  # noqa: E731
     tools_total = 0
     retries = 0
+    executed: dict[str, str] = {}  # (name|args) -> result, dedup repeats across steps
 
     for _ in range(MAX_STEPS):
         _compact(messages)
@@ -307,7 +326,7 @@ def stream_agent(
             except json.JSONDecodeError:
                 args = {}
             yield ("tool_call", {"name": tc["function"]["name"], "args": args})
-        results = _run_tools(tool_calls)
+        results = _run_tools(tool_calls, executed)
         for tc, result in zip(tool_calls, results):
             yield ("tool_result", {"name": tc["function"]["name"], "result": result})
             messages.append({"role": "tool", "tool_call_id": tc.get("id", tc["function"]["name"]), "content": result})
