@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
     "你是 SciScope 科研文献智能体,可访问一个 16 万篇科技文献的知识库。"
     "你拥有以下工具:search_literature(检索论文)、get_trends(研究趋势)、"
     "recommend_papers(相似论文推荐,需 paper_id)、get_paper(论文详情)、"
-    "query_knowledge_graph(知识图谱/研究社区)。"
+    "query_knowledge_graph(知识图谱/研究社区)、verify_claim(用语义接地度核查论断是否有文献支持)。"
     "工作方式:① 对复杂问题先规划需要哪些检索步骤,再依次调用工具(可多步:如先检索拿到 "
     "paper_id 再推荐/取详情);② 凡涉及文献事实的问题,必须先调用工具检索证据,不能凭记忆直接回答;"
     "③ 拿到工具结果后用中文综合归纳作答,引用论文标题,只依据工具返回的真实数据,不编造;"
@@ -164,14 +164,90 @@ def _run_tools(tool_calls: list[dict]) -> list[str]:
         return list(pool.map(one, tool_calls))
 
 
+# Questions worth an explicit plan (multi-step / comparative / synthesis tasks).
+# Simple lookups and greetings skip planning to avoid a wasted LLM round-trip.
+_PLAN_MARKERS = (
+    "对比", "比较", "区别", "差异", "相比", "异同", "综述", "研究现状", "概览",
+    "趋势", "演进", "演变", "发展", "推荐", "关系", "哪些", "梳理", "总结", "现状",
+    "vs", "versus", "compare", "review", "survey", "trend", "recommend",
+)
+
+
+def _needs_plan(question: str) -> bool:
+    q = question.strip().lower()
+    if len(q) < 4 or any(m in q for m in _META):
+        return False
+    return any(m in q for m in _PLAN_MARKERS) or len(question) >= 18
+
+
+def _parse_plan(text: str) -> list[str]:
+    """Extract numbered/bulleted steps from a planning completion (pure, testable)."""
+    steps: list[str] = []
+    for line in (text or "").splitlines():
+        s = line.strip().lstrip("-*·•0123456789.、)（) ").strip()
+        core = s.rstrip(":：").strip()
+        if len(s) >= 3 and core and core.lower() not in ("计划", "plan", "步骤", "steps"):
+            steps.append(s)
+    return steps[:4]
+
+
+def _complete(messages: list[dict], model: str) -> str:
+    """Drain a non-streaming completion (no tools) to a single string."""
+    text, _ = _drain(_stream_chat(messages, model, None), lambda k, p: None)
+    return text
+
+
+def _make_plan(question: str, model: str) -> list[str]:
+    """Ask the model to decompose a complex question into 2-4 executable steps."""
+    prompt = [
+        {"role": "system", "content": "你是科研智能体的规划器,只输出执行步骤。"},
+        {"role": "user", "content": (
+            "把下面的科研问题拆成 2-4 个可执行步骤。每步只能使用以下内置工具之一,"
+            "并写清用它检索/处理什么:\n"
+            "search_literature(检索文献)、get_trends(研究趋势)、recommend_papers(相似推荐)、"
+            "get_paper(论文详情)、summarize_field(领域综述)、compare_papers(论文对比)、"
+            "query_knowledge_graph(知识图谱)、verify_claim(论断核查)。\n"
+            "不要使用 Google Scholar、Web of Science 等外部工具。"
+            "每行一步,只输出步骤本身,不要解释、不要编号前缀。\n\n"
+            f"问题:{question}\n\n步骤:"
+        )},
+    ]
+    try:
+        return _parse_plan(_complete(prompt, model))
+    except Exception:  # noqa: BLE001 — planning is best-effort; never break the loop
+        return []
+
+
+def _self_critique(question: str, answer: str, model: str) -> str | None:
+    """Model-driven reflection: have the model judge whether its own answer is
+    sufficient and evidence-grounded. Returns a retry instruction, or None if OK.
+    """
+    prompt = [
+        {"role": "system", "content": "你是严格的审稿人,只输出 OK 或 RETRY。"},
+        {"role": "user", "content": (
+            f"问题:{question}\n\n回答:{answer}\n\n"
+            "判断这个回答是否充分回答了问题、且关键论断都有文献证据支撑。"
+            "若充分且有据,只回复 OK;否则回复「RETRY:」加一句话指出缺什么、该补检索什么。"
+        )},
+    ]
+    try:
+        out = _complete(prompt, model).strip()
+    except Exception:  # noqa: BLE001
+        return None
+    if out.upper().startswith("RETRY"):
+        reason = out.split(":", 1)[-1].split("：", 1)[-1].strip()
+        return reason or "回答证据不足,请补充检索后重答。"
+    return None
+
+
 def stream_agent(
     question: str,
     history: list[dict] | None = None,
     model: str | None = None,
 ) -> Iterator[tuple[str, Any]]:
     """Event stream for the agentic loop. Yields:
-    ('text', delta) | ('tool_call', {name,args}) | ('tool_result', {name,result})
-    | ('final', answer).
+    ('plan', [steps]) | ('text', delta) | ('tool_call', {name,args}) |
+    ('tool_result', {name,result}) | ('reflect', reason) | ('final', answer).
     """
     model = model or _detect_model()
     if not model:
@@ -181,6 +257,18 @@ def stream_agent(
     messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(history or [])
     messages.append({"role": "user", "content": question})
+
+    # Explicit planning: for complex tasks, the model first emits a step plan.
+    # The plan is surfaced as an event (shown in the UI / report) and primed into
+    # context so the loop executes it — this is what makes it a real agent, not a
+    # one-shot answerer.
+    if _needs_plan(question):
+        plan = _make_plan(question, model)
+        if plan:
+            yield ("plan", plan)
+            messages.append({"role": "assistant",
+                             "content": "执行计划:\n" + "\n".join(f"{i}. {s}" for i, s in enumerate(plan, 1))})
+            messages.append({"role": "user", "content": "请按上述计划逐步调用工具完成,最后用中文综合作答。"})
 
     text_events: list[tuple[str, Any]] = []
     forward = lambda k, p: text_events.append((k, p))  # noqa: E731
@@ -195,7 +283,14 @@ def stream_agent(
             yield ev
         if not tool_calls:
             # Reflect: self-correct once if the answer is ungrounded/insufficient.
-            reason = _reflect_reason(full_text, tools_total, question) if retries < MAX_RETRIES else None
+            # (1) cheap heuristic catches the obvious no-tool hallucination / weak
+            # answer; (2) if it passes but the answer was tool-grounded, let the
+            # model critique its own sufficiency.
+            reason = None
+            if retries < MAX_RETRIES:
+                reason = _reflect_reason(full_text, tools_total, question)
+                if reason is None and tools_total > 0:
+                    reason = _self_critique(question, full_text, model)
             if reason:
                 retries += 1
                 yield ("reflect", reason)

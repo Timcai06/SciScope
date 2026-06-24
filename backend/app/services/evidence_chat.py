@@ -83,13 +83,25 @@ def answer_question(
     papers: list[dict[str, Any]],
     provider: LLMProvider | None = None,
     history: list[dict] | None = None,
+    retrieval: str = "auto",
 ) -> ChatResponse:
+    """Answer a question over evidence.
+
+    ``retrieval`` makes the data-source an explicit contract rather than a hidden
+    runtime sniff:
+      * ``"auto"`` (default): use the hybrid DB/pgvector backend if reachable,
+        else fall back to the in-memory ``papers`` matcher.
+      * ``"db"``: require the hybrid backend.
+      * ``"memory"``: always use the in-memory ``papers`` matcher (deterministic;
+        used by hermetic unit tests over the sample corpus).
+    """
     entities: list[str] = []
     neighbors: list[str] = []
     evidence = None
     retrieval_q = _retrieval_query(question, history)
     llm = provider or get_llm_provider()
-    if retrieval_service.is_available():
+    use_db = retrieval == "db" or (retrieval == "auto" and retrieval_service.is_available())
+    if use_db:
         # GraphRAG: expand each query along the keyword co-occurrence graph so the
         # knowledge graph actively participates in retrieval (query expansion).
         from backend.app.services import graphrag

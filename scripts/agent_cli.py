@@ -58,6 +58,7 @@ TOOLS = {
     "compare_papers": ("⚖️", "论文对比"),
     "export_bibliography": ("🔖", "引文导出"),
     "query_knowledge_graph": ("🕸️", "知识图谱"),
+    "verify_claim": ("✅", "论断核查"),
 }
 HELP = [
     ("/help", "显示帮助"),
@@ -169,6 +170,13 @@ def run_turn(q: str, history: list[dict], model: str) -> None:
                 console.print(f"  [tool]{icon} {label}[/]  [toolarg]{args}[/]")
                 used.append(payload["name"])
                 status = console.status(f"[muted]{label}运行中…[/]", spinner="dots")
+                status.start()
+            elif kind == "plan":
+                status.stop()
+                console.print("  [tool]🗺 执行计划[/]")
+                for i, step in enumerate(payload, 1):
+                    console.print(f"     [faint]{i}.[/] [toolarg]{step}[/]")
+                status = console.status("[muted]按计划执行…[/]", spinner="dots")
                 status.start()
             elif kind == "reflect":
                 if live:
