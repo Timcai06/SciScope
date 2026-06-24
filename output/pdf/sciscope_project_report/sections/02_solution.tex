@@ -28,10 +28,10 @@
 \node[layer, text width=150mm] (pg) at (78,60) {PostgreSQL + pgvector 服务层:papers/chunks/edges · 全文索引(tsvector)· 向量索引(ivfflat)};
 
 \node[lab] at (-3,77)  {⑤ 接口};
-\node[layer, text width=150mm] (api) at (78,77) {FastAPI:\ \ \texttt{/search}\ \ \texttt{/chat}\ \ \texttt{/trends}\ \ \texttt{/recommend}\ \ \texttt{/graph}};
+\node[layer, text width=150mm] (api) at (78,77) {FastAPI:\ \ \texttt{/search}\ \ \texttt{/chat}\ \ \texttt{/trends}\ \ \texttt{/recommend}\ \ \texttt{/graph}\ \ \texttt{/agent/stream}};
 
 \node[lab] at (-3,94)  {⑥ 交互};
-\node[band, text width=90mm] (fe) at (50,94) {Next.js 工作台:检索/趋势/推荐/图谱/问答 五面板};
+\node[band, text width=90mm] (fe) at (50,94) {\textbf{终端 AI 助手} \texttt{make agent}(自主工具编排 · SSE 流式)\\{\scriptsize Web 前端已预留 \texttt{/api/agent/stream} 接口,规划中}};
 \node[band, text width=56mm] (llm) at (125,94) {可替换大模型(vLLM/LM Studio)\\{\scriptsize OpenAI 兼容 · 仅生成层}};
 
 \draw[arrow] (raw) -- (proc);
@@ -43,7 +43,7 @@
 \draw[arrow] (api) -- (fe);
 \draw[arrow] (api) -- (llm);
 \end{tikzpicture}
-\caption{SciScope 总体架构:采集 → 治理 → 分析/模型 → 服务 → 接口 → 交互;大模型仅作可替换的生成层}
+\caption{SciScope 总体架构:采集 → 治理 → 分析/模型 → 服务 → 接口 → 交互;交互层以\textbf{终端智能体}自主编排工具,大模型仅作可替换的生成层}
 \end{figure}
 
 \textbf{设计原则}:① 离线可复现(每层产物由 \texttt{make} 目标生成);② 大模型可替换(生成层走 OpenAI 兼容接口);③ 证据可追溯(回答必带引用);④ 本地优先(数据与索引均在本地,支持涉密场景)。
@@ -72,8 +72,63 @@
 \caption{混合检索 + 证据接地生成链路(中文问句可跨语言命中英文文献)}
 \end{figure}
 
+\subsection{智能体编排层:从"固定管线"到"自主 agent"}
+上节的检索增强问答是\textbf{固定流程}。在其之上,我们构建了\textbf{自主科研智能体}:大模型不再被动接收检索结果,而是\textbf{自己规划步骤、自主选择并调用工具、观察结果后决定下一步},必要时\textbf{自我纠错重试}——这正是赛题"科研\emph{智能体}"的核心,也是本系统与"直接问大模型"的本质区别。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  x=1mm, y=1mm, font=\scriptsize,
+  b/.style={draw=SciLine, rounded corners=1.2pt, line width=0.55pt, align=center, inner sep=3pt, minimum height=9mm, fill=white, text=SciInk},
+  bb/.style={b, fill=SciPanel},
+  arrow/.style={-{Latex[length=1.8mm]}, line width=0.6pt, draw=SciMuted},
+  loop/.style={-{Latex[length=1.8mm]}, line width=0.6pt, draw=SciTealDark, dashed}
+]
+\node[b, text width=18mm] (q) at (0,0) {用户问题};
+\node[bb, text width=18mm] (plan) at (28,0) {① 规划\\plan};
+\node[b, text width=20mm] (sel) at (58,0) {② 大模型\\选择工具};
+\node[b, text width=20mm] (exec) at (90,0) {③ 并行执行\\只读工具};
+\node[b, text width=18mm] (obs) at (121,0) {④ 观察\\结果};
+\node[bb, text width=20mm] (ans) at (151,0) {⑥ 据证作答\\带引用};
+\draw[arrow] (q) -- (plan); \draw[arrow] (plan) -- (sel);
+\draw[arrow] (sel) -- (exec); \draw[arrow] (exec) -- (obs);
+\draw[loop] (obs) to[out=110,in=70] node[above,font=\tiny,text=SciTealDark]{需更多证据则继续} (sel);
+\draw[arrow] (obs) -- (ans);
+\draw[loop] (ans) to[out=-120,in=-60] node[below,font=\tiny,text=SciTealDark]{⑤ 反思自评:证据不足→重写检索重试} (sel);
+\end{tikzpicture}
+\caption{自主智能体循环:规划 → 选工具 → 并行执行 → 观察 →(循环)→ 反思自评 → 据证作答}
+\end{figure}
+
+\textbf{核心机制}:
+\begin{itemize}
+\item \textbf{显式规划(plan)}:复杂问题先生成可执行步骤计划(仅引用内置工具,且 recommend/compare 等依赖 paper\_id 的工具会被安排在 search 之后),再据计划逐步执行;计划对用户与评委\textbf{可见}。
+\item \textbf{工具自主编排}:大模型按需调用 9 个工具,可\textbf{多步链式}(如先 \texttt{search} 拿到真实 paper\_id 再 \texttt{recommend\_papers} / \texttt{get\_trends});只读工具\textbf{并行执行};相同参数调用\textbf{自动去重}防止空转。
+\item \textbf{反思与自评(reflect)}:回答后由模型自评"是否充分、关键论断是否都有证据支撑",不足则改写检索\textbf{重试一次}。
+\item \textbf{上下文压缩}:长会话自动压缩历史工具结果,避免超出上下文窗口。
+\item \textbf{服务/客户端分离}:agent 核心运行于 \texttt{/api/agent/stream}(SSE 流式),终端助手与未来 Web 前端\textbf{共用同一智能体核心}。
+\end{itemize}
+
+\begin{center}
+\begin{tabularx}{0.96\textwidth}{>{\ttfamily}p{34mm}X}
+\toprule
+\textnormal{\textbf{工具}} & \textbf{作用} \\
+\midrule
+search\_literature & 跨语言混合检索(FTS + 向量 + RRF + 双语映射 + 重排) \\
+get\_trends & Mann-Kendall 趋势判定 + Sen's 斜率 + 下一年预测 \\
+recommend\_papers & 语义 + 关键词 + 作者 + MMR 多样性的可解释推荐 \\
+get\_paper & 按 paper\_id 取论文详情 \\
+summarize\_field & 检索代表论文作为领域综述素材 \\
+compare\_papers & 取两篇论文详情用于多维对比 \\
+query\_knowledge\_graph & 作者/关键词/主题图谱与研究社区主题 \\
+export\_bibliography & 导出 BibTeX 引文条目 \\
+verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等级并给出处 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
 \subsection{方案功能}
 \begin{itemize}
+\item \textbf{科研智能体 \texttt{/api/agent/stream}}:大模型\textbf{自主规划并编排}上述能力(9 个工具),多步推理、自我纠错、据证作答;终端助手 \texttt{make agent} 提供 Claude Code 风格的流式交互。
 \item \textbf{文献问答 \texttt{/api/chat}}:\textbf{GraphRAG}(查询抽取关键词实体 → 沿共现图扩展邻居 → query expansion)+ 混合检索证据 → 本地大模型据证生成带引用回答 → \textbf{答案可被证据支撑性校验}(低置信明确提示)。
 \item \textbf{混合检索 \texttt{/api/search}}:FTS + 向量 + RRF 融合,去重到论文级,返回命中片段。
 \item \textbf{趋势预测 \texttt{/api/trends}}:关键词/主题的增长率、burst、生命周期与下一年线性外推(含不确定区间)。
@@ -89,10 +144,11 @@
 \item \textbf{推荐模型}:论文级平均向量(pgvector \texttt{avg})+ 多信号加权,逐条给出可解释因子。
 \item \textbf{知识图谱}:NetworkX 中心度/社区,百万级边按中心度剪枝导出 JSON,作者 ego 图走 SQL 实时查询。
 \item \textbf{生成层}:OpenAI 兼容本地服务,输出限长防失控,可平滑切换更大/远程模型。
+\item \textbf{智能体编排}:基于本地 \texttt{Qwen2.5-7B}(vLLM,hermes 工具解析)的 ReAct 式工具调用循环——流式选工具、只读工具并行执行、调用去重、plan/reflect 自校验,事件化输出供 CLI 与 Web 复用。
 \end{itemize}
 
 \subsection{实现过程}
 \textbf{数据生成与采集} → 6 源按领域/年份抓取,落 \texttt{data/raw\_canonical} 分区 JSONL。\\
 \textbf{数据组织与治理} → 规范化字段;标题优先去重(合并跨源/预印本同篇,留最全一条)+ front-matter 剔除 + PDF 垃圾/ NUL 清洗;160{,}488 → 159{,}190 篇。\\
 \textbf{信息汲取与建模} → 切片入库,计算片段/论文向量,拟合趋势/推荐/图谱/主题;关键词统一过滤 arXiv 码与超泛标签。\texttt{make agent-build} 一键重建。\\
-\textbf{服务与交互} → FastAPI 暴露五接口,前端可视化;数据库不可用时自动回退内存检索,保证演示鲁棒。
+\textbf{服务与交互} → FastAPI 暴露检索/问答/趋势/推荐/图谱及\textbf{智能体流式}接口;终端 AI 助手 \texttt{make agent} 自主编排工具(Web 前端已预留 SSE 接口);数据库不可用时自动回退内存检索,保证演示鲁棒。
