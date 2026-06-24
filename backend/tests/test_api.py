@@ -5,6 +5,14 @@ from backend.app.main import create_app
 from backend.app.services.corpus_service import get_corpus
 
 
+@pytest.fixture(autouse=True)
+def _clear_db_env(monkeypatch):
+    """Hermetic API tests run against the 5-paper sample corpus (ingest=5,
+    dashboard 2020-2024); a live dev DB must not leak into the chat endpoint."""
+    monkeypatch.delenv("SCISCOPE_DB_DSN", raising=False)
+    monkeypatch.delenv("SCISCOPE_DATABASE_URL", raising=False)
+
+
 @pytest.fixture
 def client():
     get_corpus.cache_clear()

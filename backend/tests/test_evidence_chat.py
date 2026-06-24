@@ -7,6 +7,15 @@ from data_pipeline.loaders import load_papers
 from data_pipeline.sample_data import sample_papers_path
 
 
+@pytest.fixture(autouse=True)
+def _clear_db_env(monkeypatch):
+    """Keep these hermetic: assert behavior over the sample corpus, not whatever
+    dev PostgreSQL happens to be running. Without a DSN, ``answer_question`` uses
+    the in-memory sample matcher (the path these tests pass ``papers`` for)."""
+    monkeypatch.delenv("SCISCOPE_DB_DSN", raising=False)
+    monkeypatch.delenv("SCISCOPE_DATABASE_URL", raising=False)
+
+
 class FailingProvider:
     def complete(self, prompt: str) -> str:
         raise AssertionError("provider should not be called without evidence")
