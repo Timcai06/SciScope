@@ -16,6 +16,37 @@
 \item \textbf{合作拓展}:作者合作网络辅助识别潜在合作者与团队,促进产学研对接与资源整合。
 \end{itemize}
 
+\subsubsection{经济效益量化(情景测算)}
+为便于评委直观判读,下面给出\textbf{情景测算}(基于公开订阅定价与典型科研流程工时假设),用于说明本地化方案的成本结构差异。
+
+\begin{center}
+\begin{tabularx}{0.96\textwidth}{>{\bfseries}p{30mm}X X}
+\toprule
+方案 & 年度可变成本(以 100 名研究员估) & 数据与自主可控 \\
+\midrule
+商用文献 AI 订阅 & 按 \$15/月/人估,约 \textbf{12--18 万元/年}, 随人数线性增长 & 查询与文献记录上传第三方,数据出境 \\
+通用大模型 API 问答 & 按重度文献问答用量估,\textbf{数万至十余万元/年}, 随调用量增长 & 查询内容上传第三方 \\
+\rowcolor{SciPanel} SciScope 本地部署 & 建库与索引为\textbf{一次性可复现投入},边际推理成本 \textbf{近 0}(单卡本地) & 数据、索引、模型\textbf{全本地},自主可控 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{center}
+\begin{tabularx}{0.96\textwidth}{>{\bfseries}p{30mm}X X}
+\toprule
+科研环节 & 传统人工 & SciScope 辅助(情景估计) \\
+\midrule
+立项查新 / 综述前期调研 & 单次约 40--80 工时(逐篇检索、去重、筛读) & 语义问答 + 证据直达,估\textbf{压缩 30\%--50\%} 前期工时 \\
+热点 / 趋势研判 & 数天人工巡检多个数据库 & 趋势模型一键产出可解释榜单,\textbf{分钟级} \\
+相似论文 / 合作者发现 & 人工滚雪球式查找 & 推荐与图谱即时给出候选 + 可解释因子 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{plainbox}
+\textbf{测算边界(据实声明)}:以上为\textbf{情景测算},依据公开订阅定价区间与典型科研流程工时假设推得,用于说明成本结构与效率方向;\textbf{具体金额、工时与百分比须结合目标机构的真实业务计时或用户实验核对},本报告不声称已实测,亦不夸大未验证的经济数字。
+\end{plainbox}
+
 \subsection{推广前景}
 \begin{itemize}
 \item \textbf{高校/科研院所}:学科情报中心、研究生文献调研、综述与查新服务。
