@@ -55,24 +55,24 @@ var verbs = []string{
 	"推演中", "酝酿中", "梳理中", "求证中", "琢磨中", "盘点中", "沉思中",
 }
 
-// ---- tool icons/labels ----
+// ---- tool icons/labels (Nerd Font / Font Awesome glyphs, U+F0xx PUA) ----
 var toolLabels = map[string][2]string{
-	"search_literature":     {"🔍", "检索文献"},
-	"get_trends":            {"📈", "研究趋势"},
-	"recommend_papers":      {"📚", "论文推荐"},
-	"get_paper":             {"📄", "论文详情"},
-	"summarize_field":       {"📝", "领域综述"},
-	"compare_papers":        {"⚖️", "论文对比"},
-	"export_bibliography":   {"🔖", "引文导出"},
-	"query_knowledge_graph": {"🕸️", "知识图谱"},
-	"verify_claim":          {"✅", "论断核查"},
+	"search_literature":     {"\uf002", "检索文献"}, // search
+	"get_trends":            {"\uf201", "研究趋势"}, // line-chart
+	"recommend_papers":      {"\uf02d", "论文推荐"}, // book
+	"get_paper":             {"\uf15c", "论文详情"}, // file-text
+	"summarize_field":       {"\uf0ca", "领域综述"}, // list-ul
+	"compare_papers":        {"\uf24e", "论文对比"}, // balance-scale
+	"export_bibliography":   {"\uf02e", "引文导出"}, // bookmark
+	"query_knowledge_graph": {"\uf0e8", "知识图谱"}, // sitemap
+	"verify_claim":          {"\uf058", "论断核查"}, // check-circle
 }
 
 func toolLabel(name string) string {
 	if v, ok := toolLabels[name]; ok {
-		return v[0] + " " + v[1]
+		return v[0] + "  " + v[1]
 	}
-	return "⚙ " + name
+	return "\uf013  " + name
 }
 
 type slashCmd struct{ cmd, desc string }
@@ -204,7 +204,8 @@ type model struct {
 	answering bool
 	verb      string
 	tick      int
-	used      []string // tools called this turn (for the answer footer)
+	start     time.Time // when the current turn began (for the elapsed timer)
+	used      []string  // tools called this turn (for the answer footer)
 	history   []turn
 	sub       chan tea.Msg
 	cancel    context.CancelFunc
@@ -344,6 +345,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.answer = ""
 			m.used = nil
 			m.verb = verbs[rand.Intn(len(verbs))]
+			m.start = time.Now()
 			ctx, cancel := context.WithCancel(context.Background())
 			m.cancel = cancel
 			q := v
@@ -480,7 +482,8 @@ func (m model) View() string {
 
 	// thinking spinner (Claude Code-style verb + esc hint) while a turn runs
 	if m.answering {
-		parts = append(parts, m.spin.View()+" "+stAccent.Render(m.verb+"…")+stFaint.Render("  (esc 中断)"))
+		elapsed := int(time.Since(m.start).Seconds())
+		parts = append(parts, m.spin.View()+" "+stAccent.Render(m.verb+"…")+stFaint.Render(fmt.Sprintf("  (%ds · esc 中断)", elapsed)))
 	} else if strings.HasPrefix(m.ti.Value(), "/") {
 		if ms := filterCmds(m.ti.Value()); len(ms) > 0 {
 			idx := m.menuIdx % len(ms)
