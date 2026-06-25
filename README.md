@@ -41,7 +41,7 @@ make dev
 
 打开：
 
-- 前端：`http://localhost:3000`
+- 前端：`http://localhost:3001`
 - 后端文档：`http://127.0.0.1:8000/docs`
 
 ### 常见运行路径

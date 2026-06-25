@@ -20,7 +20,7 @@ It is aligned to `Makefile` targets and current code behavior.
 
 ```text
 Backend: 127.0.0.1:8000
-Frontend: 3000
+Frontend: 3001
 vLLM server: 127.0.0.1:8001
 ```
 
@@ -30,7 +30,7 @@ vLLM server: 127.0.0.1:8001
 export SCISCOPE_APP_NAME=SciScope
 export SCISCOPE_ENV=local
 export SCISCOPE_DATA_PATH=data/sample/papers.sample.json
-export SCISCOPE_CORS_ORIGINS=http://localhost:3000
+export SCISCOPE_CORS_ORIGINS=http://localhost:3001
 export SCISCOPE_DB_DSN=postgresql://tim@localhost:5432/sciscope
 export SCISCOPE_USE_MOCK_LLM=true
 export SCISCOPE_LLM_PROVIDER=deepseek
@@ -45,7 +45,7 @@ make dev
 
 打开：
 
-- Frontend: `http://localhost:3000`
+- Frontend: `http://localhost:3001`
 - Backend Docs: `http://127.0.0.1:8000/docs`
 
 ## 运行入口
@@ -186,7 +186,7 @@ make dev
 
 然后：
 
-- 打开 `http://localhost:3000`
+- 打开 `http://localhost:3001`
 - 运行 `make smoke`
 - 跑一次 `curl` 提问并确认返回有 `answer` / `evidence`
 - 运行 `make tui` 验证 SSE 可达（按需）
