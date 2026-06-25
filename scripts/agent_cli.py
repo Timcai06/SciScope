@@ -29,6 +29,15 @@ from rich.table import Table  # noqa: E402
 from rich.text import Text  # noqa: E402
 from rich.theme import Theme  # noqa: E402
 
+try:  # interactive slash-command completion (type "/" -> inline list, à la Claude Code)
+    from prompt_toolkit import PromptSession  # noqa: E402
+    from prompt_toolkit.completion import Completer, Completion  # noqa: E402
+    from prompt_toolkit.shortcuts import CompleteStyle  # noqa: E402
+    from prompt_toolkit.styles import Style  # noqa: E402
+    _HAVE_PT = True
+except ImportError:  # graceful fallback to rich's basic input
+    _HAVE_PT = False
+
 # Claude Code-style palette: one warm accent, semantic colors, lots of muted grey.
 THEME = Theme(
     {
@@ -69,6 +78,35 @@ HELP = [
     ("/model", "显示当前模型"),
     ("/quit", "退出 (或 Ctrl-C)"),
 ]
+
+
+if _HAVE_PT:
+    class _SlashCompleter(Completer):
+        """Inline slash-command list (à la Claude Code): typing '/' lists commands.
+
+        The description is folded into the row text (no separate boxed 'meta'
+        column), so each row is one flush line — '/help        显示帮助' — and the
+        selected row is highlighted as a single bar.
+        """
+
+        def get_completions(self, document, complete_event):
+            text = document.text_before_cursor
+            if not text.startswith("/"):
+                return
+            for cmd, desc in HELP:
+                if cmd.startswith(text):
+                    yield Completion(cmd, start_position=-len(text), display=f"{cmd:<11} {desc}")
+
+    _PT_STYLE = Style.from_dict(
+        {
+            "prompt": "#d7875f bold",
+            # flush single-column list: dim rows on the default terminal background,
+            # only the current row gets the warm terracotta bar.
+            "completion-menu": "noinherit",
+            "completion-menu.completion": "noinherit #9e9e9e",
+            "completion-menu.completion.current": "bg:#d7875f #1c1c1c bold",
+        }
+    )
 
 
 def banner(model: str) -> None:
@@ -228,11 +266,24 @@ def main() -> None:
     console.clear()
     banner(short)
 
+    # prompt_toolkit session gives a "/" -> dropdown completion menu; fall back to
+    # rich's basic input when prompt_toolkit is missing or stdin is not a TTY.
+    session = None
+    if _HAVE_PT and sys.stdin.isatty():
+        session = PromptSession(
+            completer=_SlashCompleter(),
+            complete_while_typing=True,
+            complete_style=CompleteStyle.COLUMN,  # single flush column, not a multi-col box
+        )
+
     history: list[dict] = []
     while True:
         console.print(status_line(short, len(history) // 2), highlight=False)
         try:
-            q = console.input("[accent]❯[/] ").strip()
+            if session is not None:
+                q = session.prompt([("class:prompt", "❯ ")], style=_PT_STYLE).strip()
+            else:
+                q = console.input("[accent]❯[/] ").strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[muted]再见 ✦[/]")
             break
