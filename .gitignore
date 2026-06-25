@@ -54,3 +54,6 @@ graphs/**
 !indices/.gitkeep
 !models/.gitkeep
 !graphs/.gitkeep
+
+# Go TUI client build artifact
+tui/sciscope-tui
