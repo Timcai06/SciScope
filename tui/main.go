@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"os"
@@ -436,6 +437,11 @@ func stream(ctx context.Context, backend, q string, history []turn, sub chan tea
 		return
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		sub <- errMsg(formatHTTPError(resp))
+		sub <- doneMsg{}
+		return
+	}
 	sc := bufio.NewScanner(resp.Body)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	for sc.Scan() {
@@ -575,6 +581,15 @@ func (m *model) loadRecentSessions() {
 	if err == nil {
 		m.recentSessions = sessions
 	}
+}
+
+func formatHTTPError(resp *http.Response) string {
+	payload, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	detail := strings.TrimSpace(string(payload))
+	if detail == "" {
+		detail = resp.Status
+	}
+	return fmt.Sprintf("后端返回 %s: %s", resp.Status, detail)
 }
 
 func (m *model) refresh() {

@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from backend.app.core.config import _parse_bool, _parse_cors_origins
-from backend.app.models.schemas import ChatRequest, DashboardResponse
+from backend.app.models.schemas import AgentRequest, ChatRequest, DashboardResponse
 
 
 def test_parse_bool_accepts_common_true_values():
@@ -39,6 +39,17 @@ def test_chat_request_strips_question_whitespace():
 def test_chat_request_rejects_whitespace_only_question():
     with pytest.raises(ValidationError):
         ChatRequest(question="   ")
+
+
+def test_agent_request_strips_question_whitespace():
+    request = AgentRequest(question="  RAG  ")
+
+    assert request.question == "RAG"
+
+
+def test_agent_request_rejects_whitespace_only_question():
+    with pytest.raises(ValidationError):
+        AgentRequest(question="   ")
 
 
 def test_dashboard_response_requires_explicit_year_range_shape():

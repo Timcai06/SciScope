@@ -27,6 +27,14 @@ class AgentRequest(BaseModel):
     question: str = Field(min_length=1)
     history: list[ChatTurn] = Field(default_factory=list)
 
+    @field_validator("question")
+    @classmethod
+    def strip_question(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("question must not be empty")
+        return stripped
+
 
 class ChatRequest(BaseModel):
     """Chat input contract for evidence-backed question answering."""

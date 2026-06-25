@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,6 +31,19 @@ func TestRenderToolResultSearchLiteratureAsEvidenceCards(t *testing.T) {
 		if !strings.Contains(rendered, want) {
 			t.Fatalf("rendered result missing %q:\n%s", want, rendered)
 		}
+	}
+}
+
+func TestFormatHTTPErrorIncludesValidationDetails(t *testing.T) {
+	resp := &http.Response{
+		Status: "422 Unprocessable Entity",
+		Body:   io.NopCloser(strings.NewReader(`{"detail":[{"loc":["body","question"],"msg":"question must not be empty"}]}`)),
+	}
+
+	got := formatHTTPError(resp)
+
+	if !strings.Contains(got, "422") || !strings.Contains(got, "question must not be empty") {
+		t.Fatalf("expected validation detail in HTTP error, got %q", got)
 	}
 }
 
