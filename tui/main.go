@@ -15,6 +15,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -90,6 +91,7 @@ type slashCmd struct{ cmd, desc string }
 var slashCmds = []slashCmd{
 	{"/help", "显示帮助"},
 	{"/tools", "列出可用工具"},
+	{"/export", "导出 Markdown 会话"},
 	{"/clear", "清空对话"},
 	{"/quit", "退出"},
 }
@@ -120,6 +122,34 @@ type reflectMsg string
 type finalMsg string
 type errMsg string
 type doneMsg struct{}
+
+type transcriptEvent struct {
+	Kind    string
+	Tool    string
+	Content string
+}
+
+type evidencePaper struct {
+	PaperID string   `json:"paper_id"`
+	Title   string   `json:"标题"`
+	Year    int      `json:"年份"`
+	Authors []string `json:"作者"`
+	Snippet string   `json:"摘要片段"`
+}
+
+type claimEvidence struct {
+	PaperID    string  `json:"paper_id"`
+	Title      string  `json:"标题"`
+	Year       int     `json:"年份"`
+	Similarity float64 `json:"接地相似度"`
+}
+
+type claimResult struct {
+	Claim         string          `json:"论断"`
+	Verdict       string          `json:"支持等级"`
+	TopSimilarity float64         `json:"最高接地相似度"`
+	Evidence      []claimEvidence `json:"证据"`
+}
 
 func backendURL() string {
 	if v := os.Getenv("SCISCOPE_BACKEND"); v != "" {
@@ -206,21 +236,24 @@ func listen(sub chan tea.Msg) tea.Cmd {
 
 // ---- model ----
 type model struct {
-	ti        textinput.Model
-	vp        viewport.Model
-	spin      spinner.Model
-	blocks    []string // finalized conversation lines
-	answer    string   // current streaming answer
-	answering bool
-	verb      string
-	tick      int
-	start     time.Time // when the current turn began (for the elapsed timer)
-	used      []string  // tools called this turn (for the answer footer)
-	history   []turn
-	sub       chan tea.Msg
-	cancel    context.CancelFunc
-	menuIdx   int
-	ready     bool
+	ti         textinput.Model
+	vp         viewport.Model
+	spin       spinner.Model
+	blocks     []string // finalized conversation lines
+	answer     string   // current streaming answer
+	answering  bool
+	verb       string
+	tick       int
+	start      time.Time // when the current turn began (for the elapsed timer)
+	used       []string  // tools called this turn (for the answer footer)
+	toolStart  map[string]time.Time
+	history    []turn
+	transcript []transcriptEvent
+	lastExport string
+	sub        chan tea.Msg
+	cancel     context.CancelFunc
+	menuIdx    int
+	ready      bool
 }
 
 func initialModel() model {
@@ -244,6 +277,14 @@ func (m model) Init() tea.Cmd { return textinput.Blink }
 func (m *model) appendBlock(s string) {
 	m.blocks = append(m.blocks, s)
 	m.refresh()
+}
+
+func (m *model) record(kind, tool, content string) {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return
+	}
+	m.transcript = append(m.transcript, transcriptEvent{Kind: kind, Tool: tool, Content: content})
 }
 
 func (m *model) refresh() {
@@ -279,6 +320,246 @@ func preview(s string) string {
 		return string(r[:84]) + "…"
 	}
 	return s
+}
+
+func clip(s string, n int) string {
+	s = strings.TrimSpace(s)
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n]) + "…"
+	}
+	return s
+}
+
+func elapsedSuffix(d time.Duration) string {
+	if d <= 0 {
+		return ""
+	}
+	return stFaint.Render(fmt.Sprintf("  %.1fs", d.Seconds()))
+}
+
+func renderToolResult(name, result string, width int, elapsed time.Duration) string {
+	switch name {
+	case "search_literature", "summarize_field":
+		var papers []evidencePaper
+		if json.Unmarshal([]byte(result), &papers) == nil && len(papers) > 0 {
+			lines := []string{stConn.Render("  ⎿  ") + stTool.Render(fmt.Sprintf("证据卡 %d 篇", len(papers))) + elapsedSuffix(elapsed)}
+			for i, p := range papers {
+				if i >= 4 {
+					lines = append(lines, stFaint.Render(fmt.Sprintf("      +%d 篇更多证据", len(papers)-i)))
+					break
+				}
+				meta := []string{p.PaperID}
+				if p.Year != 0 {
+					meta = append(meta, fmt.Sprintf("%d", p.Year))
+				}
+				if len(p.Authors) > 0 {
+					meta = append(meta, strings.Join(p.Authors, ", "))
+				}
+				lines = append(lines,
+					stFaint.Render("      "+fmt.Sprintf("[%d] ", i+1))+stInk.Render(clip(p.Title, 72)),
+					stFaint.Render("          "+strings.Join(meta, " · ")),
+				)
+				if p.Snippet != "" {
+					lines = append(lines, stMuted.Render("          "+clip(p.Snippet, 96)))
+				}
+			}
+			return strings.Join(lines, "\n")
+		}
+	case "verify_claim":
+		var cr claimResult
+		if json.Unmarshal([]byte(result), &cr) == nil && cr.Verdict != "" {
+			head := fmt.Sprintf("论断核查 · %s", cr.Verdict)
+			if cr.TopSimilarity > 0 {
+				head += fmt.Sprintf(" · %.3f", cr.TopSimilarity)
+			}
+			lines := []string{stConn.Render("  ⎿  ") + stTool.Render(head) + elapsedSuffix(elapsed)}
+			if cr.Claim != "" {
+				lines = append(lines, stMuted.Render("      "+clip(cr.Claim, 96)))
+			}
+			for i, ev := range cr.Evidence {
+				if i >= 4 {
+					break
+				}
+				meta := []string{ev.PaperID}
+				if ev.Year != 0 {
+					meta = append(meta, fmt.Sprintf("%d", ev.Year))
+				}
+				if ev.Similarity > 0 {
+					meta = append(meta, fmt.Sprintf("相似度 %.3f", ev.Similarity))
+				}
+				lines = append(lines,
+					stFaint.Render("      "+fmt.Sprintf("[%d] ", i+1))+stInk.Render(clip(ev.Title, 78)),
+					stFaint.Render("          "+strings.Join(meta, " · ")),
+				)
+			}
+			return strings.Join(lines, "\n")
+		}
+	case "get_trends":
+		var rows []map[string]any
+		if json.Unmarshal([]byte(result), &rows) == nil && len(rows) > 0 {
+			lines := []string{stConn.Render("  ⎿  ") + stTool.Render(fmt.Sprintf("趋势卡 %d 条", len(rows))) + elapsedSuffix(elapsed)}
+			for i, row := range rows {
+				if i >= 3 {
+					break
+				}
+				kw := fmt.Sprintf("%v", row["关键词"])
+				trend := fmt.Sprintf("%v", row["趋势判定"])
+				momentum := fmt.Sprintf("%v", row["动量分"])
+				lines = append(lines, stFaint.Render("      "+fmt.Sprintf("[%d] ", i+1))+stInk.Render(kw)+" "+stMuted.Render("趋势 "+trend+" · 动量 "+momentum))
+			}
+			return strings.Join(lines, "\n")
+		}
+	}
+	return stConn.Render("  ⎿  ") + stFaint.Render(preview(result)) + elapsedSuffix(elapsed)
+}
+
+func summarizeToolResultMarkdown(name, result string) string {
+	switch name {
+	case "search_literature", "summarize_field":
+		var papers []evidencePaper
+		if json.Unmarshal([]byte(result), &papers) == nil && len(papers) > 0 {
+			lines := []string{}
+			for i, p := range papers {
+				if i >= 8 {
+					lines = append(lines, fmt.Sprintf("- 另有 %d 篇证据未展开", len(papers)-i))
+					break
+				}
+				meta := []string{p.PaperID}
+				if p.Year != 0 {
+					meta = append(meta, fmt.Sprintf("%d", p.Year))
+				}
+				if len(p.Authors) > 0 {
+					meta = append(meta, strings.Join(p.Authors, ", "))
+				}
+				lines = append(lines, fmt.Sprintf("- [%d] %s", i+1, p.Title))
+				if len(meta) > 0 {
+					lines = append(lines, "  "+strings.Join(meta, " · "))
+				}
+				if p.Snippet != "" {
+					lines = append(lines, "  "+p.Snippet)
+				}
+			}
+			return strings.Join(lines, "\n")
+		}
+	case "verify_claim":
+		var cr claimResult
+		if json.Unmarshal([]byte(result), &cr) == nil && cr.Verdict != "" {
+			head := fmt.Sprintf("论断: %s\n支持等级: %s", cr.Claim, cr.Verdict)
+			if cr.TopSimilarity > 0 {
+				head += fmt.Sprintf("\n最高接地相似度: %.3f", cr.TopSimilarity)
+			}
+			lines := []string{head}
+			for i, ev := range cr.Evidence {
+				if i >= 8 {
+					break
+				}
+				meta := []string{ev.PaperID}
+				if ev.Year != 0 {
+					meta = append(meta, fmt.Sprintf("%d", ev.Year))
+				}
+				if ev.Similarity > 0 {
+					meta = append(meta, fmt.Sprintf("相似度 %.3f", ev.Similarity))
+				}
+				lines = append(lines, fmt.Sprintf("- [%d] %s", i+1, ev.Title))
+				if len(meta) > 0 {
+					lines = append(lines, "  "+strings.Join(meta, " · "))
+				}
+			}
+			return strings.Join(lines, "\n")
+		}
+	case "get_trends":
+		var rows []map[string]any
+		if json.Unmarshal([]byte(result), &rows) == nil && len(rows) > 0 {
+			lines := []string{}
+			for i, row := range rows {
+				if i >= 8 {
+					break
+				}
+				lines = append(lines, fmt.Sprintf("- [%d] %v: 趋势 %v · 动量 %v", i+1, row["关键词"], row["趋势判定"], row["动量分"]))
+			}
+			return strings.Join(lines, "\n")
+		}
+	}
+	return preview(result)
+}
+
+func exportMarkdown(events []transcriptEvent, generatedAt time.Time) string {
+	lines := []string{
+		"# SciScope 会话导出",
+		"",
+		"导出时间: " + generatedAt.Format("2006-01-02 15:04:05 MST"),
+		"",
+	}
+	for _, ev := range events {
+		content := strings.TrimSpace(ev.Content)
+		if content == "" {
+			continue
+		}
+		switch ev.Kind {
+		case "user":
+			lines = append(lines, "## 用户问题", "", content, "")
+		case "plan":
+			lines = append(lines, "## 执行计划", "", content, "")
+		case "tool_call":
+			lines = append(lines, "## 工具调用: "+ev.Tool, "", content, "")
+		case "tool_result":
+			lines = append(lines, "## 证据结果: "+ev.Tool, "", content, "")
+		case "reflect":
+			lines = append(lines, "## 自我纠错", "", content, "")
+		case "assistant":
+			lines = append(lines, "## 智能体回答", "", content, "")
+		case "error":
+			lines = append(lines, "## 错误与恢复建议", "", content, "")
+		default:
+			lines = append(lines, "## "+ev.Kind, "", content, "")
+		}
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n")) + "\n"
+}
+
+func sessionDir() string {
+	if v := os.Getenv("SCISCOPE_SESSION_DIR"); v != "" {
+		return v
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".sciscope", "sessions")
+	}
+	return "sessions"
+}
+
+func writeSessionMarkdown(dir string, events []transcriptEvent, now time.Time) (string, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	base := "sciscope-session-" + now.Format("20060102-150405")
+	path := filepath.Join(dir, base+".md")
+	for i := 2; ; i++ {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			break
+		}
+		path = filepath.Join(dir, fmt.Sprintf("%s-%02d.md", base, i))
+	}
+	if err := os.WriteFile(path, []byte(exportMarkdown(events, now)), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func friendlyError(s string) string {
+	low := strings.ToLower(s)
+	switch {
+	case strings.Contains(low, "connection refused") || strings.Contains(low, "无法连接后端"):
+		return s + "\n  建议: 先运行 make backend, 再重新提问。"
+	case strings.Contains(low, "llm") || strings.Contains(low, "vllm") || strings.Contains(low, "8001"):
+		return s + "\n  建议: 检查 make llm 或 make dev-vllm 是否已启动。"
+	case strings.Contains(low, "graphs not built"):
+		return s + "\n  建议: 运行 make graph-export 后重试。"
+	case strings.Contains(low, "database") || strings.Contains(low, "postgres") || strings.Contains(low, "pgvector"):
+		return s + "\n  建议: 检查 PostgreSQL, 必要时运行 make postgres-refresh。"
+	default:
+		return s
+	}
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -350,10 +631,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.ti.SetValue("")
 			m.appendBlock(stUser.Render("❯ ") + stInk.Render(v))
+			m.record("user", "", v)
 			m.history = append(m.history, turn{"user", v})
 			m.answering = true
 			m.answer = ""
 			m.used = nil
+			m.toolStart = map[string]time.Time{}
 			m.verb = verbs[rand.Intn(len(verbs))]
 			m.start = time.Now()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -369,27 +652,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case planMsg:
 		lines := []string{stBullet.Render("⏺ ") + stAccent.Render("执行计划")}
+		plain := []string{}
 		for _, s := range msg {
 			lines = append(lines, stConn.Render("  ⎿  ")+stMuted.Render("☐ "+s))
+			plain = append(plain, "- "+s)
 		}
+		m.record("plan", "", strings.Join(plain, "\n"))
 		m.appendBlock(strings.Join(lines, "\n"))
 		return m, listen(m.sub)
 
 	case toolCallMsg:
 		m.used = append(m.used, msg.name)
+		if m.toolStart == nil {
+			m.toolStart = map[string]time.Time{}
+		}
+		m.toolStart[msg.name] = time.Now()
 		line := stBullet.Render("⏺ ") + stTool.Render(toolLabel(msg.name))
 		if a := m.argsStr(msg.args); a != "" {
 			line += stFaint.Render("(" + a + ")")
+			m.record("tool_call", msg.name, a)
+		} else {
+			m.record("tool_call", msg.name, toolLabel(msg.name))
 		}
 		m.appendBlock(line)
 		return m, listen(m.sub)
 
 	case toolResultMsg:
-		m.appendBlock(stConn.Render("  ⎿  ") + stFaint.Render(preview(msg.result)))
+		var elapsed time.Duration
+		if m.toolStart != nil {
+			elapsed = time.Since(m.toolStart[msg.name])
+		}
+		m.record("tool_result", msg.name, summarizeToolResultMarkdown(msg.name, msg.result))
+		m.appendBlock(renderToolResult(msg.name, msg.result, m.vp.Width, elapsed))
 		return m, listen(m.sub)
 
 	case reflectMsg:
 		m.answer = ""
+		m.record("reflect", "", string(msg))
 		m.appendBlock(stBullet.Render("⏺ ") + stWarn.Render("自我纠错 ") + stFaint.Render(string(msg)))
 		return m, listen(m.sub)
 
@@ -405,17 +704,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, listen(m.sub)
 
 	case errMsg:
-		m.appendBlock(lipgloss.NewStyle().Foreground(lipgloss.Color("#d75f5f")).Render("⏺ ✗ " + string(msg)))
+		errText := friendlyError(string(msg))
+		m.record("error", "", errText)
+		m.appendBlock(lipgloss.NewStyle().Foreground(lipgloss.Color("#d75f5f")).Render("⏺ ✗ " + errText))
 		return m, listen(m.sub)
 
 	case doneMsg:
 		if m.answer != "" {
 			ans := m.answer
 			m.answering = false
+			m.record("assistant", "", ans)
 			m.appendBlock(m.renderAnswer())
 			m.history = append(m.history, turn{"assistant", ans})
 			if len(m.history) > 12 {
 				m.history = m.history[len(m.history)-12:]
+			}
+			if path, err := writeSessionMarkdown(sessionDir(), m.transcript, time.Now()); err == nil {
+				m.lastExport = path
+				m.appendBlock(stFaint.Render("  会话已保存: " + path))
+			} else {
+				m.appendBlock(stWarn.Render("  会话保存失败: " + err.Error()))
 			}
 		}
 		m.answer = ""
@@ -466,15 +774,29 @@ func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
 	case "/clear":
 		m.blocks = nil
 		m.history = nil
+		m.transcript = nil
+		m.lastExport = ""
 		m.refresh()
 	case "/help":
-		m.appendBlock(stFaint.Render("  命令: /help /tools /clear /quit · Esc 中断 · Ctrl+C 退出"))
+		m.appendBlock(stFaint.Render("  命令: /help /tools /export /clear /quit · Esc 中断 · Ctrl+C 退出"))
 	case "/tools":
 		lines := []string{stFaint.Render("  可用工具(LLM 自主调用):")}
 		for _, name := range []string{"search_literature", "get_trends", "recommend_papers", "get_paper", "summarize_field", "compare_papers", "export_bibliography", "query_knowledge_graph", "verify_claim"} {
 			lines = append(lines, "    "+toolLabel(name))
 		}
 		m.appendBlock(strings.Join(lines, "\n"))
+	case "/export":
+		if len(m.transcript) == 0 {
+			m.appendBlock(stWarn.Render("  暂无可导出的会话。先提一个问题, 再使用 /export。"))
+			return m, nil
+		}
+		path, err := writeSessionMarkdown(sessionDir(), m.transcript, time.Now())
+		if err != nil {
+			m.appendBlock(stWarn.Render("  导出失败: " + err.Error()))
+			return m, nil
+		}
+		m.lastExport = path
+		m.appendBlock(stFaint.Render("  已导出 Markdown: " + path))
 	default:
 		m.appendBlock(stWarn.Render("  未知命令 " + v))
 	}
