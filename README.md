@@ -77,6 +77,7 @@ binaries and publishes a Homebrew cask:
 ```bash
 git tag v0.1.0 && git push origin v0.1.0      # CI cuts the release
 brew install Timcai06/sciscope/sciscope-tui    # users install the client
+sciscope-tui --demo                            # offline golden demo
 ```
 
 One-time setup: create an empty `Timcai06/homebrew-sciscope` repo and add a

@@ -1,7 +1,7 @@
 # GoReleaser config for the SciScope terminal client.
 # Release flow:  git tag v0.1.0 && git push origin v0.1.0
 # CI (.github/workflows/release.yml) runs goreleaser from this dir and publishes
-# multi-platform binaries + a Homebrew formula to the tap repo below.
+# multi-platform binaries + a Homebrew cask to the tap repo below.
 #
 # Prereqs (one-time): create an empty GitHub repo  Timcai06/homebrew-sciscope
 # and give the release job a token with write access to it (HOMEBREW_TAP_GITHUB_TOKEN).
@@ -17,7 +17,7 @@ builds:
     goos: [darwin, linux]
     goarch: [amd64, arm64]
     ldflags:
-      - -s -w
+      - -s -w -X main.version={{ .Version }}
 
 archives:
   - id: default
@@ -44,5 +44,11 @@ homebrew_casks:
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/sciscope-tui"]
           end
     caveats: |
-      运行前需后端在 :8000、本地大模型在 :8001;
+      运行离线演示:
+        sciscope-tui --demo
+
+      连接真实后端:
+        make backend && make llm
+        sciscope-tui
+
       或用 SCISCOPE_BACKEND=https://你的后端 指向远程服务。
