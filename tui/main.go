@@ -595,13 +595,16 @@ func (m model) renderComposer(width int) string {
 		width = 48
 	}
 	raw := strings.TrimSpace(m.ti.Value())
+	inputWidth := width - 10
+	if inputWidth < 34 {
+		inputWidth = 34
+	}
 	value := raw
 	if value == "" {
-		value = stFaint.Render("输入科研问题，或 / 打开命令")
+		value = stFaint.Render("Ask a research question, verify a claim, or type /")
 	} else {
-		value = strings.ReplaceAll(value, "\n", "\n"+stFaint.Render("│  "))
+		value = strings.ReplaceAll(value, "\n", "\n"+strings.Repeat(" ", 2))
 	}
-	hint := stFaint.Render("/help  /doctor  /sessions  /demo  /export") + stAccent.Render("   Enter 发送")
 	mode := "ready"
 	if m.answering {
 		mode = "streaming"
@@ -610,14 +613,27 @@ func (m model) renderComposer(width int) string {
 	} else {
 		mode = "Shift+Enter 多行"
 	}
+	inputLine := lipgloss.NewStyle().Width(inputWidth).Render(stAccent.Render("❯ ") + value)
+	hint := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		stFaint.Render(mode),
+		stFaint.Render("  ·  "),
+		stAccent.Render("Enter"),
+		stFaint.Render(" send  ·  "),
+		stAccent.Render("/"),
+		stFaint.Render(" commands"),
+	)
 	body := strings.Join([]string{
-		stFaint.Render("│  ") + value,
-		stFaint.Render("│  ") + stMuted.Render(mode),
-		stFaint.Render("│  ") + hint,
+		stFaint.Render("ask · SciScope"),
+		inputLine,
+		hint,
 	}, "\n")
-	head := stConn.Render("╭─ ask · SciScope")
-	tail := stConn.Render("╰─")
-	return lipgloss.NewStyle().Width(width - 2).Render(strings.Join([]string{head, body, tail}, "\n"))
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(cAccent).
+		Padding(0, 1).
+		Width(width - 2).
+		Render(body)
 }
 
 func (m model) argsStr(args map[string]any) string {
@@ -709,50 +725,23 @@ func asciiBrand(width int) string {
 }
 
 func renderSplash(width int, sessions []sessionFile) string {
+	_ = sessions
 	if width < 60 {
 		width = 60
 	}
-	quick := []string{
-		stFaint.Render("/demo       播放黄金演示流"),
-		stFaint.Render("/sessions   打开最近研究会话"),
-		stFaint.Render("/help       查看命令与恢复动作"),
+	subtitle := "Evidence-grounded research agent for literature intelligence"
+	if width < 76 {
+		subtitle = "Evidence-grounded research agent"
 	}
-	demo := []string{
-		stFaint.Render("verify_claim → evidence panel"),
-		stFaint.Render("跨语言接地 · 可验证证据"),
-		stFaint.Render("timeline · export · retry"),
-	}
-	status := splashStatusLines()
-	recent := recentSplashLines(sessions)
-	innerWidth := width - 8
-	dashboard := ""
-	if width >= 96 {
-		colWidth := (innerWidth - 4) / 3
-		dashboard = lipgloss.JoinHorizontal(
-			lipgloss.Top,
-			miniPanel("Quick actions", quick, colWidth),
-			"  ",
-			miniPanel("Golden demo", demo, colWidth),
-			"  ",
-			miniPanel("System status", status, colWidth),
-		)
-		dashboard += "\n" + panelRow("sessions", "Recent work", "", recent)
-	} else {
-		dashboard = strings.Join([]string{
-			panelRow("actions", "Quick actions", "", quick),
-			panelRow("demo", "Golden demo", "", demo),
-			panelRow("status", "System status", "", status),
-			panelRow("sessions", "Recent work", "", recent),
-		}, "\n")
-	}
+	prompt := "Start with a claim, paper, topic, or trend. Type / for commands."
 	body := []string{
 		asciiBrand(width),
 		stInk.Render("科研智能体终端"),
-		stFaint.Render("evidence-first research agent · local sessions · reproducible export"),
+		stFaint.Render(subtitle),
 		"",
-		dashboard,
+		stConn.Render(strings.Repeat("─", minInt(width-12, 72))),
+		stFaint.Render(prompt),
 		"",
-		stFaint.Render("输入科研问题，或从 /demo 开始一条完整的可验证证据流。"),
 	}
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -760,6 +749,13 @@ func renderSplash(width int, sessions []sessionFile) string {
 		Padding(1, 2).
 		Width(width - 4).
 		Render(strings.Join(body, "\n"))
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func splashStatusLines() []string {
@@ -792,6 +788,39 @@ func recentSplashLines(sessions []sessionFile) []string {
 		lines = append(lines, stFaint.Render("  "+session.ModTime.Format("01-02 15:04")))
 	}
 	return lines
+}
+
+func (m model) renderCommandPalette(width int) string {
+	if width < 48 {
+		width = 48
+	}
+	matches := filterCmds(m.ti.Value())
+	if len(matches) == 0 {
+		return ""
+	}
+	inner := width - 6
+	if inner < 38 {
+		inner = 38
+	}
+	idx := m.menuIdx % len(matches)
+	rows := []string{
+		stFaint.Render("commands · type to filter · ↑/↓ select · Enter run"),
+	}
+	for i, c := range matches {
+		row := fmt.Sprintf("  %-13s %s", c.cmd, c.desc)
+		row = lipgloss.NewStyle().Width(inner).Render(row)
+		if i == idx {
+			rows = append(rows, stSelCmd.Width(inner).Render(row))
+			continue
+		}
+		rows = append(rows, stCmd.Width(inner).Render(row))
+	}
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(cFaint).
+		Padding(0, 1).
+		Width(width - 2).
+		Render(strings.Join(rows, "\n"))
 }
 
 func durationText(d time.Duration) string {
@@ -1651,18 +1680,8 @@ func (m model) View() string {
 		elapsed := int(time.Since(m.start).Seconds())
 		parts = append(parts, m.spin.View()+" "+stAccent.Render(m.verb+"…")+stFaint.Render(fmt.Sprintf("  (%ds · esc 中断)", elapsed)))
 	} else if strings.HasPrefix(m.ti.Value(), "/") {
-		if ms := filterCmds(m.ti.Value()); len(ms) > 0 {
-			idx := m.menuIdx % len(ms)
-			menu := []string{}
-			for i, c := range ms {
-				row := fmt.Sprintf(" %-13s %s", c.cmd, c.desc)
-				if i == idx {
-					menu = append(menu, stSelCmd.Render(row))
-				} else {
-					menu = append(menu, stCmd.Render(row))
-				}
-			}
-			parts = append(parts, strings.Join(menu, "\n"))
+		if menu := m.renderCommandPalette(m.vp.Width); menu != "" {
+			parts = append(parts, menu)
 		}
 	}
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestRenderToolResultSearchLiteratureAsEvidenceCards(t *testing.T) {
@@ -372,16 +373,25 @@ func TestSplashScreenShowsProductCurtain(t *testing.T) {
 	for _, want := range []string{
 		"███████╗ ██████╗██╗███████╗ ██████╗ ██████╗ ██████╗ ███████╗",
 		"科研智能体终端",
-		"Quick actions",
-		"Golden demo",
-		"Recent work",
-		"verify_claim",
-		"/sessions",
-		"/demo",
-		"可验证证据",
+		"Evidence-grounded research agent",
+		"Start with a claim",
+		"Type / for commands",
 	} {
 		if !strings.Contains(splash, want) {
 			t.Fatalf("splash missing %q:\n%s", want, splash)
+		}
+	}
+	for _, removed := range []string{
+		"Quick actions",
+		"Golden demo",
+		"System status",
+		"Recent work",
+		"/demo",
+		"/sessions",
+		"/resume 1",
+	} {
+		if strings.Contains(splash, removed) {
+			t.Fatalf("splash should not render old dashboard content %q:\n%s", removed, splash)
 		}
 	}
 }
@@ -403,9 +413,9 @@ func TestSplashScalesDownWithoutLosingActions(t *testing.T) {
 
 	for _, want := range []string{
 		"SciScope",
-		"/demo",
-		"/sessions",
-		"verify_claim",
+		"科研智能体终端",
+		"Type /",
+		"commands",
 	} {
 		if !strings.Contains(splash, want) {
 			t.Fatalf("compact splash missing %q:\n%s", want, splash)
@@ -419,16 +429,37 @@ func TestComposerRendersPolishedInputBox(t *testing.T) {
 	composer := m.renderComposer(96)
 
 	for _, want := range []string{
-		"╭─ ask · SciScope",
-		"│",
+		"ask · SciScope",
+		"❯",
 		"核查 RAG",
-		"/help",
-		"/sessions",
-		"Enter 发送",
+		"Enter",
+		"commands",
 	} {
 		if !strings.Contains(composer, want) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)
 		}
+	}
+}
+
+func TestSlashCommandPaletteUsesFullWidth(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+	m.ti.SetValue("/")
+	palette := m.renderCommandPalette(100)
+
+	for _, want := range []string{
+		"commands · type to filter",
+		"/help",
+		"/sessions",
+		"Enter run",
+	} {
+		if !strings.Contains(palette, want) {
+			t.Fatalf("palette missing %q:\n%s", want, palette)
+		}
+	}
+	if lipgloss.Width(palette) < 96 {
+		t.Fatalf("expected full-width command palette, width=%d:\n%s", lipgloss.Width(palette), palette)
 	}
 }
 
@@ -478,15 +509,9 @@ func TestSplashShowsRecentSessionSummaries(t *testing.T) {
 
 	splash := renderSplash(112, sessions)
 
-	for _, want := range []string{
-		"Recent work",
-		"/resume 1",
-		"核查 RAG",
-		"是否降低幻觉",
-		"06-25 13:00",
-	} {
-		if !strings.Contains(splash, want) {
-			t.Fatalf("splash missing recent session %q:\n%s", want, splash)
+	for _, removed := range []string{"Recent work", "/resume 1", "核查 RAG", "06-25 13:00"} {
+		if strings.Contains(splash, removed) {
+			t.Fatalf("splash should keep recent sessions out of the opening curtain %q:\n%s", removed, splash)
 		}
 	}
 }
@@ -571,18 +596,18 @@ func TestExportLastSessionReturnsNewestMarkdown(t *testing.T) {
 	}
 }
 
-func TestSplashShowsLiveStatusPanel(t *testing.T) {
+func TestSplashKeepsStatusOutOfOpeningCurtain(t *testing.T) {
 	splash := renderSplash(112, nil)
 
-	for _, want := range []string{
+	for _, removed := range []string{
 		"System status",
 		"Backend",
 		"LLM",
 		"Sessions",
 		"doctor",
 	} {
-		if !strings.Contains(splash, want) {
-			t.Fatalf("splash missing status signal %q:\n%s", want, splash)
+		if strings.Contains(splash, removed) {
+			t.Fatalf("splash should not show status dashboard content %q:\n%s", removed, splash)
 		}
 	}
 }
@@ -593,11 +618,12 @@ func TestComposerShowsMultilineAndRecoveryHints(t *testing.T) {
 	composer := m.renderComposer(96)
 
 	for _, want := range []string{
-		"╭─ ask · SciScope",
+		"ask · SciScope",
 		"第一行",
 		"第二行",
 		"Shift+Enter",
-		"/doctor",
+		"/",
+		"commands",
 	} {
 		if !strings.Contains(composer, want) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)
