@@ -501,14 +501,18 @@ func TestSplashScalesDownWithoutLosingActions(t *testing.T) {
 func TestComposerRendersPolishedInputBox(t *testing.T) {
 	m := initialModel()
 	m.ti.SetValue("核查 RAG")
+	m.sessionID = "tui-test-session"
 	composer := m.renderComposer(96)
 
 	for _, want := range []string{
-		"ask · SciScope",
-		"❯",
+		"agent",
+		"langgraph",
+		"session tui-test-session",
 		"核查 RAG",
 		"Enter",
+		"Esc",
 		"commands",
+		"/retry",
 	} {
 		if !strings.Contains(composer, want) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)
@@ -524,9 +528,14 @@ func TestSlashCommandPaletteUsesFullWidth(t *testing.T) {
 	palette := m.renderCommandPalette(100)
 
 	for _, want := range []string{
-		"commands · type to filter",
-		"/help",
+		"Commands",
+		"Suggested",
+		"Session",
+		"Evidence",
+		"System",
+		"/demo",
 		"/sessions",
+		"Golden demo",
 		"Enter run",
 	} {
 		if !strings.Contains(palette, want) {
@@ -535,6 +544,26 @@ func TestSlashCommandPaletteUsesFullWidth(t *testing.T) {
 	}
 	if lipgloss.Width(palette) < 96 {
 		t.Fatalf("expected full-width command palette, width=%d:\n%s", lipgloss.Width(palette), palette)
+	}
+}
+
+func TestSlashCommandPaletteFiltersByCategoryAndDescription(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+	m.ti.SetValue("/session")
+	palette := m.renderCommandPalette(100)
+
+	for _, want := range []string{
+		"Recent sessions",
+		"Resume session",
+	} {
+		if !strings.Contains(palette, want) {
+			t.Fatalf("filtered palette missing %q:\n%s", want, palette)
+		}
+	}
+	if strings.Contains(palette, "Golden demo") {
+		t.Fatalf("filtered palette should not include demo:\n%s", palette)
 	}
 }
 
@@ -693,12 +722,15 @@ func TestComposerShowsMultilineAndRecoveryHints(t *testing.T) {
 	composer := m.renderComposer(96)
 
 	for _, want := range []string{
-		"ask · SciScope",
+		"agent",
+		"langgraph",
 		"第一行",
 		"第二行",
 		"Shift+Enter",
+		"Esc",
 		"/",
 		"commands",
+		"/retry",
 	} {
 		if !strings.Contains(composer, want) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)

@@ -108,25 +108,49 @@ func toolPlainLabel(name string) string {
 	return name
 }
 
-type slashCmd struct{ cmd, desc string }
+type slashCmd struct {
+	cmd       string
+	title     string
+	desc      string
+	category  string
+	key       string
+	suggested bool
+}
 
 var slashCmds = []slashCmd{
-	{"/help", "显示帮助"},
-	{"/tools", "列出可用工具"},
-	{"/doctor", "检查后端/模型/会话"},
-	{"/export", "导出 Markdown 会话"},
-	{"/demo", "播放黄金演示流"},
-	{"/retry", "重试上一问"},
-	{"/sessions", "列出最近会话"},
-	{"/resume", "恢复会话: /resume 1"},
-	{"/clear", "清空对话"},
-	{"/quit", "退出"},
+	{cmd: "/demo", title: "Golden demo", desc: "播放可验证证据流", category: "Suggested", key: "demo", suggested: true},
+	{cmd: "/doctor", title: "Status check", desc: "检查后端、LLM、会话与图谱", category: "Suggested", key: "doctor", suggested: true},
+	{cmd: "/retry", title: "Retry last turn", desc: "同一 LangGraph 会话线程恢复上一问", category: "Suggested", key: "retry", suggested: true},
+	{cmd: "/export", title: "Export report", desc: "导出 Markdown 会话与证据", category: "Suggested", key: "export", suggested: true},
+	{cmd: "/sessions", title: "Recent sessions", desc: "列出最近研究会话", category: "Session", key: "sessions"},
+	{cmd: "/resume", title: "Resume session", desc: "恢复会话: /resume 1", category: "Session", key: "resume N"},
+	{cmd: "/tools", title: "Agent tools", desc: "列出 LLM 可自主调用的科研工具", category: "Evidence", key: "tools"},
+	{cmd: "/help", title: "Help", desc: "显示命令与快捷键", category: "System", key: "?"},
+	{cmd: "/clear", title: "Clear view", desc: "清空当前对话视图", category: "System", key: "clear"},
+	{cmd: "/quit", title: "Quit", desc: "退出 SciScope TUI", category: "System", key: "ctrl+c"},
 }
 
 func filterCmds(prefix string) []slashCmd {
-	out := []slashCmd{}
+	query := strings.TrimSpace(strings.TrimPrefix(prefix, "/"))
+	query = strings.ToLower(query)
+	matches := []slashCmd{}
 	for _, c := range slashCmds {
-		if strings.HasPrefix(c.cmd, prefix) {
+		haystack := strings.ToLower(strings.Join([]string{c.cmd, c.title, c.desc, c.category}, " "))
+		if query == "" || strings.Contains(haystack, query) {
+			matches = append(matches, c)
+		}
+	}
+	if query != "" {
+		return matches
+	}
+	out := []slashCmd{}
+	for _, c := range matches {
+		if c.suggested {
+			out = append(out, c)
+		}
+	}
+	for _, c := range matches {
+		if !c.suggested {
 			out = append(out, c)
 		}
 	}
@@ -785,7 +809,7 @@ func (m model) renderComposer(width int) string {
 		width = 48
 	}
 	raw := strings.TrimSpace(m.ti.Value())
-	inputWidth := width - 10
+	inputWidth := width - 8
 	if inputWidth < 34 {
 		inputWidth = 34
 	}
@@ -803,23 +827,59 @@ func (m model) renderComposer(width int) string {
 	} else {
 		mode = "Shift+Enter 多行"
 	}
-	inputLine := lipgloss.NewStyle().Width(inputWidth).Render(stAccent.Render("❯ ") + value)
+	runtime := m.lastMeta.Runtime
+	if runtime == "" {
+		runtime = "langgraph"
+	}
+	session := clip(m.sessionID, 20)
+	if m.lastMeta.SessionID != "" {
+		session = clip(m.lastMeta.SessionID, 20)
+	}
+	leftMeta := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		stAccent.Render("agent"),
+		stFaint.Render(" · "),
+		stInk.Render(runtime),
+		stFaint.Render(" · session "),
+		stInk.Render(session),
+	)
+	rightMeta := mode
+	if m.lastExport != "" {
+		rightMeta += " · saved " + filepath.Base(m.lastExport)
+	}
+	head := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		lipgloss.NewStyle().Width(inputWidth-26).Render(leftMeta),
+		stFaint.Render(clip(rightMeta, 26)),
+	)
+	promptSymbol := "❯"
+	if m.answering {
+		promptSymbol = "●"
+	}
+	inputLine := lipgloss.NewStyle().
+		Width(inputWidth).
+		Render(stAccent.Render(promptSymbol+" ") + value)
 	hint := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		stFaint.Render(mode),
-		stFaint.Render("  ·  "),
 		stAccent.Render("Enter"),
-		stFaint.Render(" send  ·  "),
+		stFaint.Render(" send"),
+		stFaint.Render("  ·  "),
+		stAccent.Render("Esc"),
+		stFaint.Render(" interrupt"),
+		stFaint.Render("  ·  "),
 		stAccent.Render("/"),
 		stFaint.Render(" commands"),
+		stFaint.Render("  ·  "),
+		stAccent.Render("/retry"),
+		stFaint.Render(" recover"),
 	)
 	body := strings.Join([]string{
-		stFaint.Render("ask · SciScope"),
+		head,
 		inputLine,
 		hint,
 	}, "\n")
 	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+		Border(lipgloss.NormalBorder(), true, false, true, false).
 		BorderForeground(cAccent).
 		Padding(0, 1).
 		Width(width - 2).
@@ -994,10 +1054,33 @@ func (m model) renderCommandPalette(width int) string {
 	}
 	idx := m.menuIdx % len(matches)
 	rows := []string{
-		stFaint.Render("commands · type to filter · ↑/↓ select · Enter run"),
+		lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			stAccent.Render("Commands"),
+			stFaint.Render(" · type to filter · ↑/↓ select · Enter run"),
+		),
 	}
+	lastCategory := ""
 	for i, c := range matches {
-		row := fmt.Sprintf("  %-13s %s", c.cmd, c.desc)
+		if c.category != lastCategory {
+			rows = append(rows, stFaint.Render("  "+c.category))
+			lastCategory = c.category
+		}
+		marker := " "
+		if c.suggested {
+			marker = "•"
+		}
+		left := fmt.Sprintf("%s %-12s %-18s", marker, c.cmd, clip(c.title, 18))
+		midWidth := inner - lipgloss.Width(left) - 16
+		if midWidth < 12 {
+			midWidth = 12
+		}
+		row := lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			stInk.Render(left),
+			stFaint.Render(lipgloss.NewStyle().Width(midWidth).Render(clip(c.desc, midWidth))),
+			stFaint.Render(" "+clip(c.key, 14)),
+		)
 		row = lipgloss.NewStyle().Width(inner).Render(row)
 		if i == idx {
 			rows = append(rows, stSelCmd.Width(inner).Render(row))
@@ -1006,7 +1089,7 @@ func (m model) renderCommandPalette(width int) string {
 		rows = append(rows, stCmd.Width(inner).Render(row))
 	}
 	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+		Border(lipgloss.NormalBorder(), true, false, true, false).
 		BorderForeground(cFaint).
 		Padding(0, 1).
 		Width(width - 2).
