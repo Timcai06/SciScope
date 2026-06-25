@@ -151,11 +151,12 @@ type recoveryHint struct {
 }
 
 type sessionFile struct {
-	Index   int
-	Path    string
-	Name    string
-	ModTime time.Time
-	Size    int64
+	Index        int
+	Path         string
+	Name         string
+	LastQuestion string
+	ModTime      time.Time
+	Size         int64
 }
 
 type loadedSession struct {
@@ -404,13 +405,21 @@ func (m *model) addTimeline(ev timelineEvent) {
 	m.timeline = append(m.timeline, ev)
 }
 
+func (m *model) loadRecentSessions() {
+	sessions, err := listSessionFiles(sessionDir(), 3)
+	if err == nil {
+		m.recentSessions = sessions
+	}
+}
+
 func (m *model) refresh() {
 	content := strings.Join(m.blocks, "\n")
 	if m.answering && m.answer != "" {
 		content += "\n" + stBullet.Render("⏺ ") + stInk.Render(m.answer)
 	}
 	if strings.TrimSpace(content) == "" && m.vp.Width > 0 {
-		content = renderSplash(m.vp.Width)
+		m.loadRecentSessions()
+		content = renderSplash(m.vp.Width, m.recentSessions)
 	}
 	m.vp.SetContent(content)
 	m.vp.GotoBottom()
@@ -505,7 +514,7 @@ func miniPanel(title string, lines []string, width int) string {
 		Render(strings.Join(body, "\n"))
 }
 
-func renderSplash(width int) string {
+func renderSplash(width int, sessions []sessionFile) string {
 	if width < 60 {
 		width = 60
 	}
@@ -519,11 +528,7 @@ func renderSplash(width int) string {
 		stFaint.Render("跨语言接地 · 可验证证据"),
 		stFaint.Render("timeline · export · retry"),
 	}
-	recent := []string{
-		stFaint.Render("会话自动保存到 ~/.sciscope/sessions"),
-		stFaint.Render("/resume 1 继续上一段研究"),
-		stFaint.Render("Markdown 可直接放入报告"),
-	}
+	recent := recentSplashLines(sessions)
 	innerWidth := width - 8
 	dashboard := ""
 	if width >= 96 {
@@ -557,6 +562,29 @@ func renderSplash(width int) string {
 		Padding(1, 2).
 		Width(width - 4).
 		Render(strings.Join(body, "\n"))
+}
+
+func recentSplashLines(sessions []sessionFile) []string {
+	if len(sessions) == 0 {
+		return []string{
+			stFaint.Render("暂无本地会话"),
+			stFaint.Render("/demo 播放黄金演示流"),
+			stFaint.Render("完成回答后自动保存"),
+		}
+	}
+	lines := []string{}
+	for i, session := range sessions {
+		if i >= 3 {
+			break
+		}
+		question := session.LastQuestion
+		if question == "" {
+			question = strings.TrimSuffix(session.Name, filepath.Ext(session.Name))
+		}
+		lines = append(lines, stFaint.Render(fmt.Sprintf("/resume %d  %s", session.Index, clip(question, 32))))
+		lines = append(lines, stFaint.Render("  "+session.ModTime.Format("01-02 15:04")))
+	}
+	return lines
 }
 
 func durationText(d time.Duration) string {
@@ -859,11 +887,16 @@ func listSessionFiles(dir string, limit int) ([]sessionFile, error) {
 			continue
 		}
 		path := filepath.Join(dir, entry.Name())
+		lastQuestion := ""
+		if b, err := os.ReadFile(path); err == nil {
+			lastQuestion = extractLastQuestion(string(b))
+		}
 		sessions = append(sessions, sessionFile{
-			Path:    path,
-			Name:    entry.Name(),
-			ModTime: info.ModTime(),
-			Size:    info.Size(),
+			Path:         path,
+			Name:         entry.Name(),
+			LastQuestion: lastQuestion,
+			ModTime:      info.ModTime(),
+			Size:         info.Size(),
 		})
 	}
 	sort.Slice(sessions, func(i, j int) bool {
@@ -1044,12 +1077,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if !m.ready {
 			m.vp = viewport.New(msg.Width, vh)
-			m.vp.SetContent(renderSplash(msg.Width))
+			m.loadRecentSessions()
+			m.vp.SetContent(renderSplash(msg.Width, m.recentSessions))
 			m.ready = true
 		} else {
 			m.vp.Width, m.vp.Height = msg.Width, vh
 			if len(m.blocks) == 0 && m.answer == "" {
-				m.vp.SetContent(renderSplash(msg.Width))
+				m.loadRecentSessions()
+				m.vp.SetContent(renderSplash(msg.Width, m.recentSessions))
 			}
 		}
 		m.ti.Width = msg.Width - 4

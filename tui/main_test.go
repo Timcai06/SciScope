@@ -367,7 +367,7 @@ func TestDemoModeReadsEnvironment(t *testing.T) {
 }
 
 func TestSplashScreenShowsProductCurtain(t *testing.T) {
-	splash := renderSplash(96)
+	splash := renderSplash(96, nil)
 
 	for _, want := range []string{
 		"科研智能体终端",
@@ -386,7 +386,7 @@ func TestSplashScreenShowsProductCurtain(t *testing.T) {
 }
 
 func TestSplashScalesDownWithoutLosingActions(t *testing.T) {
-	splash := renderSplash(42)
+	splash := renderSplash(42, nil)
 
 	for _, want := range []string{
 		"SciScope",
@@ -426,5 +426,31 @@ func TestInitialViewportUsesSplashCurtain(t *testing.T) {
 
 	if !strings.Contains(got.vp.View(), "科研智能体终端") {
 		t.Fatalf("expected initial viewport to show splash:\n%s", got.vp.View())
+	}
+}
+
+func TestSplashShowsRecentSessionSummaries(t *testing.T) {
+	sessions := []sessionFile{
+		{
+			Index:        1,
+			Name:         "sciscope-session-20260625-130000.md",
+			LastQuestion: "核查 RAG 是否降低幻觉",
+			ModTime:      time.Date(2026, 6, 25, 13, 0, 0, 0, time.Local),
+			Size:         2048,
+		},
+	}
+
+	splash := renderSplash(112, sessions)
+
+	for _, want := range []string{
+		"Recent work",
+		"/resume 1",
+		"核查 RAG",
+		"是否降低幻觉",
+		"06-25 13:00",
+	} {
+		if !strings.Contains(splash, want) {
+			t.Fatalf("splash missing recent session %q:\n%s", want, splash)
+		}
 	}
 }
