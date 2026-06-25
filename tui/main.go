@@ -495,21 +495,61 @@ func panelRow(kind, title, meta string, body []string) string {
 	return strings.Join(lines, "\n")
 }
 
+func miniPanel(title string, lines []string, width int) string {
+	body := append([]string{stAccent.Render(title)}, lines...)
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(cFaint).
+		Padding(0, 1).
+		Width(width).
+		Render(strings.Join(body, "\n"))
+}
+
 func renderSplash(width int) string {
 	if width < 60 {
 		width = 60
+	}
+	quick := []string{
+		stFaint.Render("/demo       播放黄金演示流"),
+		stFaint.Render("/sessions   打开最近研究会话"),
+		stFaint.Render("/help       查看命令与恢复动作"),
+	}
+	demo := []string{
+		stFaint.Render("verify_claim → evidence panel"),
+		stFaint.Render("跨语言接地 · 可验证证据"),
+		stFaint.Render("timeline · export · retry"),
+	}
+	recent := []string{
+		stFaint.Render("会话自动保存到 ~/.sciscope/sessions"),
+		stFaint.Render("/resume 1 继续上一段研究"),
+		stFaint.Render("Markdown 可直接放入报告"),
+	}
+	innerWidth := width - 8
+	dashboard := ""
+	if width >= 96 {
+		colWidth := (innerWidth - 4) / 3
+		dashboard = lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			miniPanel("Quick actions", quick, colWidth),
+			"  ",
+			miniPanel("Golden demo", demo, colWidth),
+			"  ",
+			miniPanel("Recent work", recent, colWidth),
+		)
+	} else {
+		dashboard = strings.Join([]string{
+			panelRow("actions", "Quick actions", "", quick),
+			panelRow("demo", "Golden demo", "", demo),
+			panelRow("sessions", "Recent work", "", recent),
+		}, "\n")
 	}
 	body := []string{
 		stAccent.Render("SciScope") + stInk.Render(" 科研智能体终端"),
 		stFaint.Render("evidence-first research agent · local sessions · reproducible export"),
 		"",
-		stInk.Render("核心能力"),
-		stFaint.Render("verify_claim  跨语言论断核查，输出可验证证据"),
-		stFaint.Render("search_literature  检索论文并生成 evidence panel"),
-		stFaint.Render("timeline  展示 plan / tool / evidence / recovery"),
+		dashboard,
 		"",
-		stInk.Render("开始"),
-		stFaint.Render("直接输入科研问题，或使用 /demo /sessions /help"),
+		stFaint.Render("输入科研问题，或从 /demo 开始一条完整的可验证证据流。"),
 	}
 	return lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).

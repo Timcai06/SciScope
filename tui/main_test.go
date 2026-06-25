@@ -371,6 +371,9 @@ func TestSplashScreenShowsProductCurtain(t *testing.T) {
 
 	for _, want := range []string{
 		"科研智能体终端",
+		"Quick actions",
+		"Golden demo",
+		"Recent work",
 		"verify_claim",
 		"/sessions",
 		"/demo",
@@ -378,6 +381,21 @@ func TestSplashScreenShowsProductCurtain(t *testing.T) {
 	} {
 		if !strings.Contains(splash, want) {
 			t.Fatalf("splash missing %q:\n%s", want, splash)
+		}
+	}
+}
+
+func TestSplashScalesDownWithoutLosingActions(t *testing.T) {
+	splash := renderSplash(42)
+
+	for _, want := range []string{
+		"SciScope",
+		"/demo",
+		"/sessions",
+		"verify_claim",
+	} {
+		if !strings.Contains(splash, want) {
+			t.Fatalf("compact splash missing %q:\n%s", want, splash)
 		}
 	}
 }
