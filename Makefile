@@ -80,6 +80,10 @@ export SCISCOPE_USE_MOCK_LLM ?= true
 export SCISCOPE_LLM_PROVIDER ?= deepseek
 export LOCAL_LLM_BASE_URL ?= $(VLLM_BASE_URL)
 export LOCAL_LLM_MODEL ?= $(VLLM_MODEL)
+# So `make backend` / `make dev` serve the real corpus (the agent/RAG need these);
+# without them retrieval has no DB and every search returns "未检索到".
+export SCISCOPE_DB_DSN ?= $(POSTGRES_DSN)
+export SCISCOPE_EMBEDDER_PATH ?= $(EMBEDDER_PATH)
 export NEXT_PUBLIC_SCISCOPE_API_BASE ?= http://$(BACKEND_HOST):$(BACKEND_PORT)
 unexport VLLM_BASE_URL
 unexport VLLM_EXTRA_ARGS
