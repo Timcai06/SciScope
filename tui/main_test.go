@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/charmbracelet/bubbles/viewport"
 )
 
 func TestRenderToolResultSearchLiteratureAsEvidenceCards(t *testing.T) {
@@ -167,5 +169,42 @@ func TestExportMarkdownIncludesTimelineSection(t *testing.T) {
 	}
 	if !strings.Contains(md, "1. 引文导出: RAG") {
 		t.Fatalf("expected timeline content in export:\n%s", md)
+	}
+}
+
+func TestRecoveryActionClassifiesBackendError(t *testing.T) {
+	action := recoveryAction("无法连接后端 http://127.0.0.1:8000: connect: connection refused")
+
+	if action.Command != "make backend" {
+		t.Fatalf("expected make backend recovery command, got %#v", action)
+	}
+	if !action.Retryable {
+		t.Fatalf("expected backend error to be retryable")
+	}
+	if !strings.Contains(action.Message, "/retry") {
+		t.Fatalf("expected retry hint in recovery message: %s", action.Message)
+	}
+}
+
+func TestRetrySlashReplaysLastQuestion(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(80, 20)
+	m.lastQuestion = "核查 RAG 是否降低幻觉"
+
+	next, cmd := m.runSlash("/retry")
+	got := next.(model)
+
+	if cmd == nil {
+		t.Fatalf("expected retry to start a stream command")
+	}
+	if !got.answering {
+		t.Fatalf("expected model to be answering after retry")
+	}
+	if got.history[len(got.history)-1] != (turn{"user", "核查 RAG 是否降低幻觉"}) {
+		t.Fatalf("expected retry to append last question to history, got %#v", got.history)
+	}
+	if len(got.transcript) == 0 || got.transcript[len(got.transcript)-1].Content != "核查 RAG 是否降低幻觉" {
+		t.Fatalf("expected retry question in transcript, got %#v", got.transcript)
 	}
 }

@@ -28,12 +28,13 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// ---- palette (warm terracotta accent, à la Claude Code) ----
+// ---- palette (cyan research console, à la Claude Code structure) ----
 var (
-	cAccent  = lipgloss.Color("#d7875f")
-	cTool    = lipgloss.Color("#5fafd7")
+	cAccent  = lipgloss.Color("#5fd7d7")
+	cTool    = lipgloss.Color("#87afff")
 	cWarn    = lipgloss.Color("#d7af5f")
 	cUser    = lipgloss.Color("#87d787")
+	cError   = lipgloss.Color("#ff8787")
 	cMuted   = lipgloss.Color("#808080")
 	cFaint   = lipgloss.Color("#5f5f5f")
 	cInk     = lipgloss.Color("#d7d7d7")
@@ -42,6 +43,7 @@ var (
 	stConn   = lipgloss.NewStyle().Foreground(cFaint)             // ⎿
 	stTool   = lipgloss.NewStyle().Foreground(cTool)
 	stWarn   = lipgloss.NewStyle().Foreground(cWarn)
+	stError  = lipgloss.NewStyle().Foreground(cError)
 	stUser   = lipgloss.NewStyle().Foreground(cUser).Bold(true)
 	stMuted  = lipgloss.NewStyle().Foreground(cMuted)
 	stFaint  = lipgloss.NewStyle().Foreground(cFaint)
@@ -99,6 +101,7 @@ var slashCmds = []slashCmd{
 	{"/help", "显示帮助"},
 	{"/tools", "列出可用工具"},
 	{"/export", "导出 Markdown 会话"},
+	{"/retry", "重试上一问"},
 	{"/clear", "清空对话"},
 	{"/quit", "退出"},
 }
@@ -134,6 +137,13 @@ type transcriptEvent struct {
 	Kind    string
 	Tool    string
 	Content string
+}
+
+type recoveryHint struct {
+	Title     string
+	Command   string
+	Message   string
+	Retryable bool
 }
 
 type timelineEvent struct {
@@ -251,25 +261,26 @@ func listen(sub chan tea.Msg) tea.Cmd {
 
 // ---- model ----
 type model struct {
-	ti         textinput.Model
-	vp         viewport.Model
-	spin       spinner.Model
-	blocks     []string // finalized conversation lines
-	answer     string   // current streaming answer
-	answering  bool
-	verb       string
-	tick       int
-	start      time.Time // when the current turn began (for the elapsed timer)
-	used       []string  // tools called this turn (for the answer footer)
-	toolStart  map[string]time.Time
-	history    []turn
-	transcript []transcriptEvent
-	timeline   []timelineEvent
-	lastExport string
-	sub        chan tea.Msg
-	cancel     context.CancelFunc
-	menuIdx    int
-	ready      bool
+	ti           textinput.Model
+	vp           viewport.Model
+	spin         spinner.Model
+	blocks       []string // finalized conversation lines
+	answer       string   // current streaming answer
+	answering    bool
+	verb         string
+	tick         int
+	start        time.Time // when the current turn began (for the elapsed timer)
+	used         []string  // tools called this turn (for the answer footer)
+	toolStart    map[string]time.Time
+	history      []turn
+	transcript   []transcriptEvent
+	timeline     []timelineEvent
+	lastExport   string
+	lastQuestion string
+	sub          chan tea.Msg
+	cancel       context.CancelFunc
+	menuIdx      int
+	ready        bool
 }
 
 func initialModel() model {
@@ -662,20 +673,81 @@ func writeSessionMarkdown(dir string, events []transcriptEvent, now time.Time) (
 	return path, nil
 }
 
-func friendlyError(s string) string {
+func recoveryAction(s string) recoveryHint {
 	low := strings.ToLower(s)
 	switch {
 	case strings.Contains(low, "connection refused") || strings.Contains(low, "无法连接后端"):
-		return s + "\n  建议: 先运行 make backend, 再重新提问。"
+		return recoveryHint{
+			Title:     "后端未连接",
+			Command:   "make backend",
+			Message:   "建议: 先运行 make backend, 然后输入 /retry 重试上一问。",
+			Retryable: true,
+		}
 	case strings.Contains(low, "llm") || strings.Contains(low, "vllm") || strings.Contains(low, "8001"):
-		return s + "\n  建议: 检查 make llm 或 make dev-vllm 是否已启动。"
+		return recoveryHint{
+			Title:     "LLM 服务不可用",
+			Command:   "make llm",
+			Message:   "建议: 检查 make llm 或 make dev-vllm 是否已启动，然后输入 /retry。",
+			Retryable: true,
+		}
 	case strings.Contains(low, "graphs not built"):
-		return s + "\n  建议: 运行 make graph-export 后重试。"
+		return recoveryHint{
+			Title:     "图谱未构建",
+			Command:   "make graph-export",
+			Message:   "建议: 运行 make graph-export 后输入 /retry。",
+			Retryable: true,
+		}
 	case strings.Contains(low, "database") || strings.Contains(low, "postgres") || strings.Contains(low, "pgvector"):
-		return s + "\n  建议: 检查 PostgreSQL, 必要时运行 make postgres-refresh。"
+		return recoveryHint{
+			Title:     "数据库不可用",
+			Command:   "make postgres-refresh",
+			Message:   "建议: 检查 PostgreSQL, 必要时运行 make postgres-refresh, 然后输入 /retry。",
+			Retryable: true,
+		}
 	default:
-		return s
+		return recoveryHint{
+			Title:     "请求失败",
+			Message:   "建议: 查看错误详情；如果环境已恢复，可输入 /retry 重试上一问。",
+			Retryable: true,
+		}
 	}
+}
+
+func friendlyError(s string) string {
+	action := recoveryAction(s)
+	lines := []string{s, "  " + action.Message}
+	if action.Command != "" {
+		lines = append(lines, "  恢复动作: "+action.Command)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (m *model) startQuestion(v string, retry bool) tea.Cmd {
+	prefix := "❯ "
+	if retry {
+		prefix = "↻ "
+	}
+	hist := append([]turn(nil), m.history...)
+	m.ti.SetValue("")
+	m.appendBlock(stUser.Render(prefix) + stInk.Render(v))
+	m.record("user", "", v)
+	m.history = append(m.history, turn{"user", v})
+	m.lastQuestion = v
+	m.answering = true
+	m.answer = ""
+	m.used = nil
+	m.toolStart = map[string]time.Time{}
+	m.timeline = nil
+	m.verb = verbs[rand.Intn(len(verbs))]
+	m.start = time.Now()
+	ctx, cancel := context.WithCancel(context.Background())
+	m.cancel = cancel
+	q := v
+	return tea.Batch(
+		func() tea.Msg { go stream(ctx, backendURL(), q, hist, m.sub); return nil },
+		listen(m.sub),
+		m.spin.Tick,
+	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -745,26 +817,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.menuIdx = 0
 				return m.runSlash(v)
 			}
-			m.ti.SetValue("")
-			m.appendBlock(stUser.Render("❯ ") + stInk.Render(v))
-			m.record("user", "", v)
-			m.history = append(m.history, turn{"user", v})
-			m.answering = true
-			m.answer = ""
-			m.used = nil
-			m.toolStart = map[string]time.Time{}
-			m.timeline = nil
-			m.verb = verbs[rand.Intn(len(verbs))]
-			m.start = time.Now()
-			ctx, cancel := context.WithCancel(context.Background())
-			m.cancel = cancel
-			q := v
-			hist := append([]turn(nil), m.history...)
-			return m, tea.Batch(
-				func() tea.Msg { go stream(ctx, backendURL(), q, hist, m.sub); return nil },
-				listen(m.sub),
-				m.spin.Tick,
-			)
+			cmd := m.startQuestion(v, false)
+			return m, cmd
 		}
 
 	case planMsg:
@@ -832,7 +886,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		errText := friendlyError(string(msg))
 		m.record("error", "", errText)
-		m.appendBlock(lipgloss.NewStyle().Foreground(lipgloss.Color("#d75f5f")).Render("⏺ ✗ " + errText))
+		action := recoveryAction(string(msg))
+		m.addTimeline(timelineEvent{Kind: "error", Label: action.Title, Detail: action.Message})
+		m.appendBlock(stError.Render("⏺ ✗ " + errText))
 		return m, listen(m.sub)
 
 	case doneMsg:
@@ -908,15 +964,23 @@ func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
 		m.transcript = nil
 		m.timeline = nil
 		m.lastExport = ""
+		m.lastQuestion = ""
 		m.refresh()
 	case "/help":
-		m.appendBlock(stFaint.Render("  命令: /help /tools /export /clear /quit · Esc 中断 · Ctrl+C 退出"))
+		m.appendBlock(stFaint.Render("  命令: /help /tools /export /retry /clear /quit · Esc 中断 · Ctrl+C 退出"))
 	case "/tools":
 		lines := []string{stFaint.Render("  可用工具(LLM 自主调用):")}
 		for _, name := range []string{"search_literature", "get_trends", "recommend_papers", "get_paper", "summarize_field", "compare_papers", "export_bibliography", "query_knowledge_graph", "verify_claim"} {
 			lines = append(lines, "    "+toolLabel(name))
 		}
 		m.appendBlock(strings.Join(lines, "\n"))
+	case "/retry":
+		if m.lastQuestion == "" {
+			m.appendBlock(stWarn.Render("  暂无可重试的问题。先提一个问题, 或从会话记录中复制问题。"))
+			return m, nil
+		}
+		cmd := m.startQuestion(m.lastQuestion, true)
+		return m, cmd
 	case "/export":
 		if len(m.transcript) == 0 {
 			m.appendBlock(stWarn.Render("  暂无可导出的会话。先提一个问题, 再使用 /export。"))
@@ -941,7 +1005,7 @@ func (m model) View() string {
 	}
 	banner := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).BorderForeground(cAccent).Padding(0, 1)
-	header := banner.Render(stAccent.Render("✦ SciScope 科研智能体") + "  " + stFaint.Render("检索·趋势·推荐·图谱·综述·对比·引文·核查"))
+	header := banner.Render(stAccent.Render("◆ SciScope") + "  " + stInk.Render("科研智能体终端") + "  " + stFaint.Render("evidence · timeline · retry · export"))
 	parts := []string{header, m.vp.View()}
 
 	// thinking spinner (Claude Code-style verb + esc hint) while a turn runs
@@ -964,7 +1028,11 @@ func (m model) View() string {
 		}
 	}
 
-	status := stFaint.Render(fmt.Sprintf("  对话 %d 轮 · /help 命令 · Ctrl+C 退出", len(m.history)/2))
+	statusText := fmt.Sprintf("  对话 %d 轮 · /retry 重试 · /export 导出 · Ctrl+C 退出", len(m.history)/2)
+	if m.lastExport != "" {
+		statusText += " · saved " + filepath.Base(m.lastExport)
+	}
+	status := stFaint.Render(statusText)
 	parts = append(parts, m.ti.View(), status)
 	return strings.Join(parts, "\n")
 }
