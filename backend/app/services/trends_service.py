@@ -20,11 +20,13 @@ _YEAR_COL_RE = re.compile(r"normalized_df_(\d{4})$")
 
 
 def is_available() -> bool:
+    """Trend API is available only when ``trend_scores.json`` has been generated."""
     return (TREND_DIR / "trend_scores.json").exists()
 
 
 @lru_cache(maxsize=1)
 def _scores() -> dict[str, Any]:
+    """Load and cache the built trend score payload from `trend_scores.json`."""
     path = TREND_DIR / "trend_scores.json"
     if not path.exists():
         return {}
@@ -32,6 +34,7 @@ def _scores() -> dict[str, Any]:
 
 
 def _forecast_year(scores: dict[str, Any]) -> int | None:
+    """Compute forecast target year from fitted years metadata."""
     fit_years = scores.get("fit_years") or []
     return (max(fit_years) + 1) if fit_years else None
 
@@ -52,6 +55,7 @@ _KEEP_FIELDS = {
 
 
 def _normalize_item(raw: dict[str, Any], forecast_year: int | None) -> dict[str, Any]:
+    """Normalize trend list entries into stable API payload fields."""
     item = {k: _clean(v) for k, v in raw.items() if k in _KEEP_FIELDS}
     item.setdefault("forecast_year", forecast_year)
     for field in _INT_FIELDS:
@@ -61,6 +65,10 @@ def _normalize_item(raw: dict[str, Any], forecast_year: int | None) -> dict[str,
 
 
 def overview(hot_limit: int = 30, emerging_limit: int = 20) -> dict[str, Any]:
+    """Return trend summary with hot / emerging lists and metadata.
+
+    Input limits are applied after filtering to stable fields and normalized types.
+    """
     scores = _scores()
     fy = _forecast_year(scores)
     return {
@@ -76,7 +84,7 @@ def overview(hot_limit: int = 30, emerging_limit: int = 20) -> dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def _keyword_year_cols() -> tuple[list[tuple[int, str]], dict[str, dict[str, float]]]:
-    """Return (year_columns, {keyword: row}) from keyword_trends.csv."""
+    """Return cached parsed columns and rows from `keyword_trends.csv`."""
     import csv
 
     path = ANALYSIS_DIR / "keyword_trends.csv"
@@ -97,6 +105,10 @@ def _keyword_year_cols() -> tuple[list[tuple[int, str]], dict[str, dict[str, flo
 
 
 def keyword_series(keyword: str) -> list[dict[str, Any]]:
+    """Return normalized per-year series for a keyword.
+
+    Returns [] when keyword is absent or data file missing.
+    """
     year_cols, rows = _keyword_year_cols()
     row = rows.get(keyword)
     if not row:

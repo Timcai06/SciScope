@@ -1,14 +1,14 @@
 """Embedding model wrapper for SciScope retrieval.
 
-Uses a local sentence-transformers model so the embedding step is reproducible
-and offline. The model is part of the deliverable "model files" and is cached
-under ``models/embedder/``.
-
-The default model ``intfloat/multilingual-e5-base`` produces 768-dim vectors
-(matching ``chunk_embeddings.embedding vector(768)`` in ``pgvector.sql``) and
-handles Chinese questions over an English corpus. e5 models require an
-instruction prefix: ``query:`` for search queries and ``passage:`` for indexed
-documents.
+维护级口径（不可变）：
+* 仅承载向量化行为，不混入检索策略或业务打分规则。
+* 使用本地 `sentence-transformers`，模型与本地缓存目录可复现；
+  `SCISCOPE_EMBEDDER_DIR` 和 `SCISCOPE_EMBEDDER_PATH` 仅影响加载来源，
+  但写库/写文件时继续沿用 `model_name` 标签。
+* 默认模型 `intfloat/multilingual-e5-base` 约定产出 768 维向量，并要求
+  在查询/文档侧分别加 `query:` / `passage:` 前缀，保障检索语义口径一致。
+* `normalize_embeddings=True` + `astype(np.float32)` 是本系统统一向量规范；
+  任何后续消费者（尤其是 pgvector 相似度计算）都假定该规范成立。
 """
 
 from __future__ import annotations
@@ -41,6 +41,8 @@ class SciScopeEmbedder:
         from sentence_transformers import SentenceTransformer
 
         self.model_name = model_name
+        # model_name 既是模型加载入口，也是 chunk/paper 向量元数据中的“口径标签”。
+        # 若切换模型，必须以模型名变化触发重建索引/向量，否则会发生口径污染。
         cache = str(cache_dir or _CACHE_DIR)
         Path(cache).mkdir(parents=True, exist_ok=True)
         load_target = _LOCAL_PATH if _LOCAL_PATH and Path(_LOCAL_PATH).exists() else model_name
@@ -57,10 +59,16 @@ class SciScopeEmbedder:
             self.model = self.model.half()
 
     def encode_passages(self, texts: list[str], batch_size: int = 128) -> np.ndarray:
+        """Encode retrieval chunks (title/abstract/keywords/full_text fragments).
+
+        Invariant: 同一次运行里一批 `texts` 的尺寸顺序与返回向量顺序一一对应；
+        下游 upsert 以此建立 `chunk_uid -> embedding` 的稳定映射。
+        """
         prefixed = [f"passage: {text}" for text in texts]
         return self._encode(prefixed, batch_size)
 
     def encode_query(self, text: str) -> np.ndarray:
+        """Encode single query text with the query-prefix contract."""
         return self._encode([f"query: {text}"], batch_size=1)[0]
 
     def _encode(self, texts: list[str], batch_size: int) -> np.ndarray:

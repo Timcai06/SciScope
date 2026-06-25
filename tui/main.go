@@ -290,6 +290,10 @@ func demoScriptMessages() []tea.Msg {
 	}
 }
 
+// playDemo replays a deterministic offline sequence so "/demo" and the
+// environment-gated startup path work without backend/LLM/network.
+// The sequence is fixed: user prompt -> plan -> tool calls/results ->
+// reflect -> final, ending with doneMsg.
 func playDemo(sub chan tea.Msg) {
 	delay := demoDelay()
 	for _, msg := range demoScriptMessages() {
@@ -300,7 +304,16 @@ func playDemo(sub chan tea.Msg) {
 	}
 }
 
-// stream POSTs the question and pushes one tea.Msg per SSE event into sub.
+// stream POSTs the question and pushes one tea.Msg per valid SSE payload.
+// Supported event types:
+//   plan      -> []string{"..."}
+//   text      -> incremental answer chunk
+//   tool_call -> {name,args}
+//   tool_result-> {name,result}
+//   reflect   -> self-check text
+//   final     -> final answer block
+//   error     -> recoverable error text
+// Scanner keeps only lines starting with "data:" and stops at "[DONE]".
 func stream(ctx context.Context, backend, q string, history []turn, sub chan tea.Msg) {
 	body, _ := json.Marshal(map[string]any{"question": q, "history": history})
 	req, _ := http.NewRequestWithContext(ctx, "POST", backend+"/api/agent/stream", bytes.NewReader(body))
@@ -531,6 +544,10 @@ func elapsedSuffix(d time.Duration) string {
 }
 
 func panelRow(kind, title, meta string, body []string) string {
+	// panelRow is the internal line grammar for dashboard/splash/tool blocks:
+	//   header: "╭─ <kind> · <title> [· <meta>]"
+	//   body: each logical row prefixed with "│  "
+	//   footer: "╰─"
 	head := "╭─ " + kind + " · " + title
 	if strings.TrimSpace(meta) != "" {
 		head += " · " + meta
@@ -939,6 +956,10 @@ func exportMarkdown(events []transcriptEvent, generatedAt time.Time) string {
 }
 
 func sessionDir() string {
+	// Session persistence layout:
+	// 1) explicit override via SCISCOPE_SESSION_DIR
+	// 2) fallback to ~/.sciscope/sessions
+	// 3) final fallback to ./sessions
 	if v := os.Getenv("SCISCOPE_SESSION_DIR"); v != "" {
 		return v
 	}
@@ -1041,6 +1062,8 @@ func renderSessionsList(sessions []sessionFile) string {
 }
 
 func writeSessionMarkdown(dir string, events []transcriptEvent, now time.Time) (string, error) {
+	// Persisted sessions are append-only; if a timestamped filename exists,
+	// a numeric suffix is appended to avoid overwrite.
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}

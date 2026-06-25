@@ -19,6 +19,11 @@ from functools import lru_cache
 _LOCAL_PATH = os.getenv("SCISCOPE_RERANKER_PATH", "models/reranker_local/bge-reranker-v2-m3")
 _MAX_LENGTH = 512
 
+# 跨编码器重排不变量：
+# - 仅基于候选集合做局部重排，不参与底库召回；
+# - 默认离线加载，模型路径不可达时返回 False 直接禁用；
+# - 失败时必须保持原序（或 top_k 截断）返回，避免影响可用性。
+
 
 def is_available() -> bool:
     """Rerank is usable only when explicitly enabled and the model is present."""

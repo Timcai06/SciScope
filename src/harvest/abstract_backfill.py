@@ -27,6 +27,7 @@ OPENALEX = "https://api.openalex.org/works/doi:"
 
 
 def _iter_files(canonical_dir: Path, source: str) -> list[Path]:
+    # canonical 分区按 source/year 保存为 jsonl，按路径顺序扫描便于 checkpoint 对账。
     return sorted((canonical_dir / source).glob("*.jsonl"))
 
 
@@ -41,6 +42,7 @@ def _doi(record: dict[str, Any]) -> str:
 
 
 def _fetch_openalex(doi: str, mailto: str, timeout: int) -> dict[str, Any] | None:
+    # OpenAlex by DOI 仅做补摘要补齐；对单条记录失败吞掉，避免把整批任务打断。
     url = OPENALEX + urllib.parse.quote(doi)
     if mailto:
         url += "?mailto=" + urllib.parse.quote(mailto)
@@ -62,6 +64,10 @@ def backfill(
     timeout: int = 25,
     workers: int = 5,
 ) -> dict[str, int]:
+    # 这个流程的核心是“可恢复 + 不重复尝试”：
+    # - 只处理无 abstract 且未标记过 attempt 的记录；
+    # - 批次请求后立即 checkpoint 落盘；
+    # - _sciscope_abstract_attempt/soure 记录避免重复回写。
     import socket
     from concurrent.futures import ThreadPoolExecutor
 
@@ -72,6 +78,7 @@ def backfill(
     remaining = limit
 
     def _flush(path: Path, records: list) -> None:
+        # 每个批次完成后做 `.jsonl.tmp` 原子替换，发生中断可直接从上一次落盘恢复。
         tmp = path.with_suffix(".jsonl.tmp")
         tmp.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records) + "\n", encoding="utf-8")
         tmp.replace(path)
@@ -97,8 +104,7 @@ def backfill(
                 continue
             if remaining < len(pending):
                 pending = pending[:remaining]
-            # Process in checkpointed batches; each batch fires `workers` requests
-            # concurrently (OpenAlex polite pool tolerates this with a mailto).
+            # 批次处理 + 并发请求：按 workers 并发，既控制吞吐也便于低收益尾部及时观察。
             batch = max(workers * 8, 40)
             for start in range(0, len(pending), batch):
                 group = pending[start : start + batch]

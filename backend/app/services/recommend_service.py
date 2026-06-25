@@ -12,6 +12,8 @@ from typing import Any
 
 from backend.app.core.config import get_settings
 
+# Candidate pool and scoring weights are tuned for semantic-first recommendation with
+# limited recency/authorship nudges and explicit diversity re-ranking.
 CANDIDATE_POOL = 50
 W_SEMANTIC = 0.6
 W_KEYWORD = 0.2
@@ -34,12 +36,14 @@ class Recommendation:
 
 
 def _connect():
+    """Open connection to recommendation data model tables."""
     import psycopg
 
     return psycopg.connect(get_settings().db_dsn)
 
 
 def is_available() -> bool:
+    """True when recommendation table exists and DB connection is reachable."""
     settings = get_settings()
     if not settings.db_dsn:
         return False
@@ -54,6 +58,7 @@ def is_available() -> bool:
 
 
 def _resolve_paper_uid(cur, paper_id: str) -> str | None:
+    """Resolve external/metadata paper identifiers to internal ``paper_uid``."""
     cur.execute(
         """
         SELECT paper_uid FROM papers
@@ -67,6 +72,14 @@ def _resolve_paper_uid(cur, paper_id: str) -> str | None:
 
 
 def recommend(paper_id: str, limit: int = 10) -> list[Recommendation]:
+    """Return similarity + overlap ranked recommendations for a seed paper.
+
+    Contract:
+      - Inputs: `paper_id` and requested `limit`.
+      - Resolution chain: accepts internal UID, source id, or metadata paper_id.
+      - Output: ordered list, score-rounded explanation factors, bounded deduplicated fields.
+      - Returns [] if paper is missing, embeddings are unavailable, or DB is offline.
+    """
     if not get_settings().db_dsn:
         return []
     from pgvector.psycopg import register_vector
@@ -151,6 +164,7 @@ def recommend(paper_id: str, limit: int = 10) -> list[Recommendation]:
 
 
 def _mmr_select(score_by_uid: dict[str, float], vec_by_uid: dict, limit: int, lam: float = MMR_LAMBDA) -> list[str]:
+    """Apply Maximal Marginal Relevance to avoid near-duplicate recommendations."""
     import numpy as np
 
     uids = list(score_by_uid)
@@ -178,6 +192,7 @@ def _mmr_select(score_by_uid: dict[str, float], vec_by_uid: dict, limit: int, la
 
 
 def _recency(year: int | None, seed_year: int | None) -> float:
+    """Decay recency score linearly with publication-year distance (10-year horizon)."""
     if not year or not seed_year:
         return 0.0
     gap = abs(seed_year - year)
@@ -185,6 +200,7 @@ def _recency(year: int | None, seed_year: int | None) -> float:
 
 
 def _keywords(cur, paper_uid: str) -> set[str]:
+    """Load normalized keyword set for a single paper UID."""
     cur.execute(
         """
         SELECT k.normalized_keyword FROM paper_keywords pk
@@ -197,6 +213,7 @@ def _keywords(cur, paper_uid: str) -> set[str]:
 
 
 def _authors(cur, paper_uid: str) -> set[str]:
+    """Load normalized author set for a single paper UID."""
     cur.execute(
         """
         SELECT a.normalized_name FROM paper_authors pa
@@ -209,6 +226,7 @@ def _authors(cur, paper_uid: str) -> set[str]:
 
 
 def _keywords_bulk(cur, paper_uids: list[str]) -> dict[str, set[str]]:
+    """Batch load normalized keywords for recommendation overlap scoring."""
     cur.execute(
         """
         SELECT pk.paper_uid, k.normalized_keyword FROM paper_keywords pk
@@ -224,6 +242,7 @@ def _keywords_bulk(cur, paper_uids: list[str]) -> dict[str, set[str]]:
 
 
 def _authors_bulk(cur, paper_uids: list[str]) -> dict[str, set[str]]:
+    """Batch load normalized author names for recommendation overlap scoring."""
     cur.execute(
         """
         SELECT pa.paper_uid, a.normalized_name FROM paper_authors pa
@@ -239,6 +258,7 @@ def _authors_bulk(cur, paper_uids: list[str]) -> dict[str, set[str]]:
 
 
 def _hydrate(cur, paper_uids: list[str]) -> dict[str, dict[str, Any]]:
+    """Load lightweight paper metadata used in API response."""
     cur.execute(
         """
         SELECT paper_uid, coalesce(metadata->>'paper_id', source_id) AS paper_id, title, year, field

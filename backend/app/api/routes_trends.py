@@ -1,3 +1,5 @@
+"""Trend analysis API for hot topic and emerging keyword outputs."""
+
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.app.models.schemas import TrendsResponse
@@ -12,6 +14,15 @@ def trends(
     hot_limit: int = Query(default=30, ge=1, le=200),
     emerging_limit: int = Query(default=20, ge=1, le=200),
 ) -> TrendsResponse:
+    """Return aggregate trend summaries and optional keyword-specific series.
+
+    - Without ``keyword``: returns global hot/emerging lists.
+    - With ``keyword``: injects keyword series from ``trends_service.keyword_series``.
+    - Returns bounded list sizes using ``hot_limit`` and ``emerging_limit``.
+
+    Error contract:
+    - ``503`` when trend model artifacts are missing (run `make trend-model` first).
+    """
     if not trends_service.is_available():
         raise HTTPException(
             status_code=503,

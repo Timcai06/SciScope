@@ -10,6 +10,14 @@ Outputs (the deliverable "graph files"):
     output/graphs/keyword_graph.json
     output/graphs/paper_topic_graph.json
     output/graphs/graph_metrics.json
+
+维护级口径（不可变）：
+* 这里只导出“概览图”：按 centrality/topN 缩小节点规模，避免向前端泄露全量
+  百万级边。
+* 边只保留节点集合内对的关系；边权不足阈值的连接会被剔除，确保渲染成本可控。
+* 节点/边的 id 与 label 为字符串化，不要求数据库原始类型；用于 frontend
+  稳定渲染去耦。
+* 全量关系仍由数据库 service 层提供，图导出文件是首屏加速缓存，不承诺完整性。
 """
 
 from __future__ import annotations
@@ -58,6 +66,8 @@ def build_author_graph(analysis_dir: Path) -> dict[str, Any]:
         analysis_dir / "author_metrics.csv",
         usecols=["author_key", "author", "paper_count", "weighted_degree", "pagerank", "community_id", "dominant_field"],
     )
+    # 作者图不变量：先按加权度排序后截取 TOP_AUTHORS，按 degree 保持边界一致，
+    # 同时确保不会导入过小/噪声实体。
     top = metrics.sort_values("weighted_degree", ascending=False).head(TOP_AUTHORS)
     allowed = set(top["author_key"].astype(str))
     nodes = [
@@ -107,6 +117,8 @@ def _community_summaries(nodes: list[dict[str, Any]], top_k: int = 8) -> list[di
 
 
 def build_keyword_graph(analysis_dir: Path) -> dict[str, Any]:
+    # 关键词图不变量：先做噪词过滤后按 pagerank 选 TOP_KEYWORDS；
+    # 社区统计只在导出子图内做，不回填全局社区表。
     metrics = pd.read_csv(
         analysis_dir / "keyword_metrics.csv",
         usecols=["keyword", "doc_count", "pagerank", "community_id", "lifecycle_stage"],
@@ -133,6 +145,8 @@ def build_keyword_graph(analysis_dir: Path) -> dict[str, Any]:
 
 
 def build_paper_topic_graph(analysis_dir: Path) -> dict[str, Any]:
+    # 主题图不变量：固定选取 topic 数量最多的模型，降低跨模型口径漂移；
+    # 每个 topic 最多展示 8 个关键词，保持可读性。
     topic_kw = pd.read_csv(analysis_dir / "topic_keywords.csv")
     share = pd.read_csv(analysis_dir / "topic_year_share.csv")
     # Use the model with the most topics for a richer view.

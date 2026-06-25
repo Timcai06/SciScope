@@ -11,6 +11,12 @@ high-frequency tail and distort trends / keyword graphs:
 
 Specific research terms (``machine learning``, ``knowledge graph``,
 ``drug discovery``, ``catalysis`` ...) are intentionally kept.
+
+维护级口径（不可变）：
+* “噪词”是跨图谱/趋势流水线共享的统一口径：分类代码、过宽泛学科名、
+  场景化期刊片段，三类都不应进入热点和图谱的可检索口径。
+* 过滤目标为字符串级别布尔判定，返回 True 即整体剔除，不保留降权策略。
+* 同义/拼接式泄漏（如 `". "` 拼接词）按一票否决处理，避免把大量元数据术语误判为关键词。
 """
 
 from __future__ import annotations
@@ -79,6 +85,9 @@ def is_noise_keyword(keyword: str) -> bool:
     kw = (keyword or "").strip().lower()
     if not kw or len(kw) <= 1:
         return True
+    # 第一层：分类代码（cs.lg / stat.ml / q-bio.ot / q bio ot ...）直接剔除；
+    # 第二层：学科/期刊噪词（严格匹配 + 子串匹配）直接剔除；
+    # 第三层：OpenAlex 概念消岐括号/“foo. bar”拼接也剔除，避免误入趋势。
     if _CATEGORY_CODE_RE.match(kw) or _SPACE_CODE_RE.match(kw):
         return True
     if kw in _GENERIC_LABELS or kw in _VENUE_EXACT:

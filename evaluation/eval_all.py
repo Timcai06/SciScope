@@ -1,8 +1,14 @@
 """Run the full evaluation evidence pack and persist results.
 
+维护口径说明:
+- 该脚本聚合检索/趋势/推荐三类**离线评测**，用于“样本内一致性验证”，不是全量生产系统SLA。
+- 输出 JSON/Markdown 仅消费以下固定字段与口径，不改变底层统计。
+- self-retrieval 部分使用评测脚本内置抽样参数(默认 200/150)，指标与样本规模相关，不能外推为“全库真实准确率”。
+- 趋势回测固定按 2022–2024 训练、2025 验证，且仅覆盖 `data/analysis/keyword_trends.csv` 中满足筛选条件的关键词。
+
 Produces output/eval/eval_report.json (machine-readable) and
 output/eval/eval_report.md (human-readable) covering:
-  - retrieval quality (self-retrieval recall@k, MRR, latency)
+  - retrieval quality (self-retrieval recall@k, MRR@10, latency)
   - trend forecast backtest (fit 2022-2024, predict 2025)
   - recommendation offline evaluation (same-field / shared-keyword rate)
 
@@ -24,6 +30,7 @@ def run() -> dict:
     from evaluation import eval_recommend, eval_retrieval, eval_trends
 
     dsn = os.getenv("SCISCOPE_DB_DSN") or os.getenv("SCISCOPE_DATABASE_URL", "postgresql://tim@localhost:5432/sciscope")
+    # 统一指标来源：本函数只是拼接调用，不修改各模块计算；报告中应按子模块的样本口径逐一解读。
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "retrieval": eval_retrieval.run(dsn=dsn, sample=200, seed=42, limit=10),
@@ -42,6 +49,7 @@ def _to_markdown(r: dict) -> str:
     ret_k = r["retrieval"]["by_keywords"]
     tb = r["trend_backtest"]
     rec = r["recommendation"]
+    # 说明: Markdown 复用 JSON 字段，供人工复核时强调“样本规模/口径边界”，避免误当成全量基准线。
     return f"""# SciScope 评测证据包
 
 生成时间:{r['generated_at']}

@@ -1,10 +1,17 @@
 """Automatic retrieval-quality evaluation (no manual labels needed).
 
-Uses a self-retrieval protocol: sample papers that have embeddings, derive a
-query from each paper (its title, and separately its keywords), run the hybrid
-retriever, and check at what rank the source paper comes back. Reports
-recall@k, MRR, and mean latency so retrieval "效果与效率" can be shown
-quantitatively.
+维护指标口径:
+- Self-retrieval 协议：从可检索语料中抽样论文，使用“标题查询”和“关键词查询”各跑一次检索，
+  检查被检索项是否能在返回列表中回到源文档位置。
+- `recall@k = 在前 k 命中样本数 / 实际发起检索次数`。`k ∈ {1,5,10}`。
+- `MRR@10 = 平均倒数秩`，当前实现按 `sum(1/rank for hit)/used` 统计，未命中视为 0。
+- `mean_latency_ms = 全部有效查询耗时均值`，单位为毫秒，衡量的是单次检索接口调用时延。
+- 本脚本仅为“离线可复现的检索一致性评估”，不能直接等价于线上覆盖率或业务召回率。
+
+数据假设与输入:
+- 仅抽样 `paper_embeddings` 命中的论文；若 `paper.title` 太短或查询串为空，会导致该条 query 被跳过。
+- 关键词检索使用 paper_keywords 表拼接的前 6 个关键词字符串，缺失关键词会变成空查询并被跳过。
+- DB 连接默认读取 `SCISCOPE_DATABASE_URL` 或 CLI 参数传入 DSN；检索服务必须可用且可复用语义+关键字混合索引。
 
 Usage:
     python -m evaluation.eval_retrieval --dsn postgresql://tim@localhost:5432/sciscope --sample 200
@@ -49,6 +56,7 @@ def _sample_papers(dsn: str, sample: int, seed: int) -> list[dict]:
         for paper_uid, kw in cur.fetchall():
             keyword_map.setdefault(paper_uid, []).append(kw)
 
+    # 固定随机种子用于复现：样本属于可复现的评测子集，不是全量论文集合。
     random.Random(seed).shuffle(rows)
     picked = rows[:sample]
     return [
@@ -84,6 +92,7 @@ def _evaluate(papers: list[dict], query_fn, limit: int) -> dict:
         metrics[f"recall@{k}"] = round(sum(1 for r in hits if r <= k) / used, 4) if used else 0.0
     metrics["mrr@10"] = round(sum(1.0 / r for r in hits) / used, 4) if used else 0.0
     metrics["mean_latency_ms"] = round(1000 * sum(latencies) / len(latencies), 1) if latencies else 0.0
+    # 注: `used` 是有效查询条数；若 query 为空则不参与计数，避免以 0-查询抹平有效召回曲线。
     return metrics
 
 

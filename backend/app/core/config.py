@@ -1,3 +1,10 @@
+"""Configuration layer for backend runtime defaults and overrides.
+
+Values come from environment variables and are converted into strongly-typed
+settings. Missing values fall back to local-oriented defaults unless explicitly
+overridden.
+"""
+
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +29,11 @@ class Settings:
 
 
 def _parse_bool(value: str | None, default: bool) -> bool:
+    """Parse a boolean env var with permissive truthy/falsy spellings.
+
+    Accepted true values: true/1/yes/y/on
+    Accepted false values: false/0/no/n/off
+    """
     if value is None:
         return default
 
@@ -35,11 +47,30 @@ def _parse_bool(value: str | None, default: bool) -> bool:
 
 
 def _parse_cors_origins(value: str | None) -> list[str]:
+    """Parse comma-separated CORS origins with whitespace trimming.
+
+    Fallback is local frontend origin when env var is missing, preserving existing
+    single-origin development assumption.
+    """
     raw_value = value if value is not None else "http://localhost:3000"
     return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
 
 
 def get_settings() -> Settings:
+    """Build immutable settings with environment precedence and local-first fallback.
+
+    Resolution rules:
+    1) Each field first reads its dedicated environment variable.
+    2) If absent, it falls back to a local development default.
+    3) DB DSN honors `SCISCOPE_DB_DSN` over legacy `SCISCOPE_DATABASE_URL`.
+
+    This keeps behavior deterministic in tests/dev while still allowing explicit
+    deployment override through env vars.
+    """
+    # Local-first defaults for quick bootstrap:
+    # - local app identity/name and default dev sample corpus
+    # - localhost CORS + 127.0.0.1 LLM endpoint
+    # - mock LLM enabled unless explicitly switched off
     return Settings(
         app_name=os.getenv("SCISCOPE_APP_NAME", "SciScope"),
         env=os.getenv("SCISCOPE_ENV", "local"),

@@ -3,9 +3,9 @@
 Architecture mirrors OpenCode / Claude Code (verified against their source, not
 guessed):
   * stream -> act -> observe -> repeat (Claude Code's heartbeat)
-  * the loop is a generator that yields typed events (text / tool_call /
-    tool_result / final) — OpenCode's ``fullStream`` of typed parts, which the
-    TUI consumes for live rendering.
+  * the loop is a generator that yields typed events (plan / text / tool_call /
+    tool_result / reflect / final) — OpenCode's ``fullStream`` of typed parts,
+    which the TUI consumes for live rendering.
   * tools are read-only, so a step's tool calls run in parallel (Claude Code's
     "partition by safety, run reads in parallel").
   * termination: the model emits no tool calls (natural completion) or the step
@@ -165,6 +165,8 @@ def _run_tools(tool_calls: list[dict], executed: dict[str, str]) -> list[str]:
     breaks the failure mode where the model re-issues the same broken call (e.g. a
     fabricated paper_id) every step until the step cap.
     """
+    # Tool calls form the service boundary: no writes, only read-side evidence or
+    # ranking outputs. This keeps the loop side-effect free regardless of retry.
     def one(tc: dict) -> str:
         sig = tc["function"]["name"] + "|" + (tc["function"].get("arguments") or "{}")
         if sig in executed:
@@ -193,6 +195,7 @@ _PLAN_MARKERS = (
 
 
 def _needs_plan(question: str) -> bool:
+    """Plan only when the prompt is likely to need stateful multi-step retrieval."""
     q = question.strip().lower()
     if len(q) < 4 or any(m in q for m in _META):
         return False

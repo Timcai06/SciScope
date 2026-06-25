@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+"""Raw ingest hardening for canonical handoff.
+
+Raw stage keeps the governance boundary stable: source/year parsing, canonical keying,
+and duplicate arbitration happen here. Downstream stages should treat these canonical files
+as immutable evidence and only trust fields prefixed with ``_sciscope_*`` as harvest-level
+metadata rather than business content.
+"""
+
 import csv
 import json
 import re
@@ -123,6 +131,13 @@ def build_raw_canonical(
     archive_dir: str | Path | None = None,
     delete_archive: bool = False,
 ) -> dict[str, Any]:
+    """Build immutable canonical partitions from raw JSONL.
+
+    Output contract:
+    - partitioning by ``(source, year)`` to preserve source-level audit boundaries;
+    - dedupe within partition by deterministic record key + quality score;
+    - forward suspicious future-year records as ``future_year_suspect`` instead of silently clipping.
+    """
     raw_path = Path(raw_dir)
     canonical_path = Path(canonical_dir)
     inventory = Path(inventory_path)
@@ -164,6 +179,8 @@ def build_raw_canonical(
                 valid += 1
                 original_year = year
                 if year.isdigit() and int(year) > year_ceiling:
+                    # 不丢弃未来年份：保留原始值，但标记为待核验，
+                    # 让审计/报告层先“可见”再让后续流程决定是否降级使用。
                     year = "future_year_suspect"
                 years[year] += 1
                 sources_seen[source] += 1
@@ -187,6 +204,7 @@ def build_raw_canonical(
                     partitions[partition_key][key] = record
                     partition_scores[partition_key][key] = score
                 elif score > existing_score:
+                    # 同一 source+year+key 下保留最完整记录（全文>摘要>关键词>作者）。
                     partitions[partition_key][key] = record
                     partition_scores[partition_key][key] = score
 
@@ -205,6 +223,8 @@ def build_raw_canonical(
                 }
             )
 
+    # Canonical is a full boundary artifact: rebuild from scratch so lineage is explicit
+    # and stale partitions cannot linger across reruns.
     if canonical_path.exists():
         shutil.rmtree(canonical_path)
     canonical_path.mkdir(parents=True, exist_ok=True)
@@ -244,6 +264,8 @@ def build_raw_canonical(
 
     archived_files = 0
     if archive_dir is not None:
+        # Raw-level quarantine: move harvested sources to archive for inspection after governance.
+        # Keep historical raw payloads available for traceability review, default is not delete.
         archive_path = Path(archive_dir)
         if archive_path.exists():
             shutil.rmtree(archive_path)

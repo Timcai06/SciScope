@@ -25,11 +25,13 @@ _FILES = {
 
 
 def is_available() -> bool:
+    """Graph endpoints are available when at least one exported graph file exists."""
     return any((GRAPH_DIR / name).exists() for name in _FILES.values())
 
 
 @lru_cache(maxsize=4)
 def _load(graph_type: str) -> dict[str, Any]:
+    """Load a prebuilt graph JSON export; return an empty graph on missing files."""
     name = _FILES.get(graph_type)
     if not name:
         return {"type": graph_type, "nodes": [], "edges": []}
@@ -40,6 +42,7 @@ def _load(graph_type: str) -> dict[str, Any]:
 
 
 def _ego_filter(graph: dict[str, Any], center: str, limit: int) -> dict[str, Any]:
+    """Filter prebuilt graph nodes/edges to an ego view around `center`."""
     edges = [
         e for e in graph.get("edges", [])
         if e.get("source") == center or e.get("target") == center
@@ -53,6 +56,7 @@ def _ego_filter(graph: dict[str, Any], center: str, limit: int) -> dict[str, Any
 
 
 def _author_ego_from_db(center: str, limit: int) -> dict[str, Any] | None:
+    """Build a live author ego graph from coauthor edges when DB is accessible."""
     settings = get_settings()
     if not settings.db_dsn:
         return None
@@ -98,6 +102,13 @@ def _author_ego_from_db(center: str, limit: int) -> dict[str, Any] | None:
 
 
 def graph(graph_type: str, center: str | None = None, limit: int = 100) -> dict[str, Any]:
+    """Return graph payload for API rendering.
+
+    Routes:
+      - author+center: live ego graph from DB.
+      - keyword/topic with center: in-memory ego filter over exported graph.
+      - no center: capped full graph preview and communities.
+    """
     if center and graph_type == "author":
         ego = _author_ego_from_db(center, limit)
         if ego is not None:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Render report figures from analysis assets and emit an ingestion manifest."""
+
 import csv
 import json
 import math
@@ -1517,6 +1519,11 @@ def build_report_figures(
     analysis_dir: str | Path = "data/analysis",
     output_dir: str | Path = "output/assets/sciscope_data_report",
 ) -> dict[str, Any]:
+    """Build chart assets used by report templates.
+
+    Inputs are optional per table; missing upstream tables are skipped so a partial
+    rebuild can still produce a consumable manifest for downstream report jobs.
+    """
     configure_plot_style()
     analysis_path = Path(analysis_dir)
     output_path = Path(output_dir)
@@ -1538,6 +1545,9 @@ def build_report_figures(
     author_metrics = _read_csv(analysis_path / "author_metrics.csv")
     author_diagnostics = _read_csv(analysis_path / "author_network_diagnostics.csv")
 
+    # Keep report-boundary contract explicit: only emit figure rows for assets that
+    # were actually generated in this run, then materialize figure_manifest.csv for
+    # downstream reuse.
     manifest: list[dict[str, str]] = []
     if not quality.empty:
         manifest.append(_plot_source_records(quality, output_path))

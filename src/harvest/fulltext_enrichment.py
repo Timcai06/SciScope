@@ -1,3 +1,11 @@
+"""In-place full-text enrichment for canonical records.
+
+职责:
+- 按 source 逐文件补全文本（arxiv/openalex/crossref/doaj/pubmed）；
+- 用 checkpoint 写入保证进度可恢复；
+- 使用失败标记记录重试边界，避免反复对同一条记录打点网络。
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -207,6 +215,7 @@ def _fetch_bytes(
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
     max_bytes: int = DEFAULT_MAX_DOWNLOAD_BYTES,
 ) -> bytes:
+    # 网络读取按字节上限和时间上限断路：超限或超时直接失败返回，由上层记录失败原因。
     request = Request(url, headers=_request_headers())
     with urlopen(request, timeout=timeout) as response:
         chunks: list[bytes] = []
@@ -338,6 +347,7 @@ def _fetch_text_with_browser(
     *,
     timeout_seconds: int = DEFAULT_BROWSER_TIMEOUT_SECONDS,
 ) -> str:
+    # 浏览器回退用于处理高反爬页面：仅在 fallback 路径开启时触发，失败则返回空串交由上层继续下一 URL。
     script = _browser_fetch_script()
     if not script.exists():
         return ""
@@ -404,6 +414,7 @@ def _dedupe_urls(urls: list[tuple[str, str]]) -> list[tuple[str, str]]:
 
 
 def _crossref_candidate_urls(raw: dict[str, Any]) -> list[tuple[str, str]]:
+    # Crossref 边界：优先 text-mining/pdf/html 链接，不可用时回退 DOI 解析。
     urls: list[tuple[str, str]] = []
     for link in raw.get("link") or []:
         if not isinstance(link, dict):
@@ -421,6 +432,7 @@ def _crossref_candidate_urls(raw: dict[str, Any]) -> list[tuple[str, str]]:
 
 
 def _doaj_candidate_urls(raw: dict[str, Any]) -> list[tuple[str, str]]:
+    # DOAJ 边界：只采纳 bibjson.link 中标记 fulltext 的 URL；无效或缺失时尝试 DOI。
     urls: list[tuple[str, str]] = []
     bibjson = raw.get("bibjson") if isinstance(raw.get("bibjson"), dict) else {}
     for link in bibjson.get("link") or []:
@@ -435,6 +447,7 @@ def _doaj_candidate_urls(raw: dict[str, Any]) -> list[tuple[str, str]]:
 
 
 def _openalex_candidate_urls(raw: dict[str, Any]) -> list[tuple[str, str]]:
+    # OpenAlex 边界：先读 OA location，再回退 DOI（适配最常见的可访问入口变化）。
     urls: list[tuple[str, str]] = []
     for location_key in ("primary_location", "best_oa_location"):
         location = raw.get(location_key)
@@ -450,6 +463,7 @@ def _openalex_candidate_urls(raw: dict[str, Any]) -> list[tuple[str, str]]:
 
 
 def _pubmed_candidate_urls(raw: dict[str, Any]) -> list[tuple[str, str]]:
+    # PubMed 边界：优先 PMCID/PMC 的 PMC 页面，末端以 DOI 兜底。
     urls: list[tuple[str, str]] = []
     for key in ("pmcid", "pmc"):
         if raw.get(key):
@@ -487,6 +501,7 @@ def _enrich_url_record(
         fetch_url = url
         if stable_only and not _is_stable_fulltext_url(url):
             if not _is_doi_url(url):
+                # stable_only 模式下只允许 DOI 链接做跳转验证：降低落点到短期可变域名导致的“抓到后续不可复现”。
                 continue
             try:
                 fetch_url = _resolve_redirect_url(url, timeout_seconds=timeout_seconds)
@@ -595,6 +610,14 @@ def enrich_fulltext_in_place(
     field_filter: str | None = None,
     retry_failed: bool = False,
 ) -> dict[str, Any]:
+    """在 canonical 分区内补充 full-text（原位更新 + 幂等推进）。
+
+维护口径:
+- 只处理缺失 full_text 的记录，避免重复刷写；
+- 统一通过 `.tmp` 临时文件与 checkpoint 写盘，任务中断后可恢复；
+- 每条失败会写入 `full_text_attempt_*`，`retry_failed=False` 时默认跳过历史失败记录；
+- `max_attempts` 与 `field_filter` 用于控制低收益尾部资源消耗，适合 PubMed 等长尾回退场景。
+    """
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"Unsupported source for in-place full-text enrichment: {source}")
 

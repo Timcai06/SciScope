@@ -1,3 +1,15 @@
+"""Public-source harvest orchestrator.
+
+This module owns multi-source collection:
+- openalex / arxiv / pubmed / pmc / crossref / semantic_scholar / doaj / core
+and exposes统一的 fetch -> write flow.
+
+维护口径:
+- 每个源的查询策略、分页/回放边界都在本文件里集中定义，便于追溯；
+- 写入统一使用 `.tmp` 原子替换：支持失败回滚；
+- `seen` 去重 + output 现存行数保护，确保“未提升结果”时不覆写下游已存在文件（幂等推进）。
+"""
+
 from __future__ import annotations
 
 import json
@@ -126,6 +138,10 @@ def _request_json(
     data: bytes | None = None,
     timeout: int = 45,
 ) -> dict[str, Any]:
+    """统一 JSON 请求入口：处理 3 次重试、4xx/5xx 与短暂网络失败。
+
+    请求参数和重试等待策略不变：这里只记录这个接口在网络抖动时的可观测行为口径。
+    """
     query = urlencode({key: value for key, value in (params or {}).items() if value not in {None, ""}})
     target = f"{url}?{query}" if query else url
     request = Request(target, data=data, headers={"User-Agent": "SciScopeHarvester/0.1", **(headers or {})})
@@ -149,6 +165,7 @@ def _request_json(
 
 
 def _request_xml(url: str, params: dict[str, Any], *, timeout: int = 45) -> ET.Element:
+    """XML/API 请求入口（主要用于 NCBI/PMC），错误语义与 JSON 请求一致。"""
     query = urlencode({key: value for key, value in params.items() if value not in {None, ""}})
     request = Request(f"{url}?{query}", headers={"User-Agent": "SciScopeHarvester/0.1"})
     last_error: Exception | None = None
@@ -200,6 +217,13 @@ def _write_wrappers(
     backfill_fetch_query: Callable[[str, str, int], list[dict[str, Any]]] | None = None,
     backfill_min_query_limit: int = 0,
 ) -> int:
+    """公共写入入口：按 source/query 将抓取结果写成 wrapper JSONL 并做幂等推进。
+
+    - 以 source_id 为 key 做去重，避免同查询交叉污染；
+    - 先写 `output.tmp` 再原子 replace，保持中断可回滚；
+    - 如果新结果少于既有行数，保留旧文件，避免低收益轮次把历史回滚到更低质量状态。
+    - 记录 source/query/field_seed/crawled_at，后续可复现来源覆盖和质量边界。
+    """
     if limit <= 0:
         raise ValueError("limit must be positive")
 
@@ -260,6 +284,8 @@ def _write_wrappers(
                 break
             query_limit = min(limit, max(limit - written, backfill_min_query_limit))
             backfill_fetch = backfill_fetch_query or fetch_query
+            # backfill 是“收口尾部”而非主查询重复抓取：当主查询收敛后仍试图补齐缺口，
+            # 以控制低收益尾部可观测性和源内覆盖范围。
             _progress(f"{source}: backfill query='{query}' field='{field}' target={query_limit} total={written}/{limit}")
             before = written
             try:
@@ -336,6 +362,7 @@ def _arxiv_fetch(_field: str, query: str, query_limit: int, year: int | None = N
 
 
 def harvest_arxiv(*, output_path: str | Path, limit: int) -> int:
+    # arXiv 边界：Atom API，按学科查询并取提交时间倒序；适合工程快速覆盖领域新文献。
     return _write_wrappers(output_path=output_path, source="arxiv", limit=limit, fetch_query=_arxiv_fetch)
 
 
@@ -415,6 +442,7 @@ def _pubmed_fetch_ids(*, query: str, ids: list[str]) -> list[dict[str, Any]]:
 
 
 def harvest_pubmed(*, output_path: str | Path, limit: int) -> int:
+    # PubMed 边界：先 eSearch 定位 PMIDs 再 eFetch 拉 metadata；正文不在此阶段落盘，交给 fulltext/enrichment。
     return _write_wrappers(output_path=output_path, source="pubmed", limit=limit, fetch_query=_pubmed_fetch)
 
 
@@ -528,6 +556,7 @@ def _pmc_summary_query_fetch(_field: str, query: str, query_limit: int) -> list[
 
 
 def harvest_pmc(*, output_path: str | Path, limit: int) -> int:
+    # PMC 边界：优先全文 XML，失败按 id 补抓 esummary；与 PubMed 的分流目的是降低正文缺失率。
     return _write_wrappers(
         output_path=output_path,
         source="pmc",
@@ -640,6 +669,7 @@ def _crossref_fetch(_field: str, query: str, query_limit: int) -> list[dict[str,
 
 
 def harvest_crossref(*, output_path: str | Path, limit: int) -> int:
+    # Crossref 边界：只抓 journal-article 与出版时间过滤，核心是 DOI 与年份可追踪的元数据。
     return _write_wrappers(output_path=output_path, source="crossref", limit=limit, fetch_query=_crossref_fetch)
 
 
@@ -734,6 +764,7 @@ def _doaj_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any
 
 
 def harvest_doaj(*, output_path: str | Path, limit: int) -> int:
+    # DOAJ 边界：使用官方搜索 API，结果数 cap 与分页分页策略共同限制低收益尾部扩散。
     return _write_wrappers(output_path=output_path, source="doaj", limit=limit, fetch_query=_doaj_fetch)
 
 
@@ -803,6 +834,7 @@ def _core_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any
 
 
 def harvest_core(*, output_path: str | Path, limit: int) -> int:
+    # CORE 边界：无 API key 直接报错失败；该源不参与主链 fallback，是配置问题必须上报。
     return _write_wrappers(output_path=output_path, source="core", limit=limit, fetch_query=_core_fetch)
 
 
@@ -818,6 +850,7 @@ HARVESTERS: dict[str, Callable[..., int]] = {
 }
 
 
+# YEAR_SUPPORTED_SOURCES 只允许 NCBI/ArXiv/Crossref/PMC 这类能稳定下推年份参数的来源。
 def harvest_source(*, source: str, output_path: str | Path, limit: int) -> int:
     if source not in HARVESTERS:
         raise HarvestError(f"Unsupported source: {source}. Supported sources: {', '.join(SUPPORTED_SOURCES)}")

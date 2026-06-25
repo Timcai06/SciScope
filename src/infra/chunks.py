@@ -7,21 +7,33 @@ from pathlib import Path
 from typing import Any
 
 
+"""RAG chunk generation primitives for the corpus -> chunk -> embedding pipeline.
+
+`build_chunk_assets` reads normalized papers and writes JSONL chunks plus a summary.
+Chunk IDs are deterministic and the emitted metadata is designed to be stable for
+re-runs and traceable back to source documents.
+"""
+
+
 DEFAULT_MAX_CHARS = 1800
 DEFAULT_OVERLAP_CHARS = 180
 
 
 def normalize_identifier(value: str) -> str:
+    # Shared normalization for id material to keep collisions predictable across runs.
     normalized = re.sub(r"\s+", " ", str(value or "").strip().lower())
     return normalized
 
 
 def stable_uid(*parts: Any) -> str:
+    # Stable ID recipe for papers/chunks/edges. Uses explicit separators to avoid
+    # accidental token ambiguity when parts concatenate.
     payload = "\u241f".join(normalize_identifier(str(part)) for part in parts)
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()
 
 
 def paper_uid(paper: dict[str, Any]) -> str:
+    # Prefer source/system-level key (source_id/paper_id) over title/year fallback.
     source = str(paper.get("source") or "unknown")
     source_id = str(paper.get("source_id") or paper.get("paper_id") or "").strip()
     if source_id:
@@ -30,6 +42,7 @@ def paper_uid(paper: dict[str, Any]) -> str:
 
 
 def estimate_tokens(text: str) -> int:
+    # Cheap token proxy to support capacity checks before embedding/vector ingestion.
     if not text:
         return 0
     latin_tokens = len(re.findall(r"[A-Za-z0-9]+", text))
@@ -38,6 +51,7 @@ def estimate_tokens(text: str) -> int:
 
 
 def split_text(text: str, *, max_chars: int = DEFAULT_MAX_CHARS, overlap_chars: int = DEFAULT_OVERLAP_CHARS) -> list[str]:
+    # Keep chunks sentence-aware when possible, with overlap to preserve local context.
     cleaned = re.sub(r"\s+", " ", str(text or "")).strip()
     if not cleaned:
         return []
@@ -80,6 +94,8 @@ def build_paper_chunks(
     max_chars: int = DEFAULT_MAX_CHARS,
     overlap_chars: int = DEFAULT_OVERLAP_CHARS,
 ) -> list[dict[str, Any]]:
+    # Compose chunks from title/abstract/full_text/keywords in a fixed order so
+    # downstream audit and chunk-level tracing remain deterministic.
     uid = paper_uid(paper)
     chunks: list[dict[str, Any]] = []
     full_text = paper.get("full_text") or ""
@@ -137,6 +153,8 @@ def build_chunk_assets(
     max_chars: int = DEFAULT_MAX_CHARS,
     overlap_chars: int = DEFAULT_OVERLAP_CHARS,
 ) -> dict[str, Any]:
+    # Build all paper chunks to JSONL and emit lightweight counters for pipeline
+    # health checks (type distribution, full-text coverage, token estimate).
     source = Path(input_path)
     output = Path(output_path)
     summary = Path(summary_path)

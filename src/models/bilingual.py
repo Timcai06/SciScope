@@ -108,9 +108,14 @@ def expand_bilingual(query: str) -> str:
     Replacement (not append) avoids two failure modes: the FTS arm AND-failing on
     an unmatchable Chinese token, and the semantic arm being dragged toward
     Chinese-titled papers by the Chinese prefix. Untranslated Chinese is kept and
-    handled cross-lingually by the embedder. The English equivalent is also
-    appended once so the original intent is preserved.
+    handled cross-lingually by the embedder. The English equivalent is inserted
+    in-place (or appended when a span does not overlap) so the original intent
+    is preserved.
     """
+    # 不变量：
+    # - 仅当查询确认为中文语境时执行映射，避免将英文查询错误打断。
+    # - 使用字典最长匹配，避免“语言模型”覆盖“生成式大语言模型”等子串偏移。
+    # - 替换后按空白归一化，保证下游 embedding 输入稳定。
     if not query or not any("一" <= ch <= "鿿" for ch in query):
         return query
     out = query
@@ -122,4 +127,6 @@ def expand_bilingual(query: str) -> str:
             additions.append(CN_EN[cn])
     if not additions:
         return query
+    # additions 保留为变换发生性的语义锚点；当前返回体仍以替换后的文本为准，
+    # 不再对原始查询做重复拼接，避免长度膨胀。
     return " ".join(out.split())

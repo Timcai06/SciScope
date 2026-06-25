@@ -1,3 +1,5 @@
+"""Recommendation endpoint for content-similarity suggestions."""
+
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.app.models.schemas import Recommendation, RecommendResponse
@@ -11,6 +13,18 @@ def recommend(
     paper_id: str = Query(min_length=1),
     limit: int = Query(default=10, ge=1, le=50),
 ) -> RecommendResponse:
+    """Return top similar papers for a given source paper.
+
+    Request/response contract:
+    - ``paper_id`` must be a non-empty identifier.
+    - ``limit`` controls how many recommendations are included, bounded to [1, 50].
+    - Returns ``RecommendResponse`` where each row is a recommendation with scoring
+      and traceable rationale factors.
+
+    Error contract:
+    - ``503`` when embeddings/recommendation artifacts are missing.
+    - ``404`` when no recommendations can be resolved for the target id.
+    """
     if not recommend_service.is_available():
         raise HTTPException(
             status_code=503,

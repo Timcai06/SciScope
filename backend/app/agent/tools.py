@@ -4,6 +4,10 @@ Each tool wraps an existing service (retrieval / trends / recommend / graph) and
 returns a compact, token-efficient string for the model to reason over. The
 OpenAI-style schemas in ``TOOL_SCHEMAS`` are sent to the local LLM so it can pick
 and call tools itself (agentic orchestration) instead of a fixed pipeline.
+
+Boundary note: tools are intentionally read-only and map to backend service/table
+state (papers/chunks/chunk_embeddings/recommendation assets/graphs). Returned
+payloads are evidence references, not raw authoritative facts.
 """
 
 from __future__ import annotations
@@ -164,6 +168,7 @@ def execute_tool(name: str, args: dict[str, Any]) -> str:
             return _graph(args)
         if name == "verify_claim":
             return _verify_claim(args)
+        # Unknown tool names are rejected here to keep the call boundary explicit.
         return f"未知工具: {name}"
     except Exception as exc:  # noqa: BLE001 — surface failures to the model, don't crash the loop
         return f"工具 {name} 执行出错: {type(exc).__name__}: {exc}"

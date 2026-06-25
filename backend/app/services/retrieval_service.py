@@ -1,10 +1,21 @@
-"""Hybrid retrieval over the PostgreSQL + pgvector service layer.
+"""Hybrid retrieval service for production paper search.
 
-Combines lexical retrieval (PostgreSQL FTS on ``paper_chunks.search_document``)
-with semantic retrieval (pgvector cosine over ``chunk_embeddings``) and fuses
-the two ranked lists with Reciprocal Rank Fusion (RRF), deduplicated to the
-paper level. Heavy dependencies (psycopg, pgvector, sentence-transformers) are
-imported lazily so importing this module stays cheap and test-safe.
+Boundary:
+  - Reads corpus indexes from Postgres tables:
+    ``papers``, ``paper_chunks``, ``chunk_embeddings``.
+  - Returns ranked paper-level matches for API/agent callers.
+  - Does not execute local full-text scoring or LLM generation.
+
+Pipeline contract:
+  1. Normalize query text for lexical intent.
+  2. Run lexical FTS and optional semantic nearest-neighbor queries.
+  3. Fuse by RRF, then optionally rerank and optionally boost by recency.
+  4. Hydrate paper metadata for response shaping.
+
+Fallback strategy:
+  - Service-level availability is intentionally explicit via ``is_available``.
+  - If embeddings are unavailable, semantic branch is skipped.
+  - If reranker is unavailable, fallback to raw RRF ordering.
 """
 
 from __future__ import annotations
@@ -16,11 +27,12 @@ from typing import Any
 from backend.app.core.config import get_settings
 
 RRF_K = 60
-CHUNK_POOL = 40  # candidates pulled from each retrieval arm before fusion
+CHUNK_POOL = 40  # candidate snippets pulled from each retrieval arm before fusion
 
 
 @dataclass
 class RetrievedPaper:
+    """Normalized paper search result record exposed to response models."""
     paper_id: str
     title: str
     year: int | None
@@ -32,7 +44,7 @@ class RetrievedPaper:
 
 
 def is_available() -> bool:
-    """Hybrid retrieval is usable only when a DSN is configured and reachable."""
+    """Return True only when DSN, driver, and basic papers table access are healthy."""
     settings = get_settings()
     if not settings.db_dsn:
         return False
@@ -50,6 +62,7 @@ def is_available() -> bool:
 
 
 def _connect():
+    """Open a fresh Postgres connection from ``SCISCOPE_DB_DSN``."""
     import psycopg
 
     return psycopg.connect(get_settings().db_dsn)
@@ -57,6 +70,7 @@ def _connect():
 
 @lru_cache(maxsize=1)
 def _has_embeddings() -> bool:
+    """True if semantic vector index table is queryable in current environment."""
     try:
         with _connect() as conn, conn.cursor() as cur:
             cur.execute("SELECT 1 FROM chunk_embeddings LIMIT 1")
@@ -66,6 +80,7 @@ def _has_embeddings() -> bool:
 
 
 def _filter_clause(field: str | None, year: int | None, params: list[Any]) -> str:
+    """Build optional SQL filters for ``field`` and ``year`` with bound parameters."""
     clauses = ""
     if field:
         clauses += " AND p.field = %s"
@@ -95,6 +110,7 @@ def _or_tsquery(query: str) -> str:
 
 
 def _fts_query(conn, tsquery_sql: str, query_text: str, field: str | None, year: int | None) -> list[tuple[str, str]]:
+    """Execute one FTS arm and return ``(paper_uid, chunk_text)`` hits."""
     params: list[Any] = [query_text]
     filters = _filter_clause(field, year, params)
     params.append(CHUNK_POOL)
@@ -113,7 +129,7 @@ def _fts_query(conn, tsquery_sql: str, query_text: str, field: str | None, year:
 
 
 def _lexical_candidates(conn, query: str, field: str | None, year: int | None) -> list[tuple[str, str]]:
-    # Precision-first: AND/phrase matches (websearch) lead so an exact title
+    # Precision-first: websearch-to-tsquery keeps exact phrase/title matches high.
     # query keeps its paper at rank 1; then OR matches fill in for recall on
     # multi-term queries (which AND alone would miss).
     out: list[tuple[str, str]] = []
@@ -159,6 +175,7 @@ def _semantic_candidates(conn, query: str, field: str | None, year: int | None) 
 
 
 def _rrf_fuse(*ranked_lists: list[tuple[str, str]]) -> dict[str, dict[str, Any]]:
+    """Fuse one or more ranked chunk lists to paper-level scores with RRF."""
     fused: dict[str, dict[str, Any]] = {}
     arm_names = ["lexical", "semantic"]
     for arm_index, ranked in enumerate(ranked_lists):
@@ -178,6 +195,7 @@ def _rrf_fuse(*ranked_lists: list[tuple[str, str]]) -> dict[str, dict[str, Any]]
 
 
 def _hydrate(conn, paper_uids: list[str]) -> dict[str, dict[str, Any]]:
+    """Load paper metadata + first 12 authors for an ordered paper UID batch."""
     if not paper_uids:
         return {}
     meta: dict[str, dict[str, Any]] = {}
@@ -236,6 +254,7 @@ _FILLER_EN = [
 
 
 def _clean_query(query: str) -> str:
+    """Drop retrieval-irrelevant filler terms while preserving short topical queries."""
     cleaned = query
     for f in _FILLER_CN:
         cleaned = cleaned.replace(f, " ")
@@ -250,6 +269,22 @@ _RECENCY = ("最新", "最近", "近期", "今年", "newest", "latest", "recent"
 
 
 def search(query: str, limit: int = 10, field: str | None = None, year: int | None = None) -> list[RetrievedPaper]:
+    """Search papers via hybrid lexical+semantic strategy.
+
+    Inputs:
+      - ``query``: user search intent in Chinese/English.
+      - ``limit``: number of paper-level items returned.
+      - ``field`` / ``year``: optional hard filters when DB query is used.
+
+    Returns:
+      Paper-level list sorted by final retrieval score (after optional rerank).
+
+    Service behavior:
+      - Returns ``[]`` when query is empty, DB is unconfigured, or no match.
+      - Skips semantic branch when embeddings are not available.
+      - Applies cross-encoder rerank when installed; applies recency bias only for
+        queries containing recency intent terms.
+    """
     query = (query or "").strip()
     if not query or not get_settings().db_dsn:
         return []

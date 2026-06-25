@@ -1,3 +1,11 @@
+"""LLM provider abstraction used by evidence chat and agent tools.
+
+Boundary:
+  - Normalizes provider selection (`mock` / local OpenAI-compatible / deepseek).
+  - Exposes a tiny `complete(prompt)` contract shared by chat services.
+  - Keeps transport and decoding details inside this module; callers only handle strings.
+"""
+
 import json
 import urllib.error
 import urllib.request
@@ -7,11 +15,15 @@ from backend.app.core.config import Settings, get_settings
 
 
 class LLMProvider(Protocol):
+    """Protocol for all providers injected into higher-level services."""
+
     def complete(self, prompt: str) -> str:
         """Return a completion for the prompt."""
 
 
 class MockDeepSeekProvider:
+    """Deterministic offline fallback used in tests and no-LLM mode."""
+
     def complete(self, prompt: str) -> str:
         return (
             "RAG and retrieval augmented generation improve scientific question "
@@ -20,6 +32,8 @@ class MockDeepSeekProvider:
 
 
 class DeepSeekProvider:
+    """Strict DeepSeek provider stub: selection gate + API call contract placeholder."""
+
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
 
@@ -31,6 +45,8 @@ class DeepSeekProvider:
 
 
 class LocalOpenAIProvider:
+    """OpenAI-compatible local endpoint provider for offline/inference deployments."""
+
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
 
@@ -73,6 +89,7 @@ class LocalOpenAIProvider:
 
 
 def _extract_openai_message(data: dict[str, Any]) -> str:
+    """Extract completion text from OpenAI chat-completion payload."""
     try:
         content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
@@ -85,6 +102,7 @@ def _extract_openai_message(data: dict[str, Any]) -> str:
 
 
 def get_llm_provider() -> LLMProvider:
+    """Select provider by settings, with explicit hard failure on unknown values."""
     settings = get_settings()
     if settings.use_mock_llm:
         return MockDeepSeekProvider()

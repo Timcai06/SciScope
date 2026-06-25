@@ -10,6 +10,14 @@ Outputs (the deliverable "trend model files"):
     models/trends/hot_keywords.csv
     models/trends/topic_trends.csv
     models/trends/trend_scores.json
+
+维护级口径（不可变）：
+* 统计口径基于 `normalized_df_<year>` 列，默认剔除 `doc_count < MIN_DOC_COUNT`
+  的低频关键词，避免短序列引发方向抖动。
+* 预测默认避开最新 YTD 年，优先用完整年度序列拟合趋势；趋势窗口不足时退化到
+  已有点数。
+* 趋势指标主要依赖 `mk_tau / mk_p / sen_slope` 稳健估计方向，`r2` 只作拟合质量提示。
+* 置信区间来自残差标准差近似 95% 区间，不做严格统计推断承诺。
 """
 
 from __future__ import annotations
@@ -33,6 +41,7 @@ _YEAR_COL_RE = re.compile(r"normalized_df_(\d{4})$")
 
 
 def _year_columns(df: pd.DataFrame) -> list[tuple[int, str]]:
+    # 仅识别 `normalized_df_<year>` 格式列，避免把非年份字段参与拟合/预测。
     pairs = []
     for col in df.columns:
         m = _YEAR_COL_RE.match(col)
@@ -48,6 +57,7 @@ def _mann_kendall(values: np.ndarray) -> dict[str, float | str]:
     pairwise slopes) resists the year-to-date outlier and gives a reliable trend
     direction, which is what matters for "is this keyword rising/falling".
     """
+    # 长度<3 无法形成可置信趋势，返回默认无趋势，保留列结构供后续拼装。
     n = len(values)
     if n < 3:
         return {"mk_tau": 0.0, "mk_p": 1.0, "mk_trend": "no-trend", "sen_slope": 0.0}
@@ -84,6 +94,10 @@ def _fit_forecast(years: np.ndarray, values: np.ndarray) -> dict[str, float]:
     Reports OLS r2 for fit quality but extrapolates with Sen's slope, which is
     far less sensitive to a single noisy year than the OLS slope.
     """
+    # 预测 invariants：
+    # - 允许年份不足时退化到“平坦保底”；
+    # - 优先使用 Sen 斜率进行外推（配合 `phi` 衰减），仅保留非负值；
+    # - `r2` 与 `low/high` 供观测，不作为下游 hard 约束。
     n = len(years)
     mk = _mann_kendall(values) if n >= 3 else {"mk_tau": 0.0, "mk_p": 1.0, "mk_trend": "no-trend", "sen_slope": 0.0}
     if n < 2 or np.allclose(values, values[0]):
@@ -118,6 +132,7 @@ def _fit_forecast(years: np.ndarray, values: np.ndarray) -> dict[str, float]:
 
 
 def _minmax(series: pd.Series) -> pd.Series:
+    # 全零段归一化避免除零，固定输出 0 作为安全值，确保 trend_score 有界。
     lo, hi = series.min(), series.max()
     if hi - lo < 1e-12:
         return pd.Series(0.0, index=series.index)
@@ -132,7 +147,7 @@ def build_keyword_trends(analysis_dir: Path) -> pd.DataFrame:
     year_cols = _year_columns(trends)
     if not year_cols:
         raise ValueError("keyword_trends.csv has no normalized_df_<year> columns")
-    # The latest year is partial (year-to-date); fit on complete years only.
+    # 最新年度通常为年内增量，本规则将其排除，fit 使用完整年度序列。
     full_years = [(y, c) for y, c in year_cols][:-1] or year_cols
     years = np.array([y for y, _ in full_years], dtype=float)
 
@@ -159,6 +174,7 @@ def build_keyword_trends(analysis_dir: Path) -> pd.DataFrame:
         trends = trends.merge(lifecycle, on="keyword", how="left")
 
     # Composite hotness: blend momentum, burst, and forecast slope.
+    # 三项先各自 minmax 后加权，输出保持可比性，但不能直接理解为概率。
     trends["trend_score"] = (
         0.5 * _minmax(trends["momentum_score"].fillna(0))
         + 0.3 * _minmax(trends["burst_score"].fillna(0))
@@ -174,6 +190,8 @@ def build_topic_trends(analysis_dir: Path) -> pd.DataFrame:
         share.pivot_table(index=["model", "topic_id"], columns="year", values="paper_count", fill_value=0)
         .reset_index()
     )
+    # 主题口径：同一份 run 中默认选择 topic 数量最多的 model，保证产物稳定；
+    # fit 与 keyword 趋势沿用“完整年份优先”的拟合规则。
     year_cols = sorted(c for c in pivot.columns if isinstance(c, (int, np.integer)))
     fit_years = year_cols[:-1] or year_cols
     years = np.array([float(y) for y in fit_years])

@@ -1,75 +1,120 @@
-# SciScope 项目结构
+# SciScope 项目结构（交接版）
 
-代码按**六层**组织,职责单一、依赖自底向上。**Python 承载全部智能**(数据 → RAG →
-agent),**Go 仅作终端客户端**(经 SSE 消费,可替换、不绑定)。
+SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交接边界，目录层级按职责切分。
 
-```
+- Python 承载数据治理、RAG、检索、证据接地和 Agent 逻辑。
+- `backend` 与 `src` 是核心运行逻辑层，`tui` 只消费 SSE。
+- `frontend` 复用后端接口，作为展示和交互工作台。
+
+## 六层职责（从底到上）
+
+1. 数据层
+   - `data_pipeline/`：入库规范化工具（loaders/normalize/analytics）
+   - `data/`：`raw`、`raw_canonical`、`processed`、`analysis`、`sample`
+
+2. 模型与索引输入层
+   - `src/harvest/`：源采集与文本补全
+   - `src/analysis/`：报告与分析资产计算
+   - `src/models/`：模型/索引相关脚本（embedding/recommend/trend 等）
+
+3. 服务层
+   - `backend/app/services/`：检索、GraphRAG、证据问答、趋势与推荐服务
+   - `src/infra/` + `infra/postgres/`：PostgreSQL schema 与装载 CLI/SQL
+
+4. Agent 层
+   - `backend/app/agent/`：stream_agent 工具循环与可执行工具集合
+
+5. 接口层
+   - `backend/app/api/`：REST 和 SSE 接口（含 `routes_agent.py` 的 `/api/agent/stream`）
+   - `backend/app/main.py`：FastAPI 入口
+
+6. 客户端层
+   - `tui/`：Go/TUI 协议客户端（SSE 消费）
+   - `frontend/`：Next.js 仪表盘与 API 工作台
+
+## 目录总览
+
+```text
 数据要素/
-├── data_pipeline/              ① 数据加载/规范化
-│   ├── loaders.py                 读取 JSON/CSV 论文记录
-│   ├── normalize.py               统一字段(标题/摘要/作者/年份/关键词)
-│   ├── models.py                  共享数据类
-│   └── analytics.py               基础分析
-├── src/
-│   ├── harvest/                ① 6 源采集(arXiv/PubMed/PMC/OpenAlex/Crossref/DOAJ)
-│   ├── analysis/               ① 分析资产(分布/关键词/主题/作者网络)→ 数据报告
-│   ├── models/                 ② 模型/索引层
-│   │   ├── embeddings.py           多语言 e5 嵌入器
-│   │   ├── build_embeddings.py     批量向量化(断点续传)
-│   │   ├── bilingual.py            中→英术语映射(跨语言检索)
-│   │   ├── reranker.py             cross-encoder 重排
-│   │   ├── trends.py               Mann-Kendall + Sen's 斜率 + 预测
-│   │   ├── recommend.py            语义+关键词+作者+MMR 推荐
-│   │   ├── graph_export.py         Louvain/PageRank → output/graphs/*.json
-│   │   └── keyword_filter.py       噪声关键词过滤
-│   └── infra/                  建库/装载 CLI(PostgreSQL schema + load)
-├── models/                     ② 模型文件:嵌入器权重·趋势·推荐·本地 LLM(Git 忽略)
-├── output/graphs/              ② 知识图谱 JSON 产物(Git 忽略)
-├── backend/app/
-│   ├── services/               ③ 服务层 / RAG 核心
-│   │   ├── retrieval_service.py    混合检索:FTS + pgvector + RRF + 双语 + 重排
-│   │   ├── graphrag.py             沿关键词共现图扩展查询
-│   │   ├── evidence_chat.py        固定式 GraphRAG 问答(/api/chat)+ 证据接地
-│   │   ├── recommend_service.py / trends_service.py / graph_service.py
-│   │   ├── corpus_service.py       样本语料回退(无 DB 时)
-│   │   └── deepseek_provider.py    LLM provider 抽象
-│   ├── agent/                  ④ 智能体层
-│   │   ├── loop.py                 stream_agent:ReAct 循环(plan→执行→观察→反思)
-│   │   └── tools.py                9 个工具(包装上面的 services)
-│   ├── api/                    ⑤ 接口:routes_agent(/api/agent/stream SSE)+ search/chat/...
-│   └── main.py                 FastAPI app
-├── tui/                        ⑥ Go 终端客户端(Bubble Tea / Charm)
-│   ├── main.go                    Elm 架构;消费 SSE,⏺/⎿ 渲染,Nerd Font 图标
-│   ├── .goreleaser.yaml            Homebrew 分发配置
-│   └── go.mod / go.sum
-├── infra/postgres/             PostgreSQL schema + pgvector SQL
-├── evaluation/                 评测套件(检索/推荐/趋势/相关性)
-├── frontend/                   Next.js 工作台(规划中,复用同一 SSE/REST 接口)
-├── output/{pdf,assets,eval}/   两份报告 PDF + 图表 + 评测结果
-├── docs/{competition,research}/ 赛题源文档 / 研究笔记 / runbook
-├── data/{raw_canonical,processed,analysis,sample}/  数据底座(多为 Git 忽略)
-├── Makefile                    全流水线(make full-rebuild / backend / llm / tui ...)
-├── 交付说明.md                  评委索引(成果→仓库位置映射)
-└── .github/workflows/release.yml  打 tag → GoReleaser → Homebrew cask
+├── backend/                  FastAPI（服务/接口/模型）
+│   ├── app/
+│   │   ├── api/
+│   │   ├── agent/
+│   │   ├── core/
+│   │   ├── models/
+│   │   └── services/
+│   └── tests/
+├── data/                     原始数据到标准化资产
+│   ├── raw/
+│   ├── raw_canonical/
+│   ├── raw_archive/ (运行时生成)
+│   ├── processed/
+│   ├── analysis/
+│   └── sample/
+├── data_pipeline/            原始清洗与规范化工具
+├── docs/                     交接、竞赛资料、runbook、发布说明
+├── evaluation/               检索/推荐/趋势评估
+├── frontend/                 Next.js 仪表盘
+├── infra/                    PostgreSQL SQL 与部署相关配置
+├── models/                   模型文件（常见 Git 忽略）
+├── output/                   报告图表、PDF、评估结果
+│   ├── assets/
+│   ├── eval/
+│   ├── graphs/
+│   ├── logs/
+│   └── pdf/
+├── plan/                     任务与路线文档
+├── scripts/                  辅助脚本
+├── src/                      核心数据工程与模型脚本
+│   ├── harvest/
+│   ├── analysis/
+│   ├── infra/
+│   └── models/
+├── tui/                      Go 终端客户端
+├── configs/                  配置文件与示例
+├── .github/                  流水线与发布工作流
+├── Makefile                  全部可执行交接口
+└── README.md
 ```
 
-## 运行时数据库(PostgreSQL + pgvector)
+## 运行关系（交接最重要）
 
-`papers` · `paper_chunks` · `chunk_embeddings`(367k)· `paper_embeddings`(159k)·
-`authors` · `paper_authors` · `coauthor_edges` · `keyword_*`。
+- `data` / `src/harvest`：采集、治理与分析资产源。
+- `data/analysis` + `src/models`：输出数据视图与模型训练/重排输入。
+- `backend/app/services`：构建检索/证据/趋势/推荐功能与 `/api` 套件。
+- `backend/app/agent`：封装 ReAct 工具循环并对外暴露 SSE（`/api/agent/stream`）。
+- `frontend` + `tui`：同源接口消费层，复用同一后端能力。
 
-## 分层职责
+## 数据链路（按 Makefile 命令）
 
-| 层 | 目录 | 职责 |
-|----|------|------|
-| ① 数据 | `data_pipeline`, `src/harvest`, `src/analysis` | 采集 → 规范化/去重 → 分析资产 |
-| ② 模型 | `src/models`, `models/`, `output/graphs/` | 向量/趋势/推荐/图谱模型文件,入 pgvector |
-| ③ 服务/RAG | `backend/app/services` | 混合检索 + GraphRAG + 证据接地 |
-| ④ 智能体 | `backend/app/agent` | ReAct 工具循环:plan→执行→观察→反思 |
-| ⑤ 接口 | `backend/app/api` | FastAPI;智能体走 `/api/agent/stream`(SSE) |
-| ⑥ 客户端 | `tui/` | Go/Bubble Tea 终端;Web 前端复用接口 |
+- `make harvest-*` → `make raw-governance` → `make analysis-assets-all`
+- `make processed-corpus` → `make rag-chunks`
+- `make postgres-load` / `make postgres-refresh` → `make embeddings`
+- `make recommend-model` / `make trend-model` / `make graph-export`
+- `make report-figures` → `make data-report-pdf` / `make project-report-pdf`
 
-## Git 跟踪约定
+`make full-rebuild` 是 raw governance 之后的默认重建入口；`make agent-build` 为模型侧快速重建入口。
 
-`data/`(除 `sample/`)、`models/`、`output/graphs/*.json`、`tui/sciscope-tui`、
-`tui/dist/` 均为生成产物,被 Git 忽略(保留 `.gitkeep` 占位);可由 `make` 目标复现。
+## 接口与发布边界
+
+- `POST /api/agent/stream`：Go TUI 消费的唯一 Agent 流式协议。
+- `/api/chat`：基于证据的固定式问答（非规划式 Agent）。
+- `make tui-build`：产出 `tui/sciscope-tui`（仅客户端二进制）。
+- Homebrew 只覆盖 Go 客户端，不包含 Python 后端、数据库和大模型制品。
+- 数据治理与 Agent 工具边界见 `docs/data-agent-boundary.md`。
+
+## 生成产物与 Git 约定
+
+以下目录或文件通常由 Make/脚本生成，原则上通过仓库入口命令复现，不建议手工编辑：
+
+- `data/`（除 `data/sample/`）
+- `models/`
+- `output/graphs/`
+- `frontend/.next/`, `frontend/.tsconfig.tsbuildinfo`
+- `tui/sciscope-tui`, `tui/dist/`
+
+## 常见入口文件
+
+- `docs/project_structure.md`：结构与责任边界
+- `docs/runbook.md`：启动、验证、故障处理
+- `README.md`：项目入口与常用命令

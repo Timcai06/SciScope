@@ -1,65 +1,109 @@
-# SciScope TUI Homebrew Release
+# SciScope TUI Homebrew Release Guide
 
-This release path packages only the Go terminal client. The Python backend,
-PostgreSQL data services, and local LLM remain separate local services.
+This guide targets only the Go terminal client.
+Python backend, database services, and model artifacts are **not** included in the
+Homebrew artifact.
+
+## Scope and packaging boundary
+
+- Packaging target: `tui/sciscope-tui` binary and `homebrew-cask` formula metadata.
+- Distribution artifact scope: cross-platform Go binaries + cask metadata.
+- Excluded scope: backend API, PostgreSQL/PGVector, crawlers, RAG data, and model assets.
+
+## Release architecture (handoff view)
+
+- Release is driven by git tags matching `v*`.
+- `.github/workflows/release.yml` runs:
+  - checkout
+  - setup Go
+  - `goreleaser release --clean` with `workdir: tui`
+- `tui/.goreleaser.yaml` builds `darwin`/`linux × amd64/arm64`, generates checksums,
+  then publishes Homebrew cask to `Timcai06/homebrew-sciscope`.
+- Cask install hook strips macOS quarantine xattr after install.
+
+## Version injection policy
+
+- In Go binary build config:
+  - `ldflags: -s -w -X main.version={{ .Version }}`
+  - `{{ .Version }}` is derived from the release tag (for CI) or
+    `TUI_VERSION` in local wrappers.
+- Local CI-equivalent verification:
+
+```bash
+make tui-build TUI_VERSION=0.1.0
+./tui/sciscope-tui --version   # expect: sciscope-tui 0.1.0
+```
 
 ## One-time setup
 
-1. Create the tap repository:
+1. Create tap repository:
 
    ```bash
    gh repo create Timcai06/homebrew-sciscope --public --confirm
    ```
 
-2. Add a repository secret on `Timcai06/SciScope`:
+2. Add repository secret to `Timcai06/SciScope`:
 
-   ```text
-   HOMEBREW_TAP_GITHUB_TOKEN
+   - `HOMEBREW_TAP_GITHUB_TOKEN` with write access to `Timcai06/homebrew-sciscope`.
+
+3. Ensure tooling:
+
+   ```bash
+   go version
+   goreleaser --version
    ```
 
-   The token needs write access to `Timcai06/homebrew-sciscope`.
+## Preflight checklist
 
-## Preflight
-
-Run from the SciScope repository root:
+From repo root:
 
 ```bash
-cd tui && GOCACHE=../.cache/go-build go test ./... && cd ..
 make tui-build TUI_VERSION=0.1.0
-./tui/sciscope-tui --version
 ./tui/sciscope-tui --help
-make -n tui-demo
+make tui-demo
+cd tui && go test ./... && cd ..
 cd tui && goreleaser check && cd ..
 ```
 
-Expected version output:
+Snapshot validation (optional):
 
-```text
-sciscope-tui 0.1.0
+```bash
+cd tui
+goreleaser release --snapshot --clean
+cd ..
 ```
 
-## Cut a release
+## Release operations
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The GitHub Actions release workflow runs GoReleaser from `tui/`, uploads
-multi-platform archives, writes checksums, and opens/updates the Homebrew cask
-in `Timcai06/homebrew-sciscope`.
+This triggers `.github/workflows/release.yml`.
 
 ## User install
 
 ```bash
 brew install Timcai06/sciscope/sciscope-tui
+sciscope-tui --help
 sciscope-tui --demo
 ```
 
-For a real backend:
+Production attach:
 
 ```bash
 make backend
-make llm
+make llm    # optional local compatible LLM
 sciscope-tui
 ```
+
+## Failure triage
+
+- Token / permission issue:
+  check `HOMEBREW_TAP_GITHUB_TOKEN` scope and tap existence.
+- Version mismatch:
+  check git tag and `TUI_VERSION` alignment.
+- Workflow/asset path issue:
+  verify `.github/workflows/release.yml` workdir (`tui`) and
+  `tui/.goreleaser.yaml` entries.

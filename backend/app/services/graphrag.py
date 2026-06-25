@@ -18,18 +18,25 @@ from dataclasses import dataclass, field
 from backend.app.core.config import get_settings
 
 _TOKEN_RE = re.compile(r"[\w一-鿿]+", re.UNICODE)
-SEED_PAPER_CAP = 4000      # max seed papers scanned for co-occurrence
+SEED_PAPER_CAP = 4000
 MAX_SEEDS = 6
 MAX_NEIGHBOURS = 8
 
 
 @dataclass
 class GraphExpansion:
+    """Expansion result used by retrieval-side GraphRAG.
+
+    entities: recognized seed keywords from question tokens.
+    neighbours: co-occurring keywords to append for query expansion.
+    """
+
     entities: list[str] = field(default_factory=list)      # matched keyword entities
     neighbours: list[str] = field(default_factory=list)     # co-occurring graph neighbours
 
 
 def _candidate_terms(question: str) -> list[str]:
+    """Extract unigrams/bigrams/trigrams from the question for keyword matching."""
     tokens = [t.lower() for t in _TOKEN_RE.findall(question) if len(t) > 2]
     terms = set(tokens)
     for i in range(len(tokens) - 1):
@@ -40,13 +47,18 @@ def _candidate_terms(question: str) -> list[str]:
 
 
 def _connect():
+    """Open Postgres connection for live graph-neighbour expansion."""
     import psycopg
 
     return psycopg.connect(get_settings().db_dsn)
 
 
 def expand(question: str) -> GraphExpansion:
-    """Return matched keyword entities and their co-occurrence-graph neighbours."""
+    """Return matched keyword seeds and bounded co-occurrence neighbours.
+
+    Returns empty expansion on any DB/schema failure so retrieval can continue
+    without graph expansion.
+    """
     from src.models.keyword_filter import is_noise_keyword
 
     if not get_settings().db_dsn:
@@ -100,7 +112,7 @@ def expand(question: str) -> GraphExpansion:
 
 
 def expanded_query(question: str, expansion: GraphExpansion) -> str:
-    """Append graph-neighbour keywords to the query for retrieval (query expansion)."""
+    """Append query-expansion terms from graph neighbours while preserving intent."""
     if not expansion.neighbours:
         return question
     return question + " " + " ".join(expansion.neighbours)

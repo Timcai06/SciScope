@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+"""Generate analysis-layer canonical artifacts from ``data/raw_canonical`` input.
+
+The outputs in ``data/analysis`` are the contract boundary for downstream services
+and models: retrieval/trend/recommendation/graph/rag assets are all derived from
+these files, so this layer should be treated as immutable after materialization.
+"""
+
 import csv
 import hashlib
 import json
@@ -278,6 +285,7 @@ def _paper_with_source(wrapper: dict[str, Any]) -> dict[str, Any]:
     raw_metadata = _raw_metadata(wrapper)
     year_status = str(wrapper.get("_sciscope_year_status") or "normal")
     if year_status == "future_year_suspect":
+        # 发现异常年份时不直接丢记录；保留原始年份用于审计溯源，但不作为时间窗统计时间字段。
         paper = {
             **paper,
             "year": "",
@@ -350,6 +358,7 @@ def _extract_text_signal_terms(paper: dict[str, Any]) -> set[str]:
 
 
 def _raw_metadata(wrapper: dict[str, Any]) -> dict[str, str]:
+    # Persist stable citation crumbs independent of normalization side effects.
     raw = wrapper.get("raw") if isinstance(wrapper.get("raw"), dict) else {}
     doi = str(raw.get("doi") or raw.get("DOI") or "").strip()
     url = str(raw.get("url") or raw.get("URL") or raw.get("id") or raw.get("source_id") or wrapper.get("source_id") or "").strip()
@@ -567,6 +576,7 @@ def _raw_paths(raw_path: Path, sources: tuple[str, ...], filename_template: str 
 
 
 def _build_collection_manifest(raw_path: Path, sources: tuple[str, ...], filename_template: str | None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    # 生成每源每文件级别清单，给 data-layer-audit 与重跑回溯提供可对账证据。
     rows: list[dict[str, Any]] = []
     year_pattern = re.compile(r"(19|20)\d{2}")
     for source, path in _raw_paths(raw_path, sources, filename_template):
@@ -1967,6 +1977,7 @@ def build_analysis_assets(
     sources: tuple[str, ...] = DEFAULT_SOURCES,
     filename_template: str | None = None,
 ) -> dict[str, Any]:
+    """Build all analysis assets consumed by retrieval, trends, recommendations, and report rendering."""
     raw_path = Path(raw_dir)
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -1980,6 +1991,7 @@ def build_analysis_assets(
     duplicates = 0
     invalid_records = 0
 
+    # 从 raw partition 逐条构建可用于检索与模型训练的统一语料；该阶段输出即作为下游边界输入。
     for wrapper in _iter_wrappers(raw_path, sources=sources, filename_template=filename_template):
         input_records += 1
         if wrapper is None:
@@ -2055,6 +2067,7 @@ def build_analysis_assets(
         json.dumps(papers, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    # papers_clean 是 processed-corpus 的上游输入，也是后续 chunks/pgvector 的统一基准。
     _write_csv(
         output_path / "collection_manifest.csv",
         collection_rows,

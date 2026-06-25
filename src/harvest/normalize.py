@@ -1,3 +1,9 @@
+"""Canonical record normalization.
+
+此模块承接采集层的 raw wrapper，并按 source 做标准化映射到论文 JSON。
+不同来源字段形态差异很大，故在这里集中隔离映射差异，后续统计链路只依赖统一输出。
+"""
+
 from __future__ import annotations
 
 import json
@@ -269,6 +275,10 @@ def doaj_work_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
 
 
 def paper_wrapper_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
+    # normalize 的 source 分发边界：
+    # - OpenAlex 优先使用 abstract_inverted_index 与作者身份结构
+    # - arXiv/PM/PMC/DOAJ 等按各自 raw 结构读取
+    # - 所有输出经过统一清洗后进入全局处理，避免源字段污染
     source = str(wrapper.get("source") or "openalex")
     if source == "openalex":
         paper = openalex_work_to_paper(wrapper)
@@ -292,6 +302,7 @@ def paper_wrapper_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
 
 
 def normalize_raw_jsonl(input_path: str | Path, output_path: str | Path) -> dict[str, int]:
+    # 标准化步骤是幂等的消费：重复运行会重建输出文件，但基于 paper_id/title+year 去重以保持稳定收敛。
     source = Path(input_path)
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)

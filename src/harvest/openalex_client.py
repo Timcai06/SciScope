@@ -1,3 +1,9 @@
+"""OpenAlex collection client.
+
+This module负责 OpenAlex 的采集实现细节：查询模板、分页游标、请求重试与去重。
+它被 public_sources 作为主 openalex 源注入，属于“字段丰富但仅抓取有 abstract 的文献”策略。
+"""
+
 from __future__ import annotations
 
 import json
@@ -49,6 +55,7 @@ def _line_count(path: Path) -> int:
 
 
 def _request_json(params: dict[str, Any], timeout: int = 30) -> dict[str, Any]:
+    """OpenAlex API 单请求入口：只在 429/5xx 下按既定退避重试，保留网络/限流失败可见性。"""
     query = urlencode({key: value for key, value in params.items() if value not in {None, ""}})
     request = Request(
         f"{OPENALEX_WORKS_URL}?{query}",
@@ -74,6 +81,8 @@ def _request_json(params: dict[str, Any], timeout: int = 30) -> dict[str, Any]:
 
 
 def _query_params(query: str, cursor: str, per_page: int, year: int | None = None) -> dict[str, Any]:
+    # 强制 has_abstract 筛选是本链路的关键边界：减少无正文记录进入后续 normalize/fulltext。
+    # year 维度通过 from/to_publication_date 进行闭区间约束，避免跨年污染。
     filters = ["has_abstract:true"]
     if year is not None:
         filters.extend([f"from_publication_date:{year}-01-01", f"to_publication_date:{year}-12-31"])
@@ -137,6 +146,8 @@ def harvest_openalex(
         for field, query in query_plan:
             cursor = "*"
             query_written = 0
+            # OpenAlex 查询采用 cursor 分页，可断点重跑；
+            # query_written 限额让单个 query 与全局 limit 的上限都可控，避免单领域过采样。
             _progress(f"query='{query}' field='{field}' target={target_per_query} total={written}/{limit}")
             while written < limit and query_written < target_per_query:
                 page_size = min(per_page, limit - written, target_per_query - query_written)
@@ -176,6 +187,7 @@ def harvest_openalex(
                 break
 
     if written >= existing_records:
+        # 仅当本次结果不低于现有文件记录数才替换，维持幂等推进与低收益回退防护。
         temp_output.replace(output)
         _progress(f"done records={written} output={output}")
         return written

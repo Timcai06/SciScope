@@ -1,80 +1,140 @@
 # SciScope Runbook
 
-This runbook covers local setup and verification for the SciScope foundation
-slice: FastAPI backend APIs, the Next.js frontend, mock DeepSeek mode, and the
-sample corpus.
+This runbook is the practical handoff guide for SciScope foundation operations.
+It is aligned to `Makefile` targets and current code behavior.
+
+## Scope and Priority
+
+- Use Makefile targets as the source of truth for runnable workflows.
+- `docs/project_structure.md` defines directory ownership and boundaries.
+- When behavior conflicts with text in older notes, runtime code + Makefile wins.
 
 ## Requirements
 
 - Python 3.11+
-- Node.js 20+
-- npm
+- Node.js 20+ and npm
+- PostgreSQL (for RAG/search/trends/recommend workflows)
+- Go (for local TUI build/run)
 
-## Source Documents
+## Service Ports and Defaults
 
-The original contest/source documents are stored at the repository root:
-
-- `赛题.docx`
-- `数据集.docx`
-
-Treat these files as the source reference material for the project brief and
-dataset description.
-
-## Project Layout
-
-Use `docs/project_structure.md` as the directory map. In short, `data/` holds
-paper data assets, and `output/` holds generated chart assets and final PDFs.
-
-## Backend Setup
-
-Run backend commands from the repository root.
-
-The Makefile wraps the setup and development commands:
-
-```bash
-make install
-make dev
+```text
+Backend: 127.0.0.1:8000
+Frontend: 3000
+vLLM server: 127.0.0.1:8001
 ```
 
-`make dev` starts both services. Open the frontend at
-`http://localhost:3000`; the backend API docs are at
-`http://127.0.0.1:8000/docs`.
-
-Manual backend setup is also available:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install fastapi uvicorn pydantic pandas numpy scikit-learn networkx matplotlib pytest httpx
-```
-
-Configure local environment values. The defaults work for the sample corpus and
-mock LLM mode.
+## 常用环境变量（默认值可覆盖）
 
 ```bash
 export SCISCOPE_APP_NAME=SciScope
 export SCISCOPE_ENV=local
 export SCISCOPE_DATA_PATH=data/sample/papers.sample.json
 export SCISCOPE_CORS_ORIGINS=http://localhost:3000
+export SCISCOPE_DB_DSN=postgresql://tim@localhost:5432/sciscope
 export SCISCOPE_USE_MOCK_LLM=true
+export SCISCOPE_LLM_PROVIDER=deepseek
 ```
 
-Start the backend:
+## 5 分钟起步
 
 ```bash
-uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+make install
+make dev
 ```
 
-## Backend Checks
+打开：
 
-Run tests from the repository root:
+- Frontend: `http://localhost:3000`
+- Backend Docs: `http://127.0.0.1:8000/docs`
+
+## 运行入口
+
+### 全栈联动（推荐）
 
 ```bash
+make dev
+```
+
+- 同时启动后端与前端。
+
+### 后端独立
+
+```bash
+make backend
+```
+
+### 前端独立
+
+```bash
+make frontend
+```
+
+### Go TUI
+
+```bash
+make backend   # first
+make tui       # consume /api/agent/stream
+```
+
+离线演示：
+
+```bash
+make tui-demo
+```
+
+## 数据与报告链路（常用）
+
+```bash
+make raw-governance
+make analysis-assets-all
+make processed-corpus
+make data-layer-audit
+make rag-chunks
+make postgres-refresh
+make report-figures
+make data-report-pdf
+```
+
+关键一键入口：
+
+```bash
+make full-rebuild        # 分析资产后的一键重建：RAG+模型资产+报表
+make data-layer-refresh  # 分析资产与报告刷新入口
+make agent-build         # embeddings + recommend + trend + graph
+```
+
+## 本地模型路径
+
+### 默认（可复现）——Mock
+
+```bash
+export SCISCOPE_USE_MOCK_LLM=true
+make dev
+```
+
+### 本地 OpenAI-compatible 提供者
+
+```bash
+make llm       # 启动默认本地模型服务（127.0.0.1:8001）
+export SCISCOPE_USE_MOCK_LLM=false
+export SCISCOPE_LLM_PROVIDER=vllm
+make dev-vllm
+```
+
+也可外部提供兼容端点，设置 `LOCAL_LLM_BASE_URL` 与 `LOCAL_LLM_MODEL`。
+
+## 验收与回归命令
+
+```bash
+make test
 make test-backend
+make smoke
+make vllm-smoke
+make tui-build TUI_VERSION=0.1.0
 ```
 
-With the backend running on `127.0.0.1:8000`, verify the local APIs:
+手工接口校验（后端已运行）：
 
 ```bash
 curl http://127.0.0.1:8000/api/ingest/status
@@ -84,122 +144,49 @@ curl -X POST http://127.0.0.1:8000/api/chat \
   -d '{"question":"What does RAG improve?"}'
 ```
 
-Expected results:
-
-- Ingest status returns `{"status":"ready","papers":...}`.
-- Dashboard overview returns totals, year range, trend, field distribution,
-  keywords, and collaboration edges.
-- Chat returns an `answer`, `evidence`, and `confidence`.
-
-## Frontend Setup
-
-Run frontend commands from `frontend`.
-
-```bash
-cd frontend
-npm install
-export NEXT_PUBLIC_SCISCOPE_API_BASE=http://localhost:8000
-npm run typecheck
-npm run build
-npm run dev
-```
-
-Open the app at:
+## TUI 合约（与后端同步）
 
 ```text
-http://localhost:3000
+POST /api/agent/stream
+Content-Type: application/json
+Body: {"question":"...", "history":[{"role":"user","content":"..."}]}
+SSE events: plan, text, tool_call, tool_result, reflect, final, error
 ```
 
-The frontend reads `NEXT_PUBLIC_SCISCOPE_API_BASE` at build/runtime to call the
-FastAPI backend. Use `http://localhost:8000` for the standard local backend.
+## 常见故障与处理
 
-From the repository root, the equivalent Makefile commands are:
+- `connection refused`
+  - 确认 `make backend` 已启动，确认 `127.0.0.1:8000` 未被占用。
+
+- `Unable to detect model` / `LLM not found`
+  - 临时切回 `SCISCOPE_USE_MOCK_LLM=true`。
+  - 或先启动 `make llm` 再回到 `SCISCOPE_LLM_PROVIDER=vllm`。
+
+- 数据库相关错误
+  - 检查 `SCISCOPE_DB_DSN`。
+  - 运行 `make postgres-schema && make postgres-refresh`。
+
+- `/api/search` 无返回或报未入库
+  - 走完整链路：`make full-rebuild` 或至少 `make rag-chunks && make postgres-load`。
+
+- 报表/图片/PDF 缺失
+  - 检查 `data/analysis/` 和 `output/assets/sciscope_data_report/`。
+  - 执行 `make report-figures && make data-report-pdf`。
+
+- Go TUI 图标错乱
+  - 终端不支持 Nerd Font 时，先设置 `SCISCOPE_TUI_ICONS=off`。
+
+## 交接验收最小链
 
 ```bash
-make frontend
-make typecheck
-make build
-```
-
-## DeepSeek Configuration
-
-The default development path uses the deterministic mock provider. Keep mock
-mode enabled for repeatable tests:
-
-```bash
-export SCISCOPE_USE_MOCK_LLM=true
-```
-
-## Local vLLM-Metal Configuration
-
-For local model generation on Apple Silicon, run a vLLM-Metal OpenAI-compatible
-server separately, then start SciScope with the local provider.
-
-Recommended first model:
-
-```text
-mlx-community/Qwen2.5-7B-Instruct-4bit
-```
-
-Start the local model server on a port that does not conflict with the SciScope
-backend:
-
-```bash
-vllm serve mlx-community/Qwen2.5-7B-Instruct-4bit \
-  --host 127.0.0.1 \
-  --port 8001
-```
-
-Then start the full SciScope app against that local server:
-
-```bash
-make dev-vllm
-```
-
-Equivalent manual environment:
-
-```bash
-export SCISCOPE_USE_MOCK_LLM=false
-export SCISCOPE_LLM_PROVIDER=vllm
-export LOCAL_LLM_BASE_URL=http://127.0.0.1:8001/v1
-export LOCAL_LLM_MODEL=mlx-community/Qwen2.5-7B-Instruct-4bit
+make install
+make full-rebuild
 make dev
 ```
 
-The same provider also works with LM Studio or another OpenAI-compatible local
-server by changing `SCISCOPE_LLM_PROVIDER`, `LOCAL_LLM_BASE_URL`, and
-`LOCAL_LLM_MODEL`.
+然后：
 
-## DeepSeek Configuration
-
-Real DeepSeek HTTP integration is intentionally deferred to a later
-implementation slice. Keep `SCISCOPE_LLM_PROVIDER=deepseek` only for mock mode
-or configuration/error-path tests until that provider is implemented.
-
-When real integration lands, it will use environment configuration for the API
-key, model name, and optional compatible base URL.
-
-## Webpack Workaround
-
-The frontend `dev` and `build` scripts use webpack:
-
-```json
-"dev": "next dev --webpack",
-"build": "next build --webpack"
-```
-
-This is intentional. Turbopack had issues in this repository path because it
-contains Chinese characters (`数据要素`). Revisit the workaround after a
-Next/Turbopack upgrade or after moving the repository to an ASCII-only path.
-
-## Local Verification Checklist
-
-Use this checklist before handing off foundation changes:
-
-```bash
-make test
-```
-
-For full manual verification, run the backend and frontend together, open
-`http://localhost:3000`, confirm the dashboard loads, and submit a chat question
-that returns evidence from the sample corpus.
+- 打开 `http://localhost:3000`
+- 运行 `make smoke`
+- 跑一次 `curl` 提问并确认返回有 `answer` / `evidence`
+- 运行 `make tui` 验证 SSE 可达（按需）

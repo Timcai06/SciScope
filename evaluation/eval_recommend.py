@@ -1,9 +1,17 @@
 """Offline evaluation of the recommendation model.
 
-For a random sample of seed papers, fetch top-k recommendations and measure
-relevance proxies (no manual labels): same-field rate, shared-keyword rate, and
-mean semantic similarity. A good recommender should return papers in the same
-field and sharing keywords far above the corpus base rate.
+维护指标口径:
+- 随机抽样 `sample` 篇种子论文，取每篇前 `limit` 条推荐，统计同域/共享关键词等代理指标。
+- `same_field_rate = 同域推荐数 / 总推荐数`。
+- `shared_keyword_rate = 至少共享 1 个关键词的推荐数 / 总推荐数`（字段 `shared_keywords` 为真值）。
+- `mean_semantic_similarity = 推荐语义相似度平均值`，用于辅助判断 embedding 一致性，不代替人工标签。
+- 本函数使用 `recommend_service` 返回结果中的字段作为真值，属于离线一致性检验，不构成推荐系统最终业务 KPI。
+
+数据假设:
+- 采用 `paper_embeddings ⋈ papers` 的论文池；若某篇种子未能返回推荐将被计入 `seeds_sampled`，
+  但不计入 `total_recommendations`。
+- field / keyword 字段取决于上游抓取与入库完整性；空字段会降低同域和共享关键词命中率的可比性。
+- 通过随机种子 `seed` 保证复现性；不同数据库快照下样本会随时间变更。
 """
 
 from __future__ import annotations
@@ -50,6 +58,7 @@ def run(dsn: str, sample: int, seed: int, limit: int) -> dict:
             if r.shared_keywords:
                 shared_kw += 1
             sims.append(r.semantic_similarity)
+    # 注: 指标分母是 total_recommendations；当推荐为空时会保留 0 值以避免除零，便于脚本稳定输出但不代表“无效模型”。
 
     return {
         "seeds_sampled": len(picked),

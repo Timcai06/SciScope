@@ -7,6 +7,17 @@ paper-level embedding to find semantic neighbours. This script materialises
 recommender (``backend/app/services/recommend_service.py``) then fuses semantic
 similarity with keyword/author overlap and recency, with explanation factors.
 
+维护级口径（不可变）：
+* paper 维度口径：`paper_embeddings.embedding` = 同一 `paper_uid` 下该 model
+  的 chunk embedding 均值；`chunk_count` 记录被聚合的 chunk 数。
+* 刷新口径：执行脚本会先建表（如果缺失）并 `TRUNCATE paper_embeddings`，
+  当前实现不做增量增量式 append；每次是完整重建快照。
+* 查询口径：下游服务使用 `vector_cosine_ops` 与同一个 `embedding_model`
+  标签进行 ANN 检索，模型名改变时应重新运行本脚本，不允许跨模型混用。
+    * 推荐特征融合与 MMR 契约（只写说明）：
+    * 运行时得分来源为语义相似度 + keyword_overlap + author_overlap + recency；
+    * 服务层再按 MMR（relevance 与 diversity）做二次排序，确保结果既相关又去重。
+
 Output (the deliverable "recommendation model files"):
     paper_embeddings table + index in PostgreSQL
     models/recommend/recommend_model.json (metadata)
@@ -59,6 +70,8 @@ def run(dsn: str = DEFAULT_DSN, model_name: str = "intfloat/multilingual-e5-base
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
+            # CREATE/ANALYZE 形成 pgvector 的统一访问契约：建索引后再 ANALYZE，
+            # 确保服务层的近邻搜索 plan/代价不退化。
             cur.execute(CREATE_SQL)
             cur.execute("TRUNCATE paper_embeddings")
             cur.execute(POPULATE_SQL, (model_name, model_name))

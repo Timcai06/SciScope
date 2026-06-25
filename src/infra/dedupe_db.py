@@ -23,6 +23,8 @@ DEFAULT_DSN = os.getenv("SCISCOPE_DATABASE_URL", "postgresql://tim@localhost:543
 
 
 def _score(full_text_len: int, abstract_len: int, kw: int, authors: int, crawled_at: str) -> tuple:
+    # Dedup scoring policy: prefer full-text enrichment, then abstract depth, then
+    # keyword/author richness, then latest crawl date string for reproducibility.
     return (
         100 if full_text_len > 200 else 0,
         min(abstract_len // 100, 20),
@@ -33,6 +35,8 @@ def _score(full_text_len: int, abstract_len: int, kw: int, authors: int, crawled
 
 
 def plan_deletions(dsn: str) -> tuple[list[str], dict[str, int]]:
+    # Dedupe boundary: first classify journal/editorial front-matter and remove it directly,
+    # then choose one winner per dedupe key, scheduling all losers.
     import psycopg
 
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
@@ -78,6 +82,7 @@ def plan_deletions(dsn: str) -> tuple[list[str], dict[str, int]]:
 
 
 def run(dsn: str, apply: bool) -> dict:
+    # Default mode is dry-run so operators can validate scope before destructive changes.
     import psycopg
 
     to_delete, stats = plan_deletions(dsn)

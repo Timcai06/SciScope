@@ -13,11 +13,19 @@ DEFAULT_BATCH_SIZE = 1000
 DEFAULT_MAX_AUTHORS_FOR_EDGES = 50
 
 
+"""PostgreSQL loader for normalized papers/chunks into the graph-friendly schema.
+
+The writer path is idempotent (upserts by stable UID) and keeps downstream pgvector
+ingestion contracts intact by preserving stable paper/chunk identifiers plus rich metadata.
+"""
+
+
 class PostgresDependencyError(RuntimeError):
     """Raised when psycopg is unavailable for PostgreSQL loading."""
 
 
 def normalized_name(value: str) -> str:
+    # Shared normalization for author/keyword keys to improve dedupe stability.
     return re.sub(r"\s+", " ", str(value or "").strip().lower())
 
 
@@ -64,6 +72,9 @@ def import_postgres(
     batch_size: int = DEFAULT_BATCH_SIZE,
     max_authors_for_edges: int = DEFAULT_MAX_AUTHORS_FOR_EDGES,
 ) -> dict[str, int]:
+    # CLI/runtime entry writes in this order:
+    # 1) papers -> 2) authors/keywords entities and relations -> 3) coauthor edges -> 4) chunks.
+    # Each stage is batched and upserted to make reruns safe and observable.
     try:
         import psycopg
     except ImportError as exc:
@@ -84,6 +95,7 @@ def import_postgres(
 
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
+            # Papers first, because paper_uid is the canonical foreign key for all link tables.
             for batch in batched((_paper_row(paper) for paper in papers), batch_size):
                 cur.executemany(PAPER_SQL, batch)
                 stats["papers"] += len(batch)
@@ -162,6 +174,7 @@ def import_postgres(
 
 
 def _paper_row(paper: dict[str, Any]) -> tuple[Any, ...]:
+    # Compose deterministic paper row tuple; keep crawl/source metadata for auditability.
     uid = paper_uid(paper)
     return _sanitize_row((
         uid,
@@ -189,6 +202,7 @@ def _paper_row(paper: dict[str, Any]) -> tuple[Any, ...]:
 
 
 def _chunk_row(chunk: dict[str, Any]) -> tuple[Any, ...]:
+    # Chunk row includes paper_uid and token estimate, which are used by retrieval and chunk-health checks.
     return _sanitize_row((
         str(chunk.get("chunk_uid") or ""),
         str(chunk.get("paper_uid") or ""),
@@ -202,6 +216,7 @@ def _chunk_row(chunk: dict[str, Any]) -> tuple[Any, ...]:
 
 
 def _doi_from_paper(paper: dict[str, Any]) -> str | None:
+    # Source identifiers that look like DOI are promoted; everything else stays NULL.
     source_id = str(paper.get("source_id") or paper.get("paper_id") or "").strip()
     if source_id.lower().startswith("10."):
         return source_id

@@ -1,3 +1,16 @@
+"""Question-answering service for literature-grounded chat.
+
+Boundary:
+  - Accepts a user question and optional in-memory papers.
+  - Builds evidence, prompts the configured LLM provider, and returns
+    `ChatResponse` with citations + confidence.
+  - Does not write to corpus or model state; it only orchestrates retrieval and
+    prompt assembly.
+
+Fallback model:
+  - DB + `retrieval_service` when available and requested.
+  - Deterministic in-memory lexical matcher when DB route is off or unreachable.
+"""
 import re
 from typing import Any
 
@@ -41,6 +54,7 @@ _MULTIHOP_EVIDENCE_CAP = 6
 
 
 def _is_multihop(question: str) -> bool:
+    """Detect comparative / temporal questions that benefit from decomposition."""
     q = question.lower()
     return any(m in q for m in _MULTIHOP)
 
@@ -94,6 +108,11 @@ def answer_question(
       * ``"db"``: require the hybrid backend.
       * ``"memory"``: always use the in-memory ``papers`` matcher (deterministic;
         used by hermetic unit tests over the sample corpus).
+
+    Contract notes:
+      - `question` is used both for retrieval and user-facing answer drafting.
+      - `history` only affects query rewriting and prompt context, not final filtering.
+      - `provider` can be injected to bypass global provider selection.
     """
     entities: list[str] = []
     neighbors: list[str] = []
@@ -125,7 +144,7 @@ def answer_question(
                 evidence.append(_to_evidence(item))
         evidence = evidence[:_MULTIHOP_EVIDENCE_CAP]
     if evidence is None:
-        # Fall back to the in-memory matcher (sample corpus / DB unavailable).
+        # Fallback: use deterministic in-memory matcher for sample corpus or DB-offline mode.
         evidence = _retrieve_evidence(retrieval_q, papers, limit=EVIDENCE_LIMIT)
 
     if not evidence:
@@ -227,6 +246,11 @@ def _retrieve_evidence(
     papers: list[dict[str, Any]],
     limit: int,
 ) -> list[EvidenceItem]:
+    """Deterministic fallback retrieval used when DB route is disabled.
+
+    It performs lightweight lexical matching over paper title/keywords/abstract/full_text
+    and is intentionally stable for tests and offline operation.
+    """
     query_terms = _text_terms(question)
     query_phrases = _query_phrases(question)
     special_phrases = _special_query_phrases(query_terms)
@@ -269,6 +293,11 @@ def _history_block(history: list[dict] | None, chinese: bool) -> str:
 
 
 def _build_prompt(question: str, evidence: list[EvidenceItem], history: list[dict] | None = None) -> str:
+    """Build a short evidence-only prompt while keeping language consistency.
+
+    The prompt always asks for citation-style references `[n]` so callers can map
+    answer claims back to returned evidence rows.
+    """
     evidence_lines = []
     for index, item in enumerate(evidence, start=1):
         snippet = (item.snippet or item.reason).strip()
@@ -322,6 +351,7 @@ def _score_paper(
     special_phrases: set[str],
     paper: dict[str, Any],
 ) -> tuple[int, list[str]]:
+    """Score one in-memory paper candidate with term, phrase, and keyword boosts."""
     fields = {
         "title": str(paper.get("title", "")),
         "keywords": " ".join(str(keyword) for keyword in paper.get("keywords", [])),

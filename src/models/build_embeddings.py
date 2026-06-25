@@ -5,6 +5,15 @@ local embedder, and upserts ``(chunk_uid, embedding_model, embedding)`` into the
 ``chunk_embeddings`` table. Supports resume (skips chunk_uids already embedded
 with the same model) and chunk-type filtering to control cost.
 
+维护级口径（不可变）：
+* chunk 维度口径：每条 chunk 都以 `chunk_type` 为单位编码，默认覆盖
+  ``title_abstract`` / ``full_text`` / ``keywords`` 三类。
+* 续跑口径：resume 模式下只跳过当前 `embedding_model` 已存在的
+  ``chunk_uid``；同一模型重复执行应可重入，不会引入重复行。
+* 外键口径：仅为仍存在于 `paper_chunks`（并且类型匹配）的 chunk 建索引入库；
+  主键缺失会导致 FK 失败，因此先聚合 `valid` 用于预过滤是必须约束。
+* 持久化口径：`ON CONFLICT (chunk_uid)` 在数据库层做幂等重写，主键粒度是
+  chunk_uid；`embedding_model` 可能被更新为新 run 的值。
 Usage:
     python -m src.models.build_embeddings \
         --dsn postgresql://tim@localhost:5432/sciscope \
@@ -29,6 +38,7 @@ ALL_CHUNK_TYPES = ("title_abstract", "full_text", "keywords")
 
 
 def iter_chunks(path: Path, chunk_types: set[str]) -> Iterator[dict]:
+    # 读取输入流时保持“过滤 -> yield”的单向通道，避免一次性加载所有 chunk。
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             if not line.strip():
@@ -39,6 +49,8 @@ def iter_chunks(path: Path, chunk_types: set[str]) -> Iterator[dict]:
 
 
 def _batched(items: Iterable[dict], size: int) -> Iterator[list[dict]]:
+    # 将 JSONL 输入聚合为固定上限的批次；不是严格分页（尾批可小于 size），
+    # 这是编码吞吐与内存占用之间的稳定折衷。
     batch: list[dict] = []
     for item in items:
         batch.append(item)
@@ -95,6 +107,10 @@ def build_embeddings(
         since_commit = 0
         for batch in _batched(iter_chunks(chunks_path, selected), batch_size):
             stats["total_seen"] += len(batch)
+            # pending/skip 的不变量：
+            # - pending：本批次有效 chunk，且该 model 未入库；
+            # - skipped：已入库（resume 命中）或不在 valid 集合（已清理/失效）；
+            # 这保证重跑统计可解释、可审计。
             pending = [c for c in batch if c["chunk_uid"] in valid and c["chunk_uid"] not in existing]
             stats["skipped"] += len(batch) - len(pending)
             if not pending:
@@ -109,6 +125,7 @@ def build_embeddings(
             stats["embedded"] += len(rows)
             since_commit += len(rows)
             # Commit every N batches (not every batch) to remove IO stalls.
+            # 提交颗粒度不影响最终写入逻辑，只影响故障恢复时“已落盘”窗口宽度。
             if since_commit >= batch_size * commit_every:
                 conn.commit()
                 since_commit = 0

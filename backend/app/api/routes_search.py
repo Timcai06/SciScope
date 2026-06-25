@@ -1,3 +1,5 @@
+"""Search API for hybrid query + metadata filtering."""
+
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.app.models.schemas import SearchResponse, SearchResultItem
@@ -13,6 +15,16 @@ def search(
     year: int | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=50),
 ) -> SearchResponse:
+    """Execute a full-text/hybrid retrieval query.
+
+    Query contract:
+    - ``q`` is required and cannot be blank.
+    - Optional ``field`` and ``year`` narrow result set.
+    - ``limit`` controls page-style truncation for the first response page.
+
+    Error contract:
+    - ``503`` if retrieval backend is not initialized (configure DB DSN and corpus).
+    """
     if not retrieval_service.is_available():
         raise HTTPException(
             status_code=503,

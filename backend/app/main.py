@@ -1,3 +1,9 @@
+"""FastAPI application bootstrap for SciScope backend.
+
+The module wires all API routers into a single app instance and applies shared
+runtime configuration (CORS/app metadata) from environment-driven settings.
+"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,6 +19,14 @@ from backend.app.core.config import get_settings
 
 
 def create_app() -> FastAPI:
+    """Create and configure the FastAPI app.
+
+    Contract:
+    - App title is driven by ``SCISCOPE_APP_NAME``.
+    - CORS origins are injected from ``SCISCOPE_CORS_ORIGINS`` (or default local UI origin list).
+    - Routes are mounted with their own prefixes from route modules; no route-level
+      prefix rewriting is done here.
+    """
     settings = get_settings()
     app = FastAPI(title=settings.app_name)
 

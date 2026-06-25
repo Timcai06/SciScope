@@ -10,7 +10,19 @@ from src.infra.chunks import build_chunk_assets
 from src.infra.postgres_loader import import_postgres
 
 
+"""Command entrypoint for infra data operations.
+
+Supported commands:
+- chunks: emit paper_chunks.jsonl + summary
+- schema: apply PostgreSQL schema SQL
+- load-postgres: write papers/chunks into PostgreSQL
+
+The module intentionally keeps CLI parsing close to side-effecting helpers for traceability.
+"""
+
+
 def _chunks(args: argparse.Namespace) -> None:
+    # Build-only command: no DB side effects, just writes deterministic chunk assets.
     summary = build_chunk_assets(
         input_path=args.input,
         output_path=args.output,
@@ -22,11 +34,13 @@ def _chunks(args: argparse.Namespace) -> None:
 
 
 def _schema(args: argparse.Namespace) -> None:
+    # Execute external psql against provided DSN and schema file.
     subprocess.run(["psql", args.dsn, "-f", str(args.file)], check=True)
     print(json.dumps({"dsn": args.dsn, "schema": str(args.file), "status": "applied"}, ensure_ascii=False))
 
 
 def _load_postgres(args: argparse.Namespace) -> None:
+    # Delegates loader defaults and batching to infra.postgres_loader.
     summary = import_postgres(
         dsn=args.dsn,
         papers_path=args.papers,
@@ -64,6 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    # Keep argv contract explicit to avoid accidental invocation without a subcommand.
     parser = build_parser()
     args = parser.parse_args()
     args.func(args)
