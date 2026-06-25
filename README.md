@@ -113,7 +113,7 @@ make tui-doctor # 检查后端/LLM/会话目录/图谱资产
 
 关键 API：
 
-- `POST /api/agent/stream`（SSE）：SSE 事件 `plan/text/tool_call/tool_result/reflect/final/error`
+- `POST /api/agent/stream`（SSE）：请求支持 `question/history/session_id/retry`；SSE 事件 `plan/text/tool_call/tool_result/reflect/final/error`，并在 `meta` 中返回 `runtime/node/elapsed_ms/session_id/retry`，供 TUI 渲染工具时间线与同会话 `/retry`。
 - `GET /api/ingest/status`
 - `GET /api/dashboard/overview`
 - `POST /api/chat`

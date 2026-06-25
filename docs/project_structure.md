@@ -82,7 +82,7 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 - `data` / `src/harvest`：采集、治理与分析资产源。
 - `data/analysis` + `src/models`：输出数据视图与模型训练/重排输入。
 - `backend/app/services`：构建检索/证据/趋势/推荐功能与 `/api` 套件。
-- `backend/app/agent`：默认使用 LangGraph StateGraph 编排 plan / tool / reflect / final；legacy ReAct loop 仅作兼容回退，并统一经 SSE（`/api/agent/stream`）对外输出。
+- `backend/app/agent`：默认使用 LangGraph StateGraph 编排 prepare / plan / tool / reflect / final；`session_id` 映射 LangGraph `thread_id`，支持同会话 `/retry` 错误恢复；legacy ReAct loop 仅作兼容回退，并统一经 SSE（`/api/agent/stream`）对外输出。
 - `frontend` + `tui`：同源接口消费层，复用同一后端能力。
 
 ## 数据链路（按 Makefile 命令）
@@ -97,7 +97,7 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 
 ## 接口与发布边界
 
-- `POST /api/agent/stream`：Go TUI 消费的唯一 Agent 流式协议。
+- `POST /api/agent/stream`：Go TUI 消费的唯一 Agent 流式协议；请求支持 `question/history/session_id/retry`，SSE `meta` 返回 `runtime/node/elapsed_ms/session_id/retry`。
 - `/api/chat`：基于证据的固定式问答（非规划式 Agent）。
 - `make tui-build`：产出 `tui/sciscope-tui`（仅客户端二进制）。
 - Homebrew 只覆盖 Go 客户端，不包含 Python 后端、数据库和大模型制品。
