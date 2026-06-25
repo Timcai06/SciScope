@@ -84,3 +84,12 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 \end{enumerate}
 \textbf{关键特性}:中文论断可由英文论文接地;工具返回的是\textbf{强支持 / 部分支持 / 证据不足}的校准信号,要求模型据证表述,证据不足时不得强行断言。
 \end{plainbox}
+
+\subsection{用例八:TUI 产品化工作流与黄金会话导出}
+最新终端客户端把底层 LangGraph 节点翻译为用户可读的科研工作流阶段,运行中显示"理解问题 → 制定研究计划 → 推理与检索决策 → 证据检索 → 自检修正 → 综合回答";\texttt{/timeline} 按阶段分组展示证据链,最终回答以"研究结论 + 证据工具 + 过程入口"呈现,避免把内部工具日志直接堆到主聊天区。
+\begin{plainbox}
+\textbf{黄金会话样例}:\texttt{docs/examples/golden\_verify\_claim\_session.md}\par\vspace{2pt}
+\textbf{用户问题}:RAG 能否降低科研问答系统中的幻觉风险?请给出证据和判断边界。\par\vspace{2pt}
+\textbf{工作流阶段}:制定研究计划 → 证据检索 → 自检修正 → 综合回答。\par\vspace{2pt}
+\textbf{输出边界}:结论表述为"降低幻觉风险并提升可核验性",而不是"完全消除幻觉";证据工具与 \texttt{/timeline} 入口保留给评委复核。
+\end{plainbox}

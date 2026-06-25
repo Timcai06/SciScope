@@ -113,7 +113,7 @@
 \begin{figure}[H]
 \centering
 \figasset[0.94\textwidth]{agent_trace_timeline.png}
-\caption{TUI 中可见的智能体执行轨迹:plan、工具调用、证据卡、reflect 与 final 均通过 SSE 事件流呈现,便于评委复核系统不是黑盒问答。}
+\caption{TUI 中可见的智能体执行轨迹:科研工作流阶段、工具调用、证据卡、reflect 与 final 均通过 SSE 事件流呈现,便于评委复核系统不是黑盒问答。}
 \label{fig:agent-trace}
 \end{figure}
 
@@ -124,11 +124,11 @@
 \item \textbf{反思与自评(reflect)}:回答后由模型自评"是否充分、关键论断是否都有证据支撑",不足则改写检索\textbf{重试一次}。
 \item \textbf{上下文压缩}:长会话自动压缩历史工具结果,避免超出上下文窗口。
 \item \textbf{会话态与错误恢复}:TUI 传入 \texttt{session\_id},后端映射为 LangGraph \texttt{thread\_id} 并通过 checkpoint 保留会话态;\texttt{/retry} 在同一线程内携带 \texttt{retry=true} 触发恢复。
-\item \textbf{服务/客户端分离}:agent 核心运行于 \texttt{/api/agent/stream}(SSE 流式),事件 \texttt{meta} 返回运行时、节点、耗时、会话与 retry 标记,终端助手与未来 Web 前端\textbf{共用同一智能体核心}。
+\item \textbf{服务/客户端分离}:agent 核心运行于 \texttt{/api/agent/stream}(SSE 流式),事件 \texttt{meta} 返回运行时、节点、用户可读阶段(\texttt{phase})、耗时、会话与 retry 标记,终端助手与未来 Web 前端\textbf{共用同一智能体核心}。TUI 将底层节点翻译为"理解问题 / 制定研究计划 / 推理与检索决策 / 证据检索 / 自检修正 / 综合回答"的科研工作流阶段条。
 \end{itemize}
 
 \begin{plainbox}
-\textbf{当前产品化路线}:智能体编排已以 LangGraph StateGraph 作为默认运行时,将 prepare、plan、LLM step、tool execution、reflect 与 final synthesis 拆为可观察节点;\texttt{session\_id} 映射 \texttt{thread\_id},checkpoint 保存会话态,\texttt{/retry} 支持同线程错误恢复。legacy ReAct loop 仅保留为兼容回退。下一阶段的重点是持久化 checkpoint、Human-in-the-Loop、多 Agent 分工与更细的节点级恢复;现有检索、趋势、推荐、图谱和 \texttt{verify\_claim} 工具保持不变,迁移目标是升级运行时而非重写数据底座。
+\textbf{当前产品化路线}:智能体编排已以 LangGraph StateGraph 作为默认运行时,将 prepare、plan、LLM step、tool execution、reflect 与 final synthesis 拆为可观察节点;SSE \texttt{meta.phase} 进一步把节点映射为用户可理解的科研工作流阶段。\texttt{session\_id} 映射 \texttt{thread\_id},checkpoint 保存会话态,\texttt{/retry} 支持同线程错误恢复。legacy ReAct loop 仅保留为兼容回退。下一阶段的重点是持久化 checkpoint、Human-in-the-Loop、多 Agent 分工与更细的节点级恢复;现有检索、趋势、推荐、图谱和 \texttt{verify\_claim} 工具保持不变,迁移目标是升级运行时而非重写数据底座。
 \end{plainbox}
 
 \begin{center}
@@ -167,7 +167,7 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 \item \textbf{推荐模型}:论文级平均向量(pgvector \texttt{avg})+ 多信号加权,逐条给出可解释因子。
 \item \textbf{知识图谱}:NetworkX 中心度/社区,百万级边按中心度剪枝导出 JSON,作者 ego 图走 SQL 实时查询。
 \item \textbf{生成层}:OpenAI 兼容本地服务,输出限长防失控,可平滑切换更大/远程模型。
-\item \textbf{智能体编排}:基于 LangGraph StateGraph 的科研智能体运行时——prepare / plan / LLM step / tool execution / reflect / final synthesis 节点化编排,底层使用本地 \texttt{Qwen2.5-7B}(vLLM,hermes 工具解析),支持流式选工具、只读工具并行执行、调用去重、plan/reflect 自校验、会话 checkpoint 与同线程 \texttt{/retry},事件化输出供 CLI 与 Web 复用。
+\item \textbf{智能体编排}:基于 LangGraph StateGraph 的科研智能体运行时——prepare / plan / LLM step / tool execution / reflect / final synthesis 节点化编排,底层使用本地 \texttt{Qwen2.5-7B}(vLLM,hermes 工具解析),支持流式选工具、只读工具并行执行、调用去重、plan/reflect 自校验、会话 checkpoint 与同线程 \texttt{/retry};事件化输出供 CLI 与 Web 复用,并通过 \texttt{phase} 字段向用户呈现科研工作流阶段。
 \end{itemize}
 
 \subsection{实现过程}
@@ -205,8 +205,8 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 2. 模型层 & 片段/论文向量、趋势、推荐、图谱等\textbf{模型文件},入 PostgreSQL + pgvector(\texttt{src/models}、\texttt{models/}、\texttt{output/graphs/}) \\
 3. 服务 / RAG & 混合检索(FTS + 向量 + RRF + 双语 + 重排)+ GraphRAG + 证据接地(\texttt{backend/app/services}) \\
 4. 智能体 & LangGraph StateGraph:prepare -> plan -> 选工具 -> 并行执行 -> 观察 -> 反思自评 -> 据证作答;支持 session checkpoint 与同线程 \texttt{/retry}(\texttt{backend/app/agent}) \\
-5. 接口 & FastAPI;智能体经 \texttt{/api/agent/stream} 以 SSE 流式输出,并在 \texttt{meta} 中暴露 runtime / node / elapsed / session / retry(\texttt{backend/app/api}) \\
-6. 客户端 & Go / Bubble Tea 终端(\texttt{tui/main.go}),纯 SSE 消费;Web 前端复用同一接口 \\
+5. 接口 & FastAPI;智能体经 \texttt{/api/agent/stream} 以 SSE 流式输出,并在 \texttt{meta} 中暴露 runtime / node / phase / elapsed / session / retry(\texttt{backend/app/api}) \\
+6. 客户端 & Go / Bubble Tea 终端(\texttt{tui/main.go}),纯 SSE 消费;将 \texttt{phase} 渲染为科研工作流阶段条与分组 \texttt{/timeline},Web 前端复用同一接口 \\
 \bottomrule
 \end{tabularx}
 \end{center}
