@@ -23,6 +23,10 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Iterator
 
+from backend.app.agent import llm as llm_runtime
+from backend.app.agent import planning as planning_runtime
+from backend.app.agent import reflection as reflection_runtime
+from backend.app.agent import tool_runner
 from backend.app.agent.tools import TOOL_SCHEMAS, execute_tool
 
 LLM_BASE = os.getenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:8001/v1")
@@ -273,12 +277,12 @@ def stream_agent(
     ('plan', [steps]) | ('text', delta) | ('tool_call', {name,args}) |
     ('tool_result', {name,result}) | ('reflect', reason) | ('final', answer).
     """
-    model = model or _detect_model()
+    model = model or llm_runtime.detect_model()
     if not model:
         yield ("final", "本地大模型未运行(:8001)。请先 `make llm`。")
         return
 
-    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages: list[dict] = [{"role": "system", "content": llm_runtime.SYSTEM_PROMPT}]
     messages.extend(history or [])
     messages.append({"role": "user", "content": question})
 
@@ -286,8 +290,8 @@ def stream_agent(
     # The plan is surfaced as an event (shown in the UI / report) and primed into
     # context so the loop executes it — this is what makes it a real agent, not a
     # one-shot answerer.
-    if _needs_plan(question):
-        plan = _make_plan(question, model)
+    if planning_runtime.needs_plan(question):
+        plan = planning_runtime.make_plan(question, model)
         if plan:
             yield ("plan", plan)
             messages.append({"role": "assistant",
@@ -301,9 +305,9 @@ def stream_agent(
     executed: dict[str, str] = {}  # (name|args) -> result, dedup repeats across steps
 
     for _ in range(MAX_STEPS):
-        _compact(messages)
+        llm_runtime.compact(messages)
         text_events.clear()
-        full_text, tool_calls = _drain(_stream_chat(messages, model, TOOL_SCHEMAS), forward)
+        full_text, tool_calls = llm_runtime.drain(llm_runtime.stream_chat(messages, model, TOOL_SCHEMAS), forward)
         for ev in text_events:
             yield ev
         if not tool_calls:
@@ -313,9 +317,9 @@ def stream_agent(
             # model critique its own sufficiency.
             reason = None
             if retries < MAX_RETRIES:
-                reason = _reflect_reason(full_text, tools_total, question)
+                reason = reflection_runtime.reflect_reason(full_text, tools_total, question)
                 if reason is None and tools_total > 0:
-                    reason = _self_critique(question, full_text, model)
+                    reason = reflection_runtime.self_critique(question, full_text, model)
             if reason:
                 retries += 1
                 yield ("reflect", reason)
@@ -335,7 +339,7 @@ def stream_agent(
             except json.JSONDecodeError:
                 args = {}
             yield ("tool_call", {"name": tc["function"]["name"], "args": args})
-        results = _run_tools(tool_calls, executed)
+        results = tool_runner.run_tools(tool_calls, executed)
         for tc, result in zip(tool_calls, results):
             yield ("tool_result", {"name": tc["function"]["name"], "result": result})
             messages.append({"role": "tool", "tool_call_id": tc.get("id", tc["function"]["name"]), "content": result})
@@ -343,7 +347,7 @@ def stream_agent(
     # Step cap reached — force a final synthesis without more tools.
     messages.append({"role": "user", "content": "请基于以上工具结果,用中文给出最终回答。"})
     text_events.clear()
-    full_text, _ = _drain(_stream_chat(messages, model, None), forward)
+    full_text, _ = llm_runtime.drain(llm_runtime.stream_chat(messages, model, None), forward)
     for ev in text_events:
         yield ev
     yield ("final", full_text)
@@ -369,4 +373,4 @@ def run_agent(
                 on_event("tool_call", payload)
         elif kind == "tool_result" and on_event:
             on_event("tool_result", payload)
-    return {"answer": answer, "steps": steps, "tools_used": tools_used, "model": model or _detect_model()}
+    return {"answer": answer, "steps": steps, "tools_used": tools_used, "model": model or llm_runtime.detect_model()}
