@@ -312,3 +312,55 @@ func TestTimelineAndErrorUsePanelRows(t *testing.T) {
 		t.Fatalf("recovery panel missing command:\n%s", errPanel)
 	}
 }
+
+func TestDemoScriptCoversGoldenFlow(t *testing.T) {
+	msgs := demoScriptMessages()
+	if len(msgs) < 7 {
+		t.Fatalf("expected rich demo script, got %#v", msgs)
+	}
+
+	var hasStart, hasPlan, hasVerifyCall, hasVerifyResult, hasSearchResult, hasFinal, hasDone bool
+	for _, msg := range msgs {
+		switch msg := msg.(type) {
+		case demoStartMsg:
+			hasStart = strings.Contains(string(msg), "RAG")
+		case planMsg:
+			hasPlan = len(msg) >= 3
+		case toolCallMsg:
+			if msg.name == "verify_claim" {
+				hasVerifyCall = true
+			}
+		case toolResultMsg:
+			if msg.name == "verify_claim" && strings.Contains(msg.result, "强支持") {
+				hasVerifyResult = true
+			}
+			if msg.name == "search_literature" && strings.Contains(msg.result, "Retrieval-Augmented") {
+				hasSearchResult = true
+			}
+		case finalMsg:
+			hasFinal = strings.Contains(string(msg), "可验证")
+		case doneMsg:
+			hasDone = true
+		}
+	}
+	for name, ok := range map[string]bool{
+		"start":         hasStart,
+		"plan":          hasPlan,
+		"verify_call":   hasVerifyCall,
+		"verify_result": hasVerifyResult,
+		"search_result": hasSearchResult,
+		"final":         hasFinal,
+		"done":          hasDone,
+	} {
+		if !ok {
+			t.Fatalf("demo script missing %s: %#v", name, msgs)
+		}
+	}
+}
+
+func TestDemoModeReadsEnvironment(t *testing.T) {
+	t.Setenv("SCISCOPE_TUI_DEMO", "1")
+	if !demoMode() {
+		t.Fatalf("expected demo mode from SCISCOPE_TUI_DEMO=1")
+	}
+}
