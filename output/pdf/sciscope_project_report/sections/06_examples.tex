@@ -86,10 +86,21 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 \end{plainbox}
 
 \subsection{用例八:TUI 产品化工作流与黄金会话导出}
-最新终端客户端把底层 LangGraph 节点翻译为用户可读的科研工作流阶段,运行中显示"理解问题 → 制定研究计划 → 推理与检索决策 → 证据检索 → 自检修正 → 综合回答";\texttt{/timeline} 按阶段分组展示证据链,最终回答以"研究结论 + 证据工具 + 过程入口"呈现,避免把内部工具日志直接堆到主聊天区。
+终端客户端将底层 LangGraph 节点翻译为用户可读的科研工作流阶段。用户看到的是研究过程,而不是内部工具日志:\texttt{/timeline} 按阶段回看证据链,最终回答固定为"研究结论 + 证据工具 + 过程入口"。
 \begin{plainbox}
 \textbf{黄金会话样例}:\texttt{docs/examples/golden\_verify\_claim\_session.md}\par\vspace{2pt}
 \textbf{用户问题}:RAG 能否降低科研问答系统中的幻觉风险?请给出证据和判断边界。\par\vspace{2pt}
-\textbf{工作流阶段}:制定研究计划 → 证据检索 → 自检修正 → 综合回答。\par\vspace{2pt}
-\textbf{输出边界}:结论表述为"降低幻觉风险并提升可核验性",而不是"完全消除幻觉";证据工具与 \texttt{/timeline} 入口保留给评委复核。
+\begin{center}
+\begin{tabularx}{0.92\textwidth}{>{\bfseries}p{28mm}X}
+\toprule
+阶段 & 样例中的可见动作 \\
+\midrule
+制定研究计划 & 将中文论断改写为英文检索表达,规划证据核查路径 \\
+证据检索 & 调用 \texttt{verify\_claim} 与文献检索,返回支持等级和证据卡 \\
+自检修正 & 将结论限定为"降低风险",不夸大为"完全消除幻觉" \\
+综合回答 & 输出研究结论、依据、判断边界和可复现入口 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+\textbf{输出边界}:结论表述为"降低幻觉风险并提升可核验性";证据工具与 \texttt{/timeline} 入口保留给评委复核。
 \end{plainbox}

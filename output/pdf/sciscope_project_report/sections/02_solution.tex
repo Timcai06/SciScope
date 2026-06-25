@@ -124,27 +124,42 @@
 \item \textbf{反思与自评(reflect)}:回答后由模型自评"是否充分、关键论断是否都有证据支撑",不足则改写检索\textbf{重试一次}。
 \item \textbf{上下文压缩}:长会话自动压缩历史工具结果,避免超出上下文窗口。
 \item \textbf{会话态与错误恢复}:TUI 传入 \texttt{session\_id},后端映射为 LangGraph \texttt{thread\_id} 并通过 checkpoint 保留会话态;\texttt{/retry} 在同一线程内携带 \texttt{retry=true} 触发恢复。
-\item \textbf{服务/客户端分离}:agent 核心运行于 \texttt{/api/agent/stream}(SSE 流式),事件 \texttt{meta} 返回运行时、节点、用户可读阶段(\texttt{phase})、耗时、会话与 retry 标记,终端助手与未来 Web 前端\textbf{共用同一智能体核心}。TUI 将底层节点翻译为"理解问题 / 制定研究计划 / 推理与检索决策 / 证据检索 / 自检修正 / 综合回答"的科研工作流阶段条。
+\item \textbf{服务/客户端分离}:agent 核心运行于 \texttt{/api/agent/stream}(SSE 流式)。事件 \texttt{meta} 同时返回运行时、节点、用户可读阶段(\texttt{phase})、耗时、会话与 retry 标记;TUI 与未来 Web 前端\textbf{共用同一智能体核心}。
 \end{itemize}
 
 \begin{plainbox}
-\textbf{当前产品化路线}:智能体编排已以 LangGraph StateGraph 作为默认运行时,将 prepare、plan、LLM step、tool execution、reflect 与 final synthesis 拆为可观察节点;SSE \texttt{meta.phase} 进一步把节点映射为用户可理解的科研工作流阶段。\texttt{session\_id} 映射 \texttt{thread\_id},checkpoint 保存会话态,\texttt{/retry} 支持同线程错误恢复。legacy ReAct loop 仅保留为兼容回退。下一阶段的重点是持久化 checkpoint、Human-in-the-Loop、多 Agent 分工与更细的节点级恢复;现有检索、趋势、推荐、图谱和 \texttt{verify\_claim} 工具保持不变,迁移目标是升级运行时而非重写数据底座。
+\textbf{当前产品化路线}:LangGraph StateGraph 已作为默认运行时。\texttt{meta.phase} 将底层节点翻译为用户可理解的科研工作流阶段;TUI 在运行中显示阶段条,并用分组 \texttt{/timeline} 回看证据链。\texttt{session\_id} 映射为 \texttt{thread\_id},checkpoint 保存会话态,\texttt{/retry} 支持同线程错误恢复。legacy ReAct loop 仅保留为兼容回退。下一阶段聚焦持久化 checkpoint、Human-in-the-Loop、多 Agent 分工与节点级恢复;检索、趋势、推荐、图谱和 \texttt{verify\_claim} 工具保持不变。
 \end{plainbox}
 
 \begin{center}
-\begin{tabularx}{0.96\textwidth}{>{\ttfamily}p{34mm}X}
+\begin{tabularx}{0.96\textwidth}{>{\bfseries}p{30mm}XX}
 \toprule
-\textnormal{\textbf{工具}} & \textbf{作用} \\
+用户可见阶段 & 对应节点 & TUI 呈现 \\
 \midrule
-search\_literature & 跨语言混合检索(FTS + 向量 + 倒数排名融合 RRF + 双语映射 + 重排) \\
-get\_trends & Mann-Kendall(MK) 趋势判定 + Sen's 斜率 + 下一年预测 \\
-recommend\_papers & 语义 + 关键词 + 作者 + 最大边际相关(Maximum Marginal Relevance, MMR)多样性的可解释推荐 \\
-get\_paper & 按 paper\_id 取论文详情 \\
-summarize\_field & 检索代表论文作为领域综述素材 \\
-compare\_papers & 取两篇论文详情用于多维对比 \\
-query\_knowledge\_graph & 作者/关键词/主题图谱与研究社区主题 \\
-export\_bibliography & 导出 BibTeX 引文条目 \\
-verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等级并给出处 \\
+理解问题 & \texttt{prepare} & 解析问题、装载会话上下文 \\
+制定研究计划 & \texttt{plan} & 展示可执行研究步骤 \\
+推理与检索决策 & \texttt{llm\_step} & 选择是否调用工具与下一步动作 \\
+证据检索 & \texttt{execute\_tools} & 调用检索、趋势、推荐、核查等工具 \\
+自检修正 & \texttt{reflect} & 判断证据是否充分,必要时重试 \\
+综合回答 & \texttt{force\_synthesis/final} & 输出"研究结论 + 证据工具 + 过程入口" \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{center}
+\begin{tabularx}{0.96\textwidth}{p{42mm}X}
+\toprule
+\textbf{工具} & \textbf{作用} \\
+\midrule
+\texttt{search\_literature} & 跨语言混合检索(FTS + 向量 + 倒数排名融合 RRF + 双语映射 + 重排) \\
+\texttt{get\_trends} & Mann-Kendall(MK) 趋势判定 + Sen's 斜率 + 下一年预测 \\
+\texttt{recommend\_papers} & 语义 + 关键词 + 作者 + 最大边际相关(Maximum Marginal Relevance, MMR)多样性的可解释推荐 \\
+\texttt{get\_paper} & 按 paper\_id 取论文详情 \\
+\texttt{summarize\_field} & 检索代表论文作为领域综述素材 \\
+\texttt{compare\_papers} & 取两篇论文详情用于多维对比 \\
+\texttt{query\_knowledge\_graph} & 作者/关键词/主题图谱与研究社区主题 \\
+\texttt{export\_bibliography} & 导出 BibTeX 引文条目 \\
+\texttt{verify\_claim} & \textbf{跨语言论断核查}:用语义接地度判定支持等级并给出处 \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -167,7 +182,7 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 \item \textbf{推荐模型}:论文级平均向量(pgvector \texttt{avg})+ 多信号加权,逐条给出可解释因子。
 \item \textbf{知识图谱}:NetworkX 中心度/社区,百万级边按中心度剪枝导出 JSON,作者 ego 图走 SQL 实时查询。
 \item \textbf{生成层}:OpenAI 兼容本地服务,输出限长防失控,可平滑切换更大/远程模型。
-\item \textbf{智能体编排}:基于 LangGraph StateGraph 的科研智能体运行时——prepare / plan / LLM step / tool execution / reflect / final synthesis 节点化编排,底层使用本地 \texttt{Qwen2.5-7B}(vLLM,hermes 工具解析),支持流式选工具、只读工具并行执行、调用去重、plan/reflect 自校验、会话 checkpoint 与同线程 \texttt{/retry};事件化输出供 CLI 与 Web 复用,并通过 \texttt{phase} 字段向用户呈现科研工作流阶段。
+\item \textbf{智能体编排}:基于 LangGraph StateGraph 的科研智能体运行时。prepare / plan / LLM step / tool execution / reflect / final synthesis 被拆为可观察节点;底层使用本地 \texttt{Qwen2.5-7B}(vLLM,hermes 工具解析),支持流式选工具、只读工具并行执行、调用去重、plan/reflect 自校验、会话 checkpoint 与同线程 \texttt{/retry};事件流通过 \texttt{phase} 字段向用户呈现科研工作流阶段。
 \end{itemize}
 
 \subsection{实现过程}
