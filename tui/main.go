@@ -1,7 +1,7 @@
 // SciScope terminal client — a Bubble Tea (Charm) TUI that consumes the agent's
 // SSE event stream (/api/agent/stream). The Python agent core is untouched: this
-// is purely a presentation client, so the look can match Claude Code's polish
-// while plan/tool/reflect/answer logic stays server-side.
+// is purely a presentation client, styled after Claude Code's visual grammar
+// (⏺ action bullets, ⎿ tool-result connectors, an animated verb spinner).
 //
 // Run:  make tui        (requires `make backend` on :8000 and `make llm` on :8001)
 package main
@@ -9,13 +9,17 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -23,7 +27,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// ---- palette (matches the rich CLI: warm terracotta accent) ----
+// ---- palette (warm terracotta accent, à la Claude Code) ----
 var (
 	cAccent  = lipgloss.Color("#d7875f")
 	cTool    = lipgloss.Color("#5fafd7")
@@ -33,6 +37,8 @@ var (
 	cFaint   = lipgloss.Color("#5f5f5f")
 	cInk     = lipgloss.Color("#d7d7d7")
 	stAccent = lipgloss.NewStyle().Foreground(cAccent).Bold(true)
+	stBullet = lipgloss.NewStyle().Foreground(cAccent).Bold(true) // ⏺
+	stConn   = lipgloss.NewStyle().Foreground(cFaint)             // ⎿
 	stTool   = lipgloss.NewStyle().Foreground(cTool)
 	stWarn   = lipgloss.NewStyle().Foreground(cWarn)
 	stUser   = lipgloss.NewStyle().Foreground(cUser).Bold(true)
@@ -43,7 +49,13 @@ var (
 	stCmd    = lipgloss.NewStyle().Foreground(cMuted)
 )
 
-// ---- tool icons/labels (mirror the Python client) ----
+// rotating "spinner verbs" (Claude Code signature) — localized, research-flavored.
+var verbs = []string{
+	"检索中", "推敲中", "归纳中", "研判中", "爬梳中", "斟酌中", "综合中",
+	"推演中", "酝酿中", "梳理中", "求证中", "琢磨中", "盘点中", "沉思中",
+}
+
+// ---- tool icons/labels ----
 var toolLabels = map[string][2]string{
 	"search_literature":     {"🔍", "检索文献"},
 	"get_trends":            {"📈", "研究趋势"},
@@ -93,6 +105,7 @@ type toolCallMsg struct {
 	name string
 	args map[string]any
 }
+type toolResultMsg struct{ name, result string }
 type reflectMsg string
 type finalMsg string
 type errMsg string
@@ -106,11 +119,15 @@ func backendURL() string {
 }
 
 // stream POSTs the question and pushes one tea.Msg per SSE event into sub.
-func stream(backend, q string, history []turn, sub chan tea.Msg) {
+func stream(ctx context.Context, backend, q string, history []turn, sub chan tea.Msg) {
 	body, _ := json.Marshal(map[string]any{"question": q, "history": history})
-	resp, err := http.Post(backend+"/api/agent/stream", "application/json", bytes.NewReader(body))
+	req, _ := http.NewRequestWithContext(ctx, "POST", backend+"/api/agent/stream", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		sub <- errMsg("无法连接后端 " + backend + ":" + err.Error())
+		if ctx.Err() == nil { // not a user interrupt
+			sub <- errMsg("无法连接后端 " + backend + ":" + err.Error())
+		}
 		sub <- doneMsg{}
 		return
 	}
@@ -149,6 +166,13 @@ func stream(backend, q string, history []turn, sub chan tea.Msg) {
 			}
 			json.Unmarshal(ev.Payload, &t)
 			sub <- toolCallMsg{t.Name, t.Args}
+		case "tool_result":
+			var t struct {
+				Name   string `json:"name"`
+				Result string `json:"result"`
+			}
+			json.Unmarshal(ev.Payload, &t)
+			sub <- toolResultMsg{t.Name, t.Result}
 		case "reflect":
 			var s string
 			json.Unmarshal(ev.Payload, &s)
@@ -174,15 +198,18 @@ func listen(sub chan tea.Msg) tea.Cmd {
 type model struct {
 	ti        textinput.Model
 	vp        viewport.Model
+	spin      spinner.Model
 	blocks    []string // finalized conversation lines
 	answer    string   // current streaming answer
 	answering bool
+	verb      string
+	tick      int
 	used      []string // tools called this turn (for the answer footer)
 	history   []turn
 	sub       chan tea.Msg
+	cancel    context.CancelFunc
 	menuIdx   int
 	ready     bool
-	w, h      int
 }
 
 func initialModel() model {
@@ -191,7 +218,14 @@ func initialModel() model {
 	ti.Prompt = stAccent.Render("❯ ")
 	ti.Focus()
 	ti.CharLimit = 2000
-	return model{ti: ti, sub: make(chan tea.Msg, 64)}
+
+	sp := spinner.New()
+	sp.Spinner = spinner.Spinner{
+		Frames: []string{"✻", "✢", "✳", "∗", "✦", "✶"},
+		FPS:    time.Second / 8,
+	}
+	sp.Style = stAccent
+	return model{ti: ti, spin: sp, sub: make(chan tea.Msg, 64)}
 }
 
 func (m model) Init() tea.Cmd { return textinput.Blink }
@@ -204,19 +238,19 @@ func (m *model) appendBlock(s string) {
 func (m *model) refresh() {
 	content := strings.Join(m.blocks, "\n")
 	if m.answering && m.answer != "" {
-		content += "\n" + stInk.Render(m.answer)
+		content += "\n" + stBullet.Render("⏺ ") + stInk.Render(m.answer)
 	}
 	m.vp.SetContent(content)
 	m.vp.GotoBottom()
 }
 
 func (m model) argsStr(args map[string]any) string {
-	parts := []string{}
 	keys := make([]string, 0, len(args))
 	for k := range args {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+	parts := []string{}
 	for _, k := range keys {
 		v := args[k]
 		if v == nil || v == "" || v == float64(0) {
@@ -227,13 +261,21 @@ func (m model) argsStr(args map[string]any) string {
 	return strings.Join(parts, " · ")
 }
 
+func preview(s string) string {
+	s = strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
+	r := []rune(s)
+	if len(r) > 84 {
+		return string(r[:84]) + "…"
+	}
+	return s
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
-		m.w, m.h = msg.Width, msg.Height
-		header, footer := 3, 4 // bordered banner = 3 lines; input+status+margin = 4
+		header, footer := 3, 4 // bordered banner = 3 lines; spinner/input/status = 4
 		vh := msg.Height - header - footer
 		if vh < 3 {
 			vh = 3
@@ -247,10 +289,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.ti.Width = msg.Width - 4
 
+	case spinner.TickMsg:
+		if !m.answering {
+			return m, nil
+		}
+		m.spin, cmd = m.spin.Update(msg)
+		m.tick++
+		if m.tick%12 == 0 {
+			m.verb = verbs[rand.Intn(len(verbs))]
+		}
+		return m, cmd
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
+		case "esc":
+			if m.answering && m.cancel != nil {
+				m.cancel()
+			}
+			return m, nil
 		case "up", "down", "tab":
 			if strings.HasPrefix(m.ti.Value(), "/") {
 				ms := filterCmds(m.ti.Value())
@@ -279,37 +337,48 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.menuIdx = 0
 				return m.runSlash(v)
 			}
-			// send to agent
 			m.ti.SetValue("")
-			m.appendBlock(stUser.Render("你  ") + v)
+			m.appendBlock(stUser.Render("❯ ") + stInk.Render(v))
 			m.history = append(m.history, turn{"user", v})
 			m.answering = true
 			m.answer = ""
 			m.used = nil
+			m.verb = verbs[rand.Intn(len(verbs))]
+			ctx, cancel := context.WithCancel(context.Background())
+			m.cancel = cancel
 			q := v
 			hist := append([]turn(nil), m.history...)
 			return m, tea.Batch(
-				func() tea.Msg { go stream(backendURL(), q, hist, m.sub); return nil },
+				func() tea.Msg { go stream(ctx, backendURL(), q, hist, m.sub); return nil },
 				listen(m.sub),
+				m.spin.Tick,
 			)
 		}
 
 	case planMsg:
-		lines := []string{stAccent.Render("🗺 执行计划")}
-		for i, s := range msg {
-			lines = append(lines, stFaint.Render(fmt.Sprintf("   %d. ", i+1))+stMuted.Render(s))
+		lines := []string{stBullet.Render("⏺ ") + stAccent.Render("执行计划")}
+		for _, s := range msg {
+			lines = append(lines, stConn.Render("  ⎿  ")+stMuted.Render("☐ "+s))
 		}
 		m.appendBlock(strings.Join(lines, "\n"))
 		return m, listen(m.sub)
 
 	case toolCallMsg:
 		m.used = append(m.used, msg.name)
-		m.appendBlock(stTool.Render("  "+toolLabel(msg.name)) + "  " + stFaint.Render(m.argsStr(msg.args)))
+		line := stBullet.Render("⏺ ") + stTool.Render(toolLabel(msg.name))
+		if a := m.argsStr(msg.args); a != "" {
+			line += stFaint.Render("(" + a + ")")
+		}
+		m.appendBlock(line)
+		return m, listen(m.sub)
+
+	case toolResultMsg:
+		m.appendBlock(stConn.Render("  ⎿  ") + stFaint.Render(preview(msg.result)))
 		return m, listen(m.sub)
 
 	case reflectMsg:
 		m.answer = ""
-		m.appendBlock(stWarn.Render("  🔄 自我纠错 ") + stFaint.Render(string(msg)))
+		m.appendBlock(stBullet.Render("⏺ ") + stWarn.Render("自我纠错 ") + stFaint.Render(string(msg)))
 		return m, listen(m.sub)
 
 	case textMsg:
@@ -324,16 +393,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, listen(m.sub)
 
 	case errMsg:
-		m.appendBlock(lipgloss.NewStyle().Foreground(lipgloss.Color("#d75f5f")).Render("  ✗ " + string(msg)))
+		m.appendBlock(lipgloss.NewStyle().Foreground(lipgloss.Color("#d75f5f")).Render("⏺ ✗ " + string(msg)))
 		return m, listen(m.sub)
 
 	case doneMsg:
 		if m.answer != "" {
 			ans := m.answer
-			rendered := m.renderAnswer()
-			m.answer = ""
 			m.answering = false
-			m.appendBlock(rendered)
+			m.appendBlock(m.renderAnswer())
 			m.history = append(m.history, turn{"assistant", ans})
 			if len(m.history) > 12 {
 				m.history = m.history[len(m.history)-12:]
@@ -341,6 +408,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.answer = ""
 		m.answering = false
+		m.cancel = nil
 		m.refresh()
 		return m, nil
 	}
@@ -349,21 +417,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// renderAnswer turns the finished answer into a polished block: glamour-rendered
-// Markdown behind a terracotta left-bar, with a "✦ 回答" title and a footer listing
-// the tools the agent used this turn.
+// renderAnswer renders the finished answer as Markdown (glamour) under a ⏺ bullet,
+// with a dim footer listing the tools the agent used this turn.
 func (m model) renderAnswer() string {
 	w := m.vp.Width - 4
 	if w < 20 {
 		w = 20
 	}
-	body := m.answer
+	body := strings.Trim(m.answer, "\n")
 	if r, err := glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(w)); err == nil {
 		if out, e := r.Render(m.answer); e == nil {
-			body = strings.TrimRight(out, "\n")
+			body = strings.Trim(out, "\n")
 		}
 	}
-	parts := []string{stAccent.Render("✦ 回答"), body}
+	out := stBullet.Render("⏺ ") + body
 	if len(m.used) > 0 {
 		seen := map[string]bool{}
 		labels := []string{}
@@ -373,12 +440,9 @@ func (m model) renderAnswer() string {
 				labels = append(labels, toolLabel(n))
 			}
 		}
-		parts = append(parts, stFaint.Render("— "+strings.Join(labels, "  ")+" —"))
+		out += "\n" + stFaint.Render("  "+strings.Join(labels, "  "))
 	}
-	bar := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), false, false, false, true).
-		BorderForeground(cAccent).PaddingLeft(1)
-	return bar.Render(strings.Join(parts, "\n"))
+	return out
 }
 
 func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
@@ -390,7 +454,7 @@ func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
 		m.history = nil
 		m.refresh()
 	case "/help":
-		m.appendBlock(stFaint.Render("  命令: /help /tools /clear /quit"))
+		m.appendBlock(stFaint.Render("  命令: /help /tools /clear /quit · Esc 中断 · Ctrl+C 退出"))
 	case "/tools":
 		lines := []string{stFaint.Render("  可用工具(LLM 自主调用):")}
 		for _, name := range []string{"search_literature", "get_trends", "recommend_papers", "get_paper", "summarize_field", "compare_papers", "export_bibliography", "query_knowledge_graph", "verify_claim"} {
@@ -408,13 +472,14 @@ func (m model) View() string {
 		return "启动中…"
 	}
 	banner := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).BorderForeground(cAccent).
-		Padding(0, 1)
+		Border(lipgloss.RoundedBorder()).BorderForeground(cAccent).Padding(0, 1)
 	header := banner.Render(stAccent.Render("✦ SciScope 科研智能体") + "  " + stFaint.Render("检索·趋势·推荐·图谱·综述·对比·引文·核查"))
 	parts := []string{header, m.vp.View()}
 
-	// inline slash menu (Claude Code-style flush list)
-	if strings.HasPrefix(m.ti.Value(), "/") {
+	// thinking spinner (Claude Code-style verb + esc hint) while a turn runs
+	if m.answering {
+		parts = append(parts, m.spin.View()+" "+stAccent.Render(m.verb+"…")+stFaint.Render("  (esc 中断)"))
+	} else if strings.HasPrefix(m.ti.Value(), "/") {
 		if ms := filterCmds(m.ti.Value()); len(ms) > 0 {
 			idx := m.menuIdx % len(ms)
 			menu := []string{}
