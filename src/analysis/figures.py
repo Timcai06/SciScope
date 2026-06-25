@@ -1282,8 +1282,8 @@ def _plot_author_component_overview(
     metric_rows = _author_metric_lookup(author_metrics)
     columns = 4
     rows = math.ceil(len(slices) / columns)
-    fig, axes = plt.subplots(rows, columns, figsize=(8.6, 1.86 * rows + 0.55), squeeze=False)
-    fig.suptitle("Author Collaboration Component Overview", fontsize=10)
+    fig, axes = plt.subplots(rows, columns, figsize=(8.8, 1.96 * rows + 0.62), squeeze=False)
+    fig.suptitle("Author Collaboration Component Overview", fontsize=10, color=CHARCOAL, y=0.992)
     for index, item in enumerate(slices):
         ax = axes[index // columns][index % columns]
         plot_edges = item["plot_edges"]
@@ -1311,15 +1311,28 @@ def _plot_author_component_overview(
                 k=0.95 / math.sqrt(max(component_graph.number_of_nodes(), 1)),
                 iterations=90,
             )
+        node_order = list(component_graph.nodes)
+        coords = np.array([pos[node] for node in node_order], dtype=float)
+        if len(coords):
+            coords = coords - coords.mean(axis=0)
+            if len(coords) > 1:
+                try:
+                    _, _, vh = np.linalg.svd(coords, full_matrices=False)
+                    coords = coords @ vh.T
+                except np.linalg.LinAlgError:
+                    pass
+            scale = float(np.max(np.abs(coords))) or 1.0
+            coords = coords / scale * 0.72
+            pos = {node: coords[node_index] for node_index, node in enumerate(node_order)}
         max_weight = max((float(edge.get("weight") or 0) for _, _, edge in component_graph.edges(data=True)), default=1.0)
         for source, target, edge_data in component_graph.edges(data=True):
             weight = float(edge_data.get("weight") or 0)
             ax.plot(
                 [pos[source][0], pos[target][0]],
                 [pos[source][1], pos[target][1]],
-                color=CHARCOAL,
-                alpha=0.28 + min(weight / max_weight, 1) * 0.28,
-                linewidth=0.5 + min(weight / max_weight, 1) * 1.7,
+                color=STEEL,
+                alpha=0.22 + min(weight / max_weight, 1) * 0.36,
+                linewidth=0.55 + min(weight / max_weight, 1) * 1.65,
                 zorder=1,
             )
 
@@ -1328,11 +1341,11 @@ def _plot_author_component_overview(
         xs = [pos[node][0] for node in component_graph.nodes]
         ys = [pos[node][1] for node in component_graph.nodes]
         sizes = [42 + 170 * math.sqrt(max(node_scores.get(str(node), 0), 0) / max_score) for node in component_graph.nodes]
-        colors = [_community_color(communities.get(node, "unknown")) for node in component_graph.nodes]
-        ax.scatter(xs, ys, s=sizes, c=colors, edgecolors="white", linewidths=0.45, alpha=0.92, zorder=3)
 
         top_node = max(component_graph.nodes, key=lambda node: node_scores.get(str(node), 0))
-        ax.set_title(f"C{index + 1}: {item['nodes_total']} nodes / {item['edges_total']} edges", fontsize=6.8)
+        colors = [GRAPHITE if node == top_node else (MINTGREY if node_scores.get(str(node), 0) >= max_score * 0.62 else BLUEGREY) for node in component_graph.nodes]
+        ax.scatter(xs, ys, s=sizes, c=colors, edgecolors="white", linewidths=0.55, alpha=0.94, zorder=3)
+        ax.set_title(f"C{index + 1}: {item['nodes_total']} nodes / {item['edges_total']} edges", fontsize=6.8, color=CHARCOAL, pad=2)
         x, y = pos[top_node]
         center_x = float(np.mean(xs)) if xs else 0.0
         center_y = float(np.mean(ys)) if ys else 0.0
@@ -1343,27 +1356,31 @@ def _plot_author_component_overview(
             _wrap_label(labels.get(top_node, top_node), width=16),
             xy=(x, y),
             xytext=(x + dx / distance * 0.18, y + dy / distance * 0.18),
-            arrowprops={"arrowstyle": "-", "color": "0.48", "lw": 0.3, "alpha": 0.62},
+            arrowprops={"arrowstyle": "-", "color": STEEL, "lw": 0.35, "alpha": 0.7},
             fontsize=5.2,
             ha="center",
             va="center",
             color=BLACK,
-            bbox={"boxstyle": "round,pad=0.13", "fc": "white", "ec": "0.82", "lw": 0.25, "alpha": 0.84},
+            bbox={"boxstyle": "round,pad=0.13", "fc": "#f5faf9", "ec": MINTGREY, "lw": 0.3, "alpha": 0.92},
             zorder=5,
         )
         ax.set_xticks([])
         ax.set_yticks([])
         ax.set_frame_on(False)
-        ax.margins(0.18)
+        ax.set_aspect("equal", adjustable="box")
+        ax.set_xlim(-1.05, 1.05)
+        ax.set_ylim(-1.0, 1.0)
+        ax.margins(0)
 
     for index in range(len(slices), rows * columns):
         axes[index // columns][index % columns].axis("off")
     fig.text(
-        0.01,
-        0.01,
+        0.5,
+        0.012,
         "Each panel is a high-weight connected component; only its strongest local edges and one anchor author are labeled.",
         fontsize=6.4,
-        color="0.25",
+        color=GRAPHITE,
+        ha="center",
     )
     save_figure(fig, output_file)
     return {

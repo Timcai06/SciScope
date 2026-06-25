@@ -1,8 +1,8 @@
 \section{解决方案}
 
 \subsection{总体架构设计}
-系统采用\textbf{可复现流水线 + PostgreSQL 服务层 + 可替换大模型}的分层架构。数据自底向上逐层加工为"可问答系统";
-其中\textbf{分析层}产出《数据分析报告》,\textbf{模型层}产出科研智能体的"模型文件",两者共享同一数据底座。
+架构以\textbf{数据资产可复现、证据可追溯、决策可复核}为主线。系统分为数据治理与分析资产层、模型与索引层、服务与接口层、智能体编排层四类能力;各层既可独立评估,也共享同一数据口径,便于持续更新与复现。
+图~\ref{fig:project-architecture} 展示底层数据到智能体交互的完整链路,图~\ref{fig:capability-map} 则把工程组件收束为评委可快速识别的能力地图。
 
 \begin{figure}[H]
 \centering
@@ -14,23 +14,23 @@
   lab/.style={font=\scriptsize\bfseries, text=SciTealDark, anchor=east}
 ]
 % layers bottom-up
-\node[lab] at (-3,5)   {① 采集};
+\node[lab] at (-3,5)   {1. 采集};
 \node[layer, text width=150mm] (raw) at (78,5) {6 公开来源(arXiv/PubMed/PMC/OpenAlex/Crossref/DOAJ)→ 原始 JSONL(\texttt{data/raw\_canonical})};
 
-\node[lab] at (-3,22)  {② 治理};
+\node[lab] at (-3,22)  {2. 治理};
 \node[layer, text width=150mm] (proc) at (78,22) {清洗规范化 · \textbf{标题优先去重} · front-matter/PDF 垃圾过滤 · NUL 清洗 → 159{,}164 篇处理后语料(\texttt{processed})};
 
-\node[lab] at (-3,42)  {③ 加工};
-\node[band, text width=70mm] (ana) at (40,42) {\textbf{分析层}\\领域分布·关键词演化·作者网络·主题模型\\{\scriptsize→《数据分析报告》(成果①)}};
-\node[band, text width=72mm] (model) at (117,42) {\textbf{模型层 / RAG}\\片段切分·嵌入向量·趋势·推荐·图谱\\{\scriptsize→ 科研智能体"模型文件"(成果②)}};
+\node[lab] at (-3,42)  {3. 加工};
+\node[band, text width=70mm] (ana) at (40,42) {\textbf{分析层}\\领域分布·关键词演化·作者网络·主题模型\\{\scriptsize ->《数据分析报告》(成果 1)}};
+\node[band, text width=72mm] (model) at (117,42) {\textbf{模型层 / RAG}\\片段切分·嵌入向量·趋势·推荐·图谱\\{\scriptsize -> 科研智能体"模型文件"(成果 2)}};
 
-\node[lab] at (-3,60)  {④ 服务};
+\node[lab] at (-3,60)  {4. 服务};
 \node[layer, text width=150mm] (pg) at (78,60) {PostgreSQL + pgvector 服务层:papers/chunks/edges · 全文索引(tsvector)· 向量索引(ivfflat)};
 
-\node[lab] at (-3,77)  {⑤ 接口};
+\node[lab] at (-3,77)  {5. 接口};
 \node[layer, text width=150mm] (api) at (78,77) {FastAPI:\ \ \texttt{/search}\ \ \texttt{/chat}\ \ \texttt{/trends}\ \ \texttt{/recommend}\ \ \texttt{/graph}\ \ \texttt{/agent/stream}};
 
-\node[lab] at (-3,94)  {⑥ 交互};
+\node[lab] at (-3,94)  {6. 交互};
 \node[band, text width=90mm] (fe) at (50,94) {\textbf{终端 AI 助手} \texttt{make tui}(自主工具编排 · SSE 流式)\\{\scriptsize Web 前端已预留 \texttt{/api/agent/stream} 接口,规划中}};
 \node[band, text width=56mm] (llm) at (125,94) {可替换大模型(vLLM/LM Studio)\\{\scriptsize OpenAI 兼容 · 仅生成层}};
 
@@ -43,19 +43,22 @@
 \draw[arrow] (api) -- (fe);
 \draw[arrow] (api) -- (llm);
 \end{tikzpicture}
-\caption{SciScope 总体架构:采集 → 治理 → 分析/模型 → 服务 → 接口 → 交互;交互层以\textbf{终端智能体}自主编排工具,大模型仅作可替换的生成层}
+\caption{SciScope 总体架构:采集、治理、分析/模型、服务、接口与交互逐层衔接;交互层以\textbf{终端智能体}自主编排工具,大模型仅作可替换的生成层。数据来源:系统实现、Makefile 产物与交付目录映射。}
+\label{fig:project-architecture}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \figasset[0.94\textwidth]{system_capability_map.png}
 \caption{SciScope 能力地图:从可复现数据资产到证据接地智能体,再到终端产品化客户端。数据来源:系统实现与交付目录映射。}
+\label{fig:capability-map}
 \end{figure}
 
-\textbf{设计原则}:① 离线可复现(每层产物由 \texttt{make} 目标生成);② 大模型可替换(生成层走 OpenAI 兼容接口);③ 证据可追溯(回答必带引用);④ 本地优先(数据与索引均在本地,支持涉密场景)。
+\textbf{设计原则}:(1) 离线可复现,每层产物由 \texttt{make} 目标生成;(2) 大模型可替换,生成层走 OpenAI 兼容接口;(3) 证据可追溯,回答必带引用;(4) 本地优先,数据与索引均在本地,支持涉密场景。
 
 \subsection{核心链路:证据接地的检索增强问答}
 问答不直接交给大模型臆测,而是\textbf{先检索证据、再据证生成},每条回答都可追溯到具体论文:
+见图~\ref{fig:grounded-rag-flow}。
 
 \begin{figure}[H]
 \centering
@@ -76,10 +79,11 @@
 \draw[arrow] (rrf) -- (ev); \draw[arrow] (ev) -- (llm);
 \end{tikzpicture}
 \caption{混合检索 + 证据接地生成链路(中文问句可跨语言命中英文文献)}
+\label{fig:grounded-rag-flow}
 \end{figure}
 
 \subsection{智能体编排层:从"固定管线"到"自主 agent"}
-上节的检索增强问答是\textbf{固定流程}。在其之上,我们构建了\textbf{自主科研智能体}:大模型不再被动接收检索结果,而是\textbf{自己规划步骤、自主选择并调用工具、观察结果后决定下一步},必要时\textbf{自我纠错重试}——这正是赛题"科研\emph{智能体}"的核心,也是本系统与"直接问大模型"的本质区别。
+上节的检索增强生成(Retrieval-Augmented Generation, RAG)问答是\textbf{固定流程}。在其之上,我们构建了\textbf{自主科研智能体}:大模型不再被动接收检索结果,而是\textbf{自己规划步骤、自主选择并调用工具、观察结果后决定下一步},必要时\textbf{自我纠错重试}。图~\ref{fig:agent-loop} 与图~\ref{fig:agent-trace} 展示了从后端编排到终端可视化的同一条事件链。
 
 \begin{figure}[H]
 \centering
@@ -91,24 +95,26 @@
   loop/.style={-{Latex[length=1.8mm]}, line width=0.6pt, draw=SciTealDark, dashed}
 ]
 \node[b, text width=18mm] (q) at (0,0) {用户问题};
-\node[bb, text width=18mm] (plan) at (28,0) {① 规划\\plan};
-\node[b, text width=20mm] (sel) at (58,0) {② 大模型\\选择工具};
-\node[b, text width=20mm] (exec) at (90,0) {③ 并行执行\\只读工具};
-\node[b, text width=18mm] (obs) at (121,0) {④ 观察\\结果};
-\node[bb, text width=20mm] (ans) at (151,0) {⑥ 据证作答\\带引用};
+\node[bb, text width=18mm] (plan) at (28,0) {1. 规划\\plan};
+\node[b, text width=20mm] (sel) at (58,0) {2. 大模型\\选择工具};
+\node[b, text width=20mm] (exec) at (90,0) {3. 并行执行\\只读工具};
+\node[b, text width=18mm] (obs) at (121,0) {4. 观察\\结果};
+\node[bb, text width=20mm] (ans) at (151,0) {6. 据证作答\\带引用};
 \draw[arrow] (q) -- (plan); \draw[arrow] (plan) -- (sel);
 \draw[arrow] (sel) -- (exec); \draw[arrow] (exec) -- (obs);
 \draw[loop] (obs) to[out=110,in=70] node[above,font=\tiny,text=SciTealDark]{需更多证据则继续} (sel);
 \draw[arrow] (obs) -- (ans);
-\draw[loop] (ans) to[out=-120,in=-60] node[below,font=\tiny,text=SciTealDark]{⑤ 反思自评:证据不足→重写检索重试} (sel);
+\draw[loop] (ans) to[out=-120,in=-60] node[below,font=\tiny,text=SciTealDark]{5. 反思自评:证据不足->重写检索重试} (sel);
 \end{tikzpicture}
 \caption{自主智能体循环:规划 → 选工具 → 并行执行 → 观察 →(循环)→ 反思自评 → 据证作答}
+\label{fig:agent-loop}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \figasset[0.94\textwidth]{agent_trace_timeline.png}
 \caption{TUI 中可见的智能体执行轨迹:plan、工具调用、证据卡、reflect 与 final 均通过 SSE 事件流呈现,便于评委复核系统不是黑盒问答。}
+\label{fig:agent-trace}
 \end{figure}
 
 \textbf{核心机制}:
@@ -120,14 +126,18 @@
 \item \textbf{服务/客户端分离}:agent 核心运行于 \texttt{/api/agent/stream}(SSE 流式),终端助手与未来 Web 前端\textbf{共用同一智能体核心}。
 \end{itemize}
 
+\begin{plainbox}
+\textbf{下一阶段产品化路线}:当前智能体编排为轻量 ReAct 式运行时,已覆盖 plan、只读工具并行、去重、reflect、retry 与 SSE 事件化输出。后续产品化将把编排层迁移为 LangGraph StateGraph,以获得标准化状态持久化、Human-in-the-Loop、节点级恢复与多 Agent 分工;现有检索、趋势、推荐、图谱和 \texttt{verify\_claim} 工具保持不变,迁移目标是升级运行时而非重写数据底座。
+\end{plainbox}
+
 \begin{center}
 \begin{tabularx}{0.96\textwidth}{>{\ttfamily}p{34mm}X}
 \toprule
 \textnormal{\textbf{工具}} & \textbf{作用} \\
 \midrule
-search\_literature & 跨语言混合检索(FTS + 向量 + RRF + 双语映射 + 重排) \\
-get\_trends & Mann-Kendall 趋势判定 + Sen's 斜率 + 下一年预测 \\
-recommend\_papers & 语义 + 关键词 + 作者 + MMR 多样性的可解释推荐 \\
+search\_literature & 跨语言混合检索(FTS + 向量 + 倒数排名融合 RRF + 双语映射 + 重排) \\
+get\_trends & Mann-Kendall(MK) 趋势判定 + Sen's 斜率 + 下一年预测 \\
+recommend\_papers & 语义 + 关键词 + 作者 + 最大边际相关(Maximum Marginal Relevance, MMR)多样性的可解释推荐 \\
 get\_paper & 按 paper\_id 取论文详情 \\
 summarize\_field & 检索代表论文作为领域综述素材 \\
 compare\_papers & 取两篇论文详情用于多维对比 \\
@@ -151,7 +161,7 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 \subsection{关键技术}
 \begin{itemize}
 \item \textbf{向量化}:本地 \texttt{multilingual-e5-base}(768 维,中英跨语言),fp16 加速、断点续传;向量入 pgvector。
-\item \textbf{混合检索与 RRF}:\texttt{tsvector} 全文索引 + \texttt{ivfflat} 余弦向量索引,两路按 $1/(k+\text{rank})$ 融合(k=60)。
+\item \textbf{混合检索与 RRF}:全文索引(\texttt{tsvector}) + 余弦向量索引(\texttt{ivfflat}),两路按 $1/(k+\text{rank})$ 融合(k=60)。
 \item \textbf{趋势模型}:逐年归一化词频上最小二乘外推 + 残差不确定带;主题模型 LDA/NMF 各 40 主题。
 \item \textbf{推荐模型}:论文级平均向量(pgvector \texttt{avg})+ 多信号加权,逐条给出可解释因子。
 \item \textbf{知识图谱}:NetworkX 中心度/社区,百万级边按中心度剪枝导出 JSON,作者 ego 图走 SQL 实时查询。
@@ -171,16 +181,16 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 \begin{plainbox}\scriptsize
 \dirtree{%
 .1 \texttt{数据要素/}.
-.2 \texttt{data\_pipeline/}\quad ① 加载 / 规范化.
+.2 \texttt{data\_pipeline/}\quad [1] 加载 / 规范化.
 .2 \texttt{src/}.
-.3 \texttt{harvest, analysis/}\quad ① 6 源采集 / 分析资产 → 数据报告.
-.3 \texttt{models/}\quad ② 嵌入·趋势·推荐·图谱·双语·重排.
-.2 \texttt{models/, output/graphs/}\quad ② 模型文件 / 知识图谱 JSON.
+.3 \texttt{harvest, analysis/}\quad [1] 6 源采集 / 分析资产 -> 数据报告.
+.3 \texttt{models/}\quad [2] 嵌入·趋势·推荐·图谱·双语·重排.
+.2 \texttt{models/, output/graphs/}\quad [2] 模型文件 / 知识图谱 JSON.
 .2 \texttt{backend/app/}.
-.3 \texttt{services/}\quad ③ 混合检索(RAG)·GraphRAG·证据接地.
-.3 \texttt{agent/}\quad ④ ReAct 工具循环(plan→执行→观察→反思,9 工具).
-.3 \texttt{api/}\quad ⑤ \texttt{/api/agent/stream}(SSE)+ search / chat / trends.
-.2 \texttt{tui/}\quad ⑥ Go·Bubble Tea 终端客户端(消费 SSE).
+.3 \texttt{services/}\quad [3] 混合检索(RAG)·GraphRAG·证据接地.
+.3 \texttt{agent/}\quad [4] ReAct 工具循环(plan->执行->观察->反思,9 工具).
+.3 \texttt{api/}\quad [5] \texttt{/api/agent/stream}(SSE)+ search / chat / trends.
+.2 \texttt{tui/}\quad [6] Go·Bubble Tea 终端客户端(消费 SSE).
 .2 \texttt{PostgreSQL + pgvector}\quad 运行时:papers·chunk\_embeddings·….
 }
 \end{plainbox}
@@ -190,12 +200,12 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 \toprule
 分层 & 职责与代码位置 \\
 \midrule
-① 数据层 & 6 源采集 → 规范化 / 标题优先去重 → 分析资产(\texttt{data\_pipeline}、\texttt{src/harvest}、\texttt{src/analysis}) \\
-② 模型层 & 片段/论文向量、趋势、推荐、图谱等\textbf{模型文件},入 PostgreSQL + pgvector(\texttt{src/models}、\texttt{models/}、\texttt{output/graphs/}) \\
-③ 服务 / RAG & 混合检索(FTS + 向量 + RRF + 双语 + 重排)+ GraphRAG + 证据接地(\texttt{backend/app/services}) \\
-④ 智能体 & ReAct 工具循环:plan → 选工具 → 并行执行 → 观察 → 反思自评 → 据证作答(\texttt{backend/app/agent}) \\
-⑤ 接口 & FastAPI;智能体经 \texttt{/api/agent/stream} 以 SSE 流式输出(\texttt{backend/app/api}) \\
-⑥ 客户端 & Go / Bubble Tea 终端(\texttt{tui/main.go}),纯 SSE 消费;Web 前端复用同一接口 \\
+1. 数据层 & 6 源采集 -> 规范化 / 标题优先去重 -> 分析资产(\texttt{data\_pipeline}、\texttt{src/harvest}、\texttt{src/analysis}) \\
+2. 模型层 & 片段/论文向量、趋势、推荐、图谱等\textbf{模型文件},入 PostgreSQL + pgvector(\texttt{src/models}、\texttt{models/}、\texttt{output/graphs/}) \\
+3. 服务 / RAG & 混合检索(FTS + 向量 + RRF + 双语 + 重排)+ GraphRAG + 证据接地(\texttt{backend/app/services}) \\
+4. 智能体 & ReAct 工具循环:plan -> 选工具 -> 并行执行 -> 观察 -> 反思自评 -> 据证作答(\texttt{backend/app/agent}) \\
+5. 接口 & FastAPI;智能体经 \texttt{/api/agent/stream} 以 SSE 流式输出(\texttt{backend/app/api}) \\
+6. 客户端 & Go / Bubble Tea 终端(\texttt{tui/main.go}),纯 SSE 消费;Web 前端复用同一接口 \\
 \bottomrule
 \end{tabularx}
 \end{center}

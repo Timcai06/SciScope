@@ -59,14 +59,14 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 下面是终端智能体 \texttt{make tui} 处理一个复合问题的\textbf{真实执行轨迹}(本地 Qwen2.5-7B),展示"规划 → 自主选工具 → 多步链式 → 据证作答":
 \begin{plainbox}
 \textbf{提问}:推荐几篇关于知识图谱的代表论文并说明趋势\par\vspace{3pt}
-\statusbadge{① plan} 自动生成计划:\texttt{search\_literature(知识图谱)} → \texttt{recommend\_papers} → \texttt{get\_trends}\par\vspace{2pt}
-\statusbadge{② 执行} 智能体依计划链式调用:
+\statusbadge{1. plan} 自动生成计划:\texttt{search\_literature(知识图谱)} → \texttt{recommend\_papers} → \texttt{get\_trends}\par\vspace{2pt}
+\statusbadge{2. 执行} 智能体依计划链式调用:
 \begin{enumerate}[itemsep=1pt]
 \item \texttt{search\_literature\{query:"知识图谱"\}} —— 跨语言命中英文文献,取得真实 \texttt{paper\_id}
 \item \texttt{recommend\_papers\{paper\_id:"W2789524213"\}} —— \textbf{把上一步得到的 id 喂入}推荐(多步链式,非固定管线)
 \item \texttt{get\_trends\{keyword:"knowledge graph"\}} —— 中文关键词\textbf{自动转英文}查趋势
 \end{enumerate}
-\statusbadge{③ 据证作答} 综合三个工具的真实结果,给出代表论文清单 + 趋势判定,并标注出处。\par\vspace{2pt}
+\statusbadge{3. 据证作答} 综合三个工具的真实结果,给出代表论文清单 + 趋势判定,并标注出处。\par\vspace{2pt}
 \textbf{关键特性}:计划对用户可见;\texttt{recommend} 用的是\textbf{检索得到的真实 id 而非臆造};相同参数调用自动去重防空转;回答后还会\textbf{自评证据是否充分},不足则改写重试。
 \end{plainbox}
 

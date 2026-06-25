@@ -22,35 +22,41 @@
 \end{plainbox}
 
 \subsection{高频与升温主题}
+本节按"频次 -> 年度热度 -> 近期动量 -> 共现结构 -> 生命周期/主题模型"的顺序阅读。图~\ref{fig:top-keywords} 到图~\ref{fig:keyword-trends} 给出主趋势,图~\ref{fig:keyword-network} 以后用于解释结构与边界。
 
 \begin{figure}[H]
   \centering
   \figasset[0.86\textwidth]{top_keywords.png}
-  \caption{2022--2026 年高频融合主题词。融合信号同时吸收显式关键词和题名摘要术语, 用于降低关键词字段滞后的影响。}
+  \caption{2022--2026 年高频融合主题词。数据来源:\texttt{data/analysis/keyword\_trends.csv};融合信号同时吸收显式关键词和题名摘要术语,用于降低关键词字段滞后的影响。}
+  \label{fig:top-keywords}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \figasset[0.94\textwidth]{keyword_evolution_heatmap.png}
-  \caption{融合主题词年度热度矩阵。每一行按自身最大值归一化; 2026 年为截至 6 月 21 日的未完整年度, 只作为早期信号。}
+  \caption{融合主题词年度热度矩阵。数据来源:\texttt{data/analysis/keyword\_trends.csv};每一行按自身最大值归一化;2026 年为截至 6 月 21 日的未完整年度,只作为早期信号。}
+  \label{fig:keyword-heatmap}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \figasset[0.9\textwidth]{keyword_momentum.png}
-  \caption{融合主题词近期动量。该指标比较 2024--2025 与 2022--2023 的相对变化, 不把 2026 年未完整数据纳入完整年度动量。}
+  \caption{融合主题词近期动量。数据来源:\texttt{data/analysis/keyword\_trends.csv};该指标比较 2024--2025 与 2022--2023 的相对变化,不把 2026 年未完整数据纳入完整年度动量。}
+  \label{fig:keyword-momentum}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \figasset[0.92\textwidth]{keyword_normalized_trends.png}
-  \caption{代表性融合主题词年度归一化文档占比。归一化后仍持续上升的主题更可能反映真实研究关注变化。}
+  \caption{代表性融合主题词年度归一化文档占比。数据来源:\texttt{data/analysis/keyword\_trends.csv};归一化后仍持续上升的主题更可能反映真实研究关注变化。}
+  \label{fig:keyword-trends}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \figasset[\textwidth]{keyword_cooccurrence_network.png}
-  \caption{关键词共现网络。节点大小表示共现加权度, 节点颜色表示关键词社区, 边宽表示同篇论文中的分数化共现强度。该图用于识别 RAG、knowledge graph、question answering、clinical search 等主题之间的结构连接。}
+  \caption{关键词共现网络。数据来源:\texttt{data/analysis/keyword\_network.*};节点大小表示共现加权度,节点颜色表示关键词社区,边宽表示同篇论文中的分数化共现强度。该图用于识别 RAG、knowledge graph、question answering、clinical search 等主题之间的结构连接。}
+  \label{fig:keyword-network}
 \end{figure}
 
 \begin{figure}[H]

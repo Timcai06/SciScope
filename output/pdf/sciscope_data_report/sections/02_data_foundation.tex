@@ -5,6 +5,7 @@
 \end{reportbox}
 
 \subsection{来源结构}
+见图~\ref{fig:data-source-records}。来源规模决定后续趋势解释的背景权重,因此跨来源比较必须同时保留来源结构。
 
 \begin{center}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{28mm}r X X}
@@ -24,12 +25,13 @@ DOAJ & 11,320 & 开放期刊文章集中 & 适合观察开放获取文献结构 
 \begin{figure}[H]
   \centering
   \figasset[0.82\textwidth]{source_records_bar.png}
-  \caption{六个公开来源的标准化分析记录规模。OpenAlex 规模最大, DOAJ 规模最小, 后续跨来源比较需注意来源结构差异。}
+  \caption{六个公开来源的标准化分析记录规模。数据来源:\texttt{data/analysis/source\_quality\_report.csv};统计窗口为全分析语料 168,447 条。OpenAlex 规模最大, DOAJ 规模最小, 后续跨来源比较需注意来源结构差异。}
+  \label{fig:data-source-records}
 \end{figure}
 
 \subsection{字段完整度}
 
-标题、作者和年份字段整体完整度较高, 是分布统计和作者网络分析的主要基础。摘要覆盖率为 83.22\%, 可以支撑摘要级主题和趋势分析。正文片段覆盖率为 8.99\%, 适合做高质量证据补充, 但暂不适合把全文级结论推广到全部来源。
+标题、作者和年份字段整体完整度较高, 是分布统计和作者网络分析的主要基础。摘要覆盖率为 83.22\%, 可以支撑摘要级主题和趋势分析。正文片段覆盖率为 8.99\%, 适合做高质量证据补充, 但暂不适合把全文级结论推广到全部来源。见图~\ref{fig:data-field-readiness}。
 
 \begin{center}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{28mm}rrrrr}
@@ -49,7 +51,8 @@ DOAJ & 11,319 & 11,155 & 11,310 & 11,310 & 121 \\
 \begin{figure}[H]
   \centering
   \figasset[0.92\textwidth]{source_quality_matrix.png}
-  \caption{各来源关键字段完整度矩阵。颜色越深表示覆盖越高; Crossref 的摘要和关键词覆盖相对较弱, PMC 的正文片段优势明显。}
+  \caption{各来源关键字段完整度矩阵。数据来源:\texttt{data/analysis/source\_quality\_report.csv};颜色越深表示覆盖越高。Crossref 的摘要和关键词覆盖相对较弱, PMC 的正文片段优势明显。}
+  \label{fig:data-field-readiness}
 \end{figure}
 
 \subsection{数据质量初判}

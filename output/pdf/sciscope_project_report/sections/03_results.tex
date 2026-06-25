@@ -1,7 +1,7 @@
 \section{结果分析(系统效果与效率)}
 
 \begin{plainbox}
-\textbf{说明}:本章聚焦\textbf{系统/算法的效果与效率测试}。关于语料本身的分布、关键词演化、作者网络与主题分析,详见同级交付物《SciScope 数据分析报告》,此处不重复。
+\textbf{说明}:本章给出三组可复核证据:检索有效性(recall/MRR 与延迟)、跨语言相关性(relevance@5)与工程稳健性(自动化测试与资产口径)。指标以脚本生成的评测报告和运行时库表为准;若与具体业务场景不一致,应以场景化验证补充,避免确定性外推。
 \end{plainbox}
 
 \begin{reportbox}{核心指标一览}
@@ -12,7 +12,7 @@
 跨语言相关性 & 中文主题查询 relevance@5=\textbf{1.0}(15/15),优化前为 0.667。 \\
 趋势预测 & 2022--2024 拟合预测 2025,关键词活跃度排序 Pearson=\textbf{0.9756}。 \\
 论文推荐 & top-5 平均语义相似 \textbf{0.8918},同领域率 0.6733,共享关键词率 0.6013。 \\
-工程质量 & 后端自动化测试 \textbf{98 项全部通过};运行时库表含 367{,}773 条片段向量和 159{,}135 条论文级向量。 \\
+工程质量 & 后端测试基线按当前验收记录为 \textbf{98 项};运行时库表含 367{,}773 条片段向量和 159{,}135 条论文级向量。 \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -21,14 +21,18 @@
 \begin{figure}[H]
 \centering
 \figasset[0.94\textwidth]{eval_metric_dashboard.png}
-\caption{核心评测指标图形化总览。数据来源:\texttt{output/eval/eval\_report.json};中文相关性为固定主题查询评测口径,自动化测试按 98 项后端测试通过率展示。}
+\caption{核心评测指标图形化总览。数据来源:\texttt{output/eval/eval\_report.json} 与当前验收记录;中文相关性为固定主题查询评测口径,测试项为后端测试基线。}
+\label{fig:eval-dashboard}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \figasset[0.94\textwidth]{asset_funnel.png}
 \caption{数据到智能体的资产漏斗。数据来源:\texttt{data/analysis/summary.json}、\texttt{data/processed/*.summary.json} 与 \texttt{output/eval/eval\_report.json};图中为文件资产口径,运行时数据库/向量表口径在本章表格中另列。}
+\label{fig:asset-funnel}
 \end{figure}
+
+图~\ref{fig:eval-dashboard} 将核心效果指标集中展示,图~\ref{fig:asset-funnel} 则说明这些指标背后的文件资产链路。二者分别对应"系统效果"与"可复现资产"两个评审入口。
 
 \subsection{检索质量与效率(核心测试)}
 采用\textbf{自检索协议}(以论文自身标题/关键词为查询,检验能否检回该文)评测混合检索。评测结果固化于 \texttt{output/eval/eval\_report.json},运行时库表当前包含 159{,}187 篇论文:
@@ -87,9 +91,10 @@
   \node[anchor=north,text width=26mm,align=center] at (\xpos+3.4,-1.5) {\f};
   \node[anchor=south,font=\tiny] at (\xpos+6.1,\ha) {\after};
 }
-\node[anchor=west,font=\tiny] at (104,38) {□ 修复前\quad ■ 修复后};
+\node[anchor=west,font=\tiny] at (104,38) {空心:修复前\quad 实心:修复后};
 \end{tikzpicture}
-\caption{语义检索领域覆盖:修复前(空心)vs 修复后(实心)。计算机科学从 87 跃升至 58{,}038,偏科消除}
+\caption{语义检索领域覆盖:修复前(空心)vs 修复后(实心)。计算机科学从 87 跃升至 58{,}038,偏科消除。数据来源:论文级向量覆盖统计与全量标题摘要嵌入修复记录。}
+\label{fig:semantic-coverage-ablation}
 \end{figure}
 
 修复后语义检索与推荐覆盖运行时全领域论文库,中文问句可跨语言命中英文文献。
@@ -99,7 +104,10 @@
 \centering
 \figasset[0.90\textwidth]{claim_grounding_flow.png}
 \caption{\texttt{verify\_claim} 论断接地流程:中文论断经跨语言检索连接到英文证据,再用语义相似度给出支持等级与出处;该图展示真实功能边界,不是逻辑证明器。}
+\label{fig:claim-grounding-flow}
 \end{figure}
+
+图~\ref{fig:claim-grounding-flow} 对应差异化矩阵中的"据实接地/可验证"能力:系统给出支持等级与出处,但不把语义相似度包装为形式逻辑证明。
 
 \begin{center}
 \begin{tabularx}{0.96\textwidth}{>{\bfseries}p{34mm}XXXX}
@@ -119,7 +127,7 @@
 \subsection{趋势预测回测与推荐评估(评测证据包)}
 完整评测可由 \texttt{make eval-all} 复现,结果固化于 \texttt{output/eval/eval\_report.\{json,md\}}。
 
-\textbf{趋势预测回测}(拟合 2022--2024 → 预测 2025,1{,}998 个关键词):预测与真实的 Pearson 相关 \textbf{0.9756}(能准确\textbf{排序}哪些关键词更活跃);点预测 MAE 与 naive 持平基线相当(归一化词频年际噪声大、近均值回归),故采用阻尼外推并附不确定带,谨慎解读。模型价值在排序与多年动量/burst。
+\textbf{趋势预测回测}(拟合 2022--2024 → 预测 2025,1{,}998 个关键词):预测与真实的 Pearson 相关 \textbf{0.9756},说明模型能较好排序哪些关键词更活跃;但方向性与点预测不应被解释为确定预测,归一化词频存在年际噪声和近均值回归。本报告仅把趋势模型作为排序、动量和 burst 的候选信号。
 
 \textbf{推荐离线评估}(150 篇种子,top-5):同领域率 \textbf{0.6733}、共享关键词率 \textbf{0.6013}、平均语义相似 \textbf{0.8918}——远高于随机基线,且每条附可解释因子。
 
@@ -130,7 +138,7 @@
 \textbf{治理项} & \textbf{处理} & \textbf{效果} \\
 \midrule
 标题优先去重 + front-matter 剔除 & 分析层与处理后语料分层治理 & 残留长标题重复组归零 \\
-PDF 垃圾正文过滤 & 清 83 篇 / 46 片段 & 杜绝回答吐 PDF 乱码 \\
+PDF 垃圾正文过滤 & 清 83 篇 / 46 片段 & 显著减少回答混入 PDF 乱码的风险 \\
 关键词噪声过滤 & arXiv 码/泛标签/期刊名 & 趋势 top 回归真实主题 \\
 摘要覆盖治理 & 140{,}183 篇有摘要 & 摘要覆盖率 83.22\%,支撑主题和检索解释 \\
 全文片段治理 & 15{,}144 篇有正文字段 & 正文覆盖率 8.99\%,用于深读补充证据 \\
@@ -149,7 +157,7 @@ PDF 垃圾正文过滤 & 清 83 篇 / 46 片段 & 杜绝回答吐 PDF 乱码 \\
 论文级向量 \texttt{paper\_embeddings} & 159{,}135 \\
 主题模型(LDA + NMF) & 40 主题 / 模型 \\
 知识图谱(作者/关键词/主题) & 前端友好 JSON \\
-后端自动化测试 & 98 项全部通过 \\
+后端自动化测试 & 当前验收基线 98 项;最终以 \texttt{make test} 实测输出为准 \\
 \bottomrule
 \end{tabularx}
 \end{center}
