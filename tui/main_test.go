@@ -490,3 +490,34 @@ func TestSplashShowsRecentSessionSummaries(t *testing.T) {
 		}
 	}
 }
+
+func TestParseCLIOptions(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want cliOptions
+	}{
+		{name: "demo", args: []string{"--demo"}, want: cliOptions{Demo: true}},
+		{name: "version", args: []string{"--version"}, want: cliOptions{Version: true}},
+		{name: "short version", args: []string{"-v"}, want: cliOptions{Version: true}},
+		{name: "help", args: []string{"--help"}, want: cliOptions{Help: true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseCLIOptions(tt.args)
+			if err != nil {
+				t.Fatalf("parseCLIOptions returned error: %v", err)
+			}
+			if got.Demo != tt.want.Demo || got.Version != tt.want.Version || got.Help != tt.want.Help {
+				t.Fatalf("got %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestVersionStringIncludesAppName(t *testing.T) {
+	got := versionString("0.1.0")
+	if !strings.Contains(got, "sciscope-tui 0.1.0") {
+		t.Fatalf("unexpected version string: %s", got)
+	}
+}

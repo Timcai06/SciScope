@@ -71,6 +71,7 @@ VLLM_VENV ?= $(HOME)/.venv-vllm-metal
 VLLM_MAX_MODEL_LEN ?= 8192
 VLLM_EXTRA_ARGS ?=
 LLM_LOCAL_DIR ?= models/llm_local/Qwen2.5-7B-Instruct-4bit
+TUI_VERSION ?= dev
 
 export SCISCOPE_APP_NAME ?= SciScope
 export SCISCOPE_ENV ?= local
@@ -311,11 +312,11 @@ tui:
 
 # Offline golden demo: no backend, LLM, PostgreSQL, or network required.
 tui-demo:
-	cd tui && SCISCOPE_TUI_DEMO=1 go run .
+	cd tui && go run . --demo
 
 # Build the Go client to a single static binary (tui/sciscope-tui).
 tui-build:
-	cd tui && go build -o sciscope-tui .
+	cd tui && go build -ldflags "-X main.version=$(TUI_VERSION)" -o sciscope-tui .
 
 # Rebuild only the topic-model assets at finer granularity (default 40 topics).
 topic-model:

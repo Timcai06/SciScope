@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -27,6 +28,14 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 )
+
+var version = "dev"
+
+type cliOptions struct {
+	Demo    bool
+	Version bool
+	Help    bool
+}
 
 // ---- palette (cyan research console, à la Claude Code structure) ----
 var (
@@ -205,6 +214,40 @@ func backendURL() string {
 func demoMode() bool {
 	v := strings.ToLower(strings.TrimSpace(os.Getenv("SCISCOPE_TUI_DEMO")))
 	return v == "1" || v == "true" || v == "yes"
+}
+
+func parseCLIOptions(args []string) (cliOptions, error) {
+	fs := flag.NewFlagSet("sciscope-tui", flag.ContinueOnError)
+	fs.SetOutput(new(bytes.Buffer))
+	var opts cliOptions
+	fs.BoolVar(&opts.Demo, "demo", false, "play the offline SciScope golden demo")
+	fs.BoolVar(&opts.Version, "version", false, "print version")
+	fs.BoolVar(&opts.Version, "v", false, "print version")
+	fs.BoolVar(&opts.Help, "help", false, "print help")
+	fs.BoolVar(&opts.Help, "h", false, "print help")
+	if err := fs.Parse(args); err != nil {
+		return opts, err
+	}
+	return opts, nil
+}
+
+func versionString(v string) string {
+	return "sciscope-tui " + v
+}
+
+func helpString() string {
+	return strings.Join([]string{
+		"sciscope-tui - SciScope research agent terminal",
+		"",
+		"Usage:",
+		"  sciscope-tui          start the TUI",
+		"  sciscope-tui --demo   play the offline golden demo",
+		"  sciscope-tui --version",
+		"",
+		"Environment:",
+		"  SCISCOPE_BACKEND              backend URL, default http://127.0.0.1:8000",
+		"  SCISCOPE_TUI_DEMO_DELAY_MS    demo playback delay",
+	}, "\n")
 }
 
 func demoDelay() time.Duration {
@@ -1457,7 +1500,25 @@ func (m model) View() string {
 }
 
 func main() {
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	opts, err := parseCLIOptions(os.Args[1:])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, helpString())
+		os.Exit(2)
+	}
+	if opts.Help {
+		fmt.Println(helpString())
+		return
+	}
+	if opts.Version {
+		fmt.Println(versionString(version))
+		return
+	}
+	m := initialModel()
+	if opts.Demo {
+		m.demo = true
+	}
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
