@@ -12,6 +12,7 @@ import json
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
+from backend.app.agent.events import event_parts
 from backend.app.agent.runtime import run_agent, stream_agent
 from backend.app.models.schemas import AgentRequest
 
@@ -37,8 +38,12 @@ def agent_stream(request: AgentRequest) -> StreamingResponse:
 
     def events():
         try:
-            for kind, payload in stream_agent(request.question, history=history):
-                yield f"data: {json.dumps({'type': kind, 'payload': payload}, ensure_ascii=False)}\n\n"
+            for event in stream_agent(request.question, history=history, session_id=request.session_id):
+                kind, payload, meta = event_parts(event)
+                frame = {"type": kind, "payload": payload}
+                if meta:
+                    frame["meta"] = meta
+                yield f"data: {json.dumps(frame, ensure_ascii=False)}\n\n"
         except Exception as exc:  # noqa: BLE001
             yield f"data: {json.dumps({'type': 'error', 'payload': str(exc)}, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
@@ -58,4 +63,4 @@ def agent(request: AgentRequest) -> dict:
     aggregate payload rather than incremental SSE frames.
     """
     history = [{"role": t.role, "content": t.content} for t in request.history]
-    return run_agent(request.question, history=history)
+    return run_agent(request.question, history=history, session_id=request.session_id)

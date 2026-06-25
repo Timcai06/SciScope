@@ -52,6 +52,12 @@ def test_agent_request_rejects_whitespace_only_question():
         AgentRequest(question="   ")
 
 
+def test_agent_request_strips_session_id():
+    request = AgentRequest(question="RAG", session_id="  tui-session  ")
+
+    assert request.session_id == "tui-session"
+
+
 def test_dashboard_response_requires_explicit_year_range_shape():
     payload = {
         "total_papers": 1,

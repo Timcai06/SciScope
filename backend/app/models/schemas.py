@@ -26,6 +26,7 @@ class AgentRequest(BaseModel):
 
     question: str = Field(min_length=1)
     history: list[ChatTurn] = Field(default_factory=list)
+    session_id: str | None = Field(default=None, min_length=1)
 
     @field_validator("question")
     @classmethod
@@ -33,6 +34,16 @@ class AgentRequest(BaseModel):
         stripped = value.strip()
         if not stripped:
             raise ValueError("question must not be empty")
+        return stripped
+
+    @field_validator("session_id")
+    @classmethod
+    def strip_session_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("session_id must not be empty")
         return stripped
 
 

@@ -138,13 +138,24 @@ type turn struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
+type eventMeta struct {
+	Runtime   string `json:"runtime"`
+	Node      string `json:"node"`
+	SessionID string `json:"session_id"`
+	ElapsedMS int    `json:"elapsed_ms"`
+}
 type planMsg []string
 type textMsg string
 type toolCallMsg struct {
 	name string
 	args map[string]any
+	meta eventMeta
 }
-type toolResultMsg struct{ name, result string }
+type toolResultMsg struct {
+	name   string
+	result string
+	meta   eventMeta
+}
 type reflectMsg string
 type finalMsg string
 type errMsg string
@@ -424,8 +435,8 @@ func playDemo(sub chan tea.Msg) {
 //	error     -> recoverable error text
 //
 // Scanner keeps only lines starting with "data:" and stops at "[DONE]".
-func stream(ctx context.Context, backend, q string, history []turn, sub chan tea.Msg) {
-	body, _ := json.Marshal(map[string]any{"question": q, "history": history})
+func stream(ctx context.Context, backend, q string, history []turn, sessionID string, sub chan tea.Msg) {
+	body, _ := json.Marshal(map[string]any{"question": q, "history": history, "session_id": sessionID})
 	req, _ := http.NewRequestWithContext(ctx, "POST", backend+"/api/agent/stream", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
@@ -456,6 +467,7 @@ func stream(ctx context.Context, backend, q string, history []turn, sub chan tea
 		var ev struct {
 			Type    string          `json:"type"`
 			Payload json.RawMessage `json:"payload"`
+			Meta    eventMeta       `json:"meta"`
 		}
 		if json.Unmarshal([]byte(data), &ev) != nil {
 			continue
@@ -475,14 +487,14 @@ func stream(ctx context.Context, backend, q string, history []turn, sub chan tea
 				Args map[string]any `json:"args"`
 			}
 			json.Unmarshal(ev.Payload, &t)
-			sub <- toolCallMsg{t.Name, t.Args}
+			sub <- toolCallMsg{name: t.Name, args: t.Args, meta: ev.Meta}
 		case "tool_result":
 			var t struct {
 				Name   string `json:"name"`
 				Result string `json:"result"`
 			}
 			json.Unmarshal(ev.Payload, &t)
-			sub <- toolResultMsg{t.Name, t.Result}
+			sub <- toolResultMsg{name: t.Name, result: t.Result, meta: ev.Meta}
 		case "reflect":
 			var s string
 			json.Unmarshal(ev.Payload, &s)
@@ -523,6 +535,7 @@ type model struct {
 	recentSessions []sessionFile
 	lastExport     string
 	lastQuestion   string
+	sessionID      string
 	sub            chan tea.Msg
 	cancel         context.CancelFunc
 	menuIdx        int
@@ -543,7 +556,11 @@ func initialModel() model {
 		FPS:    time.Second / 8,
 	}
 	sp.Style = stAccent
-	return model{ti: ti, spin: sp, sub: make(chan tea.Msg, 64), demo: demoMode()}
+	return model{ti: ti, spin: sp, sub: make(chan tea.Msg, 64), demo: demoMode(), sessionID: newSessionID()}
+}
+
+func newSessionID() string {
+	return "tui-" + time.Now().UTC().Format("20060102T150405.000000000")
 }
 
 func (m model) Init() tea.Cmd {
@@ -574,6 +591,17 @@ func (m *model) addTimeline(ev timelineEvent) {
 		ev.Label = toolPlainLabel(ev.Tool)
 	}
 	m.timeline = append(m.timeline, ev)
+}
+
+func metaDetail(meta eventMeta) string {
+	parts := []string{}
+	if meta.Node != "" {
+		parts = append(parts, "node "+meta.Node)
+	}
+	if meta.ElapsedMS > 0 {
+		parts = append(parts, fmt.Sprintf("%dms", meta.ElapsedMS))
+	}
+	return strings.Join(parts, " · ")
 }
 
 func (m *model) loadRecentSessions() {
@@ -1351,7 +1379,7 @@ func (m *model) startQuestion(v string, retry bool) tea.Cmd {
 	m.cancel = cancel
 	q := v
 	return tea.Batch(
-		func() tea.Msg { go stream(ctx, backendURL(), q, hist, m.sub); return nil },
+		func() tea.Msg { go stream(ctx, backendURL(), q, hist, m.sessionID, m.sub); return nil },
 		listen(m.sub),
 		m.spin.Tick,
 	)
@@ -1471,6 +1499,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.record("tool_call", msg.name, toolLabel(msg.name))
 		}
+		if meta := metaDetail(msg.meta); meta != "" {
+			if detail != "" {
+				detail += " · " + meta
+			} else {
+				detail = meta
+			}
+		}
 		m.addTimeline(timelineEvent{Kind: "tool_call", Tool: msg.name, Label: toolPlainLabel(msg.name), Detail: detail})
 		body := []string{}
 		if detail != "" {
@@ -1489,7 +1524,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.toolStart != nil {
 			elapsed = time.Since(m.toolStart[msg.name])
 		}
-		m.addTimeline(timelineEvent{Kind: "tool_result", Tool: msg.name, Label: toolResultLabel(msg.name, msg.result), Duration: elapsed})
+		m.addTimeline(timelineEvent{Kind: "tool_result", Tool: msg.name, Label: toolResultLabel(msg.name, msg.result), Detail: metaDetail(msg.meta), Duration: elapsed})
 		m.record("tool_result", msg.name, summarizeToolResultMarkdown(msg.name, msg.result))
 		m.appendBlock(renderToolResult(msg.name, msg.result, m.vp.Width, elapsed))
 		return m, listen(m.sub)

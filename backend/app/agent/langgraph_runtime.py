@@ -12,6 +12,8 @@ existing SSE contract consumed by the TUI and future web clients.
 from __future__ import annotations
 
 import json
+import time
+from uuid import uuid4
 from functools import lru_cache
 from typing import Any, Callable, Iterator, Literal, TypedDict
 
@@ -31,6 +33,7 @@ GraphRoute = Literal["plan", "llm_step", "execute_tools", "reflect", "force_synt
 
 class AgentState(TypedDict, total=False):
     question: str
+    session_id: str | None
     history: list[dict]
     model: str | None
     messages: list[dict]
@@ -43,31 +46,49 @@ class AgentState(TypedDict, total=False):
     runtime: str
     route: GraphRoute
     emit: list[AgentEvent]
+    node_meta: dict[str, Any]
 
 
 def _load_langgraph():
     try:
         from langgraph.graph import END, StateGraph
+        from langgraph.checkpoint.memory import MemorySaver
     except ImportError as exc:  # pragma: no cover - exercised through runtime error path
         raise RuntimeError(
             "LangGraph runtime requested but langgraph is not installed. "
             "Run `make install-backend` or `python -m pip install langgraph`."
         ) from exc
-    return StateGraph, END
+    return StateGraph, END, MemorySaver
+
+
+def _finish_node(node: str, started_at: float, state: AgentState, updates: AgentState) -> AgentState:
+    meta = {
+        "runtime": "langgraph",
+        "node": node,
+        "elapsed_ms": int((time.perf_counter() - started_at) * 1000),
+    }
+    session_id = state.get("session_id")
+    if session_id:
+        meta["session_id"] = session_id
+    updates["node_meta"] = meta
+    if updates.get("emit"):
+        updates["emit"] = [(kind, payload, meta) for kind, payload, *_ in updates["emit"]]
+    return updates
 
 
 def _prepare(state: AgentState) -> AgentState:
+    started_at = time.perf_counter()
     model = state.get("model") or detect_model()
     if not model:
-        return {
+        return _finish_node("prepare", started_at, state, {
             "runtime": "langgraph",
             "route": "end",
             "emit": [("final", "本地大模型未运行(:8001)。请先 `make llm`。")],
-        }
+        })
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(state.get("history") or [])
     messages.append({"role": "user", "content": state["question"]})
-    return {
+    return _finish_node("prepare", started_at, state, {
         "model": model,
         "messages": messages,
         "executed": {},
@@ -77,19 +98,20 @@ def _prepare(state: AgentState) -> AgentState:
         "runtime": "langgraph",
         "route": "plan",
         "emit": [],
-    }
+    })
 
 
 def _plan(state: AgentState) -> AgentState:
+    started_at = time.perf_counter()
     question = state["question"]
     model = state["model"]
     messages = list(state.get("messages") or [])
     if not model or not needs_plan(question):
-        return {"messages": messages, "route": "llm_step", "emit": []}
+        return _finish_node("plan", started_at, state, {"messages": messages, "route": "llm_step", "emit": []})
 
     plan = make_plan(question, model)
     if not plan:
-        return {"messages": messages, "route": "llm_step", "emit": []}
+        return _finish_node("plan", started_at, state, {"messages": messages, "route": "llm_step", "emit": []})
 
     messages.append(
         {
@@ -98,10 +120,11 @@ def _plan(state: AgentState) -> AgentState:
         }
     )
     messages.append({"role": "user", "content": "请按上述计划逐步调用工具完成,最后用中文综合作答。"})
-    return {"messages": messages, "route": "llm_step", "emit": [("plan", plan)]}
+    return _finish_node("plan", started_at, state, {"messages": messages, "route": "llm_step", "emit": [("plan", plan)]})
 
 
 def _llm_step(state: AgentState) -> AgentState:
+    started_at = time.perf_counter()
     messages = list(state.get("messages") or [])
     compact(messages)
     text_events: list[AgentEvent] = []
@@ -124,7 +147,7 @@ def _llm_step(state: AgentState) -> AgentState:
     else:
         next_state["tools_total"] = int(state.get("tools_total") or 0)
         next_state["route"] = "reflect"
-    return next_state
+    return _finish_node("llm_step", started_at, state, next_state)
 
 
 def _tool_call_event(tool_call: dict) -> AgentEvent:
@@ -136,6 +159,7 @@ def _tool_call_event(tool_call: dict) -> AgentEvent:
 
 
 def _execute_tools(state: AgentState) -> AgentState:
+    started_at = time.perf_counter()
     messages = list(state.get("messages") or [])
     tool_calls = list(state.get("tool_calls") or [])
     executed = dict(state.get("executed") or {})
@@ -147,10 +171,11 @@ def _execute_tools(state: AgentState) -> AgentState:
         messages.append({"role": "tool", "tool_call_id": tool_call.get("id", name), "content": result})
 
     route: GraphRoute = "force_synthesis" if int(state.get("step") or 0) >= MAX_STEPS else "llm_step"
-    return {"messages": messages, "executed": executed, "tool_calls": [], "route": route, "emit": emit}
+    return _finish_node("execute_tools", started_at, state, {"messages": messages, "executed": executed, "tool_calls": [], "route": route, "emit": emit})
 
 
 def _reflect(state: AgentState) -> AgentState:
+    started_at = time.perf_counter()
     retries = int(state.get("retries") or 0)
     answer = state.get("last_answer") or ""
     reason = None
@@ -160,7 +185,7 @@ def _reflect(state: AgentState) -> AgentState:
             reason = self_critique(state["question"], answer, state["model"])
 
     if not reason:
-        return {"route": "end", "emit": [("final", answer)]}
+        return _finish_node("reflect", started_at, state, {"route": "end", "emit": [("final", answer)]})
 
     messages = list(state.get("messages") or [])
     messages.append({"role": "assistant", "content": answer})
@@ -173,15 +198,16 @@ def _reflect(state: AgentState) -> AgentState:
             ),
         }
     )
-    return {
+    return _finish_node("reflect", started_at, state, {
         "messages": messages,
         "retries": retries + 1,
         "route": "llm_step",
         "emit": [("reflect", reason)],
-    }
+    })
 
 
 def _force_synthesis(state: AgentState) -> AgentState:
+    started_at = time.perf_counter()
     messages = list(state.get("messages") or [])
     messages.append({"role": "user", "content": "请基于以上工具结果,用中文给出最终回答。"})
     text_events: list[AgentEvent] = []
@@ -189,7 +215,7 @@ def _force_synthesis(state: AgentState) -> AgentState:
         stream_chat(messages, state["model"], None),
         lambda kind, payload: text_events.append((kind, payload)),
     )
-    return {"messages": messages, "last_answer": full_text, "route": "end", "emit": [*text_events, ("final", full_text)]}
+    return _finish_node("force_synthesis", started_at, state, {"messages": messages, "last_answer": full_text, "route": "end", "emit": [*text_events, ("final", full_text)]})
 
 
 def _route(state: AgentState) -> GraphRoute:
@@ -198,7 +224,7 @@ def _route(state: AgentState) -> GraphRoute:
 
 @lru_cache(maxsize=1)
 def _build_graph():
-    StateGraph, END = _load_langgraph()
+    StateGraph, END, MemorySaver = _load_langgraph()
     graph = StateGraph(AgentState)
     graph.add_node("prepare", _prepare)
     graph.add_node("plan", _plan)
@@ -221,7 +247,7 @@ def _build_graph():
     )
     graph.add_conditional_edges("reflect", _route, {"llm_step": "llm_step", "end": END})
     graph.add_edge("force_synthesis", END)
-    return graph.compile(name="sciscope-agent")
+    return graph.compile(checkpointer=MemorySaver(), name="sciscope-agent")
 
 
 def _events_from_update(update: dict[str, Any]) -> list[AgentEvent]:
@@ -236,10 +262,13 @@ def stream_agent(
     question: str,
     history: list[dict] | None = None,
     model: str | None = None,
+    session_id: str | None = None,
 ) -> Iterator[AgentEvent]:
     """Run one agent turn through the LangGraph StateGraph and stream node events."""
-    inputs = {"question": question, "history": history or [], "model": model}
-    for update in _build_graph().stream(inputs, stream_mode="updates"):
+    thread_id = session_id or f"sciscope-turn-{uuid4().hex}"
+    inputs = {"question": question, "history": history or [], "model": model, "session_id": session_id}
+    config = {"configurable": {"thread_id": thread_id}}
+    for update in _build_graph().stream(inputs, config=config, stream_mode="updates"):
         if isinstance(update, dict):
             yield from _events_from_update(update)
 
@@ -249,13 +278,17 @@ def run_agent(
     history: list[dict] | None = None,
     model: str | None = None,
     on_event: Callable[[str, dict], None] | None = None,
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     """Aggregate the LangGraph event stream into the existing response shape."""
-    events = list(stream_agent(question, history=history, model=model))
-    for kind, payload in events:
+    events = list(stream_agent(question, history=history, model=model, session_id=session_id))
+    for event in events:
+        kind, payload, *_ = event
         if kind in {"tool_call", "tool_result"} and on_event and isinstance(payload, dict):
             on_event(kind, payload)
     response = summarize_events(events)
     response["model"] = model or detect_model()
     response["runtime"] = "langgraph"
+    if session_id:
+        response["session_id"] = session_id
     return response

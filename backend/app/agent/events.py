@@ -12,7 +12,17 @@ from typing import Any, Literal, TypeAlias
 
 
 AgentEventType: TypeAlias = Literal["plan", "text", "tool_call", "tool_result", "reflect", "final"]
-AgentEvent: TypeAlias = tuple[AgentEventType, Any]
+AgentEventMeta: TypeAlias = dict[str, Any]
+AgentEvent: TypeAlias = tuple[AgentEventType, Any] | tuple[AgentEventType, Any, AgentEventMeta]
+
+
+def event_parts(event: AgentEvent) -> tuple[AgentEventType, Any, AgentEventMeta]:
+    """Normalize 2-tuple and 3-tuple agent events."""
+    if len(event) == 3:
+        kind, payload, meta = event
+        return kind, payload, meta
+    kind, payload = event
+    return kind, payload, {}
 
 
 def summarize_events(events: list[AgentEvent]) -> dict[str, Any]:
@@ -20,7 +30,8 @@ def summarize_events(events: list[AgentEvent]) -> dict[str, Any]:
     answer = ""
     tools_used: list[dict[str, Any]] = []
     steps = 0
-    for kind, payload in events:
+    for event in events:
+        kind, payload, _ = event_parts(event)
         if kind == "final":
             answer = str(payload)
         elif kind == "tool_call" and isinstance(payload, dict):

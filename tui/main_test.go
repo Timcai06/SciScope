@@ -47,6 +47,14 @@ func TestFormatHTTPErrorIncludesValidationDetails(t *testing.T) {
 	}
 }
 
+func TestMetaDetailFormatsLangGraphNodeTiming(t *testing.T) {
+	got := metaDetail(eventMeta{Runtime: "langgraph", Node: "execute_tools", ElapsedMS: 42})
+
+	if got != "node execute_tools · 42ms" {
+		t.Fatalf("unexpected meta detail: %q", got)
+	}
+}
+
 func TestRenderToolResultVerifyClaimAsGroundingCards(t *testing.T) {
 	result := `{
 		"论断":"检索增强生成能够降低幻觉",

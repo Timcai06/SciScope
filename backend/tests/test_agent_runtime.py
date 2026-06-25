@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from backend.app.agent import langgraph_runtime, runtime
+from backend.app.agent.events import event_parts
 
 
 @pytest.fixture(autouse=True)
@@ -15,7 +16,7 @@ def _clear_runtime_env(monkeypatch):
 def test_default_runtime_is_langgraph(monkeypatch):
     class _Runtime:
         @staticmethod
-        def stream_agent(question, history=None, model=None):
+        def stream_agent(question, history=None, model=None, session_id=None):
             return iter([("final", f"graph:{question}")])
 
     monkeypatch.setattr(
@@ -70,20 +71,26 @@ def test_langgraph_runtime_wraps_legacy_events(monkeypatch):
 
     monkeypatch.setattr(langgraph_runtime, "stream_chat", fake_stream_chat)
 
-    events = list(runtime.stream_agent("rag"))
-    result = runtime.run_agent("rag")
+    events = list(runtime.stream_agent("rag", session_id="s-1"))
+    result = runtime.run_agent("rag", session_id="s-1")
+    parts = [event_parts(event) for event in events]
 
     assert runtime.selected_runtime_name() == "langgraph"
-    assert events[:3] == [
+    assert [(kind, payload) for kind, payload, _ in parts[:3]] == [
         ("plan", ["search evidence"]),
         ("tool_call", {"name": "search_literature", "args": {"query": "rag"}}),
         ("tool_result", {"name": "search_literature", "result": "ok"}),
     ]
-    assert events[-1] == ("final", "grounded answer")
+    assert parts[1][2]["runtime"] == "langgraph"
+    assert parts[1][2]["node"] == "execute_tools"
+    assert parts[1][2]["session_id"] == "s-1"
+    assert isinstance(parts[1][2]["elapsed_ms"], int)
+    assert (parts[-1][0], parts[-1][1]) == ("final", "grounded answer")
     assert result["answer"] == "grounded answer"
     assert result["steps"] == 1
     assert result["tools_used"] == [{"name": "search_literature", "args": {"query": "rag"}}]
     assert result["runtime"] == "langgraph"
+    assert result["session_id"] == "s-1"
 
 
 def test_langgraph_runtime_reflects_and_retries_weak_answer(monkeypatch):
@@ -101,8 +108,12 @@ def test_langgraph_runtime_reflects_and_retries_weak_answer(monkeypatch):
 
     events = list(runtime.stream_agent("请分析RAG研究现状"))
 
-    assert ("reflect", "你没有调用任何工具就回答了。请先用 search_literature 等工具检索证据,再据实回答。") in events
-    assert events[-1] == ("final", "改进后的证据回答")
+    parts = [event_parts(event) for event in events]
+
+    assert ("reflect", "你没有调用任何工具就回答了。请先用 search_literature 等工具检索证据,再据实回答。") in [
+        (kind, payload) for kind, payload, _ in parts
+    ]
+    assert (parts[-1][0], parts[-1][1]) == ("final", "改进后的证据回答")
 
 
 def test_unknown_runtime_fails_fast(monkeypatch):
