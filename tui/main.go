@@ -2065,7 +2065,8 @@ func (m model) renderAnswer() string {
 			body = strings.Trim(out, "\n")
 		}
 	}
-	out := stBullet.Render("⏺ ") + body
+	header := stBullet.Render("⏺ ") + stAccent.Render("研究结论")
+	out := header + "\n" + body
 	if len(m.used) > 0 {
 		seen := map[string]bool{}
 		labels := []string{}
@@ -2075,7 +2076,7 @@ func (m model) renderAnswer() string {
 				labels = append(labels, toolLabel(n))
 			}
 		}
-		out += "\n" + stFaint.Render("  "+strings.Join(labels, "  ")+" · /timeline 查看过程")
+		out += "\n" + stFaint.Render("  证据工具: "+strings.Join(labels, "  ")+" · /timeline 查看过程")
 	}
 	return out
 }

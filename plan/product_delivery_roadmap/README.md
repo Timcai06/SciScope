@@ -45,7 +45,8 @@
 
 - 做:产品体验、LangGraph 可观测工作流、交付物复现说明、TUI 分发、landing page 信息架构。
 - 不做:补采全量数据、重写底层检索/推荐/趋势模型、把后端/数据库/模型强行塞进 Homebrew 单一安装包。
-- 待确认:统一 release manifest、Linux/Windows 安装脚本、TUI 会话导出样例、无本机私有路径的 PDF 编译链路。
+- 已补:黄金会话样例 `docs/examples/golden_verify_claim_session.md`。
+- 待确认:统一 release manifest、Linux/Windows 安装脚本、真实 `sciscope-session-*.md` 自动导出快照、无本机私有路径的 PDF 编译链路。
 
 ## 下一步建议
 

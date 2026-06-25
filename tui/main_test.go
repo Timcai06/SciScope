@@ -862,10 +862,12 @@ func TestRenderAnswerUsesChatMessageStyle(t *testing.T) {
 	plain := plainANSI(rendered)
 	for _, want := range []string{
 		"⏺",
+		"研究结论",
 		"结论",
 		"RAG 能降低",
 		"/timeline 查看过程",
 		"论断核查",
+		"证据工具",
 	} {
 		if !strings.Contains(plain, want) {
 			t.Fatalf("answer message missing %q:\n%s", want, rendered)

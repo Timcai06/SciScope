@@ -58,8 +58,7 @@
 - `data/raw_canonical/*/future_year_suspect.jsonl` 为审计留存，不默认进入主口径趋势统计。
 - `output/assets/sciscope_data_report/data_layer_readiness.json` 明确了文本覆盖率、年度平衡与缺口行动。
 - `output/assets/*/figure_manifest.csv` 说明图表映射到源表和报告章节，适合核对“图都来自何处”。
-- TUI 的会话导出样例在本仓库内未发现 `sciscope-session-*.md`，**评委无环境时无法直接复现“导出样例”快照**。
-  - 该项标记为：**待补齐（待确认）**。
+- TUI 黄金会话样例已提供：`docs/examples/golden_verify_claim_session.md`，用于无环境查看 agent 工作流、证据时间线与最终回答结构。
 
 ## 三、有环境复现路径
 
@@ -192,7 +191,7 @@ curl -fsS -X POST http://127.0.0.1:8000/api/chat \
 
 - 已有模型二进制较大且本地路径依赖显著：评审环境若缺少 GPU/模型文件，`make llm`、`make dev-vllm` 等需外部准备。
 - `make data-report-pdf`、`make project-report-pdf` 的编译命令包含本机插件脚本路径（`/Users/tim/.codex/plugins/.../compile_latex.py`），路径若不存在请替换为本地可用的 `compile_latex.py` 或标准 `latexmk` 流程，**该处为环境兼容风险**。
-- 未发现提交 `sciscope-session-*.md` 的历史会话快照：**待补齐（待确认）**。
+- 已提供黄金会话样例 `docs/examples/golden_verify_claim_session.md`；真实 `sciscope-session-*.md` 自动导出快照可在最终提交前按当前版本重新生成并补充。
 - 未发现统一的依赖清单文件（如 `requirements.txt` 或 `pyproject.toml`）：**待补齐（待确认）**。
 - 命令执行前需明确 `SCISCOPE_DB_DSN`，否则 `/api/search`/`/api/recommend`/`/api/trends` 的部分接口会返回 503 或 400。
 - 外部采集与 fulltext enrich 受网络与源站配额影响：本计划默认不要求复原全部历史抓取，按“固定产物复验 + 可控重建”进行验收。
