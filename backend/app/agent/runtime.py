@@ -1,0 +1,60 @@
+"""Runtime selector for SciScope's research agent.
+
+``legacy`` remains the default so existing demos, tests, and TUI flows keep the
+same streaming behavior. Set ``SCISCOPE_AGENT_RUNTIME=langgraph`` to route turns
+through the LangGraph StateGraph wrapper.
+"""
+
+from __future__ import annotations
+
+import os
+from typing import Any, Callable, Iterator
+
+from backend.app.agent import loop as legacy_loop
+from backend.app.agent.events import AgentEvent
+
+_LEGACY_ALIASES = {"legacy", "loop", "react"}
+_LANGGRAPH_ALIASES = {"langgraph", "graph", "stategraph"}
+
+
+def selected_runtime_name() -> str:
+    """Return the normalized agent runtime selected by environment."""
+    raw = os.getenv("SCISCOPE_AGENT_RUNTIME", "legacy").strip().lower()
+    if raw in _LEGACY_ALIASES:
+        return "legacy"
+    if raw in _LANGGRAPH_ALIASES:
+        return "langgraph"
+    allowed = ", ".join(sorted(_LEGACY_ALIASES | _LANGGRAPH_ALIASES))
+    raise ValueError(f"Unsupported SCISCOPE_AGENT_RUNTIME={raw!r}. Expected one of: {allowed}")
+
+
+def _langgraph_runtime():
+    from backend.app.agent import langgraph_runtime
+
+    return langgraph_runtime
+
+
+def stream_agent(
+    question: str,
+    history: list[dict] | None = None,
+    model: str | None = None,
+) -> Iterator[AgentEvent]:
+    """Stream an agent turn from the selected runtime."""
+    runtime = selected_runtime_name()
+    if runtime == "langgraph":
+        yield from _langgraph_runtime().stream_agent(question, history=history, model=model)
+        return
+    yield from legacy_loop.stream_agent(question, history=history, model=model)
+
+
+def run_agent(
+    question: str,
+    history: list[dict] | None = None,
+    model: str | None = None,
+    on_event: Callable[[str, dict], None] | None = None,
+) -> dict[str, Any]:
+    """Run one agent turn and return the selected runtime's aggregate response."""
+    runtime = selected_runtime_name()
+    if runtime == "langgraph":
+        return _langgraph_runtime().run_agent(question, history=history, model=model, on_event=on_event)
+    return legacy_loop.run_agent(question, history=history, model=model, on_event=on_event)

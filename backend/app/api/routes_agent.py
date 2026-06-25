@@ -12,7 +12,7 @@ import json
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
-from backend.app.agent.loop import run_agent, stream_agent
+from backend.app.agent.runtime import run_agent, stream_agent
 from backend.app.models.schemas import AgentRequest
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
