@@ -109,7 +109,7 @@ make tui-doctor # 检查后端/LLM/会话目录/图谱资产
 - `SCISCOPE_DB_DSN=postgresql://tim@localhost:5432/sciscope`
 - `SCISCOPE_USE_MOCK_LLM=true`
 - `SCISCOPE_LLM_PROVIDER=deepseek`
-- `SCISCOPE_AGENT_RUNTIME=langgraph`（默认；可设为 `legacy` 使用旧 ReAct 兼容层）
+- Agent 运行时：单一 LangGraph StateGraph（`backend/app/agent/langgraph_runtime.py`），无运行时开关。
 
 关键 API：
 

@@ -1,7 +1,6 @@
 """LangGraph-backed orchestration runtime for the SciScope agent.
 
-The legacy ReAct loop remains the behavior reference, but the control flow is
-now expressed as a StateGraph:
+The agent control flow is expressed as a single StateGraph:
 
 ``prepare -> plan -> llm_step -> execute_tools -> llm_step -> reflect/final``.
 

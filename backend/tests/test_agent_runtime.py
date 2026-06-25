@@ -1,35 +1,15 @@
-"""Tests for the selectable agent runtime boundary."""
+"""Tests for the LangGraph agent runtime and its public entrypoint."""
 
 from __future__ import annotations
-
-import pytest
 
 from backend.app.agent import langgraph_runtime, runtime
 from backend.app.agent.events import event_parts
 from backend.app.agent.llm import SYSTEM_PROMPT
 
 
-@pytest.fixture(autouse=True)
-def _clear_runtime_env(monkeypatch):
-    monkeypatch.delenv("SCISCOPE_AGENT_RUNTIME", raising=False)
-
-
-def test_default_runtime_is_langgraph(monkeypatch):
-    class _Runtime:
-        @staticmethod
-        def stream_agent(question, history=None, model=None, session_id=None, retry=False):
-            return iter([("final", f"graph:{question}")])
-
-    monkeypatch.setattr(
-        runtime,
-        "_langgraph_runtime",
-        lambda: _Runtime,
-    )
-
-    events = list(runtime.stream_agent("hello"))
-
-    assert runtime.selected_runtime_name() == "langgraph"
-    assert events == [("final", "graph:hello")]
+def test_runtime_entrypoint_delegates_to_langgraph():
+    assert runtime.stream_agent is langgraph_runtime.stream_agent
+    assert runtime.run_agent is langgraph_runtime.run_agent
 
 
 def test_system_prompt_requires_synthesis_not_paper_by_paper():
@@ -38,22 +18,7 @@ def test_system_prompt_requires_synthesis_not_paper_by_paper():
     assert "不要把动量、burst、Mann-Kendall、Sen's 斜率等内部指标名直接列成用户答案" in SYSTEM_PROMPT
 
 
-def test_legacy_runtime_still_available_as_fallback(monkeypatch):
-    monkeypatch.setenv("SCISCOPE_AGENT_RUNTIME", "legacy")
-    monkeypatch.setattr(
-        runtime.legacy_loop,
-        "stream_agent",
-        lambda question, history=None, model=None: iter([("final", f"legacy:{question}")]),
-    )
-
-    events = list(runtime.stream_agent("hello"))
-
-    assert runtime.selected_runtime_name() == "legacy"
-    assert events == [("final", "legacy:hello")]
-
-
-def test_langgraph_runtime_wraps_legacy_events(monkeypatch):
-    monkeypatch.setenv("SCISCOPE_AGENT_RUNTIME", "langgraph")
+def test_langgraph_runtime_streams_plan_tool_and_grounded_answer(monkeypatch):
     monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
     monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: True)
     monkeypatch.setattr(langgraph_runtime, "make_plan", lambda question, model: ["search evidence"])
@@ -82,7 +47,6 @@ def test_langgraph_runtime_wraps_legacy_events(monkeypatch):
     result = runtime.run_agent("rag", session_id="s-1")
     parts = [event_parts(event) for event in events]
 
-    assert runtime.selected_runtime_name() == "langgraph"
     assert [(kind, payload) for kind, payload, _ in parts[:3]] == [
         ("plan", ["search evidence"]),
         ("tool_call", {"name": "search_literature", "args": {"query": "rag"}}),
@@ -103,7 +67,6 @@ def test_langgraph_runtime_wraps_legacy_events(monkeypatch):
 
 
 def test_langgraph_runtime_marks_retry_requests(monkeypatch):
-    monkeypatch.setenv("SCISCOPE_AGENT_RUNTIME", "langgraph")
     monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
     monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: False)
 
@@ -126,7 +89,6 @@ def test_langgraph_runtime_marks_retry_requests(monkeypatch):
 
 
 def test_langgraph_runtime_reflects_and_retries_weak_answer(monkeypatch):
-    monkeypatch.setenv("SCISCOPE_AGENT_RUNTIME", "langgraph")
     monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
     monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: False)
     answers = iter(["没有找到相关信息", "改进后的证据回答"])
@@ -146,10 +108,3 @@ def test_langgraph_runtime_reflects_and_retries_weak_answer(monkeypatch):
         (kind, payload) for kind, payload, _ in parts
     ]
     assert (parts[-1][0], parts[-1][1]) == ("final", "改进后的证据回答")
-
-
-def test_unknown_runtime_fails_fast(monkeypatch):
-    monkeypatch.setenv("SCISCOPE_AGENT_RUNTIME", "crew")
-
-    with pytest.raises(ValueError, match="Unsupported SCISCOPE_AGENT_RUNTIME"):
-        runtime.selected_runtime_name()

@@ -128,7 +128,7 @@
 \end{itemize}
 
 \begin{plainbox}
-\textbf{当前产品化路线}:LangGraph StateGraph 已作为默认运行时。\texttt{meta.phase} 将底层节点翻译为用户可理解的科研工作流阶段;TUI 在运行中显示阶段条,并用分组 \texttt{/timeline} 回看证据链。\texttt{session\_id} 映射为 \texttt{thread\_id},checkpoint 保存会话态,\texttt{/retry} 支持同线程错误恢复。legacy ReAct loop 仅保留为兼容回退。下一阶段聚焦持久化 checkpoint、Human-in-the-Loop、多 Agent 分工与节点级恢复;检索、趋势、推荐、图谱和 \texttt{verify\_claim} 工具保持不变。
+\textbf{当前产品化路线}:Agent 由单一 LangGraph StateGraph 编排,无运行时开关。\texttt{meta.phase} 将底层节点翻译为用户可理解的科研工作流阶段;TUI 在运行中显示阶段条,并用分组 \texttt{/timeline} 回看证据链。\texttt{session\_id} 映射为 \texttt{thread\_id},checkpoint 保存会话态,\texttt{/retry} 支持同线程错误恢复。下一阶段聚焦持久化 checkpoint、Human-in-the-Loop、多 Agent 分工与节点级恢复;检索、趋势、推荐、图谱和 \texttt{verify\_claim} 工具保持不变。
 \end{plainbox}
 
 \begin{center}

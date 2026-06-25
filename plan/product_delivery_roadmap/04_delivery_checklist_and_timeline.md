@@ -81,34 +81,31 @@
 ## 2）阶段：LangGraph 工作流升级
 
 ### 阶段目标
-将智能体从“可跑”升级为“可控可评估”状态：保留 LangGraph 默认态，明确 legacy 回退策略与恢复机制，避免运行时抖动时不可诊断。
+将智能体从“可跑”升级为“可控可评估”状态：统一为单一 LangGraph 运行时，明确节点级可观测与恢复机制，避免运行时抖动时不可诊断。
 
 ### 关键任务
 - 梳理当前运行态边界（已确认）：
-  - 默认运行时：`backend/app/agent/runtime.py` 的 `selected_runtime_name()`。
+  - 稳定入口：`backend/app/agent/runtime.py`（仅委托 LangGraph，无运行时开关）。
   - LangGraph 实现：`backend/app/agent/langgraph_runtime.py`。
-  - legacy 回退：`backend/app/agent/loop.py`。
+  - 共享原语：`planning.py` / `reflection.py` / `tool_runner.py` / `llm.py`。
   - 统一事件模型：`backend/app/agent/events.py`。
 - 落地“生产级”运行指标：每次 `plan/execute_tools/reflect/final` 的 `meta` 要完整可观测（已有基础字段 `runtime/node/elapsed_ms`）。
 - 强化 SSE 契约回归：`backend/app/api/routes_agent.py` 的 `POST /api/agent/stream` 与 `/api/agent`。
-- 加强 LangGraph 回退压测：在 `backend/app/agent/runtime.py` 的 `SCISCOPE_AGENT_RUNTIME=legacy` 与默认 `langgraph` 下做行为一致性比对。
 - 在本阶段补齐“会话恢复”与 `/retry` 的复测脚本覆盖。
 
 ### 关键文件/产物
 - `backend/app/agent/runtime.py`
 - `backend/app/agent/langgraph_runtime.py`
-- `backend/app/agent/loop.py`
 - `backend/app/api/routes_agent.py`
 - `backend/tests/test_agent_runtime.py`
-- `backend/tests/test_agent_loop.py`
 
 ### 负责人角色建议
 - 智能体负责人：工作流节点、事件、恢复逻辑
 - 后端测试负责人：回归用例、异常路径覆盖
-- 运维/平台：环境变量与部署参数稳定性（`SCISCOPE_AGENT_RUNTIME`、模型可用性）
+- 运维/平台：部署参数稳定性（模型可用性、langgraph 依赖、checkpoint 存储）
 
 ### 验收标准（阶段内）
-- 默认运行态仍为 `langgraph`，`legacy` 可通过环境变量无缝回退。
+- Agent 运行态唯一为 LangGraph StateGraph，`langgraph` 为 `make install-backend` 硬依赖。
 - SSE 事件顺序稳定、meta 字段在关键节点可解析。
 - `make test-backend` 不因工作流切换失败（特别是 `backend/tests/test_agent_runtime.py`）。
 - `retry=true` 请求不丢会话上下文（`session_id` 与回放链路保留）。

@@ -52,7 +52,7 @@
   `search_literature`, `get_trends`, `recommend_papers`, `get_paper`, `summarize_field`, `compare_papers`, `export_bibliography`, `query_knowledge_graph`, `verify_claim`。
 - 工具是 **读模型边界**（无数据写入动作）；
   若输入为空、参数异常或服务不可用，返回“可展示错误字符串”，交给循环再决策重试。
-- `loop.py` 通过 `TOOL_SCHEMAS` + `run_tools` 并发、去重签名，限制同参同参重复调用。
+- `langgraph_runtime.py` 的 `execute_tools` 节点通过 `TOOL_SCHEMAS` + `tool_runner.run_tools` 并发执行、去重签名，限制同参重复调用。
 
 ## 六、`verify_claim` 边界
 

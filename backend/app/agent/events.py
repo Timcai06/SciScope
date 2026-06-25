@@ -1,9 +1,8 @@
-"""Typed event helpers shared by agent runtimes.
+"""Typed event helpers for the agent runtime.
 
-The HTTP API and TUI consume the same event stream regardless of whether the
-turn is driven by the legacy ReAct loop or the LangGraph orchestration layer.
-Keeping the event shape explicit makes runtime migration a contract-preserving
-change instead of a UI-visible rewrite.
+The HTTP API and TUI consume the same event stream emitted by the LangGraph
+orchestration layer. Keeping the event shape explicit makes orchestration
+changes contract-preserving instead of a UI-visible rewrite.
 """
 
 from __future__ import annotations
