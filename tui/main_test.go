@@ -385,8 +385,17 @@ func TestTimelineAndErrorUsePanelRows(t *testing.T) {
 	if !strings.Contains(errPanel, "╭─ recovery · 后端未连接") {
 		t.Fatalf("recovery should use panel row grammar:\n%s", errPanel)
 	}
-	if !strings.Contains(errPanel, "make backend") {
-		t.Fatalf("recovery panel missing command:\n%s", errPanel)
+	for _, want := range []string{
+		"blocked",
+		"error",
+		"reason",
+		"primary make backend",
+		"next    /retry",
+		"inspect /doctor",
+	} {
+		if !strings.Contains(errPanel, want) {
+			t.Fatalf("recovery panel missing %q:\n%s", want, errPanel)
+		}
 	}
 }
 

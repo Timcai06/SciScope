@@ -202,6 +202,8 @@ type recoveryHint struct {
 	Title     string
 	Command   string
 	Message   string
+	Severity  string
+	Inspect   string
 	Retryable bool
 }
 
@@ -1541,6 +1543,8 @@ func recoveryAction(s string) recoveryHint {
 			Title:     "后端未连接",
 			Command:   "make backend",
 			Message:   "建议: 先运行 make backend, 然后输入 /retry 重试上一问。",
+			Severity:  "blocked",
+			Inspect:   "/doctor",
 			Retryable: true,
 		}
 	case strings.Contains(low, "llm") || strings.Contains(low, "vllm") || strings.Contains(low, "8001"):
@@ -1548,6 +1552,8 @@ func recoveryAction(s string) recoveryHint {
 			Title:     "LLM 服务不可用",
 			Command:   "make llm",
 			Message:   "建议: 检查 make llm 或 make dev-vllm 是否已启动，然后输入 /retry。",
+			Severity:  "blocked",
+			Inspect:   "/doctor",
 			Retryable: true,
 		}
 	case strings.Contains(low, "graphs not built"):
@@ -1555,6 +1561,8 @@ func recoveryAction(s string) recoveryHint {
 			Title:     "图谱未构建",
 			Command:   "make graph-export",
 			Message:   "建议: 运行 make graph-export 后输入 /retry。",
+			Severity:  "recoverable",
+			Inspect:   "/doctor",
 			Retryable: true,
 		}
 	case strings.Contains(low, "database") || strings.Contains(low, "postgres") || strings.Contains(low, "pgvector"):
@@ -1562,12 +1570,16 @@ func recoveryAction(s string) recoveryHint {
 			Title:     "数据库不可用",
 			Command:   "make postgres-refresh",
 			Message:   "建议: 检查 PostgreSQL, 必要时运行 make postgres-refresh, 然后输入 /retry。",
+			Severity:  "blocked",
+			Inspect:   "/doctor",
 			Retryable: true,
 		}
 	default:
 		return recoveryHint{
 			Title:     "请求失败",
 			Message:   "建议: 查看错误详情；如果环境已恢复，可输入 /retry 重试上一问。",
+			Severity:  "recoverable",
+			Inspect:   "/doctor",
 			Retryable: true,
 		}
 	}
@@ -1584,11 +1596,24 @@ func friendlyError(s string) string {
 
 func renderRecoveryPanel(s string) string {
 	action := recoveryAction(s)
-	body := []string{s, action.Message}
-	if action.Command != "" {
-		body = append(body, "恢复动作: "+action.Command)
+	meta := action.Severity
+	if meta == "" {
+		meta = "recoverable"
 	}
-	return panelRow("recovery", action.Title, "", body)
+	body := []string{
+		"error   " + preview(s),
+		"reason  " + action.Message,
+	}
+	if action.Command != "" {
+		body = append(body, "primary "+action.Command)
+	}
+	if action.Retryable {
+		body = append(body, "next    /retry")
+	}
+	if action.Inspect != "" {
+		body = append(body, "inspect "+action.Inspect)
+	}
+	return panelRow("recovery", action.Title, meta, body)
 }
 
 func (m *model) startQuestion(v string, retry bool) tea.Cmd {
