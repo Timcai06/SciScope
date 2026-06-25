@@ -58,6 +58,12 @@ def test_agent_request_strips_session_id():
     assert request.session_id == "tui-session"
 
 
+def test_agent_request_accepts_retry_flag():
+    request = AgentRequest(question="RAG", retry=True)
+
+    assert request.retry is True
+
+
 def test_dashboard_response_requires_explicit_year_range_shape():
     payload = {
         "total_papers": 1,

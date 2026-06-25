@@ -48,9 +48,9 @@ func TestFormatHTTPErrorIncludesValidationDetails(t *testing.T) {
 }
 
 func TestMetaDetailFormatsLangGraphNodeTiming(t *testing.T) {
-	got := metaDetail(eventMeta{Runtime: "langgraph", Node: "execute_tools", ElapsedMS: 42})
+	got := metaDetail(eventMeta{Runtime: "langgraph", Node: "execute_tools", ElapsedMS: 42, Retry: true})
 
-	if got != "node execute_tools · 42ms" {
+	if got != "node execute_tools · 42ms · retry" {
 		t.Fatalf("unexpected meta detail: %q", got)
 	}
 }

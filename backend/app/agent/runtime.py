@@ -39,11 +39,12 @@ def stream_agent(
     history: list[dict] | None = None,
     model: str | None = None,
     session_id: str | None = None,
+    retry: bool = False,
 ) -> Iterator[AgentEvent]:
     """Stream an agent turn from the selected runtime."""
     runtime = selected_runtime_name()
     if runtime == "langgraph":
-        yield from _langgraph_runtime().stream_agent(question, history=history, model=model, session_id=session_id)
+        yield from _langgraph_runtime().stream_agent(question, history=history, model=model, session_id=session_id, retry=retry)
         return
     yield from legacy_loop.stream_agent(question, history=history, model=model)
 
@@ -54,9 +55,10 @@ def run_agent(
     model: str | None = None,
     on_event: Callable[[str, dict], None] | None = None,
     session_id: str | None = None,
+    retry: bool = False,
 ) -> dict[str, Any]:
     """Run one agent turn and return the selected runtime's aggregate response."""
     runtime = selected_runtime_name()
     if runtime == "langgraph":
-        return _langgraph_runtime().run_agent(question, history=history, model=model, on_event=on_event, session_id=session_id)
+        return _langgraph_runtime().run_agent(question, history=history, model=model, on_event=on_event, session_id=session_id, retry=retry)
     return legacy_loop.run_agent(question, history=history, model=model, on_event=on_event)

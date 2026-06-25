@@ -38,7 +38,7 @@ def agent_stream(request: AgentRequest) -> StreamingResponse:
 
     def events():
         try:
-            for event in stream_agent(request.question, history=history, session_id=request.session_id):
+            for event in stream_agent(request.question, history=history, session_id=request.session_id, retry=request.retry):
                 kind, payload, meta = event_parts(event)
                 frame = {"type": kind, "payload": payload}
                 if meta:
@@ -63,4 +63,4 @@ def agent(request: AgentRequest) -> dict:
     aggregate payload rather than incremental SSE frames.
     """
     history = [{"role": t.role, "content": t.content} for t in request.history]
-    return run_agent(request.question, history=history, session_id=request.session_id)
+    return run_agent(request.question, history=history, session_id=request.session_id, retry=request.retry)

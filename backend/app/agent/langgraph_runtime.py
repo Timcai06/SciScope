@@ -34,6 +34,7 @@ GraphRoute = Literal["plan", "llm_step", "execute_tools", "reflect", "force_synt
 class AgentState(TypedDict, total=False):
     question: str
     session_id: str | None
+    retry: bool
     history: list[dict]
     model: str | None
     messages: list[dict]
@@ -70,6 +71,8 @@ def _finish_node(node: str, started_at: float, state: AgentState, updates: Agent
     session_id = state.get("session_id")
     if session_id:
         meta["session_id"] = session_id
+    if state.get("retry"):
+        meta["retry"] = True
     updates["node_meta"] = meta
     if updates.get("emit"):
         updates["emit"] = [(kind, payload, meta) for kind, payload, *_ in updates["emit"]]
@@ -88,6 +91,14 @@ def _prepare(state: AgentState) -> AgentState:
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(state.get("history") or [])
     messages.append({"role": "user", "content": state["question"]})
+    if state.get("retry"):
+        messages.append({
+            "role": "user",
+            "content": (
+                "这是同一会话线程上的 /retry 请求。请假设用户已经处理了上一轮错误或环境问题,"
+                "不要复述错误,重新规划并调用必要工具;如果仍缺少依赖,给出明确恢复动作。"
+            ),
+        })
     return _finish_node("prepare", started_at, state, {
         "model": model,
         "messages": messages,
@@ -263,10 +274,11 @@ def stream_agent(
     history: list[dict] | None = None,
     model: str | None = None,
     session_id: str | None = None,
+    retry: bool = False,
 ) -> Iterator[AgentEvent]:
     """Run one agent turn through the LangGraph StateGraph and stream node events."""
     thread_id = session_id or f"sciscope-turn-{uuid4().hex}"
-    inputs = {"question": question, "history": history or [], "model": model, "session_id": session_id}
+    inputs = {"question": question, "history": history or [], "model": model, "session_id": session_id, "retry": retry}
     config = {"configurable": {"thread_id": thread_id}}
     for update in _build_graph().stream(inputs, config=config, stream_mode="updates"):
         if isinstance(update, dict):
@@ -279,9 +291,10 @@ def run_agent(
     model: str | None = None,
     on_event: Callable[[str, dict], None] | None = None,
     session_id: str | None = None,
+    retry: bool = False,
 ) -> dict[str, Any]:
     """Aggregate the LangGraph event stream into the existing response shape."""
-    events = list(stream_agent(question, history=history, model=model, session_id=session_id))
+    events = list(stream_agent(question, history=history, model=model, session_id=session_id, retry=retry))
     for event in events:
         kind, payload, *_ = event
         if kind in {"tool_call", "tool_result"} and on_event and isinstance(payload, dict):
@@ -291,4 +304,5 @@ def run_agent(
     response["runtime"] = "langgraph"
     if session_id:
         response["session_id"] = session_id
+    response["retry"] = retry
     return response

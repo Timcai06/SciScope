@@ -27,6 +27,7 @@ class AgentRequest(BaseModel):
     question: str = Field(min_length=1)
     history: list[ChatTurn] = Field(default_factory=list)
     session_id: str | None = Field(default=None, min_length=1)
+    retry: bool = False
 
     @field_validator("question")
     @classmethod

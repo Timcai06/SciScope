@@ -143,6 +143,7 @@ type eventMeta struct {
 	Node      string `json:"node"`
 	SessionID string `json:"session_id"`
 	ElapsedMS int    `json:"elapsed_ms"`
+	Retry     bool   `json:"retry"`
 }
 type planMsg []string
 type textMsg string
@@ -435,8 +436,8 @@ func playDemo(sub chan tea.Msg) {
 //	error     -> recoverable error text
 //
 // Scanner keeps only lines starting with "data:" and stops at "[DONE]".
-func stream(ctx context.Context, backend, q string, history []turn, sessionID string, sub chan tea.Msg) {
-	body, _ := json.Marshal(map[string]any{"question": q, "history": history, "session_id": sessionID})
+func stream(ctx context.Context, backend, q string, history []turn, sessionID string, retry bool, sub chan tea.Msg) {
+	body, _ := json.Marshal(map[string]any{"question": q, "history": history, "session_id": sessionID, "retry": retry})
 	req, _ := http.NewRequestWithContext(ctx, "POST", backend+"/api/agent/stream", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
@@ -600,6 +601,9 @@ func metaDetail(meta eventMeta) string {
 	}
 	if meta.ElapsedMS > 0 {
 		parts = append(parts, fmt.Sprintf("%dms", meta.ElapsedMS))
+	}
+	if meta.Retry {
+		parts = append(parts, "retry")
 	}
 	return strings.Join(parts, " · ")
 }
@@ -1379,7 +1383,7 @@ func (m *model) startQuestion(v string, retry bool) tea.Cmd {
 	m.cancel = cancel
 	q := v
 	return tea.Batch(
-		func() tea.Msg { go stream(ctx, backendURL(), q, hist, m.sessionID, m.sub); return nil },
+		func() tea.Msg { go stream(ctx, backendURL(), q, hist, m.sessionID, retry, m.sub); return nil },
 		listen(m.sub),
 		m.spin.Tick,
 	)

@@ -16,7 +16,7 @@ def _clear_runtime_env(monkeypatch):
 def test_default_runtime_is_langgraph(monkeypatch):
     class _Runtime:
         @staticmethod
-        def stream_agent(question, history=None, model=None, session_id=None):
+        def stream_agent(question, history=None, model=None, session_id=None, retry=False):
             return iter([("final", f"graph:{question}")])
 
     monkeypatch.setattr(
@@ -91,6 +91,30 @@ def test_langgraph_runtime_wraps_legacy_events(monkeypatch):
     assert result["tools_used"] == [{"name": "search_literature", "args": {"query": "rag"}}]
     assert result["runtime"] == "langgraph"
     assert result["session_id"] == "s-1"
+    assert result["retry"] is False
+
+
+def test_langgraph_runtime_marks_retry_requests(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_AGENT_RUNTIME", "langgraph")
+    monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
+    monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: False)
+
+    def fake_stream_chat(messages, model, tools):
+        if False:
+            yield ("text", "")
+        assert any("/retry 请求" in message.get("content", "") for message in messages)
+        return "retry answer", []
+
+    monkeypatch.setattr(langgraph_runtime, "stream_chat", fake_stream_chat)
+
+    events = list(runtime.stream_agent("rag", session_id="s-retry", retry=True))
+    parts = [event_parts(event) for event in events]
+    result = runtime.run_agent("rag", session_id="s-retry", retry=True)
+
+    assert parts[-1][0:2] == ("final", "retry answer")
+    assert parts[-1][2]["retry"] is True
+    assert parts[-1][2]["session_id"] == "s-retry"
+    assert result["retry"] is True
 
 
 def test_langgraph_runtime_reflects_and_retries_weak_answer(monkeypatch):
