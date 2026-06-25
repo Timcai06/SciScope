@@ -56,7 +56,7 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 \end{plainbox}
 
 \subsection{用例六:科研智能体自主多步编排(真实轨迹)}
-下面是终端智能体 \texttt{make agent} 处理一个复合问题的\textbf{真实执行轨迹}(本地 Qwen2.5-7B),展示"规划 → 自主选工具 → 多步链式 → 据证作答":
+下面是终端智能体 \texttt{make tui} 处理一个复合问题的\textbf{真实执行轨迹}(本地 Qwen2.5-7B),展示"规划 → 自主选工具 → 多步链式 → 据证作答":
 \begin{plainbox}
 \textbf{提问}:推荐几篇关于知识图谱的代表论文并说明趋势\par\vspace{3pt}
 \statusbadge{① plan} 自动生成计划:\texttt{search\_literature(知识图谱)} → \texttt{recommend\_papers} → \texttt{get\_trends}\par\vspace{2pt}
@@ -68,4 +68,19 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 \end{enumerate}
 \statusbadge{③ 据证作答} 综合三个工具的真实结果,给出代表论文清单 + 趋势判定,并标注出处。\par\vspace{2pt}
 \textbf{关键特性}:计划对用户可见;\texttt{recommend} 用的是\textbf{检索得到的真实 id 而非臆造};相同参数调用自动去重防空转;回答后还会\textbf{自评证据是否充分},不足则改写重试。
+\end{plainbox}
+
+\subsection{用例七:论断核查与跨语言接地(\texttt{verify\_claim})}
+下面展示第 9 个智能体工具 \texttt{verify\_claim} 的真实输出轨迹:用户给出中文论断,系统检索英文文献并用同一跨语言 e5 向量空间计算“论断--证据”接地度,返回支持等级而不是让大模型直接判断。
+\begin{plainbox}
+\textbf{待核查论断}:检索增强生成能够降低大语言模型回答中的幻觉风险\par\vspace{2pt}
+\textbf{工具输出}:支持等级=\textbf{强支持},最高接地相似度=\textbf{0.846}\par\vspace{2pt}
+\textbf{主要证据}:
+\begin{enumerate}[itemsep=1pt]
+\item \emph{Retrieval-Augmented Generation and Hallucination in Large Language Models: A Scholarly Overview} \hfill 2025, 相似度 0.846
+\item \emph{Reinforced Retrieval-Augmented Generation in Large Language Models} \hfill 2025, 相似度 0.846
+\item \emph{ReRag: A New Architecture for Reducing the Hallucination by Retrieval-Augmented Generation} \hfill 2024, 相似度 0.836
+\item \emph{Benchmarking Large Language Models in Retrieval-Augmented Generation} \hfill 2023, 相似度 0.827
+\end{enumerate}
+\textbf{关键特性}:中文论断可由英文论文接地;工具返回的是\textbf{强支持 / 部分支持 / 证据不足}的校准信号,要求模型据证表述,证据不足时不得强行断言。
 \end{plainbox}

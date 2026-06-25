@@ -18,7 +18,7 @@
 \node[layer, text width=150mm] (raw) at (78,5) {6 公开来源(arXiv/PubMed/PMC/OpenAlex/Crossref/DOAJ)→ 原始 JSONL(\texttt{data/raw\_canonical})};
 
 \node[lab] at (-3,22)  {② 治理};
-\node[layer, text width=150mm] (proc) at (78,22) {清洗规范化 · \textbf{标题优先去重} · front-matter/PDF 垃圾过滤 · NUL 清洗 → 159{,}190 篇(\texttt{processed})};
+\node[layer, text width=150mm] (proc) at (78,22) {清洗规范化 · \textbf{标题优先去重} · front-matter/PDF 垃圾过滤 · NUL 清洗 → 159{,}164 篇处理后语料(\texttt{processed})};
 
 \node[lab] at (-3,42)  {③ 加工};
 \node[band, text width=70mm] (ana) at (40,42) {\textbf{分析层}\\领域分布·关键词演化·作者网络·主题模型\\{\scriptsize→《数据分析报告》(成果①)}};
@@ -149,7 +149,7 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 
 \subsection{实现过程}
 \textbf{数据生成与采集} → 6 源按领域/年份抓取,落 \texttt{data/raw\_canonical} 分区 JSONL。\\
-\textbf{数据组织与治理} → 规范化字段;标题优先去重(合并跨源/预印本同篇,留最全一条)+ front-matter 剔除 + PDF 垃圾/ NUL 清洗;160{,}488 → 159{,}190 篇。\\
+\textbf{数据组织与治理} → 规范化字段;标题优先去重(合并跨源/预印本同篇,留最全一条)+ front-matter 剔除 + PDF 垃圾/ NUL 清洗;168{,}447 条分析语料进一步形成 159{,}164 篇处理后语料文件,运行时库表当前装载 159{,}187 篇论文。\\
 \textbf{信息汲取与建模} → 切片入库,计算片段/论文向量,拟合趋势/推荐/图谱/主题;关键词统一过滤 arXiv 码与超泛标签。\texttt{make agent-build} 一键重建。\\
 \textbf{服务与交互} → FastAPI 暴露检索/问答/趋势/推荐/图谱及\textbf{智能体流式}接口;终端 AI 助手 \texttt{make tui} 自主编排工具(Web 前端已预留 SSE 接口);数据库不可用时自动回退内存检索,保证演示鲁棒。
 

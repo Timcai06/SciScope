@@ -13,7 +13,7 @@
 
 \subsection{主要工作}
 \begin{itemize}
-\item \textbf{数据底座}:从 arXiv、PubMed、PMC、OpenAlex、Crossref、DOAJ 6 个公开来源采集、清洗、规范化、去重,形成 159{,}190 篇、跨计算机/生物医学/材料等多领域、主窗口 2022--2026 的可复现语料。
+\item \textbf{数据底座}:从 arXiv、PubMed、PMC、OpenAlex、Crossref、DOAJ 6 个公开来源采集、清洗、规范化、去重,形成 168{,}447 条分析语料、159{,}164 篇处理后语料文件和 159{,}187 篇运行时入库论文,覆盖计算机/生物医学/材料等多领域、主窗口 2022--2026。
 \item \textbf{数据分析报告}(交付物①):文献分布、关键词演化、作者合作网络、主题模型、趋势统计(见同级交付物 \texttt{sciscope\_data\_report})。
 \item \textbf{科研智能体模型}(交付物②):本地嵌入索引、混合检索、趋势预测、论文推荐、知识图谱五大模型,配套 FastAPI 服务与 Next.js 工作台。
 \item \textbf{系统工程}:PostgreSQL + pgvector 服务层、本地大模型(vLLM/MLX)生成层、一键复现的 Makefile 流水线与自动化测试。
@@ -28,3 +28,7 @@
 \item \textbf{数据质量工程}:标题优先去重 + 期刊 front-matter 剔除 + PDF 垃圾过滤 + 关键词噪声过滤(剔除 arXiv 分类码与超泛学科标签),显著提升检索、趋势与图谱的信噪比。
 \end{enumerate}
 \end{reportbox}
+
+\begin{plainbox}
+\textbf{数字口径说明}:本报告将数据规模分为四类口径:数据分析报告使用 \texttt{data/analysis/summary.json} 的 168{,}447 条分析语料;处理后语料文件使用 \texttt{data/processed/papers\_corpus.summary.json} 的 159{,}164 篇;运行时服务以 PostgreSQL 当前库表为准,即 159{,}187 篇论文、367{,}773 个片段、367{,}773 条片段向量和 159{,}135 条论文级向量;系统效果以 \texttt{output/eval/eval\_report.json} 为准。四类口径用途不同,不混写为同一个总数。
+\end{plainbox}
