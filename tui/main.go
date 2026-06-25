@@ -232,6 +232,7 @@ type loadedSession struct {
 type timelineEvent struct {
 	Kind     string
 	Tool     string
+	Phase    string
 	Label    string
 	Detail   string
 	Duration time.Duration
@@ -701,6 +702,33 @@ func nodeLabel(node string) string {
 	}
 }
 
+func eventPhase(ev timelineEvent) string {
+	if strings.TrimSpace(ev.Phase) != "" {
+		return strings.TrimSpace(ev.Phase)
+	}
+	switch ev.Kind {
+	case "plan":
+		return "制定研究计划"
+	case "tool_call", "tool_result", "permission":
+		return "证据检索"
+	case "reflect":
+		return "自检修正"
+	case "final":
+		return "综合回答"
+	case "error":
+		return "错误恢复"
+	default:
+		return "执行过程"
+	}
+}
+
+func metaPhase(meta eventMeta) string {
+	if strings.TrimSpace(meta.Phase) != "" {
+		return strings.TrimSpace(meta.Phase)
+	}
+	return nodeLabel(meta.Node)
+}
+
 func streamKindLabel(kind string) string {
 	switch kind {
 	case "plan":
@@ -720,6 +748,71 @@ func streamKindLabel(kind string) string {
 	default:
 		return "stream"
 	}
+}
+
+func renderWorkflowStatus(meta eventMeta, nodes []string, kind string, elapsed time.Duration, width int) string {
+	if width < 56 {
+		width = 56
+	}
+	current := metaPhase(meta)
+	if current == "等待事件" && len(nodes) > 0 {
+		current = nodeLabel(nodes[len(nodes)-1])
+	}
+	phases := []string{"理解问题", "制定研究计划", "推理与检索决策", "证据检索", "自检修正", "综合回答"}
+	active := -1
+	for i, phase := range phases {
+		if phase == current {
+			active = i
+			break
+		}
+	}
+	steps := []string{}
+	for i, phase := range phases {
+		mark := "○"
+		style := stFaint
+		if active >= 0 && i < active {
+			mark = "●"
+		}
+		if i == active {
+			mark = "◆"
+			style = stAccent
+		}
+		steps = append(steps, style.Render(mark+" "+phase))
+	}
+	phaseLines := []string{strings.Join(steps, stFaint.Render("  →  "))}
+	if width < 96 {
+		phaseLines = []string{
+			strings.Join(steps[:3], stFaint.Render("  →  ")),
+			strings.Join(steps[3:], stFaint.Render("  →  ")),
+		}
+	}
+	session := meta.SessionID
+	if session == "" {
+		session = "local session"
+	}
+	status := []string{
+		stAccent.Render("当前阶段"),
+		stInk.Render(current),
+		stFaint.Render(streamKindLabel(kind)),
+		stFaint.Render(fmt.Sprintf("%.0fs", elapsed.Seconds())),
+	}
+	if meta.Retry {
+		status = append(status, stWarn.Render("retry"))
+	}
+	if meta.ElapsedMS > 0 {
+		status = append(status, stFaint.Render(fmt.Sprintf("%dms", meta.ElapsedMS)))
+	}
+	body := []string{
+		strings.Join(status, stFaint.Render(" · ")),
+	}
+	body = append(body, phaseLines...)
+	body = append(body, stFaint.Render("thread "+clip(session, 42)))
+	return lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true, false, true, false).
+		BorderForeground(cFaint).
+		Padding(0, 1).
+		Width(width - 2).
+		Render(strings.Join(body, "\n"))
 }
 
 func appendUniqueNode(nodes []string, node string) []string {
@@ -1169,12 +1262,18 @@ func toolResultLabel(name, result string) string {
 
 func timelineMarkdownBody(events []timelineEvent) string {
 	lines := []string{}
-	for i, ev := range events {
+	lastPhase := ""
+	for _, ev := range events {
+		phase := eventPhase(ev)
+		if phase != lastPhase {
+			lines = append(lines, "### "+phase)
+			lastPhase = phase
+		}
 		label := strings.TrimSpace(ev.Label)
 		if label == "" {
 			label = toolPlainLabel(ev.Tool)
 		}
-		line := fmt.Sprintf("%d. %s", i+1, label)
+		line := "- " + label
 		if ev.Detail != "" {
 			line += ": " + ev.Detail
 		}
@@ -1191,7 +1290,7 @@ func renderTimelineMarkdown(events []timelineEvent) string {
 	if body == "" {
 		return ""
 	}
-	return "## 工具调用时间线\n\n" + body + "\n"
+	return "## 科研工作流时间线\n\n" + body + "\n"
 }
 
 func renderTimelineBlock(events []timelineEvent) string {
@@ -1202,12 +1301,18 @@ func renderTimelineBlock(events []timelineEvent) string {
 		})
 	}
 	body := []string{}
-	for i, ev := range events {
+	lastPhase := ""
+	for _, ev := range events {
+		phase := eventPhase(ev)
+		if phase != lastPhase {
+			body = append(body, phase)
+			lastPhase = phase
+		}
 		label := ev.Label
 		if label == "" {
 			label = toolPlainLabel(ev.Tool)
 		}
-		line := fmt.Sprintf("[%d] %s", i+1, label)
+		line := "  - " + label
 		if ev.Detail != "" {
 			line += " · " + ev.Detail
 		}
@@ -1842,7 +1947,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for _, s := range msg {
 			plain = append(plain, "- "+s)
 		}
-		m.addTimeline(timelineEvent{Kind: "plan", Label: "执行计划", Detail: strings.Join([]string(msg), " / ")})
+		m.addTimeline(timelineEvent{Kind: "plan", Phase: "制定研究计划", Label: "执行计划", Detail: strings.Join([]string(msg), " / ")})
 		m.record("plan", "", strings.Join(plain, "\n"))
 		m.livePlan = append([]string(nil), msg...)
 		m.refresh()
@@ -1867,10 +1972,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				detail = meta
 			}
 		}
-		m.addTimeline(timelineEvent{Kind: "tool_call", Tool: msg.name, Label: toolPlainLabel(msg.name), Detail: detail})
+		m.addTimeline(timelineEvent{Kind: "tool_call", Phase: metaPhase(msg.meta), Tool: msg.name, Label: toolPlainLabel(msg.name), Detail: detail})
 		if notice, ok := permissionNotice(msg.name); ok {
 			m.record("permission", msg.name, notice)
-			m.addTimeline(timelineEvent{Kind: "permission", Tool: msg.name, Label: "权限提示", Detail: notice})
+			m.addTimeline(timelineEvent{Kind: "permission", Phase: metaPhase(msg.meta), Tool: msg.name, Label: "权限提示", Detail: notice})
 		}
 		return m, listen(m.sub)
 
@@ -1879,7 +1984,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.toolStart != nil {
 			elapsed = time.Since(m.toolStart[msg.name])
 		}
-		m.addTimeline(timelineEvent{Kind: "tool_result", Tool: msg.name, Label: toolResultLabel(msg.name, msg.result), Detail: metaDetail(msg.meta), Duration: elapsed})
+		m.addTimeline(timelineEvent{Kind: "tool_result", Phase: metaPhase(msg.meta), Tool: msg.name, Label: toolResultLabel(msg.name, msg.result), Detail: metaDetail(msg.meta), Duration: elapsed})
 		m.record("tool_result", msg.name, summarizeToolResultMarkdown(msg.name, msg.result))
 		return m, listen(m.sub)
 
@@ -1887,6 +1992,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.answer = ""
 		m.record("reflect", "", string(msg))
 		m.liveReflect = string(msg)
+		m.addTimeline(timelineEvent{Kind: "reflect", Phase: "自检修正", Label: "自检修正", Detail: string(msg)})
 		m.refresh()
 		return m, listen(m.sub)
 
@@ -1906,7 +2012,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		errText := friendlyError(string(msg))
 		m.record("error", "", errText)
 		action := recoveryAction(string(msg))
-		m.addTimeline(timelineEvent{Kind: "error", Label: action.Title, Detail: action.Message})
+		m.addTimeline(timelineEvent{Kind: "error", Phase: "错误恢复", Label: action.Title, Detail: action.Message})
 		m.appendBlock(stError.Render("⏺ ✗ ") + renderRecoveryPanel(string(msg)))
 		return m, listen(m.sub)
 
@@ -1914,7 +2020,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.answer != "" {
 			ans := m.answer
 			m.answering = false
-			m.addTimeline(timelineEvent{Kind: "final", Label: "回答完成"})
+			m.addTimeline(timelineEvent{Kind: "final", Phase: "综合回答", Label: "回答完成"})
 			if body := timelineMarkdownBody(m.timeline); body != "" {
 				m.record("timeline", "", body)
 			}
@@ -2086,6 +2192,7 @@ func (m model) View() string {
 
 	// thinking spinner (Claude Code-style verb + esc hint) while a turn runs
 	if m.answering {
+		parts = append(parts, renderWorkflowStatus(m.lastMeta, m.nodeSeen, m.lastStreamKind, time.Since(m.start), m.vp.Width))
 		if thinking := renderThinkingShelf(m.livePlan, m.liveReflect, m.vp.Width); thinking != "" {
 			parts = append(parts, thinking)
 		}

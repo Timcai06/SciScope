@@ -117,6 +117,36 @@ func TestRenderStreamRailShowsLangGraphObservability(t *testing.T) {
 	}
 }
 
+func TestRenderWorkflowStatusShowsCurrentResearchPhase(t *testing.T) {
+	rail := renderWorkflowStatus(
+		eventMeta{Runtime: "langgraph", Node: "execute_tools", Phase: "证据检索", SessionID: "tui-20260625T120000", ElapsedMS: 42, Retry: true},
+		[]string{"prepare", "plan", "execute_tools"},
+		"tool_call",
+		3*time.Second,
+		100,
+	)
+	plain := plainANSI(rail)
+
+	for _, want := range []string{
+		"当前阶段",
+		"证据检索",
+		"理解问题",
+		"制定研究计划",
+		"推理与检索决策",
+		"自检修正",
+		"综合回答",
+		"tui-20260625T120000",
+		"retry",
+	} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("workflow status missing %q:\n%s", want, plain)
+		}
+	}
+	if strings.Contains(plain, "execute_tools") {
+		t.Fatalf("workflow status should not expose raw graph node:\n%s", plain)
+	}
+}
+
 func TestNodePulseUpdatesLiveStreamState(t *testing.T) {
 	m := initialModel()
 	m.ready = true
@@ -263,20 +293,23 @@ func TestWriteSessionMarkdownCreatesFile(t *testing.T) {
 
 func TestRenderTimelineMarkdownShowsToolLifecycle(t *testing.T) {
 	events := []timelineEvent{
-		{Kind: "plan", Label: "执行计划", Detail: "检索相关论文"},
-		{Kind: "tool_call", Tool: "search_literature", Label: "检索文献", Detail: "RAG hallucination"},
-		{Kind: "tool_result", Tool: "search_literature", Label: "证据卡 2 篇", Duration: 1200 * time.Millisecond},
-		{Kind: "final", Label: "回答完成"},
+		{Kind: "plan", Phase: "制定研究计划", Label: "执行计划", Detail: "检索相关论文"},
+		{Kind: "tool_call", Phase: "证据检索", Tool: "search_literature", Label: "检索文献", Detail: "RAG hallucination"},
+		{Kind: "tool_result", Phase: "证据检索", Tool: "search_literature", Label: "证据卡 2 篇", Duration: 1200 * time.Millisecond},
+		{Kind: "final", Phase: "综合回答", Label: "回答完成"},
 	}
 
 	md := renderTimelineMarkdown(events)
 
 	for _, want := range []string{
-		"## 工具调用时间线",
-		"1. 执行计划: 检索相关论文",
-		"2. 检索文献: RAG hallucination",
-		"3. 证据卡 2 篇 (1.2s)",
-		"4. 回答完成",
+		"## 科研工作流时间线",
+		"### 制定研究计划",
+		"- 执行计划: 检索相关论文",
+		"### 证据检索",
+		"- 检索文献: RAG hallucination",
+		"- 证据卡 2 篇 (1.2s)",
+		"### 综合回答",
+		"- 回答完成",
 	} {
 		if !strings.Contains(md, want) {
 			t.Fatalf("timeline markdown missing %q:\n%s", want, md)
@@ -438,14 +471,21 @@ func TestPanelRowUsesConsistentDenseGrammar(t *testing.T) {
 
 func TestTimelineAndErrorUsePanelRows(t *testing.T) {
 	timeline := renderTimelineBlock([]timelineEvent{
-		{Kind: "tool_call", Label: "检索文献", Detail: "RAG"},
-		{Kind: "final", Label: "回答完成"},
+		{Kind: "tool_call", Phase: "证据检索", Label: "检索文献", Detail: "RAG"},
+		{Kind: "final", Phase: "综合回答", Label: "回答完成"},
 	})
 	if !strings.Contains(timeline, "╭─ timeline · 本轮执行时间线") {
 		t.Fatalf("timeline should use panel row grammar:\n%s", timeline)
 	}
-	if !strings.Contains(timeline, "│  [1] 检索文献 · RAG") {
-		t.Fatalf("timeline missing dense row:\n%s", timeline)
+	for _, want := range []string{
+		"证据检索",
+		"  - 检索文献 · RAG",
+		"综合回答",
+		"  - 回答完成",
+	} {
+		if !strings.Contains(timeline, want) {
+			t.Fatalf("timeline missing grouped row %q:\n%s", want, timeline)
+		}
 	}
 
 	errPanel := renderRecoveryPanel("无法连接后端: connection refused")
@@ -485,8 +525,8 @@ func TestTimelineSlashRendersCurrentTurnTrace(t *testing.T) {
 	m.ready = true
 	m.vp = viewport.New(100, 20)
 	m.timeline = []timelineEvent{
-		{Kind: "plan", Label: "执行计划", Detail: "检索证据"},
-		{Kind: "tool_result", Tool: "verify_claim", Label: "论断核查 · 强支持", Duration: 1500 * time.Millisecond},
+		{Kind: "plan", Phase: "制定研究计划", Label: "执行计划", Detail: "检索证据"},
+		{Kind: "tool_result", Phase: "证据检索", Tool: "verify_claim", Label: "论断核查 · 强支持", Duration: 1500 * time.Millisecond},
 	}
 
 	next, _ := m.runSlash("/timeline")
@@ -495,8 +535,10 @@ func TestTimelineSlashRendersCurrentTurnTrace(t *testing.T) {
 
 	for _, want := range []string{
 		"本轮执行时间线",
+		"制定研究计划",
 		"执行计划",
 		"检索证据",
+		"证据检索",
 		"论断核查",
 		"1.5s",
 	} {
