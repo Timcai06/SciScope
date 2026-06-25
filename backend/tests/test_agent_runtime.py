@@ -46,11 +46,11 @@ def test_legacy_runtime_still_available_as_fallback(monkeypatch):
 
 def test_langgraph_runtime_wraps_legacy_events(monkeypatch):
     monkeypatch.setenv("SCISCOPE_AGENT_RUNTIME", "langgraph")
-    monkeypatch.setattr(langgraph_runtime.legacy_loop, "_detect_model", lambda: "test-model")
-    monkeypatch.setattr(langgraph_runtime.legacy_loop, "_needs_plan", lambda question: True)
-    monkeypatch.setattr(langgraph_runtime.legacy_loop, "_make_plan", lambda question, model: ["search evidence"])
-    monkeypatch.setattr(langgraph_runtime.legacy_loop, "_self_critique", lambda *args: None)
-    monkeypatch.setattr(langgraph_runtime.legacy_loop, "_run_tools", lambda tool_calls, executed: ["ok"])
+    monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
+    monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: True)
+    monkeypatch.setattr(langgraph_runtime, "make_plan", lambda question, model: ["search evidence"])
+    monkeypatch.setattr(langgraph_runtime, "self_critique", lambda *args: None)
+    monkeypatch.setattr(langgraph_runtime, "run_tools", lambda tool_calls, executed: ["ok"])
 
     def fake_stream_chat(messages, model, tools):
         if False:
@@ -68,7 +68,7 @@ def test_langgraph_runtime_wraps_legacy_events(monkeypatch):
             ],
         )
 
-    monkeypatch.setattr(langgraph_runtime.legacy_loop, "_stream_chat", fake_stream_chat)
+    monkeypatch.setattr(langgraph_runtime, "stream_chat", fake_stream_chat)
 
     events = list(runtime.stream_agent("rag"))
     result = runtime.run_agent("rag")
@@ -88,8 +88,8 @@ def test_langgraph_runtime_wraps_legacy_events(monkeypatch):
 
 def test_langgraph_runtime_reflects_and_retries_weak_answer(monkeypatch):
     monkeypatch.setenv("SCISCOPE_AGENT_RUNTIME", "langgraph")
-    monkeypatch.setattr(langgraph_runtime.legacy_loop, "_detect_model", lambda: "test-model")
-    monkeypatch.setattr(langgraph_runtime.legacy_loop, "_needs_plan", lambda question: False)
+    monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
+    monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: False)
     answers = iter(["没有找到相关信息", "改进后的证据回答"])
 
     def fake_stream_chat(messages, model, tools):
@@ -97,7 +97,7 @@ def test_langgraph_runtime_reflects_and_retries_weak_answer(monkeypatch):
             yield ("text", "")
         return next(answers), []
 
-    monkeypatch.setattr(langgraph_runtime.legacy_loop, "_stream_chat", fake_stream_chat)
+    monkeypatch.setattr(langgraph_runtime, "stream_chat", fake_stream_chat)
 
     events = list(runtime.stream_agent("请分析RAG研究现状"))
 

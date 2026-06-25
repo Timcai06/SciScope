@@ -15,9 +15,15 @@ import json
 from functools import lru_cache
 from typing import Any, Callable, Iterator, Literal, TypedDict
 
-from backend.app.agent import loop as legacy_loop
 from backend.app.agent.events import AgentEvent, summarize_events
+from backend.app.agent.llm import SYSTEM_PROMPT, compact, detect_model, drain, stream_chat
+from backend.app.agent.planning import make_plan, needs_plan
+from backend.app.agent.reflection import reflect_reason, self_critique
+from backend.app.agent.tool_runner import run_tools
 from backend.app.agent.tools import TOOL_SCHEMAS
+
+MAX_STEPS = 6
+MAX_RETRIES = 1
 
 
 GraphRoute = Literal["plan", "llm_step", "execute_tools", "reflect", "force_synthesis", "end"]
@@ -51,14 +57,14 @@ def _load_langgraph():
 
 
 def _prepare(state: AgentState) -> AgentState:
-    model = state.get("model") or legacy_loop._detect_model()
+    model = state.get("model") or detect_model()
     if not model:
         return {
             "runtime": "langgraph",
             "route": "end",
             "emit": [("final", "本地大模型未运行(:8001)。请先 `make llm`。")],
         }
-    messages = [{"role": "system", "content": legacy_loop.SYSTEM_PROMPT}]
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(state.get("history") or [])
     messages.append({"role": "user", "content": state["question"]})
     return {
@@ -78,10 +84,10 @@ def _plan(state: AgentState) -> AgentState:
     question = state["question"]
     model = state["model"]
     messages = list(state.get("messages") or [])
-    if not model or not legacy_loop._needs_plan(question):
+    if not model or not needs_plan(question):
         return {"messages": messages, "route": "llm_step", "emit": []}
 
-    plan = legacy_loop._make_plan(question, model)
+    plan = make_plan(question, model)
     if not plan:
         return {"messages": messages, "route": "llm_step", "emit": []}
 
@@ -97,10 +103,10 @@ def _plan(state: AgentState) -> AgentState:
 
 def _llm_step(state: AgentState) -> AgentState:
     messages = list(state.get("messages") or [])
-    legacy_loop._compact(messages)
+    compact(messages)
     text_events: list[AgentEvent] = []
-    full_text, tool_calls = legacy_loop._drain(
-        legacy_loop._stream_chat(messages, state["model"], TOOL_SCHEMAS),
+    full_text, tool_calls = drain(
+        stream_chat(messages, state["model"], TOOL_SCHEMAS),
         lambda kind, payload: text_events.append((kind, payload)),
     )
     next_state: AgentState = {
@@ -134,13 +140,13 @@ def _execute_tools(state: AgentState) -> AgentState:
     tool_calls = list(state.get("tool_calls") or [])
     executed = dict(state.get("executed") or {})
     emit: list[AgentEvent] = [_tool_call_event(tool_call) for tool_call in tool_calls]
-    results = legacy_loop._run_tools(tool_calls, executed) if tool_calls else []
+    results = run_tools(tool_calls, executed) if tool_calls else []
     for tool_call, result in zip(tool_calls, results):
         name = tool_call["function"]["name"]
         emit.append(("tool_result", {"name": name, "result": result}))
         messages.append({"role": "tool", "tool_call_id": tool_call.get("id", name), "content": result})
 
-    route: GraphRoute = "force_synthesis" if int(state.get("step") or 0) >= legacy_loop.MAX_STEPS else "llm_step"
+    route: GraphRoute = "force_synthesis" if int(state.get("step") or 0) >= MAX_STEPS else "llm_step"
     return {"messages": messages, "executed": executed, "tool_calls": [], "route": route, "emit": emit}
 
 
@@ -148,10 +154,10 @@ def _reflect(state: AgentState) -> AgentState:
     retries = int(state.get("retries") or 0)
     answer = state.get("last_answer") or ""
     reason = None
-    if retries < legacy_loop.MAX_RETRIES:
-        reason = legacy_loop._reflect_reason(answer, int(state.get("tools_total") or 0), state["question"])
+    if retries < MAX_RETRIES:
+        reason = reflect_reason(answer, int(state.get("tools_total") or 0), state["question"])
         if reason is None and int(state.get("tools_total") or 0) > 0:
-            reason = legacy_loop._self_critique(state["question"], answer, state["model"])
+            reason = self_critique(state["question"], answer, state["model"])
 
     if not reason:
         return {"route": "end", "emit": [("final", answer)]}
@@ -179,8 +185,8 @@ def _force_synthesis(state: AgentState) -> AgentState:
     messages = list(state.get("messages") or [])
     messages.append({"role": "user", "content": "请基于以上工具结果,用中文给出最终回答。"})
     text_events: list[AgentEvent] = []
-    full_text, _ = legacy_loop._drain(
-        legacy_loop._stream_chat(messages, state["model"], None),
+    full_text, _ = drain(
+        stream_chat(messages, state["model"], None),
         lambda kind, payload: text_events.append((kind, payload)),
     )
     return {"messages": messages, "last_answer": full_text, "route": "end", "emit": [*text_events, ("final", full_text)]}
@@ -250,6 +256,6 @@ def run_agent(
         if kind in {"tool_call", "tool_result"} and on_event and isinstance(payload, dict):
             on_event(kind, payload)
     response = summarize_events(events)
-    response["model"] = model or legacy_loop._detect_model()
+    response["model"] = model or detect_model()
     response["runtime"] = "langgraph"
     return response
