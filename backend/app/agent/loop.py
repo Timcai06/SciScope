@@ -314,7 +314,10 @@ def stream_agent(
                 retries += 1
                 yield ("reflect", reason)
                 messages.append({"role": "assistant", "content": full_text})
-                messages.append({"role": "user", "content": reason})
+                messages.append({"role": "user", "content": (
+                    reason + " 请直接据此重新检索并给出改进后的【完整中文回答】,"
+                    "不要回复「好的」、不要复述计划或描述你将要做什么。"
+                )})
                 continue
             yield ("final", full_text)
             return
