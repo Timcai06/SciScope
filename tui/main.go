@@ -86,6 +86,13 @@ func toolLabel(name string) string {
 	return name
 }
 
+func toolPlainLabel(name string) string {
+	if v, ok := toolLabels[name]; ok {
+		return v[1]
+	}
+	return name
+}
+
 type slashCmd struct{ cmd, desc string }
 
 var slashCmds = []slashCmd{
@@ -127,6 +134,14 @@ type transcriptEvent struct {
 	Kind    string
 	Tool    string
 	Content string
+}
+
+type timelineEvent struct {
+	Kind     string
+	Tool     string
+	Label    string
+	Detail   string
+	Duration time.Duration
 }
 
 type evidencePaper struct {
@@ -249,6 +264,7 @@ type model struct {
 	toolStart  map[string]time.Time
 	history    []turn
 	transcript []transcriptEvent
+	timeline   []timelineEvent
 	lastExport string
 	sub        chan tea.Msg
 	cancel     context.CancelFunc
@@ -285,6 +301,13 @@ func (m *model) record(kind, tool, content string) {
 		return
 	}
 	m.transcript = append(m.transcript, transcriptEvent{Kind: kind, Tool: tool, Content: content})
+}
+
+func (m *model) addTimeline(ev timelineEvent) {
+	if ev.Label == "" {
+		ev.Label = toolPlainLabel(ev.Tool)
+	}
+	m.timeline = append(m.timeline, ev)
 }
 
 func (m *model) refresh() {
@@ -336,6 +359,95 @@ func elapsedSuffix(d time.Duration) string {
 		return ""
 	}
 	return stFaint.Render(fmt.Sprintf("  %.1fs", d.Seconds()))
+}
+
+func durationText(d time.Duration) string {
+	if d <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%.1fs", d.Seconds())
+}
+
+func permissionNotice(name string) (string, bool) {
+	switch name {
+	case "export_bibliography":
+		return "权限提示: 引文导出会生成可复制的外部文本，请确认导出内容适合写入报告或会话记录。", true
+	default:
+		return "", false
+	}
+}
+
+func toolResultLabel(name, result string) string {
+	switch name {
+	case "search_literature", "summarize_field":
+		var papers []evidencePaper
+		if json.Unmarshal([]byte(result), &papers) == nil && len(papers) > 0 {
+			return fmt.Sprintf("证据卡 %d 篇", len(papers))
+		}
+	case "verify_claim":
+		var cr claimResult
+		if json.Unmarshal([]byte(result), &cr) == nil && cr.Verdict != "" {
+			if cr.TopSimilarity > 0 {
+				return fmt.Sprintf("论断核查 · %s · %.3f", cr.Verdict, cr.TopSimilarity)
+			}
+			return "论断核查 · " + cr.Verdict
+		}
+	case "get_trends":
+		var rows []map[string]any
+		if json.Unmarshal([]byte(result), &rows) == nil && len(rows) > 0 {
+			return fmt.Sprintf("趋势卡 %d 条", len(rows))
+		}
+	}
+	return "工具返回"
+}
+
+func timelineMarkdownBody(events []timelineEvent) string {
+	lines := []string{}
+	for i, ev := range events {
+		label := strings.TrimSpace(ev.Label)
+		if label == "" {
+			label = toolPlainLabel(ev.Tool)
+		}
+		line := fmt.Sprintf("%d. %s", i+1, label)
+		if ev.Detail != "" {
+			line += ": " + ev.Detail
+		}
+		if d := durationText(ev.Duration); d != "" {
+			line += " (" + d + ")"
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func renderTimelineMarkdown(events []timelineEvent) string {
+	body := timelineMarkdownBody(events)
+	if body == "" {
+		return ""
+	}
+	return "## 工具调用时间线\n\n" + body + "\n"
+}
+
+func renderTimelineBlock(events []timelineEvent) string {
+	if len(events) == 0 {
+		return ""
+	}
+	lines := []string{stBullet.Render("⏺ ") + stAccent.Render("工具调用时间线")}
+	for i, ev := range events {
+		label := ev.Label
+		if label == "" {
+			label = toolPlainLabel(ev.Tool)
+		}
+		line := fmt.Sprintf("[%d] %s", i+1, label)
+		if ev.Detail != "" {
+			line += " · " + ev.Detail
+		}
+		if d := durationText(ev.Duration); d != "" {
+			line += " · " + d
+		}
+		lines = append(lines, stConn.Render("  ⎿  ")+stFaint.Render(line))
+	}
+	return strings.Join(lines, "\n")
 }
 
 func renderToolResult(name, result string, width int, elapsed time.Duration) string {
@@ -505,6 +617,10 @@ func exportMarkdown(events []transcriptEvent, generatedAt time.Time) string {
 			lines = append(lines, "## 工具调用: "+ev.Tool, "", content, "")
 		case "tool_result":
 			lines = append(lines, "## 证据结果: "+ev.Tool, "", content, "")
+		case "timeline":
+			lines = append(lines, "## 工具调用时间线", "", content, "")
+		case "permission":
+			lines = append(lines, "## 权限提示: "+ev.Tool, "", content, "")
 		case "reflect":
 			lines = append(lines, "## 自我纠错", "", content, "")
 		case "assistant":
@@ -637,6 +753,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.answer = ""
 			m.used = nil
 			m.toolStart = map[string]time.Time{}
+			m.timeline = nil
 			m.verb = verbs[rand.Intn(len(verbs))]
 			m.start = time.Now()
 			ctx, cancel := context.WithCancel(context.Background())
@@ -657,6 +774,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			lines = append(lines, stConn.Render("  ⎿  ")+stMuted.Render("☐ "+s))
 			plain = append(plain, "- "+s)
 		}
+		m.addTimeline(timelineEvent{Kind: "plan", Label: "执行计划", Detail: strings.Join([]string(msg), " / ")})
 		m.record("plan", "", strings.Join(plain, "\n"))
 		m.appendBlock(strings.Join(lines, "\n"))
 		return m, listen(m.sub)
@@ -668,11 +786,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.toolStart[msg.name] = time.Now()
 		line := stBullet.Render("⏺ ") + stTool.Render(toolLabel(msg.name))
+		detail := m.argsStr(msg.args)
 		if a := m.argsStr(msg.args); a != "" {
 			line += stFaint.Render("(" + a + ")")
 			m.record("tool_call", msg.name, a)
 		} else {
 			m.record("tool_call", msg.name, toolLabel(msg.name))
+		}
+		m.addTimeline(timelineEvent{Kind: "tool_call", Tool: msg.name, Label: toolPlainLabel(msg.name), Detail: detail})
+		if notice, ok := permissionNotice(msg.name); ok {
+			line += "\n" + stWarn.Render("  "+notice)
+			m.record("permission", msg.name, notice)
+			m.addTimeline(timelineEvent{Kind: "permission", Tool: msg.name, Label: "权限提示", Detail: notice})
 		}
 		m.appendBlock(line)
 		return m, listen(m.sub)
@@ -682,6 +807,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.toolStart != nil {
 			elapsed = time.Since(m.toolStart[msg.name])
 		}
+		m.addTimeline(timelineEvent{Kind: "tool_result", Tool: msg.name, Label: toolResultLabel(msg.name, msg.result), Duration: elapsed})
 		m.record("tool_result", msg.name, summarizeToolResultMarkdown(msg.name, msg.result))
 		m.appendBlock(renderToolResult(msg.name, msg.result, m.vp.Width, elapsed))
 		return m, listen(m.sub)
@@ -713,6 +839,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.answer != "" {
 			ans := m.answer
 			m.answering = false
+			m.addTimeline(timelineEvent{Kind: "final", Label: "回答完成"})
+			if body := timelineMarkdownBody(m.timeline); body != "" {
+				m.record("timeline", "", body)
+				m.appendBlock(renderTimelineBlock(m.timeline))
+			}
 			m.record("assistant", "", ans)
 			m.appendBlock(m.renderAnswer())
 			m.history = append(m.history, turn{"assistant", ans})
@@ -775,6 +906,7 @@ func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
 		m.blocks = nil
 		m.history = nil
 		m.transcript = nil
+		m.timeline = nil
 		m.lastExport = ""
 		m.refresh()
 	case "/help":

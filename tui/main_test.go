@@ -113,3 +113,59 @@ func TestWriteSessionMarkdownCreatesFile(t *testing.T) {
 		t.Fatalf("exported file missing conversation:\n%s", string(b))
 	}
 }
+
+func TestRenderTimelineMarkdownShowsToolLifecycle(t *testing.T) {
+	events := []timelineEvent{
+		{Kind: "plan", Label: "执行计划", Detail: "检索相关论文"},
+		{Kind: "tool_call", Tool: "search_literature", Label: "检索文献", Detail: "RAG hallucination"},
+		{Kind: "tool_result", Tool: "search_literature", Label: "证据卡 2 篇", Duration: 1200 * time.Millisecond},
+		{Kind: "final", Label: "回答完成"},
+	}
+
+	md := renderTimelineMarkdown(events)
+
+	for _, want := range []string{
+		"## 工具调用时间线",
+		"1. 执行计划: 检索相关论文",
+		"2. 检索文献: RAG hallucination",
+		"3. 证据卡 2 篇 (1.2s)",
+		"4. 回答完成",
+	} {
+		if !strings.Contains(md, want) {
+			t.Fatalf("timeline markdown missing %q:\n%s", want, md)
+		}
+	}
+}
+
+func TestPermissionNoticeHighlightsExportTool(t *testing.T) {
+	notice, ok := permissionNotice("export_bibliography")
+	if !ok {
+		t.Fatalf("expected export_bibliography to require a permission notice")
+	}
+	for _, want := range []string{"权限提示", "导出", "会话记录"} {
+		if !strings.Contains(notice, want) {
+			t.Fatalf("permission notice missing %q: %s", want, notice)
+		}
+	}
+
+	if notice, ok := permissionNotice("search_literature"); ok || notice != "" {
+		t.Fatalf("search_literature should not require a permission notice, got %q", notice)
+	}
+}
+
+func TestExportMarkdownIncludesTimelineSection(t *testing.T) {
+	events := []transcriptEvent{
+		{Kind: "user", Content: "导出 RAG 引文"},
+		{Kind: "timeline", Content: "1. 引文导出: RAG\n2. 回答完成"},
+		{Kind: "assistant", Content: "已整理引用。"},
+	}
+
+	md := exportMarkdown(events, time.Date(2026, 6, 25, 12, 30, 0, 0, time.UTC))
+
+	if !strings.Contains(md, "## 工具调用时间线") {
+		t.Fatalf("expected timeline section in export:\n%s", md)
+	}
+	if !strings.Contains(md, "1. 引文导出: RAG") {
+		t.Fatalf("expected timeline content in export:\n%s", md)
+	}
+}
