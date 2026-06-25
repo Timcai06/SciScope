@@ -514,6 +514,21 @@ func miniPanel(title string, lines []string, width int) string {
 		Render(strings.Join(body, "\n"))
 }
 
+func asciiBrand(width int) string {
+	if width < 86 {
+		return stAccent.Render("SciScope")
+	}
+	lines := []string{
+		"███████╗ ██████╗██╗███████╗ ██████╗ ██████╗ ██████╗ ███████╗",
+		"██╔════╝██╔════╝██║██╔════╝██╔════╝██╔═══██╗██╔══██╗██╔════╝",
+		"███████╗██║     ██║███████╗██║     ██║   ██║██████╔╝█████╗  ",
+		"╚════██║██║     ██║╚════██║██║     ██║   ██║██╔═══╝ ██╔══╝  ",
+		"███████║╚██████╗██║███████║╚██████╗╚██████╔╝██║     ███████╗",
+		"╚══════╝ ╚═════╝╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝     ╚══════╝",
+	}
+	return stAccent.Render(strings.Join(lines, "\n"))
+}
+
 func renderSplash(width int, sessions []sessionFile) string {
 	if width < 60 {
 		width = 60
@@ -549,7 +564,8 @@ func renderSplash(width int, sessions []sessionFile) string {
 		}, "\n")
 	}
 	body := []string{
-		stAccent.Render("SciScope") + stInk.Render(" 科研智能体终端"),
+		asciiBrand(width),
+		stInk.Render("科研智能体终端"),
 		stFaint.Render("evidence-first research agent · local sessions · reproducible export"),
 		"",
 		dashboard,
@@ -674,6 +690,26 @@ func renderTimelineBlock(events []timelineEvent) string {
 		body = append(body, line)
 	}
 	return panelRow("timeline", "工具调用时间线", "", body)
+}
+
+func renderPlanBlock(plan planMsg) string {
+	body := []string{}
+	for i, step := range plan {
+		body = append(body, fmt.Sprintf("[%d] %s", i+1, step))
+	}
+	return panelRow("thinking", "思考过程", fmt.Sprintf("%d 步", len(plan)), body)
+}
+
+func renderToolCallBlock(name, args string) string {
+	body := []string{}
+	if strings.TrimSpace(args) != "" {
+		body = append(body, args)
+	}
+	return panelRow("action", toolPlainLabel(name), "tool call", body)
+}
+
+func renderReflectBlock(s string) string {
+	return panelRow("thinking", "自我纠错", "", []string{s})
 }
 
 func renderToolResult(name, result string, width int, elapsed time.Duration) string {
@@ -1158,15 +1194,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case planMsg:
-		lines := []string{stBullet.Render("⏺ ") + stAccent.Render("执行计划")}
 		plain := []string{}
 		for _, s := range msg {
-			lines = append(lines, stConn.Render("  ⎿  ")+stMuted.Render("☐ "+s))
 			plain = append(plain, "- "+s)
 		}
 		m.addTimeline(timelineEvent{Kind: "plan", Label: "执行计划", Detail: strings.Join([]string(msg), " / ")})
 		m.record("plan", "", strings.Join(plain, "\n"))
-		m.appendBlock(strings.Join(lines, "\n"))
+		m.appendBlock(renderPlanBlock(msg))
 		return m, listen(m.sub)
 
 	case toolCallMsg:
@@ -1175,21 +1209,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toolStart = map[string]time.Time{}
 		}
 		m.toolStart[msg.name] = time.Now()
-		line := stBullet.Render("⏺ ") + stTool.Render(toolLabel(msg.name))
 		detail := m.argsStr(msg.args)
 		if a := m.argsStr(msg.args); a != "" {
-			line += stFaint.Render("(" + a + ")")
 			m.record("tool_call", msg.name, a)
 		} else {
 			m.record("tool_call", msg.name, toolLabel(msg.name))
 		}
 		m.addTimeline(timelineEvent{Kind: "tool_call", Tool: msg.name, Label: toolPlainLabel(msg.name), Detail: detail})
+		body := []string{}
+		if detail != "" {
+			body = append(body, detail)
+		}
 		if notice, ok := permissionNotice(msg.name); ok {
-			line += "\n" + stWarn.Render("  "+notice)
+			body = append(body, notice)
 			m.record("permission", msg.name, notice)
 			m.addTimeline(timelineEvent{Kind: "permission", Tool: msg.name, Label: "权限提示", Detail: notice})
 		}
-		m.appendBlock(line)
+		m.appendBlock(panelRow("action", toolPlainLabel(msg.name), "tool call", body))
 		return m, listen(m.sub)
 
 	case toolResultMsg:
@@ -1205,7 +1241,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case reflectMsg:
 		m.answer = ""
 		m.record("reflect", "", string(msg))
-		m.appendBlock(stBullet.Render("⏺ ") + stWarn.Render("自我纠错 ") + stFaint.Render(string(msg)))
+		m.appendBlock(renderReflectBlock(string(msg)))
 		return m, listen(m.sub)
 
 	case textMsg:

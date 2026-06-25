@@ -370,6 +370,7 @@ func TestSplashScreenShowsProductCurtain(t *testing.T) {
 	splash := renderSplash(96, nil)
 
 	for _, want := range []string{
+		"███████╗ ██████╗██╗███████╗ ██████╗ ██████╗ ██████╗ ███████╗",
 		"科研智能体终端",
 		"Quick actions",
 		"Golden demo",
@@ -382,6 +383,18 @@ func TestSplashScreenShowsProductCurtain(t *testing.T) {
 		if !strings.Contains(splash, want) {
 			t.Fatalf("splash missing %q:\n%s", want, splash)
 		}
+	}
+}
+
+func TestBrandMarkScalesForCompactWidth(t *testing.T) {
+	wide := asciiBrand(100)
+	compact := asciiBrand(42)
+
+	if !strings.Contains(wide, "███████") {
+		t.Fatalf("expected wide brand to use large ASCII art:\n%s", wide)
+	}
+	if !strings.Contains(compact, "SciScope") {
+		t.Fatalf("expected compact brand fallback:\n%s", compact)
 	}
 }
 
@@ -416,6 +429,29 @@ func TestComposerRendersPolishedInputBox(t *testing.T) {
 		if !strings.Contains(composer, want) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)
 		}
+	}
+}
+
+func TestThinkingPanelsUseTraceGrammar(t *testing.T) {
+	plan := renderPlanBlock(planMsg{"解析问题", "检索证据"})
+	if !strings.Contains(plan, "╭─ thinking · 思考过程") {
+		t.Fatalf("plan should render as thinking panel:\n%s", plan)
+	}
+	if !strings.Contains(plan, "│  [1] 解析问题") {
+		t.Fatalf("plan missing numbered step:\n%s", plan)
+	}
+
+	call := renderToolCallBlock("verify_claim", "RAG 降低幻觉")
+	if !strings.Contains(call, "╭─ action · 论断核查") {
+		t.Fatalf("tool call should render as action panel:\n%s", call)
+	}
+	if !strings.Contains(call, "RAG 降低幻觉") {
+		t.Fatalf("tool call missing args:\n%s", call)
+	}
+
+	reflection := renderReflectBlock("限定为降低风险")
+	if !strings.Contains(reflection, "╭─ thinking · 自我纠错") {
+		t.Fatalf("reflect should render as thinking panel:\n%s", reflection)
 	}
 }
 
