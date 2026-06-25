@@ -208,3 +208,70 @@ func TestRetrySlashReplaysLastQuestion(t *testing.T) {
 		t.Fatalf("expected retry question in transcript, got %#v", got.transcript)
 	}
 }
+
+func TestListSessionFilesReturnsNewestFirst(t *testing.T) {
+	dir := t.TempDir()
+	oldPath := filepath.Join(dir, "sciscope-session-20260625-120000.md")
+	newPath := filepath.Join(dir, "sciscope-session-20260625-130000.md")
+	if err := os.WriteFile(oldPath, []byte("# old"), 0o644); err != nil {
+		t.Fatalf("write old session: %v", err)
+	}
+	time.Sleep(10 * time.Millisecond)
+	if err := os.WriteFile(newPath, []byte("# new"), 0o644); err != nil {
+		t.Fatalf("write new session: %v", err)
+	}
+
+	sessions, err := listSessionFiles(dir, 5)
+	if err != nil {
+		t.Fatalf("listSessionFiles returned error: %v", err)
+	}
+	if len(sessions) != 2 {
+		t.Fatalf("expected 2 sessions, got %#v", sessions)
+	}
+	if sessions[0].Path != newPath {
+		t.Fatalf("expected newest session first, got %#v", sessions)
+	}
+}
+
+func TestLoadSessionMarkdownRestoresLastQuestion(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sciscope-session-20260625-130000.md")
+	md := "# SciScope 会话导出\n\n## 用户问题\n\n核查 RAG 是否降低幻觉\n\n## 智能体回答\n\n可以。"
+	if err := os.WriteFile(path, []byte(md), 0o644); err != nil {
+		t.Fatalf("write session: %v", err)
+	}
+
+	s, err := loadSessionMarkdown(path)
+	if err != nil {
+		t.Fatalf("loadSessionMarkdown returned error: %v", err)
+	}
+	if s.LastQuestion != "核查 RAG 是否降低幻觉" {
+		t.Fatalf("expected last question restored, got %#v", s)
+	}
+	if !strings.Contains(s.Content, "可以。") {
+		t.Fatalf("expected full content restored, got %#v", s)
+	}
+}
+
+func TestSessionsSlashRendersRecentSessions(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SCISCOPE_SESSION_DIR", dir)
+	path := filepath.Join(dir, "sciscope-session-20260625-130000.md")
+	if err := os.WriteFile(path, []byte("# SciScope 会话导出\n\n## 用户问题\n\n核查 RAG"), 0o644); err != nil {
+		t.Fatalf("write session: %v", err)
+	}
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+
+	next, _ := m.runSlash("/sessions")
+	got := next.(model)
+	content := got.vp.View()
+
+	if !strings.Contains(content, "/resume 1") {
+		t.Fatalf("expected resume command in sessions view:\n%s", content)
+	}
+	if !strings.Contains(content, "sciscope-session-20260625-130000.md") {
+		t.Fatalf("expected session filename in sessions view:\n%s", content)
+	}
+}

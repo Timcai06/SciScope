@@ -102,6 +102,8 @@ var slashCmds = []slashCmd{
 	{"/tools", "列出可用工具"},
 	{"/export", "导出 Markdown 会话"},
 	{"/retry", "重试上一问"},
+	{"/sessions", "列出最近会话"},
+	{"/resume", "恢复会话: /resume 1"},
 	{"/clear", "清空对话"},
 	{"/quit", "退出"},
 }
@@ -144,6 +146,20 @@ type recoveryHint struct {
 	Command   string
 	Message   string
 	Retryable bool
+}
+
+type sessionFile struct {
+	Index   int
+	Path    string
+	Name    string
+	ModTime time.Time
+	Size    int64
+}
+
+type loadedSession struct {
+	Path         string
+	Content      string
+	LastQuestion string
 }
 
 type timelineEvent struct {
@@ -261,26 +277,27 @@ func listen(sub chan tea.Msg) tea.Cmd {
 
 // ---- model ----
 type model struct {
-	ti           textinput.Model
-	vp           viewport.Model
-	spin         spinner.Model
-	blocks       []string // finalized conversation lines
-	answer       string   // current streaming answer
-	answering    bool
-	verb         string
-	tick         int
-	start        time.Time // when the current turn began (for the elapsed timer)
-	used         []string  // tools called this turn (for the answer footer)
-	toolStart    map[string]time.Time
-	history      []turn
-	transcript   []transcriptEvent
-	timeline     []timelineEvent
-	lastExport   string
-	lastQuestion string
-	sub          chan tea.Msg
-	cancel       context.CancelFunc
-	menuIdx      int
-	ready        bool
+	ti             textinput.Model
+	vp             viewport.Model
+	spin           spinner.Model
+	blocks         []string // finalized conversation lines
+	answer         string   // current streaming answer
+	answering      bool
+	verb           string
+	tick           int
+	start          time.Time // when the current turn began (for the elapsed timer)
+	used           []string  // tools called this turn (for the answer footer)
+	toolStart      map[string]time.Time
+	history        []turn
+	transcript     []transcriptEvent
+	timeline       []timelineEvent
+	recentSessions []sessionFile
+	lastExport     string
+	lastQuestion   string
+	sub            chan tea.Msg
+	cancel         context.CancelFunc
+	menuIdx        int
+	ready          bool
 }
 
 func initialModel() model {
@@ -655,6 +672,93 @@ func sessionDir() string {
 	return "sessions"
 }
 
+func listSessionFiles(dir string, limit int) ([]sessionFile, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	sessions := []sessionFile{}
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		sessions = append(sessions, sessionFile{
+			Path:    path,
+			Name:    entry.Name(),
+			ModTime: info.ModTime(),
+			Size:    info.Size(),
+		})
+	}
+	sort.Slice(sessions, func(i, j int) bool {
+		return sessions[i].ModTime.After(sessions[j].ModTime)
+	})
+	if limit > 0 && len(sessions) > limit {
+		sessions = sessions[:limit]
+	}
+	for i := range sessions {
+		sessions[i].Index = i + 1
+	}
+	return sessions, nil
+}
+
+func extractLastQuestion(markdown string) string {
+	lines := strings.Split(markdown, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.TrimSpace(lines[i]) != "## 用户问题" {
+			continue
+		}
+		chunk := []string{}
+		for j := i + 1; j < len(lines); j++ {
+			line := strings.TrimSpace(lines[j])
+			if strings.HasPrefix(line, "## ") {
+				break
+			}
+			if line != "" {
+				chunk = append(chunk, line)
+			}
+		}
+		return strings.TrimSpace(strings.Join(chunk, "\n"))
+	}
+	return ""
+}
+
+func loadSessionMarkdown(path string) (loadedSession, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return loadedSession{}, err
+	}
+	content := string(b)
+	return loadedSession{
+		Path:         path,
+		Content:      content,
+		LastQuestion: extractLastQuestion(content),
+	}, nil
+}
+
+func renderSessionsList(sessions []sessionFile) string {
+	if len(sessions) == 0 {
+		return stWarn.Render("  没有找到已保存会话。完成一次回答后会自动保存。")
+	}
+	lines := []string{stBullet.Render("⏺ ") + stAccent.Render("最近会话")}
+	for _, s := range sessions {
+		sizeKB := float64(s.Size) / 1024
+		meta := fmt.Sprintf("/resume %d · %s · %.1f KB", s.Index, s.ModTime.Format("01-02 15:04"), sizeKB)
+		lines = append(lines,
+			stConn.Render("  ⎿  ")+stInk.Render(s.Name),
+			stFaint.Render("      "+meta),
+		)
+	}
+	return strings.Join(lines, "\n")
+}
+
 func writeSessionMarkdown(dir string, events []transcriptEvent, now time.Time) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
@@ -810,7 +914,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if strings.HasPrefix(v, "/") {
-				if ms := filterCmds(m.ti.Value()); len(ms) > 0 && m.menuIdx < len(ms) {
+				if ms := filterCmds(m.ti.Value()); len(ms) > 0 && m.menuIdx < len(ms) && !strings.Contains(v, " ") {
 					v = ms[m.menuIdx].cmd
 				}
 				m.ti.SetValue("")
@@ -955,7 +1059,12 @@ func (m model) renderAnswer() string {
 }
 
 func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
-	switch v {
+	fields := strings.Fields(v)
+	cmdName := v
+	if len(fields) > 0 {
+		cmdName = fields[0]
+	}
+	switch cmdName {
 	case "/quit":
 		return m, tea.Quit
 	case "/clear":
@@ -967,13 +1076,52 @@ func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
 		m.lastQuestion = ""
 		m.refresh()
 	case "/help":
-		m.appendBlock(stFaint.Render("  命令: /help /tools /export /retry /clear /quit · Esc 中断 · Ctrl+C 退出"))
+		m.appendBlock(stFaint.Render("  命令: /help /tools /sessions /resume N /export /retry /clear /quit · Esc 中断 · Ctrl+C 退出"))
 	case "/tools":
 		lines := []string{stFaint.Render("  可用工具(LLM 自主调用):")}
 		for _, name := range []string{"search_literature", "get_trends", "recommend_papers", "get_paper", "summarize_field", "compare_papers", "export_bibliography", "query_knowledge_graph", "verify_claim"} {
 			lines = append(lines, "    "+toolLabel(name))
 		}
 		m.appendBlock(strings.Join(lines, "\n"))
+	case "/sessions":
+		sessions, err := listSessionFiles(sessionDir(), 8)
+		if err != nil {
+			m.appendBlock(stWarn.Render("  读取会话失败: " + err.Error()))
+			return m, nil
+		}
+		m.recentSessions = sessions
+		m.appendBlock(renderSessionsList(sessions))
+	case "/resume":
+		if len(fields) < 2 {
+			m.appendBlock(stWarn.Render("  用法: /resume 1。先输入 /sessions 查看最近会话。"))
+			return m, nil
+		}
+		if len(m.recentSessions) == 0 {
+			sessions, err := listSessionFiles(sessionDir(), 8)
+			if err != nil {
+				m.appendBlock(stWarn.Render("  读取会话失败: " + err.Error()))
+				return m, nil
+			}
+			m.recentSessions = sessions
+		}
+		var idx int
+		if _, err := fmt.Sscanf(fields[1], "%d", &idx); err != nil || idx < 1 || idx > len(m.recentSessions) {
+			m.appendBlock(stWarn.Render("  未找到该会话编号。输入 /sessions 查看可恢复的会话。"))
+			return m, nil
+		}
+		session, err := loadSessionMarkdown(m.recentSessions[idx-1].Path)
+		if err != nil {
+			m.appendBlock(stWarn.Render("  恢复会话失败: " + err.Error()))
+			return m, nil
+		}
+		m.blocks = []string{
+			stBullet.Render("⏺ ") + stAccent.Render("已恢复会话 ") + stFaint.Render(filepath.Base(session.Path)),
+			stFaint.Render(strings.TrimSpace(session.Content)),
+		}
+		m.transcript = []transcriptEvent{{Kind: "session", Content: session.Content}}
+		m.lastQuestion = session.LastQuestion
+		m.lastExport = session.Path
+		m.refresh()
 	case "/retry":
 		if m.lastQuestion == "" {
 			m.appendBlock(stWarn.Render("  暂无可重试的问题。先提一个问题, 或从会话记录中复制问题。"))
@@ -1017,7 +1165,7 @@ func (m model) View() string {
 			idx := m.menuIdx % len(ms)
 			menu := []string{}
 			for i, c := range ms {
-				row := fmt.Sprintf(" %-11s %s", c.cmd, c.desc)
+				row := fmt.Sprintf(" %-13s %s", c.cmd, c.desc)
 				if i == idx {
 					menu = append(menu, stSelCmd.Render(row))
 				} else {
@@ -1028,7 +1176,7 @@ func (m model) View() string {
 		}
 	}
 
-	statusText := fmt.Sprintf("  对话 %d 轮 · /retry 重试 · /export 导出 · Ctrl+C 退出", len(m.history)/2)
+	statusText := fmt.Sprintf("  turns %d · /sessions · /retry · /export · Ctrl+C", len(m.history)/2)
 	if m.lastExport != "" {
 		statusText += " · saved " + filepath.Base(m.lastExport)
 	}
