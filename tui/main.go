@@ -19,6 +19,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -176,6 +177,7 @@ type model struct {
 	blocks    []string // finalized conversation lines
 	answer    string   // current streaming answer
 	answering bool
+	used      []string // tools called this turn (for the answer footer)
 	history   []turn
 	sub       chan tea.Msg
 	menuIdx   int
@@ -231,7 +233,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
-		header, footer := 2, 4
+		header, footer := 3, 4 // bordered banner = 3 lines; input+status+margin = 4
 		vh := msg.Height - header - footer
 		if vh < 3 {
 			vh = 3
@@ -283,6 +285,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.history = append(m.history, turn{"user", v})
 			m.answering = true
 			m.answer = ""
+			m.used = nil
 			q := v
 			hist := append([]turn(nil), m.history...)
 			return m, tea.Batch(
@@ -300,6 +303,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, listen(m.sub)
 
 	case toolCallMsg:
+		m.used = append(m.used, msg.name)
 		m.appendBlock(stTool.Render("  "+toolLabel(msg.name)) + "  " + stFaint.Render(m.argsStr(msg.args)))
 		return m, listen(m.sub)
 
@@ -325,8 +329,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case doneMsg:
 		if m.answer != "" {
-			m.appendBlock(stInk.Render(m.answer))
-			m.history = append(m.history, turn{"assistant", m.answer})
+			ans := m.answer
+			rendered := m.renderAnswer()
+			m.answer = ""
+			m.answering = false
+			m.appendBlock(rendered)
+			m.history = append(m.history, turn{"assistant", ans})
 			if len(m.history) > 12 {
 				m.history = m.history[len(m.history)-12:]
 			}
@@ -339,6 +347,38 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	m.ti, cmd = m.ti.Update(msg)
 	return m, cmd
+}
+
+// renderAnswer turns the finished answer into a polished block: glamour-rendered
+// Markdown behind a terracotta left-bar, with a "✦ 回答" title and a footer listing
+// the tools the agent used this turn.
+func (m model) renderAnswer() string {
+	w := m.vp.Width - 4
+	if w < 20 {
+		w = 20
+	}
+	body := m.answer
+	if r, err := glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(w)); err == nil {
+		if out, e := r.Render(m.answer); e == nil {
+			body = strings.TrimRight(out, "\n")
+		}
+	}
+	parts := []string{stAccent.Render("✦ 回答"), body}
+	if len(m.used) > 0 {
+		seen := map[string]bool{}
+		labels := []string{}
+		for _, n := range m.used {
+			if !seen[n] {
+				seen[n] = true
+				labels = append(labels, toolLabel(n))
+			}
+		}
+		parts = append(parts, stFaint.Render("— "+strings.Join(labels, "  ")+" —"))
+	}
+	bar := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), false, false, false, true).
+		BorderForeground(cAccent).PaddingLeft(1)
+	return bar.Render(strings.Join(parts, "\n"))
 }
 
 func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
@@ -367,7 +407,10 @@ func (m model) View() string {
 	if !m.ready {
 		return "启动中…"
 	}
-	header := stAccent.Render("✦ SciScope 科研智能体") + stFaint.Render("   检索·趋势·推荐·图谱·综述·对比·引文·核查")
+	banner := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).BorderForeground(cAccent).
+		Padding(0, 1)
+	header := banner.Render(stAccent.Render("✦ SciScope 科研智能体") + "  " + stFaint.Render("检索·趋势·推荐·图谱·综述·对比·引文·核查"))
 	parts := []string{header, m.vp.View()}
 
 	// inline slash menu (Claude Code-style flush list)
