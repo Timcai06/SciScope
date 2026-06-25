@@ -19,9 +19,9 @@ func TestRenderToolResultSearchLiteratureAsEvidenceCards(t *testing.T) {
 	rendered := renderToolResult("search_literature", result, 120, 0)
 
 	for _, want := range []string{
-		"证据卡 2 篇",
+		"╭─ evidence · 证据卡 2 篇",
 		"Retrieval-Augmented Generation",
-		"W1 · 2025 · Ada, Bo",
+		"│  W1 · 2025 · Ada, Bo",
 		"Graph evidence improves retrieval.",
 	} {
 		if !strings.Contains(rendered, want) {
@@ -44,10 +44,11 @@ func TestRenderToolResultVerifyClaimAsGroundingCards(t *testing.T) {
 	rendered := renderToolResult("verify_claim", result, 120, 0)
 
 	for _, want := range []string{
-		"论断核查 · 强支持 · 0.846",
+		"╭─ verify · 论断核查",
+		"强支持 · 0.846",
 		"检索增强生成能够降低幻觉",
 		"Retrieval-Augmented Generation and Hallucination",
-		"W4411065983 · 2025 · 相似度 0.846",
+		"│  W4411065983 · 2025 · 相似度 0.846",
 	} {
 		if !strings.Contains(rendered, want) {
 			t.Fatalf("rendered result missing %q:\n%s", want, rendered)
@@ -273,5 +274,41 @@ func TestSessionsSlashRendersRecentSessions(t *testing.T) {
 	}
 	if !strings.Contains(content, "sciscope-session-20260625-130000.md") {
 		t.Fatalf("expected session filename in sessions view:\n%s", content)
+	}
+}
+
+func TestPanelRowUsesConsistentDenseGrammar(t *testing.T) {
+	row := panelRow("evidence", "证据卡 2 篇", "1.2s", []string{"[1] Paper", "W1 · 2025"})
+
+	for _, want := range []string{
+		"╭─ evidence · 证据卡 2 篇 · 1.2s",
+		"│  [1] Paper",
+		"│  W1 · 2025",
+		"╰─",
+	} {
+		if !strings.Contains(row, want) {
+			t.Fatalf("panel row missing %q:\n%s", want, row)
+		}
+	}
+}
+
+func TestTimelineAndErrorUsePanelRows(t *testing.T) {
+	timeline := renderTimelineBlock([]timelineEvent{
+		{Kind: "tool_call", Label: "检索文献", Detail: "RAG"},
+		{Kind: "final", Label: "回答完成"},
+	})
+	if !strings.Contains(timeline, "╭─ timeline · 工具调用时间线") {
+		t.Fatalf("timeline should use panel row grammar:\n%s", timeline)
+	}
+	if !strings.Contains(timeline, "│  [1] 检索文献 · RAG") {
+		t.Fatalf("timeline missing dense row:\n%s", timeline)
+	}
+
+	errPanel := renderRecoveryPanel("无法连接后端: connection refused")
+	if !strings.Contains(errPanel, "╭─ recovery · 后端未连接") {
+		t.Fatalf("recovery should use panel row grammar:\n%s", errPanel)
+	}
+	if !strings.Contains(errPanel, "make backend") {
+		t.Fatalf("recovery panel missing command:\n%s", errPanel)
 	}
 }

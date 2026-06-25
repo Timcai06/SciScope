@@ -389,6 +389,23 @@ func elapsedSuffix(d time.Duration) string {
 	return stFaint.Render(fmt.Sprintf("  %.1fs", d.Seconds()))
 }
 
+func panelRow(kind, title, meta string, body []string) string {
+	head := "╭─ " + kind + " · " + title
+	if strings.TrimSpace(meta) != "" {
+		head += " · " + meta
+	}
+	lines := []string{stConn.Render(head)}
+	for _, line := range body {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		lines = append(lines, stFaint.Render("│  ")+line)
+	}
+	lines = append(lines, stConn.Render("╰─"))
+	return strings.Join(lines, "\n")
+}
+
 func durationText(d time.Duration) string {
 	if d <= 0 {
 		return ""
@@ -460,7 +477,7 @@ func renderTimelineBlock(events []timelineEvent) string {
 	if len(events) == 0 {
 		return ""
 	}
-	lines := []string{stBullet.Render("⏺ ") + stAccent.Render("工具调用时间线")}
+	body := []string{}
 	for i, ev := range events {
 		label := ev.Label
 		if label == "" {
@@ -473,9 +490,9 @@ func renderTimelineBlock(events []timelineEvent) string {
 		if d := durationText(ev.Duration); d != "" {
 			line += " · " + d
 		}
-		lines = append(lines, stConn.Render("  ⎿  ")+stFaint.Render(line))
+		body = append(body, line)
 	}
-	return strings.Join(lines, "\n")
+	return panelRow("timeline", "工具调用时间线", "", body)
 }
 
 func renderToolResult(name, result string, width int, elapsed time.Duration) string {
@@ -483,10 +500,10 @@ func renderToolResult(name, result string, width int, elapsed time.Duration) str
 	case "search_literature", "summarize_field":
 		var papers []evidencePaper
 		if json.Unmarshal([]byte(result), &papers) == nil && len(papers) > 0 {
-			lines := []string{stConn.Render("  ⎿  ") + stTool.Render(fmt.Sprintf("证据卡 %d 篇", len(papers))) + elapsedSuffix(elapsed)}
+			body := []string{}
 			for i, p := range papers {
 				if i >= 4 {
-					lines = append(lines, stFaint.Render(fmt.Sprintf("      +%d 篇更多证据", len(papers)-i)))
+					body = append(body, fmt.Sprintf("+%d 篇更多证据", len(papers)-i))
 					break
 				}
 				meta := []string{p.PaperID}
@@ -496,26 +513,27 @@ func renderToolResult(name, result string, width int, elapsed time.Duration) str
 				if len(p.Authors) > 0 {
 					meta = append(meta, strings.Join(p.Authors, ", "))
 				}
-				lines = append(lines,
-					stFaint.Render("      "+fmt.Sprintf("[%d] ", i+1))+stInk.Render(clip(p.Title, 72)),
-					stFaint.Render("          "+strings.Join(meta, " · ")),
-				)
+				body = append(body, fmt.Sprintf("[%d] %s", i+1, clip(p.Title, 72)))
+				body = append(body, strings.Join(meta, " · "))
 				if p.Snippet != "" {
-					lines = append(lines, stMuted.Render("          "+clip(p.Snippet, 96)))
+					body = append(body, clip(p.Snippet, 96))
 				}
 			}
-			return strings.Join(lines, "\n")
+			return panelRow("evidence", fmt.Sprintf("证据卡 %d 篇", len(papers)), durationText(elapsed), body)
 		}
 	case "verify_claim":
 		var cr claimResult
 		if json.Unmarshal([]byte(result), &cr) == nil && cr.Verdict != "" {
-			head := fmt.Sprintf("论断核查 · %s", cr.Verdict)
+			meta := cr.Verdict
 			if cr.TopSimilarity > 0 {
-				head += fmt.Sprintf(" · %.3f", cr.TopSimilarity)
+				meta += fmt.Sprintf(" · %.3f", cr.TopSimilarity)
 			}
-			lines := []string{stConn.Render("  ⎿  ") + stTool.Render(head) + elapsedSuffix(elapsed)}
+			if d := durationText(elapsed); d != "" {
+				meta += " · " + d
+			}
+			body := []string{}
 			if cr.Claim != "" {
-				lines = append(lines, stMuted.Render("      "+clip(cr.Claim, 96)))
+				body = append(body, clip(cr.Claim, 96))
 			}
 			for i, ev := range cr.Evidence {
 				if i >= 4 {
@@ -528,17 +546,15 @@ func renderToolResult(name, result string, width int, elapsed time.Duration) str
 				if ev.Similarity > 0 {
 					meta = append(meta, fmt.Sprintf("相似度 %.3f", ev.Similarity))
 				}
-				lines = append(lines,
-					stFaint.Render("      "+fmt.Sprintf("[%d] ", i+1))+stInk.Render(clip(ev.Title, 78)),
-					stFaint.Render("          "+strings.Join(meta, " · ")),
-				)
+				body = append(body, fmt.Sprintf("[%d] %s", i+1, clip(ev.Title, 78)))
+				body = append(body, strings.Join(meta, " · "))
 			}
-			return strings.Join(lines, "\n")
+			return panelRow("verify", "论断核查", meta, body)
 		}
 	case "get_trends":
 		var rows []map[string]any
 		if json.Unmarshal([]byte(result), &rows) == nil && len(rows) > 0 {
-			lines := []string{stConn.Render("  ⎿  ") + stTool.Render(fmt.Sprintf("趋势卡 %d 条", len(rows))) + elapsedSuffix(elapsed)}
+			body := []string{}
 			for i, row := range rows {
 				if i >= 3 {
 					break
@@ -546,12 +562,12 @@ func renderToolResult(name, result string, width int, elapsed time.Duration) str
 				kw := fmt.Sprintf("%v", row["关键词"])
 				trend := fmt.Sprintf("%v", row["趋势判定"])
 				momentum := fmt.Sprintf("%v", row["动量分"])
-				lines = append(lines, stFaint.Render("      "+fmt.Sprintf("[%d] ", i+1))+stInk.Render(kw)+" "+stMuted.Render("趋势 "+trend+" · 动量 "+momentum))
+				body = append(body, fmt.Sprintf("[%d] %s · 趋势 %s · 动量 %s", i+1, kw, trend, momentum))
 			}
-			return strings.Join(lines, "\n")
+			return panelRow("trend", fmt.Sprintf("趋势卡 %d 条", len(rows)), durationText(elapsed), body)
 		}
 	}
-	return stConn.Render("  ⎿  ") + stFaint.Render(preview(result)) + elapsedSuffix(elapsed)
+	return panelRow("result", toolPlainLabel(name), durationText(elapsed), []string{preview(result)})
 }
 
 func summarizeToolResultMarkdown(name, result string) string {
@@ -826,6 +842,15 @@ func friendlyError(s string) string {
 	return strings.Join(lines, "\n")
 }
 
+func renderRecoveryPanel(s string) string {
+	action := recoveryAction(s)
+	body := []string{s, action.Message}
+	if action.Command != "" {
+		body = append(body, "恢复动作: "+action.Command)
+	}
+	return panelRow("recovery", action.Title, "", body)
+}
+
 func (m *model) startQuestion(v string, retry bool) tea.Cmd {
 	prefix := "❯ "
 	if retry {
@@ -992,7 +1017,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.record("error", "", errText)
 		action := recoveryAction(string(msg))
 		m.addTimeline(timelineEvent{Kind: "error", Label: action.Title, Detail: action.Message})
-		m.appendBlock(stError.Render("⏺ ✗ " + errText))
+		m.appendBlock(stError.Render("⏺ ✗ ") + renderRecoveryPanel(string(msg)))
 		return m, listen(m.sub)
 
 	case doneMsg:
