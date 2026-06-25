@@ -152,3 +152,34 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 \textbf{数据组织与治理} → 规范化字段;标题优先去重(合并跨源/预印本同篇,留最全一条)+ front-matter 剔除 + PDF 垃圾/ NUL 清洗;160{,}488 → 159{,}190 篇。\\
 \textbf{信息汲取与建模} → 切片入库,计算片段/论文向量,拟合趋势/推荐/图谱/主题;关键词统一过滤 arXiv 码与超泛标签。\texttt{make agent-build} 一键重建。\\
 \textbf{服务与交互} → FastAPI 暴露检索/问答/趋势/推荐/图谱及\textbf{智能体流式}接口;终端 AI 助手 \texttt{make tui} 自主编排工具(Web 前端已预留 SSE 接口);数据库不可用时自动回退内存检索,保证演示鲁棒。
+
+\subsection{项目结构与分层}
+代码按"数据 → 模型 → 服务/RAG → 智能体 → 接口 → 客户端"\textbf{六层}组织,职责单一、依赖自底向上:\textbf{Python 承载全部智能}(从数据到 agent),\textbf{Go 仅作终端客户端}(经 SSE 消费,可替换、不绑定)。
+
+\begin{plainbox}\ttfamily\scriptsize
+数据要素/\\
+\hspace*{2mm}data\_pipeline/\hfill ① 加载 / 规范化(loaders·normalize·models)\\
+\hspace*{2mm}src/harvest, src/analysis/\hfill ① 6 源采集 / 分析资产 → 数据报告\\
+\hspace*{2mm}src/models/\hfill ② 嵌入·趋势·推荐·图谱·双语·重排\\
+\hspace*{2mm}models/, output/graphs/\hfill ② 模型文件 / 知识图谱 JSON\\
+\hspace*{2mm}backend/app/services/\hfill ③ 混合检索(RAG)·GraphRAG·推荐·趋势·图谱\\
+\hspace*{2mm}backend/app/agent/\hfill ④ loop.py(ReAct 循环)· tools.py(9 工具)\\
+\hspace*{2mm}backend/app/api/\hfill ⑤ /api/agent/stream(SSE)+ search/chat/trends/...\\
+\hspace*{2mm}tui/main.go\hfill ⑥ Go·Bubble Tea 终端客户端(消费 SSE)\\
+\hspace*{2mm}PostgreSQL + pgvector\hfill 运行时:papers·chunk\_embeddings·paper\_embeddings·...
+\end{plainbox}
+
+\begin{center}
+\begin{tabularx}{0.96\textwidth}{>{\bfseries}p{22mm}X}
+\toprule
+分层 & 职责与代码位置 \\
+\midrule
+① 数据层 & 6 源采集 → 规范化 / 标题优先去重 → 分析资产(\texttt{data\_pipeline}、\texttt{src/harvest}、\texttt{src/analysis}) \\
+② 模型层 & 片段/论文向量、趋势、推荐、图谱等\textbf{模型文件},入 PostgreSQL + pgvector(\texttt{src/models}、\texttt{models/}、\texttt{output/graphs/}) \\
+③ 服务 / RAG & 混合检索(FTS + 向量 + RRF + 双语 + 重排)+ GraphRAG + 证据接地(\texttt{backend/app/services}) \\
+④ 智能体 & ReAct 工具循环:plan → 选工具 → 并行执行 → 观察 → 反思自评 → 据证作答(\texttt{backend/app/agent}) \\
+⑤ 接口 & FastAPI;智能体经 \texttt{/api/agent/stream} 以 SSE 流式输出(\texttt{backend/app/api}) \\
+⑥ 客户端 & Go / Bubble Tea 终端(\texttt{tui/main.go}),纯 SSE 消费;Web 前端复用同一接口 \\
+\bottomrule
+\end{tabularx}
+\end{center}
