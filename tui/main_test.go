@@ -167,6 +167,39 @@ func TestRenderToolResultVerifyClaimAsGroundingCards(t *testing.T) {
 	}
 }
 
+func TestRenderTrendResultAvoidsInternalMetricJargon(t *testing.T) {
+	result := `[
+		{
+			"关键词":"retrieval augmented generation",
+			"累计论文数":120,
+			"增长方向":"rising",
+			"生命周期阶段":"growth",
+			"统计依据":{"近期活跃度分":0.88,"短期加速分":0.44}
+		}
+	]`
+
+	rendered := renderToolResult("get_trends", result, 120, 0)
+	summary := summarizeToolResultMarkdown("get_trends", result)
+	visible := plainANSI(rendered + "\n" + summary)
+
+	for _, want := range []string{
+		"趋势卡",
+		"retrieval augmented generation",
+		"方向 rising",
+		"阶段 growth",
+		"依据",
+	} {
+		if !strings.Contains(visible, want) {
+			t.Fatalf("trend rendering missing %q:\n%s", want, visible)
+		}
+	}
+	for _, removed := range []string{"动量", "Mann-Kendall", "Sen", "burst"} {
+		if strings.Contains(visible, removed) {
+			t.Fatalf("trend rendering should translate internal jargon %q:\n%s", removed, visible)
+		}
+	}
+}
+
 func TestFriendlyErrorSuggestsRecoveryCommand(t *testing.T) {
 	msg := friendlyError("无法连接后端 http://127.0.0.1:8000:dial tcp 127.0.0.1:8000: connect: connection refused")
 
@@ -588,17 +621,18 @@ func TestComposerRendersPolishedInputBox(t *testing.T) {
 	composer := m.renderComposer(96)
 
 	for _, want := range []string{
-		"agent",
-		"langgraph",
-		"session tui-test-session",
 		"核查 RAG",
 		"Enter",
 		"Esc",
 		"commands",
-		"/retry",
 	} {
 		if !strings.Contains(composer, want) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)
+		}
+	}
+	for _, removed := range []string{"session tui-test-session", "langgraph", "/retry"} {
+		if strings.Contains(composer, removed) {
+			t.Fatalf("composer should not expose noisy status %q:\n%s", removed, composer)
 		}
 	}
 }
@@ -717,6 +751,48 @@ func TestPlanAndReflectStayOutOfConversationBlocks(t *testing.T) {
 	}
 }
 
+func TestToolEventsStayOutOfConversationBlocks(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.answering = true
+	m.vp = viewport.New(100, 20)
+
+	next, _ := m.Update(toolCallMsg{name: "search_literature", args: map[string]any{"query": "RAG"}})
+	got := next.(model)
+	if len(got.blocks) != 0 {
+		t.Fatalf("tool call should not append to conversation blocks: %#v", got.blocks)
+	}
+
+	next, _ = got.Update(toolResultMsg{name: "search_literature", result: `[{"paper_id":"W1","标题":"RAG","年份":2025}]`})
+	got = next.(model)
+	if len(got.blocks) != 0 {
+		t.Fatalf("tool result should not append to conversation blocks: %#v", got.blocks)
+	}
+	if len(got.timeline) < 2 {
+		t.Fatalf("tool events should still be available in timeline: %#v", got.timeline)
+	}
+}
+
+func TestDoneAppendsOnlyAnswerToConversationBlocks(t *testing.T) {
+	t.Setenv("SCISCOPE_SESSION_DIR", t.TempDir())
+	m := initialModel()
+	m.ready = true
+	m.answering = true
+	m.vp = viewport.New(100, 20)
+	m.answer = "最终回答"
+	m.timeline = []timelineEvent{{Kind: "tool_call", Label: "检索文献"}}
+
+	next, _ := m.Update(doneMsg{})
+	got := next.(model)
+
+	if len(got.blocks) != 2 {
+		t.Fatalf("expected user-visible answer and save notice only, got %#v", got.blocks)
+	}
+	if strings.Contains(got.blocks[0], "本轮执行时间线") {
+		t.Fatalf("timeline should not be appended to main chat:\n%s", strings.Join(got.blocks, "\n"))
+	}
+}
+
 func TestFinalMessageRefreshesStreamingAnswerImmediately(t *testing.T) {
 	m := initialModel()
 	m.ready = true
@@ -734,7 +810,7 @@ func TestFinalMessageRefreshesStreamingAnswerImmediately(t *testing.T) {
 	}
 }
 
-func TestRenderAnswerUsesAnswerPanel(t *testing.T) {
+func TestRenderAnswerUsesChatMessageStyle(t *testing.T) {
 	m := initialModel()
 	m.vp = viewport.New(100, 20)
 	m.answer = "## 结论\n\nRAG 能降低无依据回答风险。"
@@ -743,15 +819,18 @@ func TestRenderAnswerUsesAnswerPanel(t *testing.T) {
 	rendered := m.renderAnswer()
 	plain := plainANSI(rendered)
 	for _, want := range []string{
-		"╭─ answer · 研究结论",
+		"⏺",
 		"结论",
 		"RAG 能降低",
-		"evidence tools:",
+		"/timeline 查看过程",
 		"论断核查",
 	} {
 		if !strings.Contains(plain, want) {
-			t.Fatalf("answer panel missing %q:\n%s", want, rendered)
+			t.Fatalf("answer message missing %q:\n%s", want, rendered)
 		}
+	}
+	if strings.Contains(plain, "╭─ answer") {
+		t.Fatalf("answer should not render as isolated card:\n%s", rendered)
 	}
 }
 
@@ -887,18 +966,19 @@ func TestComposerShowsMultilineAndRecoveryHints(t *testing.T) {
 	composer := m.renderComposer(96)
 
 	for _, want := range []string{
-		"agent",
-		"langgraph",
 		"第一行",
 		"第二行",
-		"Shift+Enter",
 		"Esc",
 		"/",
 		"commands",
-		"/retry",
 	} {
 		if !strings.Contains(composer, want) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)
+		}
+	}
+	for _, removed := range []string{"agent", "langgraph", "/retry"} {
+		if strings.Contains(composer, removed) {
+			t.Fatalf("composer should stay minimal, found %q:\n%s", removed, composer)
 		}
 	}
 }

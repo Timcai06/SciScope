@@ -881,39 +881,6 @@ func (m model) renderComposer(width int) string {
 	} else {
 		value = strings.ReplaceAll(value, "\n", "\n"+strings.Repeat(" ", 2))
 	}
-	mode := "ready"
-	if m.answering {
-		mode = "streaming"
-	} else if strings.Contains(raw, "\n") {
-		mode = "multi-line · Shift+Enter"
-	} else {
-		mode = "Shift+Enter 多行"
-	}
-	runtime := m.lastMeta.Runtime
-	if runtime == "" {
-		runtime = "langgraph"
-	}
-	session := clip(m.sessionID, 20)
-	if m.lastMeta.SessionID != "" {
-		session = clip(m.lastMeta.SessionID, 20)
-	}
-	leftMeta := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		stAccent.Render("agent"),
-		stFaint.Render(" · "),
-		stInk.Render(runtime),
-		stFaint.Render(" · session "),
-		stInk.Render(session),
-	)
-	rightMeta := mode
-	if m.lastExport != "" {
-		rightMeta += " · saved " + filepath.Base(m.lastExport)
-	}
-	head := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		lipgloss.NewStyle().Width(inputWidth-26).Render(leftMeta),
-		stFaint.Render(clip(rightMeta, 26)),
-	)
 	promptSymbol := "❯"
 	if m.answering {
 		promptSymbol = "●"
@@ -931,12 +898,8 @@ func (m model) renderComposer(width int) string {
 		stFaint.Render("  ·  "),
 		stAccent.Render("/"),
 		stFaint.Render(" commands"),
-		stFaint.Render("  ·  "),
-		stAccent.Render("/retry"),
-		stFaint.Render(" recover"),
 	)
 	body := strings.Join([]string{
-		head,
 		inputLine,
 		hint,
 	}, "\n")
@@ -1335,9 +1298,7 @@ func renderToolResult(name, result string, width int, elapsed time.Duration) str
 					break
 				}
 				kw := fmt.Sprintf("%v", row["关键词"])
-				trend := fmt.Sprintf("%v", row["趋势判定"])
-				momentum := fmt.Sprintf("%v", row["动量分"])
-				body = append(body, fmt.Sprintf("[%d] %s · 趋势 %s · 动量 %s", i+1, kw, trend, momentum))
+				body = append(body, fmt.Sprintf("[%d] %s · 方向 %s · 阶段 %s · 依据 %s", i+1, kw, trendDirection(row), trendStage(row), trendBasis(row)))
 			}
 			return panelRow("trend", fmt.Sprintf("趋势卡 %d 条", len(rows)), durationText(elapsed), body)
 		}
@@ -1407,12 +1368,70 @@ func summarizeToolResultMarkdown(name, result string) string {
 				if i >= 8 {
 					break
 				}
-				lines = append(lines, fmt.Sprintf("- [%d] %v: 趋势 %v · 动量 %v", i+1, row["关键词"], row["趋势判定"], row["动量分"]))
+				lines = append(lines, fmt.Sprintf("- [%d] %v: 方向 %s · 阶段 %s · 依据 %s", i+1, row["关键词"], trendDirection(row), trendStage(row), trendBasis(row)))
 			}
 			return strings.Join(lines, "\n")
 		}
 	}
 	return preview(result)
+}
+
+func trendDirection(row map[string]any) string {
+	if value := stringField(row, "增长方向"); value != "" {
+		return value
+	}
+	if value := stringField(row, "趋势判定"); value != "" {
+		return value
+	}
+	return "待判断"
+}
+
+func trendStage(row map[string]any) string {
+	if value := stringField(row, "生命周期阶段"); value != "" {
+		return value
+	}
+	return "未分层"
+}
+
+func trendBasis(row map[string]any) string {
+	stats, _ := row["统计依据"].(map[string]any)
+	parts := []string{}
+	if value := fieldText(stats, "近期活跃度分"); value != "" {
+		parts = append(parts, "近年活跃 "+value)
+	} else if value := fieldText(row, "动量分"); value != "" {
+		parts = append(parts, "近年活跃 "+value)
+	}
+	if value := fieldText(stats, "短期加速分"); value != "" {
+		parts = append(parts, "短期加速 "+value)
+	} else if value := fieldText(row, "爆发分"); value != "" {
+		parts = append(parts, "短期加速 "+value)
+	}
+	if value := fieldText(stats, "稳健年增长斜率"); value != "" {
+		parts = append(parts, "年增长 "+value)
+	}
+	if len(parts) == 0 {
+		return "样本年度分布"
+	}
+	return strings.Join(parts, " · ")
+}
+
+func stringField(row map[string]any, key string) string {
+	value, ok := row[key]
+	if !ok || value == nil {
+		return ""
+	}
+	text := strings.TrimSpace(fmt.Sprintf("%v", value))
+	if text == "" || text == "<nil>" {
+		return ""
+	}
+	return text
+}
+
+func fieldText(row map[string]any, key string) string {
+	if row == nil {
+		return ""
+	}
+	return stringField(row, key)
 }
 
 func exportMarkdown(events []transcriptEvent, generatedAt time.Time) string {
@@ -1843,16 +1862,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.addTimeline(timelineEvent{Kind: "tool_call", Tool: msg.name, Label: toolPlainLabel(msg.name), Detail: detail})
-		body := []string{}
-		if detail != "" {
-			body = append(body, detail)
-		}
 		if notice, ok := permissionNotice(msg.name); ok {
-			body = append(body, notice)
 			m.record("permission", msg.name, notice)
 			m.addTimeline(timelineEvent{Kind: "permission", Tool: msg.name, Label: "权限提示", Detail: notice})
 		}
-		m.appendBlock(panelRow("action", toolPlainLabel(msg.name), "tool call", body))
 		return m, listen(m.sub)
 
 	case toolResultMsg:
@@ -1862,7 +1875,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.addTimeline(timelineEvent{Kind: "tool_result", Tool: msg.name, Label: toolResultLabel(msg.name, msg.result), Detail: metaDetail(msg.meta), Duration: elapsed})
 		m.record("tool_result", msg.name, summarizeToolResultMarkdown(msg.name, msg.result))
-		m.appendBlock(renderToolResult(msg.name, msg.result, m.vp.Width, elapsed))
 		return m, listen(m.sub)
 
 	case reflectMsg:
@@ -1899,7 +1911,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.addTimeline(timelineEvent{Kind: "final", Label: "回答完成"})
 			if body := timelineMarkdownBody(m.timeline); body != "" {
 				m.record("timeline", "", body)
-				m.appendBlock(renderTimelineBlock(m.timeline))
 			}
 			m.record("assistant", "", ans)
 			m.appendBlock(m.renderAnswer())
@@ -1927,8 +1938,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// renderAnswer renders the finished answer as Markdown (glamour) under a ⏺ bullet,
-// with a dim footer listing the tools the agent used this turn.
+// renderAnswer renders the finished answer as a chat message. Tool traces are
+// kept in /timeline so the main conversation stays readable.
 func (m model) renderAnswer() string {
 	w := m.vp.Width - 4
 	if w < 20 {
@@ -1942,8 +1953,7 @@ func (m model) renderAnswer() string {
 			body = strings.Trim(out, "\n")
 		}
 	}
-	lines := strings.Split(body, "\n")
-	out := panelRow("answer", "研究结论", "", lines)
+	out := stBullet.Render("⏺ ") + body
 	if len(m.used) > 0 {
 		seen := map[string]bool{}
 		labels := []string{}
@@ -1953,7 +1963,7 @@ func (m model) renderAnswer() string {
 				labels = append(labels, toolLabel(n))
 			}
 		}
-		out += "\n" + stFaint.Render("  evidence tools: "+strings.Join(labels, "  "))
+		out += "\n" + stFaint.Render("  "+strings.Join(labels, "  ")+" · /timeline 查看过程")
 	}
 	return out
 }
@@ -2070,7 +2080,6 @@ func (m model) View() string {
 
 	// thinking spinner (Claude Code-style verb + esc hint) while a turn runs
 	if m.answering {
-		parts = append(parts, renderStreamRail(m.timeline, m.lastMeta, m.nodeSeen, m.lastStreamKind, time.Since(m.start), m.vp.Width))
 		if thinking := renderThinkingShelf(m.livePlan, m.liveReflect, m.vp.Width); thinking != "" {
 			parts = append(parts, thinking)
 		}
@@ -2082,7 +2091,11 @@ func (m model) View() string {
 		}
 	}
 
-	statusText := fmt.Sprintf("  turns %d · /demo · /sessions · /retry · /export · Ctrl+C", len(m.history)/2)
+	runtime := m.lastMeta.Runtime
+	if runtime == "" {
+		runtime = "langgraph"
+	}
+	statusText := fmt.Sprintf("  %s · turns %d · /timeline · /retry · /doctor · Ctrl+C", runtime, len(m.history)/2)
 	if m.lastExport != "" {
 		statusText += " · saved " + filepath.Base(m.lastExport)
 	}

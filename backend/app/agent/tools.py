@@ -40,8 +40,9 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "function": {
             "name": "get_trends",
             "description": (
-                "查询某关键词/主题的研究趋势:动量、burst、Mann-Kendall 趋势判定、Sen's 斜率、"
-                "下一年预测。用于'趋势/热度/发展/演进/前景'类问题。"
+                "查询某关键词/主题的研究趋势证据,返回增长方向、阶段、预测和统计依据。"
+                "用于'趋势/热度/发展/演进/前景'类问题;回答时应把统计依据翻译成自然语言,"
+                "不要把动量、burst、Mann-Kendall、Sen's slope 等内部字段直接列给用户。"
             ),
             "parameters": {
                 "type": "object",
@@ -238,13 +239,16 @@ def _trends(args: dict[str, Any]) -> str:
                 {
                     "关键词": r.get("keyword"),
                     "累计论文数": r.get("doc_count"),
-                    "趋势判定": r.get("mk_trend"),
-                    "稳健斜率Sen": r.get("sen_slope"),
-                    "动量分": r.get("momentum_score"),
-                    "爆发分": r.get("burst_score"),
+                    "增长方向": r.get("mk_trend"),
+                    "统计依据": {
+                        "稳健年增长斜率": r.get("sen_slope"),
+                        "近期活跃度分": r.get("momentum_score"),
+                        "短期加速分": r.get("burst_score"),
+                    },
                     "预测目标年份": r.get("forecast_next_year"),  # 年份,非数量
                     "该年预测归一化词频": r.get("forecast_normalized_df"),
                     "生命周期阶段": r.get("lifecycle_stage"),
+                    "回答提示": "请说明趋势方向、为何这样判断、预测意味着什么;不要直接罗列内部指标名。",
                 }
                 for r in matches[:3]
             ]
@@ -266,11 +270,13 @@ def _trends(args: dict[str, Any]) -> str:
                     {
                         "关键词": r.get("keyword"),
                         "累计论文数": r.get("doc_count"),
-                        "趋势判定": "rising" if growth > 0.05 else ("falling" if growth < -0.05 else "stable"),
-                        "增长率": r.get("growth_rate"),
-                        "动量分": r.get("momentum_score"),
-                        "爆发分": r.get("burst_score"),
-                        "说明": "来自全量关键词趋势(非 top 热点,无 MK 检验)",
+                        "增长方向": "rising" if growth > 0.05 else ("falling" if growth < -0.05 else "stable"),
+                        "统计依据": {
+                            "阶段增长率": r.get("growth_rate"),
+                            "近期活跃度分": r.get("momentum_score"),
+                            "短期加速分": r.get("burst_score"),
+                        },
+                        "说明": "来自全量关键词趋势(非 top 热点,无 MK 检验);回答时翻译为自然语言。",
                     }
                 )
             return json.dumps(out, ensure_ascii=False)

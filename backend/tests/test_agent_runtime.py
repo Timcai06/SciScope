@@ -35,6 +35,7 @@ def test_default_runtime_is_langgraph(monkeypatch):
 def test_system_prompt_requires_synthesis_not_paper_by_paper():
     assert "不要默认按单篇论文逐篇复述" in SYSTEM_PROMPT
     assert "论文只能作为证据例子" in SYSTEM_PROMPT
+    assert "不要把动量、burst、Mann-Kendall、Sen's 斜率等内部指标名直接列成用户答案" in SYSTEM_PROMPT
 
 
 def test_legacy_runtime_still_available_as_fallback(monkeypatch):

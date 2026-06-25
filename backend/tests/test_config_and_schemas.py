@@ -20,7 +20,7 @@ def test_parse_bool_rejects_unknown_values():
 
 
 def test_parse_cors_origins_defaults_to_localhost():
-    assert _parse_cors_origins(None) == ["http://localhost:3000"]
+    assert _parse_cors_origins(None) == ["http://localhost:3001"]
 
 
 def test_parse_cors_origins_splits_and_strips_values():
