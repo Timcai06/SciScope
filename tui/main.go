@@ -162,6 +162,10 @@ type finalMsg string
 type errMsg string
 type doneMsg struct{}
 type demoStartMsg string
+type nodePulseMsg struct {
+	kind string
+	meta eventMeta
+}
 
 type transcriptEvent struct {
 	Kind    string
@@ -473,6 +477,9 @@ func stream(ctx context.Context, backend, q string, history []turn, sessionID st
 		if json.Unmarshal([]byte(data), &ev) != nil {
 			continue
 		}
+		if !metaEmpty(ev.Meta) {
+			sub <- nodePulseMsg{kind: ev.Type, meta: ev.Meta}
+		}
 		switch ev.Type {
 		case "plan":
 			var s []string
@@ -537,6 +544,9 @@ type model struct {
 	lastExport     string
 	lastQuestion   string
 	sessionID      string
+	lastMeta       eventMeta
+	lastStreamKind string
+	nodeSeen       []string
 	sub            chan tea.Msg
 	cancel         context.CancelFunc
 	menuIdx        int
@@ -608,6 +618,66 @@ func metaDetail(meta eventMeta) string {
 	return strings.Join(parts, " · ")
 }
 
+func metaEmpty(meta eventMeta) bool {
+	return meta.Runtime == "" && meta.Node == "" && meta.SessionID == "" && meta.ElapsedMS == 0 && !meta.Retry
+}
+
+func nodeLabel(node string) string {
+	switch node {
+	case "prepare":
+		return "准备上下文"
+	case "plan":
+		return "规划步骤"
+	case "llm_step":
+		return "模型推理"
+	case "execute_tools":
+		return "调用工具"
+	case "reflect":
+		return "证据反思"
+	case "force_synthesis":
+		return "强制综合"
+	default:
+		if node == "" {
+			return "等待事件"
+		}
+		return node
+	}
+}
+
+func streamKindLabel(kind string) string {
+	switch kind {
+	case "plan":
+		return "plan"
+	case "text":
+		return "text"
+	case "tool_call":
+		return "tool call"
+	case "tool_result":
+		return "tool result"
+	case "reflect":
+		return "reflect"
+	case "final":
+		return "final"
+	case "error":
+		return "error"
+	default:
+		return "stream"
+	}
+}
+
+func appendUniqueNode(nodes []string, node string) []string {
+	node = strings.TrimSpace(node)
+	if node == "" {
+		return nodes
+	}
+	for _, seen := range nodes {
+		if seen == node {
+			return nodes
+		}
+	}
+	return append(nodes, node)
+}
+
 func (m *model) loadRecentSessions() {
 	sessions, err := listSessionFiles(sessionDir(), 3)
 	if err == nil {
@@ -635,6 +705,79 @@ func (m *model) refresh() {
 	}
 	m.vp.SetContent(content)
 	m.vp.GotoBottom()
+}
+
+func renderStreamRail(events []timelineEvent, meta eventMeta, nodes []string, kind string, elapsed time.Duration, width int) string {
+	if width < 48 {
+		width = 48
+	}
+	runtime := meta.Runtime
+	if runtime == "" {
+		runtime = "langgraph"
+	}
+	node := nodeLabel(meta.Node)
+	if meta.Node == "" && len(nodes) > 0 {
+		node = nodeLabel(nodes[len(nodes)-1])
+	}
+	session := meta.SessionID
+	if session == "" {
+		session = "local session"
+	}
+	status := []string{
+		stAccent.Render(runtime),
+		stFaint.Render("node ") + stInk.Render(node),
+		stFaint.Render(streamKindLabel(kind)),
+		stFaint.Render(fmt.Sprintf("%.0fs", elapsed.Seconds())),
+	}
+	if meta.Retry {
+		status = append(status, stWarn.Render("retry"))
+	}
+	if meta.ElapsedMS > 0 {
+		status = append(status, stFaint.Render(fmt.Sprintf("%dms", meta.ElapsedMS)))
+	}
+
+	body := []string{
+		strings.Join(status, stFaint.Render(" · ")),
+		stFaint.Render("thread " + clip(session, 38)),
+	}
+	if len(nodes) > 0 {
+		labels := []string{}
+		start := len(nodes) - 5
+		if start < 0 {
+			start = 0
+		}
+		for _, node := range nodes[start:] {
+			labels = append(labels, nodeLabel(node))
+		}
+		body = append(body, stFaint.Render("graph  ")+stInk.Render(strings.Join(labels, stFaint.Render(" → "))))
+	}
+	if len(events) > 0 {
+		body = append(body, stFaint.Render("latest"))
+		start := len(events) - 4
+		if start < 0 {
+			start = 0
+		}
+		for _, ev := range events[start:] {
+			label := ev.Label
+			if label == "" {
+				label = toolPlainLabel(ev.Tool)
+			}
+			line := "  " + label
+			if ev.Detail != "" {
+				line += " · " + clip(ev.Detail, 54)
+			}
+			if d := durationText(ev.Duration); d != "" {
+				line += " · " + d
+			}
+			body = append(body, line)
+		}
+	}
+	return lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true, false, true, false).
+		BorderForeground(cFaint).
+		Padding(0, 1).
+		Width(width - 2).
+		Render(strings.Join(body, "\n"))
 }
 
 func (m model) renderComposer(width int) string {
@@ -1377,6 +1520,9 @@ func (m *model) startQuestion(v string, retry bool) tea.Cmd {
 	m.used = nil
 	m.toolStart = map[string]time.Time{}
 	m.timeline = nil
+	m.lastMeta = eventMeta{}
+	m.lastStreamKind = ""
+	m.nodeSeen = nil
 	m.verb = verbs[rand.Intn(len(verbs))]
 	m.start = time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1425,8 +1571,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.used = nil
 		m.toolStart = map[string]time.Time{}
 		m.timeline = nil
+		m.lastMeta = eventMeta{}
+		m.lastStreamKind = ""
+		m.nodeSeen = nil
 		m.verb = "演示中"
 		m.start = time.Now()
+		return m, listen(m.sub)
+
+	case nodePulseMsg:
+		m.lastMeta = msg.meta
+		m.lastStreamKind = msg.kind
+		m.nodeSeen = appendUniqueNode(m.nodeSeen, msg.meta.Node)
+		m.refresh()
 		return m, listen(m.sub)
 
 	case spinner.TickMsg:
@@ -1731,6 +1887,7 @@ func (m model) View() string {
 
 	// thinking spinner (Claude Code-style verb + esc hint) while a turn runs
 	if m.answering {
+		parts = append(parts, renderStreamRail(m.timeline, m.lastMeta, m.nodeSeen, m.lastStreamKind, time.Since(m.start), m.vp.Width))
 		elapsed := int(time.Since(m.start).Seconds())
 		parts = append(parts, m.spin.View()+" "+stAccent.Render(m.verb+"…")+stFaint.Render(fmt.Sprintf("  (%ds · esc 中断)", elapsed)))
 	} else if strings.HasPrefix(m.ti.Value(), "/") {

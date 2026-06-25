@@ -55,6 +55,58 @@ func TestMetaDetailFormatsLangGraphNodeTiming(t *testing.T) {
 	}
 }
 
+func TestRenderStreamRailShowsLangGraphObservability(t *testing.T) {
+	rail := renderStreamRail(
+		[]timelineEvent{{Kind: "tool_call", Label: "检索文献", Detail: "RAG hallucination"}},
+		eventMeta{Runtime: "langgraph", Node: "execute_tools", SessionID: "tui-20260625T120000", ElapsedMS: 42, Retry: true},
+		[]string{"prepare", "plan", "execute_tools"},
+		"tool_call",
+		3*time.Second,
+		100,
+	)
+
+	for _, want := range []string{
+		"langgraph",
+		"node",
+		"调用工具",
+		"tool call",
+		"retry",
+		"42ms",
+		"thread tui-20260625T120000",
+		"准备上下文",
+		"规划步骤",
+		"检索文献",
+	} {
+		if !strings.Contains(rail, want) {
+			t.Fatalf("stream rail missing %q:\n%s", want, rail)
+		}
+	}
+}
+
+func TestNodePulseUpdatesLiveStreamState(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+	m.answering = true
+	m.start = time.Now()
+
+	next, cmd := m.Update(nodePulseMsg{
+		kind: "tool_result",
+		meta: eventMeta{Runtime: "langgraph", Node: "execute_tools", SessionID: "tui-test"},
+	})
+	got := next.(model)
+
+	if cmd == nil {
+		t.Fatalf("expected node pulse to keep stream listener active")
+	}
+	if got.lastMeta.Node != "execute_tools" || got.lastStreamKind != "tool_result" {
+		t.Fatalf("unexpected stream state: %#v kind=%s", got.lastMeta, got.lastStreamKind)
+	}
+	if len(got.nodeSeen) != 1 || got.nodeSeen[0] != "execute_tools" {
+		t.Fatalf("expected node path to record execute_tools, got %#v", got.nodeSeen)
+	}
+}
+
 func TestRenderToolResultVerifyClaimAsGroundingCards(t *testing.T) {
 	result := `{
 		"论断":"检索增强生成能够降低幻觉",
