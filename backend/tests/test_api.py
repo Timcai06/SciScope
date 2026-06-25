@@ -68,10 +68,10 @@ def test_cors_allows_configured_localhost_origin(client):
     response = client.options(
         "/api/ingest/status",
         headers={
-            "Origin": "http://localhost:3000",
+            "Origin": "http://localhost:3001",
             "Access-Control-Request-Method": "GET",
         },
     )
 
     assert response.status_code == 200
-    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3001"

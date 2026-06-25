@@ -6,6 +6,7 @@ import pytest
 
 from backend.app.agent import langgraph_runtime, runtime
 from backend.app.agent.events import event_parts
+from backend.app.agent.llm import SYSTEM_PROMPT
 
 
 @pytest.fixture(autouse=True)
@@ -29,6 +30,11 @@ def test_default_runtime_is_langgraph(monkeypatch):
 
     assert runtime.selected_runtime_name() == "langgraph"
     assert events == [("final", "graph:hello")]
+
+
+def test_system_prompt_requires_synthesis_not_paper_by_paper():
+    assert "不要默认按单篇论文逐篇复述" in SYSTEM_PROMPT
+    assert "论文只能作为证据例子" in SYSTEM_PROMPT
 
 
 def test_legacy_runtime_still_available_as_fallback(monkeypatch):

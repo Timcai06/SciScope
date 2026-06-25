@@ -467,8 +467,33 @@ func playDemo(sub chan tea.Msg) {
 //	error     -> recoverable error text
 //
 // Scanner keeps only lines starting with "data:" and stops at "[DONE]".
+func sanitizeHistory(history []turn) []turn {
+	clean := make([]turn, 0, len(history))
+	for _, item := range history {
+		role := strings.TrimSpace(item.Role)
+		content := strings.TrimSpace(item.Content)
+		if content == "" {
+			continue
+		}
+		if role != "user" && role != "assistant" {
+			continue
+		}
+		clean = append(clean, turn{Role: role, Content: content})
+	}
+	return clean
+}
+
+func agentRequestBody(q string, history []turn, sessionID string, retry bool) ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"question":   strings.TrimSpace(q),
+		"history":    sanitizeHistory(history),
+		"session_id": strings.TrimSpace(sessionID),
+		"retry":      retry,
+	})
+}
+
 func stream(ctx context.Context, backend, q string, history []turn, sessionID string, retry bool, sub chan tea.Msg) {
-	body, _ := json.Marshal(map[string]any{"question": q, "history": history, "session_id": sessionID, "retry": retry})
+	body, _ := agentRequestBody(q, history, sessionID, retry)
 	req, _ := http.NewRequestWithContext(ctx, "POST", backend+"/api/agent/stream", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
@@ -574,6 +599,8 @@ type model struct {
 	lastMeta       eventMeta
 	lastStreamKind string
 	nodeSeen       []string
+	livePlan       []string
+	liveReflect    string
 	sub            chan tea.Msg
 	cancel         context.CancelFunc
 	menuIdx        int
@@ -798,6 +825,38 @@ func renderStreamRail(events []timelineEvent, meta eventMeta, nodes []string, ki
 			}
 			body = append(body, line)
 		}
+	}
+	return lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true, false, true, false).
+		BorderForeground(cFaint).
+		Padding(0, 1).
+		Width(width - 2).
+		Render(strings.Join(body, "\n"))
+}
+
+func renderThinkingShelf(plan []string, reflect string, width int) string {
+	if len(plan) == 0 && strings.TrimSpace(reflect) == "" {
+		return ""
+	}
+	if width < 48 {
+		width = 48
+	}
+	body := []string{}
+	if len(plan) > 0 {
+		body = append(body, stFaint.Render("plan"))
+		for i, step := range plan {
+			if i >= 4 {
+				break
+			}
+			body = append(body, fmt.Sprintf("  [%d] %s", i+1, clip(step, 86)))
+		}
+	}
+	if strings.TrimSpace(reflect) != "" {
+		if len(body) > 0 {
+			body = append(body, "")
+		}
+		body = append(body, stFaint.Render("reflect"))
+		body = append(body, "  "+clip(reflect, 110))
 	}
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), true, false, true, false).
@@ -1635,6 +1694,8 @@ func (m *model) startQuestion(v string, retry bool) tea.Cmd {
 	m.lastMeta = eventMeta{}
 	m.lastStreamKind = ""
 	m.nodeSeen = nil
+	m.livePlan = nil
+	m.liveReflect = ""
 	m.verb = verbs[rand.Intn(len(verbs))]
 	m.start = time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1686,6 +1747,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastMeta = eventMeta{}
 		m.lastStreamKind = ""
 		m.nodeSeen = nil
+		m.livePlan = nil
+		m.liveReflect = ""
 		m.verb = "演示中"
 		m.start = time.Now()
 		return m, listen(m.sub)
@@ -1756,7 +1819,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.addTimeline(timelineEvent{Kind: "plan", Label: "执行计划", Detail: strings.Join([]string(msg), " / ")})
 		m.record("plan", "", strings.Join(plain, "\n"))
-		m.appendBlock(renderPlanBlock(msg))
+		m.livePlan = append([]string(nil), msg...)
+		m.refresh()
 		return m, listen(m.sub)
 
 	case toolCallMsg:
@@ -1804,7 +1868,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case reflectMsg:
 		m.answer = ""
 		m.record("reflect", "", string(msg))
-		m.appendBlock(renderReflectBlock(string(msg)))
+		m.liveReflect = string(msg)
+		m.refresh()
 		return m, listen(m.sub)
 
 	case textMsg:
@@ -1816,6 +1881,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.answer == "" {
 			m.answer = string(msg)
 		}
+		m.refresh()
 		return m, listen(m.sub)
 
 	case errMsg:
@@ -1850,6 +1916,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.answer = ""
 		m.answering = false
+		m.livePlan = nil
+		m.liveReflect = ""
 		m.cancel = nil
 		m.refresh()
 		return m, nil
@@ -1874,7 +1942,8 @@ func (m model) renderAnswer() string {
 			body = strings.Trim(out, "\n")
 		}
 	}
-	out := stBullet.Render("⏺ ") + body
+	lines := strings.Split(body, "\n")
+	out := panelRow("answer", "研究结论", "", lines)
 	if len(m.used) > 0 {
 		seen := map[string]bool{}
 		labels := []string{}
@@ -1884,7 +1953,7 @@ func (m model) renderAnswer() string {
 				labels = append(labels, toolLabel(n))
 			}
 		}
-		out += "\n" + stFaint.Render("  "+strings.Join(labels, "  "))
+		out += "\n" + stFaint.Render("  evidence tools: "+strings.Join(labels, "  "))
 	}
 	return out
 }
@@ -2002,6 +2071,9 @@ func (m model) View() string {
 	// thinking spinner (Claude Code-style verb + esc hint) while a turn runs
 	if m.answering {
 		parts = append(parts, renderStreamRail(m.timeline, m.lastMeta, m.nodeSeen, m.lastStreamKind, time.Since(m.start), m.vp.Width))
+		if thinking := renderThinkingShelf(m.livePlan, m.liveReflect, m.vp.Width); thinking != "" {
+			parts = append(parts, thinking)
+		}
 		elapsed := int(time.Since(m.start).Seconds())
 		parts = append(parts, m.spin.View()+" "+stAccent.Render(m.verb+"…")+stFaint.Render(fmt.Sprintf("  (%ds · esc 中断)", elapsed)))
 	} else if strings.HasPrefix(m.ti.Value(), "/") {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
+
+var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func plainANSI(s string) string {
+	return ansiRE.ReplaceAllString(s, "")
+}
 
 func TestRenderToolResultSearchLiteratureAsEvidenceCards(t *testing.T) {
 	result := `[
@@ -44,6 +51,33 @@ func TestFormatHTTPErrorIncludesValidationDetails(t *testing.T) {
 
 	if !strings.Contains(got, "422") || !strings.Contains(got, "question must not be empty") {
 		t.Fatalf("expected validation detail in HTTP error, got %q", got)
+	}
+}
+
+func TestAgentRequestBodySanitizesHistoryForBackendSchema(t *testing.T) {
+	body, err := agentRequestBody("  核查 RAG  ", []turn{
+		{Role: "system", Content: "drop"},
+		{Role: "user", Content: "上一问"},
+		{Role: "assistant", Content: "上一答"},
+		{Role: "assistant", Content: "   "},
+	}, " tui-test ", true)
+	if err != nil {
+		t.Fatalf("agentRequestBody returned error: %v", err)
+	}
+	raw := string(body)
+	for _, want := range []string{
+		`"question":"核查 RAG"`,
+		`"session_id":"tui-test"`,
+		`"retry":true`,
+		`"role":"user"`,
+		`"role":"assistant"`,
+	} {
+		if !strings.Contains(raw, want) {
+			t.Fatalf("request body missing %q:\n%s", want, raw)
+		}
+	}
+	if strings.Contains(raw, `"system"`) || strings.Contains(raw, `"drop"`) {
+		t.Fatalf("request body should drop invalid history turns:\n%s", raw)
 	}
 }
 
@@ -637,6 +671,87 @@ func TestThinkingPanelsUseTraceGrammar(t *testing.T) {
 	reflection := renderReflectBlock("限定为降低风险")
 	if !strings.Contains(reflection, "╭─ thinking · 自我纠错") {
 		t.Fatalf("reflect should render as thinking panel:\n%s", reflection)
+	}
+}
+
+func TestThinkingShelfRendersAboveComposerState(t *testing.T) {
+	shelf := renderThinkingShelf([]string{"检索相关论文", "综合证据"}, "证据不足时重试", 100)
+
+	for _, want := range []string{
+		"plan",
+		"[1] 检索相关论文",
+		"reflect",
+		"证据不足时重试",
+	} {
+		if !strings.Contains(shelf, want) {
+			t.Fatalf("thinking shelf missing %q:\n%s", want, shelf)
+		}
+	}
+}
+
+func TestPlanAndReflectStayOutOfConversationBlocks(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.answering = true
+	m.vp = viewport.New(100, 20)
+
+	next, _ := m.Update(planMsg{"检索证据", "综合回答"})
+	got := next.(model)
+	if len(got.blocks) != 0 {
+		t.Fatalf("plan should not append to conversation blocks: %#v", got.blocks)
+	}
+	if len(got.livePlan) != 2 {
+		t.Fatalf("expected live plan to update, got %#v", got.livePlan)
+	}
+
+	next, _ = got.Update(reflectMsg("需要补充证据"))
+	got = next.(model)
+	if len(got.blocks) != 0 {
+		t.Fatalf("reflect should not append to conversation blocks: %#v", got.blocks)
+	}
+	if got.liveReflect != "需要补充证据" {
+		t.Fatalf("expected live reflect to update, got %q", got.liveReflect)
+	}
+	if !strings.Contains(got.View(), "需要补充证据") {
+		t.Fatalf("view should show live reflect above composer:\n%s", got.View())
+	}
+}
+
+func TestFinalMessageRefreshesStreamingAnswerImmediately(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.answering = true
+	m.vp = viewport.New(100, 20)
+
+	next, _ := m.Update(finalMsg("最终结论"))
+	got := next.(model)
+
+	if got.answer != "最终结论" {
+		t.Fatalf("expected final answer to be stored immediately, got %q", got.answer)
+	}
+	if !strings.Contains(got.vp.View(), "最终结论") {
+		t.Fatalf("expected final answer to render before done:\n%s", got.vp.View())
+	}
+}
+
+func TestRenderAnswerUsesAnswerPanel(t *testing.T) {
+	m := initialModel()
+	m.vp = viewport.New(100, 20)
+	m.answer = "## 结论\n\nRAG 能降低无依据回答风险。"
+	m.used = []string{"verify_claim"}
+
+	rendered := m.renderAnswer()
+	plain := plainANSI(rendered)
+	for _, want := range []string{
+		"╭─ answer · 研究结论",
+		"结论",
+		"RAG 能降低",
+		"evidence tools:",
+		"论断核查",
+	} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("answer panel missing %q:\n%s", want, rendered)
+		}
 	}
 }
 
