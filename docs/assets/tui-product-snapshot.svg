@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="620" viewBox="0 0 980 620" role="img" aria-labelledby="title desc">
+  <title id="title">SciScope TUI product snapshot</title>
+  <desc id="desc">Terminal-style snapshot showing SciScope splash, system status, evidence timeline, and composer.</desc>
+  <rect width="980" height="620" fill="#101414"/>
+  <rect x="34" y="28" width="912" height="564" rx="12" fill="#161b1b" stroke="#5fd7d7" stroke-width="2"/>
+  <text x="58" y="66" fill="#5fd7d7" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="18" font-weight="700">◆ SciScope</text>
+  <text x="190" y="66" fill="#d7d7d7" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="18">科研智能体终端</text>
+  <text x="58" y="108" fill="#5fd7d7" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="16">SCISCOPE</text>
+  <text x="58" y="136" fill="#808080" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">evidence-first research agent · local sessions · reproducible export</text>
+
+  <rect x="58" y="166" width="264" height="130" rx="8" fill="#111717" stroke="#4b5b5b"/>
+  <text x="78" y="196" fill="#5fd7d7" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="15" font-weight="700">Quick actions</text>
+  <text x="78" y="228" fill="#b8c8c8" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">/demo       golden flow</text>
+  <text x="78" y="254" fill="#b8c8c8" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">/sessions   recent work</text>
+  <text x="78" y="280" fill="#b8c8c8" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">/doctor     readiness</text>
+
+  <rect x="358" y="166" width="264" height="130" rx="8" fill="#111717" stroke="#4b5b5b"/>
+  <text x="378" y="196" fill="#5fd7d7" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="15" font-weight="700">System status</text>
+  <text x="378" y="228" fill="#b8c8c8" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">Backend  check with /doctor</text>
+  <text x="378" y="254" fill="#b8c8c8" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">LLM      check with /doctor</text>
+  <text x="378" y="280" fill="#b8c8c8" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">Sessions ~/.sciscope/sessions</text>
+
+  <rect x="658" y="166" width="264" height="130" rx="8" fill="#111717" stroke="#4b5b5b"/>
+  <text x="678" y="196" fill="#5fd7d7" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="15" font-weight="700">Golden demo</text>
+  <text x="678" y="228" fill="#b8c8c8" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">verify_claim -> evidence</text>
+  <text x="678" y="254" fill="#b8c8c8" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">cross-language grounding</text>
+  <text x="678" y="280" fill="#b8c8c8" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">timeline · export · retry</text>
+
+  <rect x="58" y="324" width="864" height="120" rx="8" fill="#111717" stroke="#4b5b5b"/>
+  <text x="78" y="354" fill="#87afff" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="14">╭─ thinking · 思考过程 · 4 步</text>
+  <text x="78" y="382" fill="#d7d7d7" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">│  [1] 解析中文论断并生成英文检索表达</text>
+  <text x="78" y="408" fill="#d7d7d7" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">│  [2] 调用 verify_claim 做跨语言接地核查</text>
+  <text x="78" y="434" fill="#808080" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">╰─</text>
+
+  <rect x="58" y="468" width="864" height="80" rx="8" fill="#0f1616" stroke="#5fd7d7"/>
+  <text x="78" y="498" fill="#808080" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">╭─ ask · SciScope</text>
+  <text x="78" y="524" fill="#d7d7d7" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="14">│  核查 RAG 是否能降低幻觉风险，并导出证据报告</text>
+  <text x="78" y="548" fill="#808080" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="13">│  /help  /doctor  /sessions  /demo  /export   Enter 发送</text>
+</svg>

@@ -32,9 +32,12 @@ import (
 var version = "dev"
 
 type cliOptions struct {
-	Demo    bool
-	Version bool
-	Help    bool
+	Command    string
+	Demo       bool
+	Doctor     bool
+	ExportLast bool
+	Version    bool
+	Help       bool
 }
 
 // ---- palette (cyan research console, à la Claude Code structure) ----
@@ -109,6 +112,7 @@ type slashCmd struct{ cmd, desc string }
 var slashCmds = []slashCmd{
 	{"/help", "显示帮助"},
 	{"/tools", "列出可用工具"},
+	{"/doctor", "检查后端/模型/会话"},
 	{"/export", "导出 Markdown 会话"},
 	{"/demo", "播放黄金演示流"},
 	{"/retry", "重试上一问"},
@@ -157,6 +161,12 @@ type recoveryHint struct {
 	Command   string
 	Message   string
 	Retryable bool
+}
+
+type doctorCheck struct {
+	Name   string
+	Status string
+	Detail string
 }
 
 type sessionFile struct {
@@ -217,6 +227,33 @@ func demoMode() bool {
 }
 
 func parseCLIOptions(args []string) (cliOptions, error) {
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		cmd := args[0]
+		switch cmd {
+		case "demo":
+			return cliOptions{Command: cmd, Demo: true}, nil
+		case "doctor":
+			return cliOptions{Command: cmd, Doctor: true}, nil
+		case "export":
+			opts := cliOptions{Command: cmd}
+			for _, arg := range args[1:] {
+				switch arg {
+				case "--last":
+					opts.ExportLast = true
+				case "--help", "-h":
+					opts.Help = true
+				default:
+					return opts, fmt.Errorf("unknown export option %q", arg)
+				}
+			}
+			if !opts.Help && !opts.ExportLast {
+				return opts, fmt.Errorf("export requires --last")
+			}
+			return opts, nil
+		default:
+			return cliOptions{Command: cmd}, fmt.Errorf("unknown command %q", cmd)
+		}
+	}
 	fs := flag.NewFlagSet("sciscope-tui", flag.ContinueOnError)
 	fs.SetOutput(new(bytes.Buffer))
 	var opts cliOptions
@@ -241,6 +278,9 @@ func helpString() string {
 		"",
 		"Usage:",
 		"  sciscope-tui          start the TUI",
+		"  sciscope-tui doctor   check backend, LLM, sessions and assets",
+		"  sciscope-tui demo     play the offline golden demo",
+		"  sciscope-tui export --last",
 		"  sciscope-tui --demo   play the offline golden demo",
 		"  sciscope-tui --version",
 		"",
@@ -248,6 +288,73 @@ func helpString() string {
 		"  SCISCOPE_BACKEND              backend URL, default http://127.0.0.1:8000",
 		"  SCISCOPE_TUI_DEMO_DELAY_MS    demo playback delay",
 	}, "\n")
+}
+
+func healthURL() string {
+	return strings.TrimRight(backendURL(), "/") + "/health"
+}
+
+func llmURL() string {
+	if v := os.Getenv("LOCAL_LLM_BASE_URL"); v != "" {
+		return strings.TrimRight(v, "/") + "/models"
+	}
+	return "http://127.0.0.1:8001/v1/models"
+}
+
+func httpReachable(url string, timeout time.Duration) bool {
+	client := http.Client{Timeout: timeout}
+	resp, err := client.Get(url)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode >= 200 && resp.StatusCode < 500
+}
+
+func collectDoctorChecks() []doctorCheck {
+	checks := []doctorCheck{}
+	if httpReachable(healthURL(), 700*time.Millisecond) {
+		checks = append(checks, doctorCheck{"Backend", "ok", healthURL()})
+	} else {
+		checks = append(checks, doctorCheck{"Backend", "warn", "not reachable; run make backend"})
+	}
+	if httpReachable(llmURL(), 700*time.Millisecond) {
+		checks = append(checks, doctorCheck{"LLM", "ok", llmURL()})
+	} else {
+		checks = append(checks, doctorCheck{"LLM", "warn", "not reachable; run make llm or use --demo"})
+	}
+	dir := sessionDir()
+	if err := os.MkdirAll(dir, 0o755); err == nil {
+		checks = append(checks, doctorCheck{"Sessions", "ok", dir})
+	} else {
+		checks = append(checks, doctorCheck{"Sessions", "error", err.Error()})
+	}
+	if _, err := os.Stat(filepath.Join("..", "output", "graphs")); err == nil {
+		checks = append(checks, doctorCheck{"Graph assets", "ok", "output/graphs"})
+	} else if _, err := os.Stat(filepath.Join("output", "graphs")); err == nil {
+		checks = append(checks, doctorCheck{"Graph assets", "ok", "output/graphs"})
+	} else {
+		checks = append(checks, doctorCheck{"Graph assets", "warn", "missing; run make graph-export"})
+	}
+	return checks
+}
+
+func renderDoctorReport(checks []doctorCheck) string {
+	lines := []string{"SciScope doctor", ""}
+	for _, check := range checks {
+		mark := "unknown"
+		switch check.Status {
+		case "ok":
+			mark = "ok"
+		case "warn":
+			mark = "warn"
+		case "error":
+			mark = "error"
+		}
+		lines = append(lines, fmt.Sprintf("%-12s %-4s %s", check.Name, mark, check.Detail))
+	}
+	lines = append(lines, "", "Next: sciscope-tui demo | sciscope-tui export --last")
+	return strings.Join(lines, "\n")
 }
 
 func demoDelay() time.Duration {
@@ -306,13 +413,15 @@ func playDemo(sub chan tea.Msg) {
 
 // stream POSTs the question and pushes one tea.Msg per valid SSE payload.
 // Supported event types:
-//   plan      -> []string{"..."}
-//   text      -> incremental answer chunk
-//   tool_call -> {name,args}
-//   tool_result-> {name,result}
-//   reflect   -> self-check text
-//   final     -> final answer block
-//   error     -> recoverable error text
+//
+//	plan      -> []string{"..."}
+//	text      -> incremental answer chunk
+//	tool_call -> {name,args}
+//	tool_result-> {name,result}
+//	reflect   -> self-check text
+//	final     -> final answer block
+//	error     -> recoverable error text
+//
 // Scanner keeps only lines starting with "data:" and stops at "[DONE]".
 func stream(ctx context.Context, backend, q string, history []turn, sub chan tea.Msg) {
 	body, _ := json.Marshal(map[string]any{"question": q, "history": history})
@@ -485,15 +594,25 @@ func (m model) renderComposer(width int) string {
 	if width < 48 {
 		width = 48
 	}
-	value := strings.TrimSpace(m.ti.Value())
+	raw := strings.TrimSpace(m.ti.Value())
+	value := raw
 	if value == "" {
 		value = stFaint.Render("输入科研问题，或 / 打开命令")
 	} else {
-		value = m.ti.View()
+		value = strings.ReplaceAll(value, "\n", "\n"+stFaint.Render("│  "))
 	}
-	hint := stFaint.Render("/help  /sessions  /demo  /export") + stAccent.Render("   Enter 发送")
+	hint := stFaint.Render("/help  /doctor  /sessions  /demo  /export") + stAccent.Render("   Enter 发送")
+	mode := "ready"
+	if m.answering {
+		mode = "streaming"
+	} else if strings.Contains(raw, "\n") {
+		mode = "multi-line · Shift+Enter"
+	} else {
+		mode = "Shift+Enter 多行"
+	}
 	body := strings.Join([]string{
 		stFaint.Render("│  ") + value,
+		stFaint.Render("│  ") + stMuted.Render(mode),
 		stFaint.Render("│  ") + hint,
 	}, "\n")
 	head := stConn.Render("╭─ ask · SciScope")
@@ -603,6 +722,7 @@ func renderSplash(width int, sessions []sessionFile) string {
 		stFaint.Render("跨语言接地 · 可验证证据"),
 		stFaint.Render("timeline · export · retry"),
 	}
+	status := splashStatusLines()
 	recent := recentSplashLines(sessions)
 	innerWidth := width - 8
 	dashboard := ""
@@ -614,12 +734,14 @@ func renderSplash(width int, sessions []sessionFile) string {
 			"  ",
 			miniPanel("Golden demo", demo, colWidth),
 			"  ",
-			miniPanel("Recent work", recent, colWidth),
+			miniPanel("System status", status, colWidth),
 		)
+		dashboard += "\n" + panelRow("sessions", "Recent work", "", recent)
 	} else {
 		dashboard = strings.Join([]string{
 			panelRow("actions", "Quick actions", "", quick),
 			panelRow("demo", "Golden demo", "", demo),
+			panelRow("status", "System status", "", status),
 			panelRow("sessions", "Recent work", "", recent),
 		}, "\n")
 	}
@@ -638,6 +760,15 @@ func renderSplash(width int, sessions []sessionFile) string {
 		Padding(1, 2).
 		Width(width - 4).
 		Render(strings.Join(body, "\n"))
+}
+
+func splashStatusLines() []string {
+	dir := sessionDir()
+	return []string{
+		stFaint.Render("Backend  check with /doctor"),
+		stFaint.Render("LLM      check with /doctor"),
+		stFaint.Render("Sessions " + clip(dir, 30)),
+	}
 }
 
 func recentSplashLines(sessions []sessionFile) []string {
@@ -953,6 +1084,21 @@ func exportMarkdown(events []transcriptEvent, generatedAt time.Time) string {
 		}
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n")) + "\n"
+}
+
+func exportLastSession(dir string) (string, string, error) {
+	sessions, err := listSessionFiles(dir, 1)
+	if err != nil {
+		return "", "", err
+	}
+	if len(sessions) == 0 {
+		return "", "", fmt.Errorf("no saved sessions in %s", dir)
+	}
+	b, err := os.ReadFile(sessions[0].Path)
+	if err != nil {
+		return "", "", err
+	}
+	return string(b), sessions[0].Path, nil
 }
 
 func sessionDir() string {
@@ -1417,6 +1563,13 @@ func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
 			lines = append(lines, "    "+toolLabel(name))
 		}
 		m.appendBlock(strings.Join(lines, "\n"))
+	case "/doctor":
+		m.appendBlock(panelRow("doctor", "System status", "", []string{
+			"Backend: " + healthURL(),
+			"LLM: " + llmURL(),
+			"Sessions: " + sessionDir(),
+			"Run `sciscope-tui doctor` for live checks.",
+		}))
 	case "/demo":
 		go playDemo(m.sub)
 		return m, listen(m.sub)
@@ -1535,6 +1688,20 @@ func main() {
 	}
 	if opts.Version {
 		fmt.Println(versionString(version))
+		return
+	}
+	if opts.Doctor {
+		fmt.Println(renderDoctorReport(collectDoctorChecks()))
+		return
+	}
+	if opts.ExportLast {
+		content, path, err := exportLastSession(sessionDir())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+		fmt.Fprintln(os.Stderr, "exported:", path)
+		fmt.Print(content)
 		return
 	}
 	m := initialModel()

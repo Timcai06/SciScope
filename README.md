@@ -2,6 +2,8 @@
 
 SciScope is a local-first scientific literature intelligence stack.
 
+![SciScope TUI product snapshot](docs/assets/tui-product-snapshot.svg)
+
 核心规则（交接口径）：
 
 - Python 是底座：数据治理、RAG、检索、证据接地、Agent 工具编排都在 `backend/` 与 `src/` 体系中实现。
@@ -48,6 +50,7 @@ make dev
 - 仅 TUI：`make backend`（先起后端）→ `make tui`。
 - 本地模型端到端：先保证可用 OpenAI-compatible 服务，再用 `make dev-vllm`。
 - 离线演示：`make tui-demo`。
+- TUI 体检：`make tui-doctor`。
 
 ## 核心命令（按场景）
 
@@ -90,6 +93,7 @@ make backend  # 先启动后端 127.0.0.1:8000
 make llm      # 可选：本地 LLM 兼容网关（用于真实联网问答）
 make tui      # 运行终端客户端
 make tui-demo # 离线演示流程（无后端）
+make tui-doctor # 检查后端/LLM/会话目录/图谱资产
 ```
 
 版本与发布链路请见：

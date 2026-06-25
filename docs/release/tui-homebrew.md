@@ -61,9 +61,12 @@ From repo root:
 make tui-build TUI_VERSION=0.1.0
 ./tui/sciscope-tui --help
 make tui-demo
+make tui-doctor
 cd tui && go test ./... && cd ..
 cd tui && goreleaser check && cd ..
 ```
+
+After a session exists, optionally verify shell export with `make tui-export-last`.
 
 Snapshot validation (optional):
 
@@ -88,6 +91,7 @@ This triggers `.github/workflows/release.yml`.
 brew install Timcai06/sciscope/sciscope-tui
 sciscope-tui --help
 sciscope-tui --demo
+sciscope-tui doctor
 ```
 
 Production attach:

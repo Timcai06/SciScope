@@ -498,6 +498,9 @@ func TestParseCLIOptions(t *testing.T) {
 		want cliOptions
 	}{
 		{name: "demo", args: []string{"--demo"}, want: cliOptions{Demo: true}},
+		{name: "demo command", args: []string{"demo"}, want: cliOptions{Demo: true, Command: "demo"}},
+		{name: "doctor command", args: []string{"doctor"}, want: cliOptions{Doctor: true, Command: "doctor"}},
+		{name: "export last command", args: []string{"export", "--last"}, want: cliOptions{ExportLast: true, Command: "export"}},
 		{name: "version", args: []string{"--version"}, want: cliOptions{Version: true}},
 		{name: "short version", args: []string{"-v"}, want: cliOptions{Version: true}},
 		{name: "help", args: []string{"--help"}, want: cliOptions{Help: true}},
@@ -508,7 +511,7 @@ func TestParseCLIOptions(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parseCLIOptions returned error: %v", err)
 			}
-			if got.Demo != tt.want.Demo || got.Version != tt.want.Version || got.Help != tt.want.Help {
+			if got.Demo != tt.want.Demo || got.Doctor != tt.want.Doctor || got.ExportLast != tt.want.ExportLast || got.Version != tt.want.Version || got.Help != tt.want.Help || got.Command != tt.want.Command {
 				t.Fatalf("got %#v, want %#v", got, tt.want)
 			}
 		})
@@ -519,5 +522,85 @@ func TestVersionStringIncludesAppName(t *testing.T) {
 	got := versionString("0.1.0")
 	if !strings.Contains(got, "sciscope-tui 0.1.0") {
 		t.Fatalf("unexpected version string: %s", got)
+	}
+}
+
+func TestDoctorReportRendersProductChecks(t *testing.T) {
+	report := renderDoctorReport([]doctorCheck{
+		{Name: "Backend", Status: "ok", Detail: "http://127.0.0.1:8000/health"},
+		{Name: "LLM", Status: "warn", Detail: "make llm"},
+		{Name: "Sessions", Status: "ok", Detail: "/tmp/sessions"},
+	})
+
+	for _, want := range []string{
+		"SciScope doctor",
+		"Backend",
+		"ok",
+		"LLM",
+		"warn",
+		"Sessions",
+		"make llm",
+	} {
+		if !strings.Contains(report, want) {
+			t.Fatalf("doctor report missing %q:\n%s", want, report)
+		}
+	}
+}
+
+func TestExportLastSessionReturnsNewestMarkdown(t *testing.T) {
+	dir := t.TempDir()
+	oldPath := filepath.Join(dir, "sciscope-session-20260625-120000.md")
+	newPath := filepath.Join(dir, "sciscope-session-20260625-130000.md")
+	if err := os.WriteFile(oldPath, []byte("# old"), 0o644); err != nil {
+		t.Fatalf("write old session: %v", err)
+	}
+	time.Sleep(10 * time.Millisecond)
+	if err := os.WriteFile(newPath, []byte("# new\n\n## 用户问题\n\n最新问题"), 0o644); err != nil {
+		t.Fatalf("write new session: %v", err)
+	}
+
+	content, path, err := exportLastSession(dir)
+	if err != nil {
+		t.Fatalf("exportLastSession returned error: %v", err)
+	}
+	if path != newPath {
+		t.Fatalf("expected newest path %s, got %s", newPath, path)
+	}
+	if !strings.Contains(content, "最新问题") {
+		t.Fatalf("expected newest session content, got:\n%s", content)
+	}
+}
+
+func TestSplashShowsLiveStatusPanel(t *testing.T) {
+	splash := renderSplash(112, nil)
+
+	for _, want := range []string{
+		"System status",
+		"Backend",
+		"LLM",
+		"Sessions",
+		"doctor",
+	} {
+		if !strings.Contains(splash, want) {
+			t.Fatalf("splash missing status signal %q:\n%s", want, splash)
+		}
+	}
+}
+
+func TestComposerShowsMultilineAndRecoveryHints(t *testing.T) {
+	m := initialModel()
+	m.ti.SetValue("第一行\n第二行")
+	composer := m.renderComposer(96)
+
+	for _, want := range []string{
+		"╭─ ask · SciScope",
+		"第一行",
+		"第二行",
+		"Shift+Enter",
+		"/doctor",
+	} {
+		if !strings.Contains(composer, want) {
+			t.Fatalf("composer missing %q:\n%s", want, composer)
+		}
 	}
 }

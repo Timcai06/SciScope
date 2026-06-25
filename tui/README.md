@@ -30,12 +30,14 @@ make llm         # 本地兼容 LLM：127.0.0.1:8001
 ```bash
 sciscope-tui --help
 sciscope-tui --version
-sciscope-tui --demo
+sciscope-tui demo
+sciscope-tui doctor
+sciscope-tui export --last
 ```
 
 ## 3. Demo / Offline 流程
 
-`/demo` 与 `SCISCOPE_TUI_DEMO=1` 触发离线演示：
+`/demo`、`sciscope-tui demo` 与 `SCISCOPE_TUI_DEMO=1` 触发离线演示：
 
 - 不依赖后端/LLM/数据库；
 - 按固定轨迹重放“用户问题 → plan → tool_call/result → reflect → final”；
@@ -50,6 +52,8 @@ sciscope-tui --demo
 - `/resume N` 从 `/sessions` 列表恢复历史会话到 transcript；
 - `lastQuestion` 变更后，`/retry` 会重放最近一问；
 - `/export` 会导出当前 transcript 的 Markdown（与历史恢复格式一致）。
+- `sciscope-tui export --last` 可在 shell 中打印最近一条 Markdown 会话，便于管道保存或粘贴到报告。
+- `sciscope-tui doctor` 执行后端、LLM、会话目录和图谱资产的产品化体检。
 
 ## 5. UI 语义：Splash / Dashboard / panel row
 
@@ -58,6 +62,7 @@ sciscope-tui --demo
 当聊天区为空时，会展示 splash：
 
 - Quick actions（示例）：`/demo`、`/sessions`、`/help`
+- System status：后端、LLM、会话目录的入口级状态提示，详细体检走 `/doctor` 或 `sciscope-tui doctor`
 - Golden demo 预览：`verify_claim → evidence panel`
 - Recent work：最近本地会话（含 `/resume` 提示）
 - 终端足够宽时以三栏 miniPanel 组成 Dashboard；不足宽度则纵向 panelRow 列表。
@@ -83,6 +88,8 @@ sciscope-tui --demo
 ## 7. 快速验收清单
 
 - `make tui-build TUI_VERSION=0.1.0` → `tui/sciscope-tui --version`
+- `make tui-doctor`，确认发布前环境体检输出可读。
 - `make tui` 连接真实后端，执行一条测试问题，观察 plan/tool/result/final 流。
 - `make tui-demo`，确认完整离线演示可完整播完。
+- `make tui-export-last`，确认最近会话可从命令行导出。
 - `/sessions` 能列出最近会话，`/export` 与 `/resume` 可用。
