@@ -155,7 +155,7 @@ install: install-backend install-frontend
 
 install-backend:
 	$(PYTHON) -m pip install --upgrade pip
-	$(PYTHON) -m pip install fastapi uvicorn pydantic pandas numpy scikit-learn networkx matplotlib pytest httpx 'psycopg[binary]' pgvector sentence-transformers langgraph
+	$(PYTHON) -m pip install -r backend/requirements.txt
 
 install-frontend:
 	cd frontend && npm install

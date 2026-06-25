@@ -1,0 +1,32 @@
+# SciScope backend — pinned direct dependencies.
+# Mirrors the package set installed by `make install-backend`, with versions
+# frozen for reproducible installs (judges / fresh checkouts).
+#
+#   python -m pip install -r backend/requirements.txt
+#
+# Transitive dependencies float to compatible releases; if you need a fully
+# locked environment, run `pip freeze` after install and commit that snapshot.
+
+# Web API + server
+fastapi==0.135.3
+uvicorn==0.43.0
+pydantic==2.12.5
+httpx==0.28.1
+
+# Data / analysis / models
+pandas==3.0.2
+numpy==2.4.4
+scikit-learn==1.8.0
+networkx==3.6.1
+matplotlib==3.10.8
+sentence-transformers==5.3.0
+
+# Storage / retrieval (PostgreSQL + pgvector)
+psycopg[binary]==3.3.3
+pgvector==0.4.2
+
+# Agent orchestration (single LangGraph StateGraph runtime)
+langgraph==1.1.6
+
+# Tests
+pytest==9.1.0
