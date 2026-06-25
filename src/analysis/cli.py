@@ -28,6 +28,18 @@ def _build_figures(args: argparse.Namespace) -> None:
     print(json.dumps(summary, ensure_ascii=False))
 
 
+def _build_project_figures(args: argparse.Namespace) -> None:
+    from src.analysis.project_figures import build_project_report_figures
+
+    summary = build_project_report_figures(
+        analysis_dir=args.analysis_dir,
+        processed_dir=args.processed_dir,
+        eval_dir=args.eval_dir,
+        output_dir=args.output_dir,
+    )
+    print(json.dumps(summary, ensure_ascii=False))
+
+
 def _build_corpus(args: argparse.Namespace) -> None:
     from src.analysis.corpus import build_processed_corpus
 
@@ -69,6 +81,13 @@ def build_parser() -> argparse.ArgumentParser:
     figures.add_argument("--analysis-dir", type=Path, default=Path("data/analysis"))
     figures.add_argument("--output-dir", type=Path, default=Path("output/assets/sciscope_data_report"))
     figures.set_defaults(func=_build_figures)
+
+    project_figures = subparsers.add_parser("project-figures", help="Build project-report product and system figures")
+    project_figures.add_argument("--analysis-dir", type=Path, default=Path("data/analysis"))
+    project_figures.add_argument("--processed-dir", type=Path, default=Path("data/processed"))
+    project_figures.add_argument("--eval-dir", type=Path, default=Path("output/eval"))
+    project_figures.add_argument("--output-dir", type=Path, default=Path("output/assets/sciscope_project_report"))
+    project_figures.set_defaults(func=_build_project_figures)
 
     corpus = subparsers.add_parser("corpus", help="Build merged processed corpus from analysis papers")
     corpus.add_argument("--input", type=Path, default=Path("data/analysis/papers_clean.json"))

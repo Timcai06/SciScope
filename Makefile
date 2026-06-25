@@ -51,6 +51,7 @@ PROCESSED_CORPUS_PATH ?= data/processed/papers_corpus.json
 PROCESSED_CORPUS_SUMMARY_PATH ?= data/processed/papers_corpus.summary.json
 ANALYSIS_OUTPUT_DIR ?= data/analysis
 REPORT_ASSETS_DIR ?= output/assets/sciscope_data_report
+PROJECT_REPORT_ASSETS_DIR ?= output/assets/sciscope_project_report
 YEAR_BALANCE_TARGET ?= 10000
 POSTGRES_DSN ?= postgresql://tim@localhost:5432/sciscope
 EMBEDDING_MODEL ?= intfloat/multilingual-e5-base
@@ -95,7 +96,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures data-report-pdf project-report-pdf report backend frontend dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf report backend frontend dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend typecheck build smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -129,6 +130,7 @@ help:
 	@echo "  make postgres-load    Load corpus/chunks into PostgreSQL"
 	@echo "  make postgres-refresh Build chunks and load PostgreSQL service tables"
 	@echo "  make report-figures   Build report-ready chart assets from data/analysis"
+	@echo "  make project-report-figures Build product/system figures for the project report"
 	@echo "  make data-report-pdf  Build the SciScope data analysis report PDF"
 	@echo "  make report           Rebuild analysis tables, report figures, and data PDF"
 	@echo "  make backend          Start FastAPI backend on $(BACKEND_HOST):$(BACKEND_PORT)"
@@ -353,6 +355,10 @@ report-figures:
 	@mkdir -p .cache/matplotlib
 	XDG_CACHE_HOME=$(CURDIR)/.cache MPLCONFIGDIR=$(CURDIR)/.cache/matplotlib $(PYTHON) -m src.analysis.cli figures --analysis-dir $(ANALYSIS_OUTPUT_DIR) --output-dir $(REPORT_ASSETS_DIR)
 
+project-report-figures:
+	@mkdir -p .cache/matplotlib
+	XDG_CACHE_HOME=$(CURDIR)/.cache MPLCONFIGDIR=$(CURDIR)/.cache/matplotlib $(PYTHON) -m src.analysis.cli project-figures --analysis-dir $(ANALYSIS_OUTPUT_DIR) --processed-dir data/processed --eval-dir output/eval --output-dir $(PROJECT_REPORT_ASSETS_DIR)
+
 data-report-pdf:
 	python3 /Users/tim/.codex/plugins/cache/openai-bundled/latex/0.2.3/scripts/compile_latex.py $(CURDIR)/output/pdf/sciscope_data_report/main.tex --engine xelatex
 	cp output/pdf/sciscope_data_report/main.pdf output/pdf/sciscope_data_report/sciscope_data_report.pdf
@@ -366,7 +372,7 @@ data-report-pdf:
 		output/pdf/sciscope_data_report/main.toc \
 		output/pdf/sciscope_data_report/main.xdv
 
-project-report-pdf:
+project-report-pdf: project-report-figures
 	python3 /Users/tim/.codex/plugins/cache/openai-bundled/latex/0.2.3/scripts/compile_latex.py $(CURDIR)/output/pdf/sciscope_project_report/main.tex --engine xelatex
 	cp output/pdf/sciscope_project_report/main.pdf output/pdf/sciscope_project_report/sciscope_project_report.pdf
 	rm -f output/pdf/sciscope_project_report/main.aux \

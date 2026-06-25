@@ -46,6 +46,12 @@
 \caption{SciScope 总体架构:采集 → 治理 → 分析/模型 → 服务 → 接口 → 交互;交互层以\textbf{终端智能体}自主编排工具,大模型仅作可替换的生成层}
 \end{figure}
 
+\begin{figure}[H]
+\centering
+\figasset[0.94\textwidth]{system_capability_map.png}
+\caption{SciScope 能力地图:从可复现数据资产到证据接地智能体,再到终端产品化客户端。数据来源:系统实现与交付目录映射。}
+\end{figure}
+
 \textbf{设计原则}:① 离线可复现(每层产物由 \texttt{make} 目标生成);② 大模型可替换(生成层走 OpenAI 兼容接口);③ 证据可追溯(回答必带引用);④ 本地优先(数据与索引均在本地,支持涉密场景)。
 
 \subsection{核心链路:证据接地的检索增强问答}
@@ -97,6 +103,12 @@
 \draw[loop] (ans) to[out=-120,in=-60] node[below,font=\tiny,text=SciTealDark]{⑤ 反思自评:证据不足→重写检索重试} (sel);
 \end{tikzpicture}
 \caption{自主智能体循环:规划 → 选工具 → 并行执行 → 观察 →(循环)→ 反思自评 → 据证作答}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\figasset[0.94\textwidth]{agent_trace_timeline.png}
+\caption{TUI 中可见的智能体执行轨迹:plan、工具调用、证据卡、reflect 与 final 均通过 SSE 事件流呈现,便于评委复核系统不是黑盒问答。}
 \end{figure}
 
 \textbf{核心机制}:

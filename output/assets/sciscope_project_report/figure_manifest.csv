@@ -1,0 +1,6 @@
+filename,purpose,source
+system_capability_map.png,Architecture capability overview,static system design
+agent_trace_timeline.png,Agent workflow trace,agent event contract
+claim_grounding_flow.png,verify_claim grounding workflow,tool contract and demo score
+eval_metric_dashboard.png,Core evaluation dashboard,output/eval/eval_report.json
+asset_funnel.png,Data-to-agent asset scale,data/analysis and data/processed summary files

@@ -18,6 +18,18 @@
 \end{center}
 \end{reportbox}
 
+\begin{figure}[H]
+\centering
+\figasset[0.94\textwidth]{eval_metric_dashboard.png}
+\caption{核心评测指标图形化总览。数据来源:\texttt{output/eval/eval\_report.json};中文相关性为固定主题查询评测口径,自动化测试按 98 项后端测试通过率展示。}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\figasset[0.94\textwidth]{asset_funnel.png}
+\caption{数据到智能体的资产漏斗。数据来源:\texttt{data/analysis/summary.json}、\texttt{data/processed/*.summary.json} 与 \texttt{output/eval/eval\_report.json};图中为文件资产口径,运行时数据库/向量表口径在本章表格中另列。}
+\end{figure}
+
 \subsection{检索质量与效率(核心测试)}
 采用\textbf{自检索协议}(以论文自身标题/关键词为查询,检验能否检回该文)评测混合检索。评测结果固化于 \texttt{output/eval/eval\_report.json},运行时库表当前包含 159{,}187 篇论文:
 
@@ -83,6 +95,12 @@
 修复后语义检索与推荐覆盖运行时全领域论文库,中文问句可跨语言命中英文文献。
 
 \subsection{差异化能力对比}
+\begin{figure}[H]
+\centering
+\figasset[0.90\textwidth]{claim_grounding_flow.png}
+\caption{\texttt{verify\_claim} 论断接地流程:中文论断经跨语言检索连接到英文证据,再用语义相似度给出支持等级与出处;该图展示真实功能边界,不是逻辑证明器。}
+\end{figure}
+
 \begin{center}
 \begin{tabularx}{0.96\textwidth}{>{\bfseries}p{34mm}XXXX}
 \toprule
