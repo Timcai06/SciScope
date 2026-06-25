@@ -30,6 +30,15 @@ MAX_RETRIES = 1
 
 GraphRoute = Literal["plan", "llm_step", "execute_tools", "reflect", "force_synthesis", "end"]
 
+NODE_PHASES = {
+    "prepare": "理解问题",
+    "plan": "制定研究计划",
+    "llm_step": "推理与检索决策",
+    "execute_tools": "证据检索",
+    "reflect": "自检修正",
+    "force_synthesis": "综合回答",
+}
+
 
 class AgentState(TypedDict, total=False):
     question: str
@@ -66,6 +75,7 @@ def _finish_node(node: str, started_at: float, state: AgentState, updates: Agent
     meta = {
         "runtime": "langgraph",
         "node": node,
+        "phase": NODE_PHASES.get(node, node),
         "elapsed_ms": int((time.perf_counter() - started_at) * 1000),
     }
     session_id = state.get("session_id")

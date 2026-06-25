@@ -166,6 +166,7 @@ type turn struct {
 type eventMeta struct {
 	Runtime   string `json:"runtime"`
 	Node      string `json:"node"`
+	Phase     string `json:"phase"`
 	SessionID string `json:"session_id"`
 	ElapsedMS int    `json:"elapsed_ms"`
 	Retry     bool   `json:"retry"`
@@ -335,7 +336,7 @@ func helpString() string {
 }
 
 func healthURL() string {
-	return strings.TrimRight(backendURL(), "/") + "/health"
+	return strings.TrimRight(backendURL(), "/") + "/api/ingest/status"
 }
 
 func llmURL() string {
@@ -660,8 +661,10 @@ func (m *model) addTimeline(ev timelineEvent) {
 
 func metaDetail(meta eventMeta) string {
 	parts := []string{}
-	if meta.Node != "" {
-		parts = append(parts, "node "+meta.Node)
+	if meta.Phase != "" {
+		parts = append(parts, "阶段 "+meta.Phase)
+	} else if meta.Node != "" {
+		parts = append(parts, "阶段 "+nodeLabel(meta.Node))
 	}
 	if meta.ElapsedMS > 0 {
 		parts = append(parts, fmt.Sprintf("%dms", meta.ElapsedMS))
@@ -673,23 +676,23 @@ func metaDetail(meta eventMeta) string {
 }
 
 func metaEmpty(meta eventMeta) bool {
-	return meta.Runtime == "" && meta.Node == "" && meta.SessionID == "" && meta.ElapsedMS == 0 && !meta.Retry
+	return meta.Runtime == "" && meta.Node == "" && meta.Phase == "" && meta.SessionID == "" && meta.ElapsedMS == 0 && !meta.Retry
 }
 
 func nodeLabel(node string) string {
 	switch node {
 	case "prepare":
-		return "准备上下文"
+		return "理解问题"
 	case "plan":
-		return "规划步骤"
+		return "制定研究计划"
 	case "llm_step":
-		return "模型推理"
+		return "推理与检索决策"
 	case "execute_tools":
-		return "调用工具"
+		return "证据检索"
 	case "reflect":
-		return "证据反思"
+		return "自检修正"
 	case "force_synthesis":
-		return "强制综合"
+		return "综合回答"
 	default:
 		if node == "" {
 			return "等待事件"
@@ -769,8 +772,11 @@ func renderStreamRail(events []timelineEvent, meta eventMeta, nodes []string, ki
 	if runtime == "" {
 		runtime = "langgraph"
 	}
-	node := nodeLabel(meta.Node)
-	if meta.Node == "" && len(nodes) > 0 {
+	node := meta.Phase
+	if node == "" {
+		node = nodeLabel(meta.Node)
+	}
+	if meta.Node == "" && meta.Phase == "" && len(nodes) > 0 {
 		node = nodeLabel(nodes[len(nodes)-1])
 	}
 	session := meta.SessionID
@@ -779,7 +785,7 @@ func renderStreamRail(events []timelineEvent, meta eventMeta, nodes []string, ki
 	}
 	status := []string{
 		stAccent.Render(runtime),
-		stFaint.Render("node ") + stInk.Render(node),
+		stFaint.Render("阶段 ") + stInk.Render(node),
 		stFaint.Render(streamKindLabel(kind)),
 		stFaint.Render(fmt.Sprintf("%.0fs", elapsed.Seconds())),
 	}
@@ -843,7 +849,7 @@ func renderThinkingShelf(plan []string, reflect string, width int) string {
 	}
 	body := []string{}
 	if len(plan) > 0 {
-		body = append(body, stFaint.Render("plan"))
+		body = append(body, stFaint.Render("研究计划"))
 		for i, step := range plan {
 			if i >= 4 {
 				break
@@ -855,7 +861,7 @@ func renderThinkingShelf(plan []string, reflect string, width int) string {
 		if len(body) > 0 {
 			body = append(body, "")
 		}
-		body = append(body, stFaint.Render("reflect"))
+		body = append(body, stFaint.Render("自检修正"))
 		body = append(body, "  "+clip(reflect, 110))
 	}
 	return lipgloss.NewStyle().

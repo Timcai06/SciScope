@@ -82,9 +82,9 @@ func TestAgentRequestBodySanitizesHistoryForBackendSchema(t *testing.T) {
 }
 
 func TestMetaDetailFormatsLangGraphNodeTiming(t *testing.T) {
-	got := metaDetail(eventMeta{Runtime: "langgraph", Node: "execute_tools", ElapsedMS: 42, Retry: true})
+	got := metaDetail(eventMeta{Runtime: "langgraph", Node: "execute_tools", Phase: "证据检索", ElapsedMS: 42, Retry: true})
 
-	if got != "node execute_tools · 42ms · retry" {
+	if got != "阶段 证据检索 · 42ms · retry" {
 		t.Fatalf("unexpected meta detail: %q", got)
 	}
 }
@@ -92,7 +92,7 @@ func TestMetaDetailFormatsLangGraphNodeTiming(t *testing.T) {
 func TestRenderStreamRailShowsLangGraphObservability(t *testing.T) {
 	rail := renderStreamRail(
 		[]timelineEvent{{Kind: "tool_call", Label: "检索文献", Detail: "RAG hallucination"}},
-		eventMeta{Runtime: "langgraph", Node: "execute_tools", SessionID: "tui-20260625T120000", ElapsedMS: 42, Retry: true},
+		eventMeta{Runtime: "langgraph", Node: "execute_tools", Phase: "证据检索", SessionID: "tui-20260625T120000", ElapsedMS: 42, Retry: true},
 		[]string{"prepare", "plan", "execute_tools"},
 		"tool_call",
 		3*time.Second,
@@ -101,14 +101,14 @@ func TestRenderStreamRailShowsLangGraphObservability(t *testing.T) {
 
 	for _, want := range []string{
 		"langgraph",
-		"node",
-		"调用工具",
+		"阶段",
+		"证据检索",
 		"tool call",
 		"retry",
 		"42ms",
 		"thread tui-20260625T120000",
-		"准备上下文",
-		"规划步骤",
+		"理解问题",
+		"制定研究计划",
 		"检索文献",
 	} {
 		if !strings.Contains(rail, want) {
@@ -712,9 +712,9 @@ func TestThinkingShelfRendersAboveComposerState(t *testing.T) {
 	shelf := renderThinkingShelf([]string{"检索相关论文", "综合证据"}, "证据不足时重试", 100)
 
 	for _, want := range []string{
-		"plan",
+		"研究计划",
 		"[1] 检索相关论文",
-		"reflect",
+		"自检修正",
 		"证据不足时重试",
 	} {
 		if !strings.Contains(shelf, want) {
@@ -900,7 +900,7 @@ func TestVersionStringIncludesAppName(t *testing.T) {
 
 func TestDoctorReportRendersProductChecks(t *testing.T) {
 	report := renderDoctorReport([]doctorCheck{
-		{Name: "Backend", Status: "ok", Detail: "http://127.0.0.1:8000/health"},
+		{Name: "Backend", Status: "ok", Detail: healthURL()},
 		{Name: "LLM", Status: "warn", Detail: "make llm"},
 		{Name: "Sessions", Status: "ok", Detail: "/tmp/sessions"},
 	})
@@ -917,6 +917,16 @@ func TestDoctorReportRendersProductChecks(t *testing.T) {
 		if !strings.Contains(report, want) {
 			t.Fatalf("doctor report missing %q:\n%s", want, report)
 		}
+	}
+}
+
+func TestDoctorUsesIngestStatusAsBackendHealthCheck(t *testing.T) {
+	t.Setenv("SCISCOPE_BACKEND", "http://127.0.0.1:8000/")
+
+	got := healthURL()
+
+	if got != "http://127.0.0.1:8000/api/ingest/status" {
+		t.Fatalf("unexpected health URL: %s", got)
 	}
 }
 

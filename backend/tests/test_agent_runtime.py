@@ -90,6 +90,7 @@ def test_langgraph_runtime_wraps_legacy_events(monkeypatch):
     ]
     assert parts[1][2]["runtime"] == "langgraph"
     assert parts[1][2]["node"] == "execute_tools"
+    assert parts[1][2]["phase"] == "证据检索"
     assert parts[1][2]["session_id"] == "s-1"
     assert isinstance(parts[1][2]["elapsed_ms"], int)
     assert (parts[-1][0], parts[-1][1]) == ("final", "grounded answer")
