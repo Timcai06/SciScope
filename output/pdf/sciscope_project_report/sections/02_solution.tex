@@ -127,7 +127,7 @@
 \end{itemize}
 
 \begin{plainbox}
-\textbf{下一阶段产品化路线}:当前智能体编排为轻量 ReAct 式运行时,已覆盖 plan、只读工具并行、去重、reflect、retry 与 SSE 事件化输出。后续产品化将把编排层迁移为 LangGraph StateGraph,以获得标准化状态持久化、Human-in-the-Loop、节点级恢复与多 Agent 分工;现有检索、趋势、推荐、图谱和 \texttt{verify\_claim} 工具保持不变,迁移目标是升级运行时而非重写数据底座。
+\textbf{当前产品化路线}:智能体编排已以 LangGraph StateGraph 作为默认运行时,将 prepare、plan、LLM step、tool execution、reflect 与 final synthesis 拆为可观察节点;legacy ReAct loop 仅保留为兼容回退。下一阶段将在该图上补充 checkpoint/session state、Human-in-the-Loop、节点级恢复与多 Agent 分工;现有检索、趋势、推荐、图谱和 \texttt{verify\_claim} 工具保持不变,迁移目标是升级运行时而非重写数据底座。
 \end{plainbox}
 
 \begin{center}
@@ -166,7 +166,7 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 \item \textbf{推荐模型}:论文级平均向量(pgvector \texttt{avg})+ 多信号加权,逐条给出可解释因子。
 \item \textbf{知识图谱}:NetworkX 中心度/社区,百万级边按中心度剪枝导出 JSON,作者 ego 图走 SQL 实时查询。
 \item \textbf{生成层}:OpenAI 兼容本地服务,输出限长防失控,可平滑切换更大/远程模型。
-\item \textbf{智能体编排}:基于本地 \texttt{Qwen2.5-7B}(vLLM,hermes 工具解析)的 ReAct 式工具调用循环——流式选工具、只读工具并行执行、调用去重、plan/reflect 自校验,事件化输出供 CLI 与 Web 复用。
+\item \textbf{智能体编排}:基于 LangGraph StateGraph 的科研智能体运行时——prepare / plan / LLM step / tool execution / reflect / final synthesis 节点化编排,底层使用本地 \texttt{Qwen2.5-7B}(vLLM,hermes 工具解析),支持流式选工具、只读工具并行执行、调用去重、plan/reflect 自校验,事件化输出供 CLI 与 Web 复用。
 \end{itemize}
 
 \subsection{实现过程}
@@ -188,7 +188,7 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 .2 \texttt{models/, output/graphs/}\quad [2] 模型文件 / 知识图谱 JSON.
 .2 \texttt{backend/app/}.
 .3 \texttt{services/}\quad [3] 混合检索(RAG)·GraphRAG·证据接地.
-.3 \texttt{agent/}\quad [4] ReAct 工具循环(plan->执行->观察->反思,9 工具).
+.3 \texttt{agent/}\quad [4] LangGraph StateGraph(plan->执行->观察->反思,9 工具).
 .3 \texttt{api/}\quad [5] \texttt{/api/agent/stream}(SSE)+ search / chat / trends.
 .2 \texttt{tui/}\quad [6] Go·Bubble Tea 终端客户端(消费 SSE).
 .2 \texttt{PostgreSQL + pgvector}\quad 运行时:papers·chunk\_embeddings·….
@@ -203,7 +203,7 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 1. 数据层 & 6 源采集 -> 规范化 / 标题优先去重 -> 分析资产(\texttt{data\_pipeline}、\texttt{src/harvest}、\texttt{src/analysis}) \\
 2. 模型层 & 片段/论文向量、趋势、推荐、图谱等\textbf{模型文件},入 PostgreSQL + pgvector(\texttt{src/models}、\texttt{models/}、\texttt{output/graphs/}) \\
 3. 服务 / RAG & 混合检索(FTS + 向量 + RRF + 双语 + 重排)+ GraphRAG + 证据接地(\texttt{backend/app/services}) \\
-4. 智能体 & ReAct 工具循环:plan -> 选工具 -> 并行执行 -> 观察 -> 反思自评 -> 据证作答(\texttt{backend/app/agent}) \\
+4. 智能体 & LangGraph StateGraph:prepare -> plan -> 选工具 -> 并行执行 -> 观察 -> 反思自评 -> 据证作答(\texttt{backend/app/agent}) \\
 5. 接口 & FastAPI;智能体经 \texttt{/api/agent/stream} 以 SSE 流式输出(\texttt{backend/app/api}) \\
 6. 客户端 & Go / Bubble Tea 终端(\texttt{tui/main.go}),纯 SSE 消费;Web 前端复用同一接口 \\
 \bottomrule

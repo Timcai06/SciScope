@@ -12,7 +12,26 @@ def _clear_runtime_env(monkeypatch):
     monkeypatch.delenv("SCISCOPE_AGENT_RUNTIME", raising=False)
 
 
-def test_default_runtime_is_legacy(monkeypatch):
+def test_default_runtime_is_langgraph(monkeypatch):
+    class _Runtime:
+        @staticmethod
+        def stream_agent(question, history=None, model=None):
+            return iter([("final", f"graph:{question}")])
+
+    monkeypatch.setattr(
+        runtime,
+        "_langgraph_runtime",
+        lambda: _Runtime,
+    )
+
+    events = list(runtime.stream_agent("hello"))
+
+    assert runtime.selected_runtime_name() == "langgraph"
+    assert events == [("final", "graph:hello")]
+
+
+def test_legacy_runtime_still_available_as_fallback(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_AGENT_RUNTIME", "legacy")
     monkeypatch.setattr(
         runtime.legacy_loop,
         "stream_agent",

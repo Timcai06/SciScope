@@ -1,8 +1,8 @@
 """Runtime selector for SciScope's research agent.
 
-``legacy`` remains the default so existing demos, tests, and TUI flows keep the
-same streaming behavior. Set ``SCISCOPE_AGENT_RUNTIME=langgraph`` to route turns
-through the LangGraph StateGraph wrapper.
+``langgraph`` is the product default. The legacy ReAct loop remains available as
+an explicit compatibility fallback via ``SCISCOPE_AGENT_RUNTIME=legacy`` while
+the codebase finishes migrating reusable primitives into the graph runtime.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ _LANGGRAPH_ALIASES = {"langgraph", "graph", "stategraph"}
 
 def selected_runtime_name() -> str:
     """Return the normalized agent runtime selected by environment."""
-    raw = os.getenv("SCISCOPE_AGENT_RUNTIME", "legacy").strip().lower()
+    raw = os.getenv("SCISCOPE_AGENT_RUNTIME", "langgraph").strip().lower()
     if raw in _LEGACY_ALIASES:
         return "legacy"
     if raw in _LANGGRAPH_ALIASES:
