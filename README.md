@@ -55,6 +55,33 @@ To use a local vLLM-Metal server instead of the mock provider, start vLLM on
 make dev-vllm
 ```
 
+## Terminal agent client (Go) & distribution
+
+The agent UI is a Go / Bubble Tea terminal client (`tui/`) that streams the agent
+over SSE. Run it with the backend (`:8000`) and local LLM (`:8001`) up:
+
+```bash
+make backend      # terminal 1
+make llm          # terminal 2
+make tui          # terminal 3  (or point at a remote backend: SCISCOPE_BACKEND=https://host)
+```
+
+- **Icons**: tool rows use Nerd Font glyphs. Install one and set it as your
+  terminal font: `brew install --cask font-hack-nerd-font`. No Nerd Font?
+  run `SCISCOPE_TUI_ICONS=off make tui` for plain text.
+
+**Homebrew distribution** (productization): tag a release and GoReleaser
+(`tui/.goreleaser.yaml` + `.github/workflows/release.yml`) builds multi-platform
+binaries and publishes a Homebrew cask:
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0      # CI cuts the release
+brew install Timcai06/sciscope/sciscope-tui    # users install the client
+```
+
+One-time setup: create an empty `Timcai06/homebrew-sciscope` repo and add a
+`HOMEBREW_TAP_GITHUB_TOKEN` secret (token with write access to that tap repo).
+
 ## Acceptance Checks
 
 Run these commands before handing off the foundation slice:

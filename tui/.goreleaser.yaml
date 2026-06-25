@@ -1,0 +1,48 @@
+# GoReleaser config for the SciScope terminal client.
+# Release flow:  git tag v0.1.0 && git push origin v0.1.0
+# CI (.github/workflows/release.yml) runs goreleaser from this dir and publishes
+# multi-platform binaries + a Homebrew formula to the tap repo below.
+#
+# Prereqs (one-time): create an empty GitHub repo  Timcai06/homebrew-sciscope
+# and give the release job a token with write access to it (HOMEBREW_TAP_GITHUB_TOKEN).
+version: 2
+project_name: sciscope-tui
+
+builds:
+  - id: sciscope-tui
+    main: .
+    binary: sciscope-tui
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+homebrew_casks:
+  - name: sciscope-tui
+    repository:
+      owner: Timcai06
+      name: homebrew-sciscope
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/Timcai06/SciScope"
+    description: "SciScope 科研智能体终端客户端(Bubble Tea, 经 SSE 连接后端)"
+    binaries:
+      - sciscope-tui
+    # unsigned binary: strip the quarantine xattr so macOS Gatekeeper lets it run
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/sciscope-tui"]
+          end
+    caveats: |
+      运行前需后端在 :8000、本地大模型在 :8001;
+      或用 SCISCOPE_BACKEND=https://你的后端 指向远程服务。

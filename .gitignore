@@ -53,5 +53,6 @@ output/graphs/**
 !models/.gitkeep
 !output/graphs/.gitkeep
 
-# Go TUI client build artifact
+# Go TUI client build artifact + goreleaser output
 tui/sciscope-tui
+tui/dist/
