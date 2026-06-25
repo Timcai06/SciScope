@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestRenderToolResultSearchLiteratureAsEvidenceCards(t *testing.T) {
@@ -362,5 +363,50 @@ func TestDemoModeReadsEnvironment(t *testing.T) {
 	t.Setenv("SCISCOPE_TUI_DEMO", "1")
 	if !demoMode() {
 		t.Fatalf("expected demo mode from SCISCOPE_TUI_DEMO=1")
+	}
+}
+
+func TestSplashScreenShowsProductCurtain(t *testing.T) {
+	splash := renderSplash(96)
+
+	for _, want := range []string{
+		"科研智能体终端",
+		"verify_claim",
+		"/sessions",
+		"/demo",
+		"可验证证据",
+	} {
+		if !strings.Contains(splash, want) {
+			t.Fatalf("splash missing %q:\n%s", want, splash)
+		}
+	}
+}
+
+func TestComposerRendersPolishedInputBox(t *testing.T) {
+	m := initialModel()
+	m.ti.SetValue("核查 RAG")
+	composer := m.renderComposer(96)
+
+	for _, want := range []string{
+		"╭─ ask · SciScope",
+		"│",
+		"核查 RAG",
+		"/help",
+		"/sessions",
+		"Enter 发送",
+	} {
+		if !strings.Contains(composer, want) {
+			t.Fatalf("composer missing %q:\n%s", want, composer)
+		}
+	}
+}
+
+func TestInitialViewportUsesSplashCurtain(t *testing.T) {
+	m := initialModel()
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	got := next.(model)
+
+	if !strings.Contains(got.vp.View(), "科研智能体终端") {
+		t.Fatalf("expected initial viewport to show splash:\n%s", got.vp.View())
 	}
 }

@@ -101,6 +101,7 @@ var slashCmds = []slashCmd{
 	{"/help", "显示帮助"},
 	{"/tools", "列出可用工具"},
 	{"/export", "导出 Markdown 会话"},
+	{"/demo", "播放黄金演示流"},
 	{"/retry", "重试上一问"},
 	{"/sessions", "列出最近会话"},
 	{"/resume", "恢复会话: /resume 1"},
@@ -408,8 +409,31 @@ func (m *model) refresh() {
 	if m.answering && m.answer != "" {
 		content += "\n" + stBullet.Render("⏺ ") + stInk.Render(m.answer)
 	}
+	if strings.TrimSpace(content) == "" && m.vp.Width > 0 {
+		content = renderSplash(m.vp.Width)
+	}
 	m.vp.SetContent(content)
 	m.vp.GotoBottom()
+}
+
+func (m model) renderComposer(width int) string {
+	if width < 48 {
+		width = 48
+	}
+	value := strings.TrimSpace(m.ti.Value())
+	if value == "" {
+		value = stFaint.Render("输入科研问题，或 / 打开命令")
+	} else {
+		value = m.ti.View()
+	}
+	hint := stFaint.Render("/help  /sessions  /demo  /export") + stAccent.Render("   Enter 发送")
+	body := strings.Join([]string{
+		stFaint.Render("│  ") + value,
+		stFaint.Render("│  ") + hint,
+	}, "\n")
+	head := stConn.Render("╭─ ask · SciScope")
+	tail := stConn.Render("╰─")
+	return lipgloss.NewStyle().Width(width - 2).Render(strings.Join([]string{head, body, tail}, "\n"))
 }
 
 func (m model) argsStr(args map[string]any) string {
@@ -469,6 +493,30 @@ func panelRow(kind, title, meta string, body []string) string {
 	}
 	lines = append(lines, stConn.Render("╰─"))
 	return strings.Join(lines, "\n")
+}
+
+func renderSplash(width int) string {
+	if width < 60 {
+		width = 60
+	}
+	body := []string{
+		stAccent.Render("SciScope") + stInk.Render(" 科研智能体终端"),
+		stFaint.Render("evidence-first research agent · local sessions · reproducible export"),
+		"",
+		stInk.Render("核心能力"),
+		stFaint.Render("verify_claim  跨语言论断核查，输出可验证证据"),
+		stFaint.Render("search_literature  检索论文并生成 evidence panel"),
+		stFaint.Render("timeline  展示 plan / tool / evidence / recovery"),
+		"",
+		stInk.Render("开始"),
+		stFaint.Render("直接输入科研问题，或使用 /demo /sessions /help"),
+	}
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(cAccent).
+		Padding(1, 2).
+		Width(width - 4).
+		Render(strings.Join(body, "\n"))
 }
 
 func durationText(d time.Duration) string {
@@ -949,17 +997,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
-		header, footer := 3, 4 // bordered banner = 3 lines; spinner/input/status = 4
+		header, footer := 3, 6 // bordered banner = 3 lines; composer/status = 6
 		vh := msg.Height - header - footer
 		if vh < 3 {
 			vh = 3
 		}
 		if !m.ready {
 			m.vp = viewport.New(msg.Width, vh)
-			m.vp.SetContent(stFaint.Render("输入问题开始 · / 看命令 · Ctrl+C 退出"))
+			m.vp.SetContent(renderSplash(msg.Width))
 			m.ready = true
 		} else {
 			m.vp.Width, m.vp.Height = msg.Width, vh
+			if len(m.blocks) == 0 && m.answer == "" {
+				m.vp.SetContent(renderSplash(msg.Width))
+			}
 		}
 		m.ti.Width = msg.Width - 4
 
@@ -1182,13 +1233,16 @@ func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
 		m.lastQuestion = ""
 		m.refresh()
 	case "/help":
-		m.appendBlock(stFaint.Render("  命令: /help /tools /sessions /resume N /export /retry /clear /quit · Esc 中断 · Ctrl+C 退出"))
+		m.appendBlock(stFaint.Render("  命令: /help /tools /demo /sessions /resume N /export /retry /clear /quit · Esc 中断 · Ctrl+C 退出"))
 	case "/tools":
 		lines := []string{stFaint.Render("  可用工具(LLM 自主调用):")}
 		for _, name := range []string{"search_literature", "get_trends", "recommend_papers", "get_paper", "summarize_field", "compare_papers", "export_bibliography", "query_knowledge_graph", "verify_claim"} {
 			lines = append(lines, "    "+toolLabel(name))
 		}
 		m.appendBlock(strings.Join(lines, "\n"))
+	case "/demo":
+		go playDemo(m.sub)
+		return m, listen(m.sub)
 	case "/sessions":
 		sessions, err := listSessionFiles(sessionDir(), 8)
 		if err != nil {
@@ -1282,12 +1336,12 @@ func (m model) View() string {
 		}
 	}
 
-	statusText := fmt.Sprintf("  turns %d · /sessions · /retry · /export · Ctrl+C", len(m.history)/2)
+	statusText := fmt.Sprintf("  turns %d · /demo · /sessions · /retry · /export · Ctrl+C", len(m.history)/2)
 	if m.lastExport != "" {
 		statusText += " · saved " + filepath.Base(m.lastExport)
 	}
 	status := stFaint.Render(statusText)
-	parts = append(parts, m.ti.View(), status)
+	parts = append(parts, m.renderComposer(m.vp.Width), status)
 	return strings.Join(parts, "\n")
 }
 
