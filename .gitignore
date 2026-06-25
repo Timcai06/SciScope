@@ -40,9 +40,8 @@ data/processed/*.jsonl
 data/processed/*.parquet
 data/sample/legacy_processed_500/*.json
 data/analysis/**
-indices/**
 models/**
-graphs/**
+output/graphs/**
 !data/raw/.gitkeep
 !data/raw/openalex/.gitkeep
 !data/raw/*/.gitkeep
@@ -51,9 +50,8 @@ graphs/**
 !data/sample/legacy_processed_500/.gitkeep
 !data/processed/.gitkeep
 !data/analysis/.gitkeep
-!indices/.gitkeep
 !models/.gitkeep
-!graphs/.gitkeep
+!output/graphs/.gitkeep
 
 # Go TUI client build artifact
 tui/sciscope-tui

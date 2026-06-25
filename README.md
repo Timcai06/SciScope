@@ -8,8 +8,8 @@ Next.js dashboard.
 
 ## Current Foundation Slice
 
-- Source documents: the original project inputs live at the repository root as
-  `赛题.docx` and `数据集.docx`.
+- Source documents: the original project inputs live at
+  `docs/competition/赛题.docx` and `docs/competition/数据集.docx`.
 - Sample paper metadata: deterministic local paper records are stored in
   `data/sample/papers.sample.json`.
 - Project layout: `data/` stores paper data assets, while `output/` stores

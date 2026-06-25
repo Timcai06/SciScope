@@ -2,7 +2,7 @@
 
 \subsection{运行环境}
 \begin{itemize}
-\item Python 3.11(conda 环境),Node.js(前端);PostgreSQL 15 + pgvector 扩展。
+\item Python 3.11(conda 环境),Go 1.26(终端客户端),Node.js(规划中的前端);PostgreSQL 15 + pgvector 扩展。
 \item 关键依赖:\texttt{fastapi}、\texttt{psycopg}、\texttt{pgvector}、\texttt{sentence-transformers}、\texttt{scikit-learn}、\texttt{networkx}、\texttt{pandas}。
 \item 本地大模型(可选):vLLM-Metal / LM Studio 等 OpenAI 兼容服务;无则自动用 mock,检索证据仍真实。
 \end{itemize}
@@ -33,8 +33,8 @@ make recommend-model trend-model graph-export\\
 \# 带数据库 + 本地嵌入启动前后端\\
 SCISCOPE\_DB\_DSN=postgresql://USER@localhost:5432/sciscope \textbackslash\\
 SCISCOPE\_EMBEDDER\_PATH=models/embedder\_local/multilingual-e5-base make dev\\[3pt]
-\# 终端直接问答(自动探测本地大模型)\\
-make chat\\[3pt]
+\# 终端科研智能体(Go 客户端,需后端 :8000 与本地大模型 :8001)\\
+make backend \&  make llm \&  make tui\\[3pt]
 \# 接本地大模型生成(需 :8001 上的 OpenAI 兼容服务)\\
 make vllm-serve\hfill\# 启动本地模型\\
 ... make dev\hfill\# 配 LOCAL\_LLM\_* 指向该模型
@@ -43,7 +43,7 @@ make vllm-serve\hfill\# 启动本地模型\\
 
 \subsection{质量与效果验证}
 \begin{plainbox}\ttfamily\small
-make test\hfill\# 92 项后端测试 + 前端类型检查 + 构建\\
+make test\hfill\# 98 项后端测试 + 前端类型检查 + 构建\\
 make eval-retrieval\hfill\# 自检索评估:recall@k / MRR / 延迟
 \end{plainbox}
 
@@ -55,8 +55,8 @@ make data-layer-refresh \&\& make rag-chunks \&\& make postgres-refresh \&\& mak
 
 \subsection{交付物清单}
 \begin{itemize}
-\item \textbf{代码}:\texttt{src/}(采集/治理/分析/模型)、\texttt{backend/}(API)、\texttt{frontend/}(工作台)、\texttt{infra/}(schema)、\texttt{Makefile}(流水线)。
-\item \textbf{模型文件}:pgvector 向量索引、\texttt{models/}(嵌入器/趋势/推荐)、\texttt{graphs/}(图谱 JSON)、RAG 片段语料;均可由 \texttt{make agent-build} 复现。
+\item \textbf{代码}:\texttt{src/}(采集/治理/分析/模型)、\texttt{backend/}(API + 智能体编排)、\texttt{tui/}(Go 终端客户端)、\texttt{infra/}(schema)、\texttt{Makefile}(流水线)。
+\item \textbf{模型文件}:pgvector 向量索引、\texttt{models/}(嵌入器/趋势/推荐)、\texttt{output/graphs/}(图谱 JSON)、RAG 片段语料;均可由 \texttt{make agent-build} 复现。
 \item \textbf{报告}:本《项目报告书》与同级《数据分析报告》(\texttt{output/pdf/sciscope\_data\_report})。
 \item \textbf{基础大模型}:声明为可替换依赖(任意 OpenAI 兼容端点),不绑定特定模型。
 \end{itemize}

@@ -31,7 +31,7 @@
 \node[layer, text width=150mm] (api) at (78,77) {FastAPI:\ \ \texttt{/search}\ \ \texttt{/chat}\ \ \texttt{/trends}\ \ \texttt{/recommend}\ \ \texttt{/graph}\ \ \texttt{/agent/stream}};
 
 \node[lab] at (-3,94)  {⑥ 交互};
-\node[band, text width=90mm] (fe) at (50,94) {\textbf{终端 AI 助手} \texttt{make agent}(自主工具编排 · SSE 流式)\\{\scriptsize Web 前端已预留 \texttt{/api/agent/stream} 接口,规划中}};
+\node[band, text width=90mm] (fe) at (50,94) {\textbf{终端 AI 助手} \texttt{make tui}(自主工具编排 · SSE 流式)\\{\scriptsize Web 前端已预留 \texttt{/api/agent/stream} 接口,规划中}};
 \node[band, text width=56mm] (llm) at (125,94) {可替换大模型(vLLM/LM Studio)\\{\scriptsize OpenAI 兼容 · 仅生成层}};
 
 \draw[arrow] (raw) -- (proc);
@@ -128,7 +128,7 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 
 \subsection{方案功能}
 \begin{itemize}
-\item \textbf{科研智能体 \texttt{/api/agent/stream}}:大模型\textbf{自主规划并编排}上述能力(9 个工具),多步推理、自我纠错、据证作答;终端助手 \texttt{make agent} 提供 Claude Code 风格的流式交互。
+\item \textbf{科研智能体 \texttt{/api/agent/stream}}:大模型\textbf{自主规划并编排}上述能力(9 个工具),多步推理、自我纠错、据证作答;终端助手 \texttt{make tui} 提供 Claude Code 风格的流式交互。
 \item \textbf{文献问答 \texttt{/api/chat}}:\textbf{GraphRAG}(查询抽取关键词实体 → 沿共现图扩展邻居 → query expansion)+ 混合检索证据 → 本地大模型据证生成带引用回答 → \textbf{答案可被证据支撑性校验}(低置信明确提示)。
 \item \textbf{混合检索 \texttt{/api/search}}:FTS + 向量 + RRF 融合,去重到论文级,返回命中片段。
 \item \textbf{趋势预测 \texttt{/api/trends}}:关键词/主题的增长率、burst、生命周期与下一年线性外推(含不确定区间)。
@@ -151,4 +151,4 @@ verify\_claim & \textbf{跨语言论断核查}:用语义接地度判定支持等
 \textbf{数据生成与采集} → 6 源按领域/年份抓取,落 \texttt{data/raw\_canonical} 分区 JSONL。\\
 \textbf{数据组织与治理} → 规范化字段;标题优先去重(合并跨源/预印本同篇,留最全一条)+ front-matter 剔除 + PDF 垃圾/ NUL 清洗;160{,}488 → 159{,}190 篇。\\
 \textbf{信息汲取与建模} → 切片入库,计算片段/论文向量,拟合趋势/推荐/图谱/主题;关键词统一过滤 arXiv 码与超泛标签。\texttt{make agent-build} 一键重建。\\
-\textbf{服务与交互} → FastAPI 暴露检索/问答/趋势/推荐/图谱及\textbf{智能体流式}接口;终端 AI 助手 \texttt{make agent} 自主编排工具(Web 前端已预留 SSE 接口);数据库不可用时自动回退内存检索,保证演示鲁棒。
+\textbf{服务与交互} → FastAPI 暴露检索/问答/趋势/推荐/图谱及\textbf{智能体流式}接口;终端 AI 助手 \texttt{make tui} 自主编排工具(Web 前端已预留 SSE 接口);数据库不可用时自动回退内存检索,保证演示鲁棒。

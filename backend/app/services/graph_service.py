@@ -1,6 +1,6 @@
 """Serve knowledge-graph data to the API.
 
-Overview graphs come from the pruned exports in ``graphs/*.json``. For a
+Overview graphs come from the pruned exports in ``output/graphs/*.json``. For a
 specific author center, an ego graph is built live from the ``coauthor_edges``
 table so the result is not limited to the pruned overview. Keyword/topic center
 queries filter the exported graph in memory.
@@ -16,7 +16,7 @@ from typing import Any
 
 from backend.app.core.config import get_settings
 
-GRAPH_DIR = Path(os.getenv("SCISCOPE_GRAPH_DIR", "graphs"))
+GRAPH_DIR = Path(os.getenv("SCISCOPE_GRAPH_DIR", "output/graphs"))
 _FILES = {
     "author": "author_graph.json",
     "keyword": "keyword_graph.json",

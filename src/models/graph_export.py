@@ -6,10 +6,10 @@ multi-million-edge tables. The full edges remain queryable per-entity from the
 service layer (coauthor_edges in PostgreSQL) for ego-graph requests.
 
 Outputs (the deliverable "graph files"):
-    graphs/author_graph.json
-    graphs/keyword_graph.json
-    graphs/paper_topic_graph.json
-    graphs/graph_metrics.json
+    output/graphs/author_graph.json
+    output/graphs/keyword_graph.json
+    output/graphs/paper_topic_graph.json
+    output/graphs/graph_metrics.json
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import pandas as pd
 from src.models.keyword_filter import is_noise_keyword
 
 ANALYSIS_DIR = Path("data/analysis")
-OUTPUT_DIR = Path("graphs")
+OUTPUT_DIR = Path("output/graphs")
 TOP_AUTHORS = 300
 TOP_KEYWORDS = 300
 MIN_AUTHOR_EDGE_WEIGHT = 2
