@@ -124,6 +124,7 @@ var slashCmds = []slashCmd{
 	{cmd: "/export", title: "Export report", desc: "导出 Markdown 会话与证据", category: "Suggested", key: "export", suggested: true},
 	{cmd: "/sessions", title: "Recent sessions", desc: "列出最近研究会话", category: "Session", key: "sessions"},
 	{cmd: "/resume", title: "Resume session", desc: "恢复会话: /resume 1", category: "Session", key: "resume N"},
+	{cmd: "/timeline", title: "Execution timeline", desc: "查看本轮 LangGraph 与工具轨迹", category: "Evidence", key: "timeline"},
 	{cmd: "/tools", title: "Agent tools", desc: "列出 LLM 可自主调用的科研工具", category: "Evidence", key: "tools"},
 	{cmd: "/help", title: "Help", desc: "显示命令与快捷键", category: "System", key: "?"},
 	{cmd: "/clear", title: "Clear view", desc: "清空当前对话视图", category: "System", key: "clear"},
@@ -1165,7 +1166,10 @@ func renderTimelineMarkdown(events []timelineEvent) string {
 
 func renderTimelineBlock(events []timelineEvent) string {
 	if len(events) == 0 {
-		return ""
+		return panelRow("timeline", "本轮执行时间线", "empty", []string{
+			"暂无本轮执行轨迹。",
+			"先输入一个科研问题, 或运行 /demo 播放黄金演示流。",
+		})
 	}
 	body := []string{}
 	for i, ev := range events {
@@ -1182,7 +1186,7 @@ func renderTimelineBlock(events []timelineEvent) string {
 		}
 		body = append(body, line)
 	}
-	return panelRow("timeline", "工具调用时间线", "", body)
+	return panelRow("timeline", "本轮执行时间线", fmt.Sprintf("%d events", len(events)), body)
 }
 
 func renderPlanBlock(plan planMsg) string {
@@ -1878,13 +1882,15 @@ func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
 		m.lastQuestion = ""
 		m.refresh()
 	case "/help":
-		m.appendBlock(stFaint.Render("  命令: /help /tools /demo /sessions /resume N /export /retry /clear /quit · Esc 中断 · Ctrl+C 退出"))
+		m.appendBlock(stFaint.Render("  命令: /help /tools /timeline /demo /sessions /resume N /export /retry /clear /quit · Esc 中断 · Ctrl+C 退出"))
 	case "/tools":
 		lines := []string{stFaint.Render("  可用工具(LLM 自主调用):")}
 		for _, name := range []string{"search_literature", "get_trends", "recommend_papers", "get_paper", "summarize_field", "compare_papers", "export_bibliography", "query_knowledge_graph", "verify_claim"} {
 			lines = append(lines, "    "+toolLabel(name))
 		}
 		m.appendBlock(strings.Join(lines, "\n"))
+	case "/timeline":
+		m.appendBlock(renderTimelineBlock(m.timeline))
 	case "/doctor":
 		m.appendBlock(panelRow("doctor", "System status", "", []string{
 			"Backend: " + healthURL(),

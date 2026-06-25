@@ -374,7 +374,7 @@ func TestTimelineAndErrorUsePanelRows(t *testing.T) {
 		{Kind: "tool_call", Label: "检索文献", Detail: "RAG"},
 		{Kind: "final", Label: "回答完成"},
 	})
-	if !strings.Contains(timeline, "╭─ timeline · 工具调用时间线") {
+	if !strings.Contains(timeline, "╭─ timeline · 本轮执行时间线") {
 		t.Fatalf("timeline should use panel row grammar:\n%s", timeline)
 	}
 	if !strings.Contains(timeline, "│  [1] 检索文献 · RAG") {
@@ -387,6 +387,46 @@ func TestTimelineAndErrorUsePanelRows(t *testing.T) {
 	}
 	if !strings.Contains(errPanel, "make backend") {
 		t.Fatalf("recovery panel missing command:\n%s", errPanel)
+	}
+}
+
+func TestTimelineBlockShowsEmptyState(t *testing.T) {
+	timeline := renderTimelineBlock(nil)
+
+	for _, want := range []string{
+		"╭─ timeline · 本轮执行时间线 · empty",
+		"暂无本轮执行轨迹",
+		"/demo",
+	} {
+		if !strings.Contains(timeline, want) {
+			t.Fatalf("empty timeline missing %q:\n%s", want, timeline)
+		}
+	}
+}
+
+func TestTimelineSlashRendersCurrentTurnTrace(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+	m.timeline = []timelineEvent{
+		{Kind: "plan", Label: "执行计划", Detail: "检索证据"},
+		{Kind: "tool_result", Tool: "verify_claim", Label: "论断核查 · 强支持", Duration: 1500 * time.Millisecond},
+	}
+
+	next, _ := m.runSlash("/timeline")
+	got := next.(model)
+	content := got.vp.View()
+
+	for _, want := range []string{
+		"本轮执行时间线",
+		"执行计划",
+		"检索证据",
+		"论断核查",
+		"1.5s",
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("/timeline output missing %q:\n%s", want, content)
+		}
 	}
 }
 
@@ -534,6 +574,7 @@ func TestSlashCommandPaletteUsesFullWidth(t *testing.T) {
 		"Evidence",
 		"System",
 		"/demo",
+		"/timeline",
 		"/sessions",
 		"Golden demo",
 		"Enter run",
