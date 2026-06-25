@@ -425,7 +425,9 @@ func (m model) renderAnswer() string {
 		w = 20
 	}
 	body := strings.Trim(m.answer, "\n")
-	if r, err := glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(w)); err == nil {
+	// Fixed dark style — NOT WithAutoStyle(), which queries the terminal background
+	// (OSC 11) on every render and leaks the response (]11;rgb:…) into the UI.
+	if r, err := glamour.NewTermRenderer(glamour.WithStandardStyle("dark"), glamour.WithWordWrap(w)); err == nil {
 		if out, e := r.Render(m.answer); e == nil {
 			body = strings.Trim(out, "\n")
 		}
