@@ -68,11 +68,21 @@ var toolLabels = map[string][2]string{
 	"verify_claim":          {"\uf058", "论断核查"}, // check-circle
 }
 
+// Nerd Font glyphs by default; set SCISCOPE_TUI_ICONS=off for plain text (no font
+// dependency \u2014 falls back to just the Chinese label, Claude Code-plain style).
+var useIcons = os.Getenv("SCISCOPE_TUI_ICONS") != "off"
+
 func toolLabel(name string) string {
 	if v, ok := toolLabels[name]; ok {
-		return v[0] + "  " + v[1]
+		if useIcons {
+			return v[0] + "  " + v[1]
+		}
+		return v[1]
 	}
-	return "\uf013  " + name
+	if useIcons {
+		return "\uf013  " + name
+	}
+	return name
 }
 
 type slashCmd struct{ cmd, desc string }
