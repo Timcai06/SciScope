@@ -978,27 +978,12 @@ func (m model) renderComposer(width int) string {
 	// composer box (rendering Value() as static text left the hardware cursor
 	// stranded at the bottom of the screen).
 	inputLine := m.ti.View()
-	hint := lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		stAccent.Render("Enter"),
-		stFaint.Render(" 发送"),
-		stFaint.Render("  ·  "),
-		stAccent.Render("Esc"),
-		stFaint.Render(" 中断"),
-		stFaint.Render("  ·  "),
-		stAccent.Render("/"),
-		stFaint.Render(" 命令"),
-	)
-	body := strings.Join([]string{
-		inputLine,
-		hint,
-	}, "\n")
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), true, false, true, false).
 		BorderForeground(cAccent).
 		Padding(0, 1).
 		Width(width - 2).
-		Render(body)
+		Render(inputLine)
 }
 
 func (m model) argsStr(args map[string]any) string {
