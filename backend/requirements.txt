@@ -28,5 +28,8 @@ pgvector==0.4.2
 # Agent orchestration (single LangGraph StateGraph runtime)
 langgraph==1.1.6
 
+# MCP server — expose SciScope tools to any MCP client (Claude Desktop, etc.)
+mcp==1.28.0
+
 # Tests
 pytest==9.1.0
