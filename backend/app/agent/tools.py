@@ -147,6 +147,24 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "delegate",
+            "description": (
+                "把一个聚焦的子任务交给专员子智能体:role=reviewer(文献综述)/trend(趋势分析)/critic(论断核查)。"
+                "仅在复杂、多面的任务需要分工时使用(如「综述 X 并核查其中关键论断」);简单问题请自己直接回答,不要滥用。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "role": {"type": "string", "description": "reviewer / trend / critic"},
+                    "task": {"type": "string", "description": "交给该专员的具体子任务(中文)"},
+                },
+                "required": ["role", "task"],
+            },
+        },
+    },
 ]
 
 
@@ -591,6 +609,13 @@ def _verify_claim(args: dict[str, Any]) -> str:
     )
 
 
+def _delegate(args: dict[str, Any]) -> str:
+    # Lazy import: specialists imports llm/tool_runner/tools, so defer to call time.
+    from backend.app.agent.specialists import run_specialist
+
+    return run_specialist(str(args.get("role") or "").strip(), str(args.get("task") or ""))
+
+
 # --- Tool contract registry -------------------------------------------------
 # Built after handlers are defined; pairs each LLM-facing schema with its handler
 # and optional pre-execution validator. New capabilities (permission checks,
@@ -606,6 +631,7 @@ _HANDLERS: dict[str, Callable[[dict[str, Any]], str]] = {
     "export_bibliography": _export_bibliography,
     "query_knowledge_graph": _graph,
     "verify_claim": _verify_claim,
+    "delegate": _delegate,
 }
 _VALIDATORS: dict[str, Callable[[dict[str, Any]], str | None]] = {
     "recommend_papers": _v_paper_id,
@@ -628,6 +654,7 @@ _PROMPT_FRAGMENTS: dict[str, str] = {
     "export_bibliography": "把若干真实 paper_id 导出为 BibTeX 引文",
     "query_knowledge_graph": "查知识图谱/研究社区(作者/关键词/主题)",
     "verify_claim": "用跨语言语义接地度核查一句论断是否有文献支持",
+    "delegate": "把聚焦子任务交给专员子智能体(reviewer/trend/critic),用于复杂多面任务的分工",
 }
 
 

@@ -89,3 +89,23 @@ added by **plugging an MCP server**, not by writing native tool code — keeping
 
 Verified by loopback: pointing the consumer at SciScope's own MCP server (①)
 discovers all 9 tools and calls them successfully.
+
+---
+
+# Specialist sub-agents (direction ③)
+
+The agent can delegate a focused subtask to a **role-specialized sub-agent** via
+the `delegate` tool (`backend/app/agent/specialists.py`) — mirroring Claude Code's
+AgentTool (sub-agents spawned like a tool call):
+
+| role | 专员 | tool subset |
+|---|---|---|
+| `reviewer` | 综述员 | search_literature, summarize_field, get_paper |
+| `trend` | 趋势分析师 | get_trends, search_literature |
+| `critic` | 批判核查员 | verify_claim, search_literature |
+
+The main agent (coordinator) calls `delegate(role, task)` for complex,
+multi-faceted requests (e.g. "review X and fact-check its key claims"); each
+specialist runs a bounded tool loop with its own system prompt and restricted
+tools. **Recursion is structurally impossible** — specialist tool subsets never
+include `delegate`, so a sub-agent cannot spawn further sub-agents.
