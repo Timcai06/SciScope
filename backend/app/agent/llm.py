@@ -63,7 +63,9 @@ def detect_model() -> str | None:
 def stream_chat(messages: list[dict], model: str, tools: list | None) -> Iterator[tuple[str, Any]]:
     """Stream a chat completion and return ``(full_text, tool_calls)``."""
     base, key, _model = _llm_target()
-    body: dict[str, Any] = {"model": model, "messages": messages, "stream": True, "temperature": 0.1, "max_tokens": 700}
+    # Cloud models can write fuller answers; keep the local 7B lean for latency.
+    max_tokens = 1500 if _is_cloud_provider() else 700
+    body: dict[str, Any] = {"model": model, "messages": messages, "stream": True, "temperature": 0.1, "max_tokens": max_tokens}
     if tools:
         body["tools"] = tools
         body["tool_choice"] = "auto"
