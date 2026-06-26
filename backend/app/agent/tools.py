@@ -168,6 +168,8 @@ class Tool:
     # model (and skip execution), or None to proceed.
     validate: Callable[[dict[str, Any]], str | None] | None = None
     max_result_chars: int = 8000
+    # One-line "when to use me", assembled into the system prompt's tool catalog.
+    prompt_fragment: str = ""
 
 
 _PLACEHOLDER_IDS = {"string", "paper_id", "id", "example", "xxx", "n/a", "none", "null", "0"}
@@ -614,6 +616,19 @@ _VALIDATORS: dict[str, Callable[[dict[str, Any]], str | None]] = {
 _MAX_RESULT_CHARS: dict[str, int] = {
     "export_bibliography": 20000,  # BibTeX for up to 20 papers can run long
 }
+# Each tool's "when to use" line. The system prompt's tool catalog is assembled
+# from these (so it never drifts from the actual tool set).
+_PROMPT_FRAGMENTS: dict[str, str] = {
+    "search_literature": "在 16 万篇文献库中检索论文,回答“有哪些论文/某主题/某领域的方法”",
+    "get_trends": "查某关键词/主题的研究趋势(增长方向、阶段、预测)",
+    "recommend_papers": "给定真实 paper_id,推荐相似论文",
+    "get_paper": "按真实 paper_id 取某篇论文的详情",
+    "summarize_field": "取某主题的代表论文,作为“领域小综述/研究现状”的素材",
+    "compare_papers": "取两篇真实 paper_id 的论文做对比",
+    "export_bibliography": "把若干真实 paper_id 导出为 BibTeX 引文",
+    "query_knowledge_graph": "查知识图谱/研究社区(作者/关键词/主题)",
+    "verify_claim": "用跨语言语义接地度核查一句论断是否有文献支持",
+}
 
 
 def _build_registry() -> dict[str, Tool]:
@@ -627,9 +642,19 @@ def _build_registry() -> dict[str, Tool]:
             is_read_only=True,
             validate=_VALIDATORS.get(name),
             max_result_chars=_MAX_RESULT_CHARS.get(name, 8000),
+            prompt_fragment=_PROMPT_FRAGMENTS.get(name, ""),
         )
     return registry
 
 
 _REGISTRY: dict[str, Tool] = _build_registry()
 TOOLS: tuple[Tool, ...] = tuple(_REGISTRY.values())
+
+
+def tools_prompt() -> str:
+    """Assemble the tool catalog for the system prompt from each tool's fragment.
+
+    Mirrors Claude Code's per-tool self-description: the catalog the model sees
+    is built from the registry, so it never drifts from the actual tool set.
+    """
+    return "\n".join(f"- {t.name}:{t.prompt_fragment}" for t in TOOLS if t.prompt_fragment)

@@ -57,3 +57,18 @@ def test_export_bibliography_rejects_empty_and_fabricated():
 
 def test_unknown_tool_is_rejected():
     assert execute_tool("does_not_exist", {}) == "未知工具: does_not_exist"
+
+
+def test_tools_prompt_lists_every_tool():
+    prompt = tools.tools_prompt()
+    for tool in tools.TOOLS:
+        assert tool.prompt_fragment, f"{tool.name} missing prompt_fragment"
+        assert tool.name in prompt
+
+
+def test_system_prompt_catalog_includes_all_tools():
+    from backend.app.agent.llm import SYSTEM_PROMPT
+
+    # The catalog is assembled from the registry, so previously-omitted tools appear.
+    for name in ("verify_claim", "export_bibliography", "summarize_field", "compare_papers"):
+        assert name in SYSTEM_PROMPT

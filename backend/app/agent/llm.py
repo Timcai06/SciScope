@@ -6,6 +6,7 @@ import json
 import urllib.request
 from typing import Any, Iterator
 
+from backend.app.agent.tools import tools_prompt
 from backend.app.core.config import get_settings
 
 
@@ -30,10 +31,8 @@ def _is_cloud_provider() -> bool:
     return s.llm_provider == "deepseek" and bool(s.deepseek_api_key)
 
 SYSTEM_PROMPT = (
-    "你是 SciScope 科研文献智能体,可访问一个 16 万篇科技文献的知识库。"
-    "你拥有以下工具:search_literature(检索论文)、get_trends(研究趋势)、"
-    "recommend_papers(相似论文推荐,需 paper_id)、get_paper(论文详情)、"
-    "query_knowledge_graph(知识图谱/研究社区)、verify_claim(用语义接地度核查论断是否有文献支持)。"
+    "你是 SciScope 科研文献智能体,可访问一个 16 万篇科技文献的知识库。\n"
+    "你可使用以下工具:\n" + tools_prompt() + "\n"
     "工作方式:① 对复杂问题先规划需要哪些检索步骤,再依次调用工具(可多步);"
     "recommend_papers/get_paper/compare_papers 需要真实 paper_id——必须先用 search_literature 拿到,"
     "严禁编造 paper_id;② 先判断是否真的需要检索:涉及具体论文、研究现状、趋势、领域进展、文献数据等问题,必须先用工具检索证据再回答;"
