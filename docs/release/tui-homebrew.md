@@ -87,12 +87,21 @@ This triggers `.github/workflows/release.yml`.
 
 ## User install
 
+Newer Homebrew refuses to load casks from third-party taps until the tap is
+trusted, so the flow is **tap → trust → install**:
+
 ```bash
-brew install Timcai06/sciscope/sciscope-tui
+brew tap Timcai06/sciscope
+brew trust --cask timcai06/sciscope/sciscope-tui   # required on newer Homebrew for third-party tap casks
+brew install --cask sciscope-tui
 sciscope-tui --help
 sciscope-tui --demo
 sciscope-tui doctor
 ```
+
+Verified on macOS arm64 with Homebrew: installs `sciscope-tui` to
+`/opt/homebrew/bin`, `--version` prints the release tag, and the install hook
+strips the macOS quarantine xattr so the unsigned binary runs.
 
 Production attach:
 

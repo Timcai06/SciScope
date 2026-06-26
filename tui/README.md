@@ -10,7 +10,21 @@ SciScope TUI 是 Go 语言的终端交互客户端，负责把后端科研代理
 - 优先输出可复现证据（证据卡、时间线、Markdown 导出）。
 - 保持离线验收能力（`--demo` / `SCISCOPE_TUI_DEMO`）用于稳定演示。
 
-## 2. 启动方式
+## 2. 安装与启动
+
+### 2.0 用户安装（Homebrew）
+
+新版 Homebrew 默认拒绝加载第三方 tap 的 cask，需先 trust，因此流程是 **tap → trust → install**：
+
+```bash
+brew tap Timcai06/sciscope
+brew trust --cask timcai06/sciscope/sciscope-tui   # 新版 Homebrew 对第三方 tap cask 必需
+brew install --cask sciscope-tui
+sciscope-tui --demo     # 零配置离线体验
+```
+
+二进制装到 `/opt/homebrew/bin/sciscope-tui`，安装钩子会自动去除 macOS quarantine 属性。
+TUI 是终端客户端，真实问答需连接后端（见 2.1）；无后端时用 `--demo` 体验固定证据流。
 
 ### 2.1 正常联调
 
