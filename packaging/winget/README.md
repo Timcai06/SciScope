@@ -16,8 +16,8 @@ and model assets are not installed by winget.
 The release workflow is tag-driven:
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 After GitHub Actions succeeds, confirm the release contains:
@@ -32,16 +32,15 @@ checksums.txt
 
 Copy the template directory to a temporary `winget-pkgs` clone and replace:
 
-- `__VERSION__` with the release version without the leading `v`, for example
-  `0.1.1`.
-- `__AMD64_SHA256__` with the SHA256 of `sciscope-tui_windows_amd64.zip`.
-- `__ARM64_SHA256__` with the SHA256 of `sciscope-tui_windows_arm64.zip`.
+- `PackageVersion` with the release version without the leading `v`, for
+  example `0.1.2`.
+- `InstallerSha256` with the release asset SHA256 values.
 
 The release URL pattern is:
 
 ```text
-https://github.com/Timcai06/SciScope/releases/download/v__VERSION__/sciscope-tui_windows_amd64.zip
-https://github.com/Timcai06/SciScope/releases/download/v__VERSION__/sciscope-tui_windows_arm64.zip
+https://github.com/Timcai06/SciScope/releases/download/v0.1.2/sciscope-tui_windows_amd64.zip
+https://github.com/Timcai06/SciScope/releases/download/v0.1.2/sciscope-tui_windows_arm64.zip
 ```
 
 ## Submit to winget-pkgs
@@ -62,4 +61,3 @@ sciscope-tui --demo
 $env:SCISCOPE_BACKEND="https://api.sciscope.example"
 sciscope-tui
 ```
-
