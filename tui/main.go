@@ -853,8 +853,13 @@ func (m *model) refresh() {
 		m.loadRecentSessions()
 		content = renderSplash(m.vp.Width, m.recentSessions)
 	}
+	// Follow new content only when already pinned to the bottom; if the user has
+	// scrolled up to read, keep their position instead of yanking them down.
+	atBottom := m.vp.AtBottom()
 	m.vp.SetContent(content)
-	m.vp.GotoBottom()
+	if atBottom {
+		m.vp.GotoBottom()
+	}
 }
 
 func renderStreamRail(events []timelineEvent, meta eventMeta, nodes []string, kind string, elapsed time.Duration, width int) string {
@@ -1901,6 +1906,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 
+	case tea.MouseMsg:
+		// Mouse wheel scrolls the transcript viewport.
+		m.vp, cmd = m.vp.Update(msg)
+		return m, cmd
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
@@ -1910,6 +1920,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cancel()
 			}
 			return m, nil
+		case "pgup", "pgdown", "ctrl+u", "ctrl+d":
+			// Keyboard scrolling of the transcript (viewport's own keymap).
+			m.vp, cmd = m.vp.Update(msg)
+			return m, cmd
 		case "up", "down", "tab":
 			if strings.HasPrefix(m.ti.Value(), "/") {
 				ms := filterCmds(m.ti.Value())
@@ -2251,7 +2265,7 @@ func main() {
 	if opts.Demo {
 		m.demo = true
 	}
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
