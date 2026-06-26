@@ -99,6 +99,33 @@ def test_langgraph_runtime_marks_retry_requests(monkeypatch):
     assert result["retry"] is True
 
 
+def test_llm_routes_to_deepseek_when_keyed(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_LLM_PROVIDER", "deepseek")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test")
+    monkeypatch.setenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+    monkeypatch.setenv("DEEPSEEK_MODEL", "deepseek-chat")
+    from backend.app.agent import llm
+
+    base, key, model = llm._llm_target()
+    assert base == "https://api.deepseek.com"
+    assert key == "sk-test"
+    assert model == "deepseek-chat"
+    # Cloud provider: detect_model trusts config, no network probe.
+    assert llm.detect_model() == "deepseek-chat"
+
+
+def test_llm_falls_back_to_local_without_key(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_LLM_PROVIDER", "deepseek")
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:8001/v1")
+    from backend.app.agent import llm
+
+    base, key, _model = llm._llm_target()
+    assert base == "http://127.0.0.1:8001/v1"
+    assert key == ""
+    assert llm._is_cloud_provider() is False
+
+
 def test_langgraph_runtime_reflects_and_retries_weak_answer(monkeypatch):
     monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
     monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: False)
