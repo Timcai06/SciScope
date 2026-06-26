@@ -56,3 +56,6 @@ output/graphs/**
 # Go TUI client build artifact + goreleaser output
 tui/sciscope-tui
 tui/dist/
+
+# deploy secrets
+deploy/.env

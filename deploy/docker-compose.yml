@@ -1,0 +1,55 @@
+# SciScope demo deployment — single host (e.g. one Aliyun ECS 4c16g).
+# Brings up: PostgreSQL+pgvector  +  the FastAPI backend (DeepSeek generation).
+# Build/run from the repo root:
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sciscope}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-sciscope}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Exposed to the host so you can pg_restore the corpus dump from the box.
+    # Keep this off the public security group; restore over the loopback only.
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sciscope} -d ${POSTGRES_DB:-sciscope}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # --- storage / retrieval ---
+      SCISCOPE_DB_DSN: postgresql://${POSTGRES_USER:-sciscope}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-sciscope}
+      SCISCOPE_EMBEDDER_PATH: /app/models/embedder_local/multilingual-e5-base
+      SCISCOPE_RERANKER_PATH: /app/models/reranker_local/bge-reranker-v2-m3
+      SCISCOPE_USE_RERANKER: "1"
+      # --- generation: hosted DeepSeek, no local GPU ---
+      SCISCOPE_USE_MOCK_LLM: "false"
+      SCISCOPE_LLM_PROVIDER: deepseek
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:?set DEEPSEEK_API_KEY in deploy/.env}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      # --- web client CORS (TUI does not need this) ---
+      SCISCOPE_CORS_ORIGINS: ${SCISCOPE_CORS_ORIGINS:-}
+    volumes:
+      # ~3.2G shipped: embedder_local + reranker_local + recommend + trends.
+      # llm_local (Qwen 7B) is NOT needed here — generation goes to DeepSeek.
+      - ../models:/app/models:ro
+      - ../data:/app/data:ro
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:
