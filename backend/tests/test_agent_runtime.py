@@ -75,6 +75,11 @@ def test_langgraph_runtime_streams_plan_tool_and_grounded_answer(monkeypatch):
     assert result["runtime"] == "langgraph"
     assert result["session_id"] == "s-1"
     assert result["retry"] is False
+    # stop_reason + token usage surfaced on the final event meta and the aggregate.
+    assert parts[-1][2]["stop_reason"] == "completed"
+    assert parts[-1][2]["tokens_in"] >= 0 and parts[-1][2]["tokens_out"] >= 0
+    assert result["stop_reason"] == "completed"
+    assert "tokens_out" in result
 
 
 def test_langgraph_runtime_marks_retry_requests(monkeypatch):

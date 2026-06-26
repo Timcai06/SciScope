@@ -39,6 +39,23 @@ NODE_PHASES = {
 }
 
 
+def _estimate_tokens(text: str) -> int:
+    """Rough token estimate (CJK ~1.5 chars/token, else ~4) for usage/cost telemetry.
+
+    An estimate, labeled as such (mirrors Claude Code's tokenCountWithEstimation
+    fallback). With a cloud provider it tracks billable volume closely enough to
+    surface per-query cost.
+    """
+    if not text:
+        return 0
+    cjk = sum(1 for ch in text if "一" <= ch <= "鿿")
+    return int(cjk / 1.5 + (len(text) - cjk) / 4)
+
+
+def _messages_tokens(messages: list[dict]) -> int:
+    return sum(_estimate_tokens(str(m.get("content") or "")) for m in messages)
+
+
 class AgentState(TypedDict, total=False):
     question: str
     session_id: str | None
@@ -56,6 +73,8 @@ class AgentState(TypedDict, total=False):
     route: GraphRoute
     emit: list[AgentEvent]
     node_meta: dict[str, Any]
+    tokens_in: int
+    tokens_out: int
 
 
 def _load_langgraph():
@@ -70,7 +89,16 @@ def _load_langgraph():
     return StateGraph, END, MemorySaver
 
 
-def _finish_node(node: str, started_at: float, state: AgentState, updates: AgentState) -> AgentState:
+def _final_extra(state: AgentState, stop_reason: str, add_in: int = 0, add_out: int = 0) -> dict[str, Any]:
+    """Build the final-event meta extras: why the turn stopped + token usage."""
+    return {
+        "stop_reason": stop_reason,
+        "tokens_in": int(state.get("tokens_in") or 0) + add_in,
+        "tokens_out": int(state.get("tokens_out") or 0) + add_out,
+    }
+
+
+def _finish_node(node: str, started_at: float, state: AgentState, updates: AgentState, extra: dict[str, Any] | None = None) -> AgentState:
     meta = {
         "runtime": "langgraph",
         "node": node,
@@ -82,6 +110,8 @@ def _finish_node(node: str, started_at: float, state: AgentState, updates: Agent
         meta["session_id"] = session_id
     if state.get("retry"):
         meta["retry"] = True
+    if extra:
+        meta.update(extra)
     updates["node_meta"] = meta
     if updates.get("emit"):
         updates["emit"] = [(kind, payload, meta) for kind, payload, *_ in updates["emit"]]
@@ -95,8 +125,8 @@ def _prepare(state: AgentState) -> AgentState:
         return _finish_node("prepare", started_at, state, {
             "runtime": "langgraph",
             "route": "end",
-            "emit": [("final", "本地大模型未运行(:8001)。请先 `make llm`。")],
-        })
+            "emit": [("final", "本地大模型未运行(:8001)。请先 `make llm`,或设置 DEEPSEEK_API_KEY 使用云端模型。")],
+        }, extra={"stop_reason": "no_model", "tokens_in": 0, "tokens_out": 0})
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(state.get("history") or [])
     messages.append({"role": "user", "content": state["question"]})
@@ -115,6 +145,8 @@ def _prepare(state: AgentState) -> AgentState:
         "tools_total": 0,
         "retries": 0,
         "step": 0,
+        "tokens_in": 0,
+        "tokens_out": 0,
         "runtime": "langgraph",
         "route": "plan",
         "emit": [],
@@ -147,6 +179,7 @@ def _llm_step(state: AgentState) -> AgentState:
     started_at = time.perf_counter()
     messages = list(state.get("messages") or [])
     compact(messages)
+    tokens_in = int(state.get("tokens_in") or 0) + _messages_tokens(messages)
     text_events: list[AgentEvent] = []
     full_text, tool_calls = drain(
         stream_chat(messages, state["model"], TOOL_SCHEMAS),
@@ -157,6 +190,8 @@ def _llm_step(state: AgentState) -> AgentState:
         "last_answer": full_text,
         "tool_calls": tool_calls,
         "step": int(state.get("step") or 0) + 1,
+        "tokens_in": tokens_in,
+        "tokens_out": int(state.get("tokens_out") or 0) + _estimate_tokens(full_text),
         "emit": text_events,
     }
     if tool_calls:
@@ -205,7 +240,11 @@ def _reflect(state: AgentState) -> AgentState:
             reason = self_critique(state["question"], answer, state["model"])
 
     if not reason:
-        return _finish_node("reflect", started_at, state, {"route": "end", "emit": [("final", answer)]})
+        return _finish_node(
+            "reflect", started_at, state,
+            {"route": "end", "emit": [("final", answer)]},
+            extra=_final_extra(state, "completed"),
+        )
 
     messages = list(state.get("messages") or [])
     messages.append({"role": "assistant", "content": answer})
@@ -230,12 +269,17 @@ def _force_synthesis(state: AgentState) -> AgentState:
     started_at = time.perf_counter()
     messages = list(state.get("messages") or [])
     messages.append({"role": "user", "content": "请基于以上工具结果,用中文给出最终回答。"})
+    call_in = _messages_tokens(messages)
     text_events: list[AgentEvent] = []
     full_text, _ = drain(
         stream_chat(messages, state["model"], None),
         lambda kind, payload: text_events.append((kind, payload)),
     )
-    return _finish_node("force_synthesis", started_at, state, {"messages": messages, "last_answer": full_text, "route": "end", "emit": [*text_events, ("final", full_text)]})
+    return _finish_node(
+        "force_synthesis", started_at, state,
+        {"messages": messages, "last_answer": full_text, "route": "end", "emit": [*text_events, ("final", full_text)]},
+        extra=_final_extra(state, "max_steps", call_in, _estimate_tokens(full_text)),
+    )
 
 
 def _route(state: AgentState) -> GraphRoute:
@@ -314,4 +358,12 @@ def run_agent(
     if session_id:
         response["session_id"] = session_id
     response["retry"] = retry
+    # Carry stop_reason + token usage from the final event's meta to the aggregate.
+    for event in events:
+        kind, _payload, *rest = event
+        meta = rest[0] if rest else {}
+        if kind == "final" and isinstance(meta, dict):
+            for key in ("stop_reason", "tokens_in", "tokens_out"):
+                if key in meta:
+                    response[key] = meta[key]
     return response
