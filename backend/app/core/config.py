@@ -49,10 +49,10 @@ def _parse_bool(value: str | None, default: bool) -> bool:
 def _parse_cors_origins(value: str | None) -> list[str]:
     """Parse comma-separated CORS origins with whitespace trimming.
 
-    Fallback is the local Next.js frontend origin used by ``make frontend`` when
-    env var is missing, preserving the single-origin development assumption.
+    CORS is opt-in now that the default product path is backend/API + TUI.
+    Browser clients can set ``SCISCOPE_CORS_ORIGINS`` explicitly.
     """
-    raw_value = value if value is not None else "http://localhost:3001"
+    raw_value = value or ""
     return [origin.strip() for origin in raw_value.split(",") if origin.strip()]
 
 

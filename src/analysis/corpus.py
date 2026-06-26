@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from src.infra.chunks import looks_like_pdf_garbage
+
 
 RECENT_YEAR_START = 2022
 RECENT_YEAR_END = 2026
@@ -48,7 +50,7 @@ def _dedupe_key(paper: dict[str, Any]) -> str:
 
 def _record_score(paper: dict[str, Any]) -> tuple:
     """Completeness score; higher wins when a dedupe key repeats."""
-    full_text = str(paper.get("full_text") or "")
+    full_text = _clean_full_text(paper.get("full_text"))
     abstract = str(paper.get("abstract") or "")
     keywords = paper.get("keywords") or []
     authors = paper.get("authors") or []
@@ -60,6 +62,18 @@ def _record_score(paper: dict[str, Any]) -> tuple:
         min(len(authors), 10),
         str(paper.get("crawled_at") or ""),  # tie-break: most recent crawl
     )
+
+
+def _clean_full_text(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if looks_like_pdf_garbage(text):
+        return ""
+    lowered = text[:4000].lower()
+    if "<script" in lowered or "radware bot manager" in lowered or "hcaptcha" in lowered:
+        return ""
+    return text
 
 
 def _is_recent_year(value: Any, *, year_start: int, year_end: int) -> bool:
@@ -100,6 +114,7 @@ def build_processed_corpus(
     corpus = [
         {
             **paper,
+            "full_text": _clean_full_text(paper.get("full_text")),
             "is_recent_window": _is_recent_year(paper.get("year"), year_start=year_start, year_end=year_end),
         }
         for paper in best.values()

@@ -20,6 +20,13 @@
 - `data/analysis + output/graphs + report assets` → `build_report_figures / data-report-pdf`
   - 目标：产出可复核报告图件与 manifest，支持人工核对。
 
+### data 与 PostgreSQL 的关系
+
+- `data/` 是可重建资产层：保存原始治理底账、分析资产、processed corpus、RAG chunks 和报告输入。
+- PostgreSQL 是服务层：用于在线检索、pgvector 相似度、推荐和 Agent 工具响应。
+- 两者不是替代关系。数据库可以从 `data/processed` 重建；报告和审计需要 `data/analysis`；原始争议记录需要 `data/raw_canonical` 追溯。
+- 可清理的是 `data/raw/` 中已治理的新采集 landing 文件、旧 smoke/sample 产物和临时文件；不应直接删除 `data/raw_canonical`、`data/analysis`、`papers_corpus.json`、`paper_chunks.jsonl`。
+
 ## 二、raw canonical 与 quarantine 边界
 
 - `build_raw_canonical` 将未来年份记录标记为 `future_year_suspect`，不直接硬删。

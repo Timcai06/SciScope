@@ -2,14 +2,14 @@
 
 \subsection{运行环境}
 \begin{itemize}
-\item Python 3.11(conda 环境),Go 1.26(终端客户端),Node.js(规划中的前端);PostgreSQL 15 + pgvector 扩展。
+\item Python 3.11(conda 环境),Go 1.26(终端客户端);PostgreSQL 15 + pgvector 扩展。
 \item 关键依赖:\texttt{fastapi}、\texttt{psycopg}、\texttt{pgvector}、\texttt{sentence-transformers}、\texttt{scikit-learn}、\texttt{networkx}、\texttt{pandas}。
 \item 本地大模型(可选):vLLM-Metal / LM Studio 等 OpenAI 兼容服务;无则自动用 mock,检索证据仍真实。
 \end{itemize}
 
 \subsection{一键安装}
 \begin{codepanel}\ttfamily\small
-make install\hfill\# 安装后端 Python 依赖与前端 npm 依赖
+make install\hfill\# 安装后端 Python 依赖
 \end{codepanel}
 
 \subsection{构建服务层与模型文件}
@@ -30,7 +30,7 @@ make recommend-model trend-model graph-export\\
 
 \subsection{启动与体验}
 \begin{codepanel}\ttfamily\small
-\# 带数据库 + 本地嵌入启动前后端\\
+\# 带数据库 + 本地嵌入启动后端\\
 SCISCOPE\_DB\_DSN=postgresql://USER@localhost:5432/sciscope \textbackslash\\
 SCISCOPE\_EMBEDDER\_PATH=models/embedder\_local/multilingual-e5-base make dev\\[3pt]
 \# 终端科研智能体(Go 客户端,需后端 :8000 与本地大模型 :8001)\\
@@ -39,11 +39,11 @@ make backend \&  make llm \&  make tui\\[3pt]
 make vllm-serve\hfill\# 启动本地模型\\
 ... make dev\hfill\# 配 LOCAL\_LLM\_* 指向该模型
 \end{codepanel}
-打开 \texttt{http://localhost:3001} 使用工作台;后端接口文档见 \texttt{http://127.0.0.1:8000/docs}。
+使用 \texttt{make tui} 进入终端科研智能体;后端接口文档见 \texttt{http://127.0.0.1:8000/docs}。
 
 \subsection{质量与效果验证}
 \begin{codepanel}\ttfamily\small
-make test\hfill\# 后端测试 + 前端类型检查 + 构建(以当前环境输出为准)\\
+make test\hfill\# 后端自动化测试(以当前环境输出为准)\\
 make eval-retrieval\hfill\# 自检索评估:recall@k / MRR / 延迟
 \end{codepanel}
 

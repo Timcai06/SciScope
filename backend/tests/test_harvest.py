@@ -1,4 +1,5 @@
 import json
+import xml.etree.ElementTree as ET
 
 import pytest
 
@@ -8,6 +9,9 @@ from src.harvest.openalex_client import _query_params
 from src.harvest.public_sources import (
     SUPPORTED_SOURCES,
     YEAR_SUPPORTED_SOURCES,
+    _pmc_article_doi,
+    _pmc_article_id,
+    _pubmed_article_doi,
     _arxiv_search_query,
     _doaj_article_year,
     _year_query,
@@ -271,6 +275,87 @@ def test_pmc_summary_record_to_item_preserves_metadata_when_full_text_is_unavail
     assert item["raw"]["year"] == "2024"
     assert item["raw"]["authors"] == ["Ada Chen", "Lin Wang"]
     assert item["raw"]["doi"] == "10.5555/pmc.1"
+
+
+def test_pubmed_article_doi_ignores_reference_article_ids():
+    article = ET.fromstring(
+        """
+        <PubmedArticle>
+          <MedlineCitation>
+            <PMID>42232482</PMID>
+            <Article>
+              <ArticleTitle>The Rich and the Simple</ArticleTitle>
+            </Article>
+          </MedlineCitation>
+          <PubmedData>
+            <ArticleIdList>
+              <ArticleId IdType="pubmed">42232482</ArticleId>
+            </ArticleIdList>
+            <ReferenceList>
+              <Reference>
+                <ArticleIdList>
+                  <ArticleId IdType="doi">10.1109/5.726791</ArticleId>
+                </ArticleIdList>
+              </Reference>
+            </ReferenceList>
+          </PubmedData>
+        </PubmedArticle>
+        """
+    )
+
+    assert _pubmed_article_doi(article) == ""
+
+
+def test_pubmed_article_doi_uses_article_level_ids():
+    article = ET.fromstring(
+        """
+        <PubmedArticle>
+          <MedlineCitation>
+            <Article>
+              <ELocationID EIdType="doi">10.5555/article.1</ELocationID>
+            </Article>
+          </MedlineCitation>
+          <PubmedData>
+            <ReferenceList>
+              <Reference>
+                <ArticleIdList>
+                  <ArticleId IdType="doi">10.1109/5.726791</ArticleId>
+                </ArticleIdList>
+              </Reference>
+            </ReferenceList>
+          </PubmedData>
+        </PubmedArticle>
+        """
+    )
+
+    assert _pubmed_article_doi(article) == "10.5555/article.1"
+
+
+def test_pmc_article_doi_uses_front_article_meta_only():
+    article = ET.fromstring(
+        """
+        <article>
+          <front>
+            <article-meta>
+              <article-id pub-id-type="pmc">123456</article-id>
+              <article-id pub-id-type="doi">10.5555/pmc.article</article-id>
+            </article-meta>
+          </front>
+          <back>
+            <ref-list>
+              <ref>
+                <element-citation>
+                  <article-id pub-id-type="doi">10.1109/5.726791</article-id>
+                </element-citation>
+              </ref>
+            </ref-list>
+          </back>
+        </article>
+        """
+    )
+
+    assert _pmc_article_id(article) == "123456"
+    assert _pmc_article_doi(article) == "10.5555/pmc.article"
 
 
 def test_arxiv_normalization_preserves_enriched_full_text():

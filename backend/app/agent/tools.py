@@ -13,8 +13,10 @@ payloads are evidence references, not raw authoritative facts.
 from __future__ import annotations
 
 import json
+import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
@@ -148,31 +150,99 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
 ]
 
 
+@dataclass(frozen=True)
+class Tool:
+    """A SciScope capability as a first-class contract.
+
+    Inspired by Claude Code's tool contract: the agent loop stays thin because
+    each tool declares its own concurrency safety, pre-execution validation, and
+    result-size bound — the runtime never special-cases individual tools. Adding
+    a capability is adding a registry entry, not growing the loop.
+    """
+
+    name: str
+    schema: dict[str, Any]
+    run: Callable[[dict[str, Any]], str]
+    is_read_only: bool = True
+    # Deterministic pre-execution check. Returns a recovery message to show the
+    # model (and skip execution), or None to proceed.
+    validate: Callable[[dict[str, Any]], str | None] | None = None
+    max_result_chars: int = 8000
+
+
+_PLACEHOLDER_IDS = {"string", "paper_id", "id", "example", "xxx", "n/a", "none", "null", "0"}
+_FABRICATED_NUM = re.compile(r"^0+1?$")  # "0000001" etc. — the model's fabricated-id pattern
+
+
+def _validate_paper_id(value: Any, field: str = "paper_id") -> str | None:
+    """Reject ids the model fabricated instead of retrieving — before the DB sees them.
+
+    Catches the real failure modes (a topic phrase passed as an id, or a
+    zero-padded placeholder) and tells the model how to recover. It does NOT
+    verify existence; the handler already reports 'not found' for plausible but
+    absent ids.
+    """
+    pid = str(value or "").strip()
+    if not pid:
+        return f"{field} 为空——请先用 search_literature 检索,用返回的真实 paper_id 再调用。"
+    if " " in pid or len(pid) > 80:
+        return f"{field}={pid!r} 不像论文 ID(疑似把主题/短语当成 ID)。请先用 search_literature 拿到真实 paper_id。"
+    if pid.lower() in _PLACEHOLDER_IDS or _FABRICATED_NUM.match(pid):
+        return f"{field}={pid!r} 像是编造的占位 ID。请先用 search_literature 拿到真实 paper_id。"
+    return None
+
+
+def _v_paper_id(args: dict[str, Any]) -> str | None:
+    return _validate_paper_id(args.get("paper_id"))
+
+
+def _v_compare(args: dict[str, Any]) -> str | None:
+    return _validate_paper_id(args.get("paper_id_a"), "paper_id_a") or _validate_paper_id(
+        args.get("paper_id_b"), "paper_id_b"
+    )
+
+
+def _v_export(args: dict[str, Any]) -> str | None:
+    ids = args.get("paper_ids") or []
+    if isinstance(ids, str):
+        ids = [ids]
+    cleaned = [str(x).strip() for x in ids if str(x).strip()]
+    if not cleaned:
+        return "paper_ids 为空——请先用 search_literature 拿到真实 paper_id。"
+    for x in cleaned:
+        denial = _validate_paper_id(x, "paper_ids 元素")
+        if denial:
+            return denial
+    return None
+
+
 def execute_tool(name: str, args: dict[str, Any]) -> str:
-    """Dispatch a tool call; always returns a string (errors included)."""
-    try:
-        if name == "search_literature":
-            return _search(args)
-        if name == "get_trends":
-            return _trends(args)
-        if name == "recommend_papers":
-            return _recommend(args)
-        if name == "get_paper":
-            return _get_paper(args)
-        if name == "summarize_field":
-            return _summarize_field(args)
-        if name == "compare_papers":
-            return _compare_papers(args)
-        if name == "export_bibliography":
-            return _export_bibliography(args)
-        if name == "query_knowledge_graph":
-            return _graph(args)
-        if name == "verify_claim":
-            return _verify_claim(args)
+    """Run a tool through its contract: validate -> run -> bound result size.
+
+    Always returns a string (validation rejections and errors included) so the
+    model can read the outcome and recover rather than the loop crashing.
+    """
+    tool = _REGISTRY.get(name)
+    if tool is None:
         # Unknown tool names are rejected here to keep the call boundary explicit.
         return f"未知工具: {name}"
+    try:
+        if tool.validate is not None:
+            denial = tool.validate(args)
+            if denial:
+                return f"[未执行] {denial}"
+        result = tool.run(args)
     except Exception as exc:  # noqa: BLE001 — surface failures to the model, don't crash the loop
         return f"工具 {name} 执行出错: {type(exc).__name__}: {exc}"
+    if isinstance(result, str) and len(result) > tool.max_result_chars:
+        result = result[: tool.max_result_chars] + " …(结果过长已截断,请用更具体的参数缩小检索范围)"
+    return result
+
+
+def is_read_only(name: str) -> bool:
+    """Whether a tool may run concurrently with others (all current tools are)."""
+    tool = _REGISTRY.get(name)
+    return tool.is_read_only if tool else True
 
 
 def _search(args: dict[str, Any]) -> str:
@@ -517,3 +587,49 @@ def _verify_claim(args: dict[str, Any]) -> str:
         },
         ensure_ascii=False,
     )
+
+
+# --- Tool contract registry -------------------------------------------------
+# Built after handlers are defined; pairs each LLM-facing schema with its handler
+# and optional pre-execution validator. New capabilities (permission checks,
+# prompt fragments, MCP/sub-agent tools) become more fields/entries here — the
+# runtime stays unchanged.
+_HANDLERS: dict[str, Callable[[dict[str, Any]], str]] = {
+    "search_literature": _search,
+    "get_trends": _trends,
+    "recommend_papers": _recommend,
+    "get_paper": _get_paper,
+    "summarize_field": _summarize_field,
+    "compare_papers": _compare_papers,
+    "export_bibliography": _export_bibliography,
+    "query_knowledge_graph": _graph,
+    "verify_claim": _verify_claim,
+}
+_VALIDATORS: dict[str, Callable[[dict[str, Any]], str | None]] = {
+    "recommend_papers": _v_paper_id,
+    "get_paper": _v_paper_id,
+    "compare_papers": _v_compare,
+    "export_bibliography": _v_export,
+}
+_MAX_RESULT_CHARS: dict[str, int] = {
+    "export_bibliography": 20000,  # BibTeX for up to 20 papers can run long
+}
+
+
+def _build_registry() -> dict[str, Tool]:
+    registry: dict[str, Tool] = {}
+    for schema in TOOL_SCHEMAS:
+        name = schema["function"]["name"]
+        registry[name] = Tool(
+            name=name,
+            schema=schema,
+            run=_HANDLERS[name],
+            is_read_only=True,
+            validate=_VALIDATORS.get(name),
+            max_result_chars=_MAX_RESULT_CHARS.get(name, 8000),
+        )
+    return registry
+
+
+_REGISTRY: dict[str, Tool] = _build_registry()
+TOOLS: tuple[Tool, ...] = tuple(_REGISTRY.values())

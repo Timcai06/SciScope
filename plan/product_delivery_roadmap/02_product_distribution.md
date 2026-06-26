@@ -2,14 +2,14 @@
 
 ## 产品定位（产品级边界）
 
-SciScope 的交付链条采用 **“TUI 为主线、Web 为观察入口”** 的分发策略：
+SciScope 的交付链条采用 **“TUI + FastAPI 为主线”** 的分发策略：
 
 - 主交互和核心价值承载在终端：`sciscope-tui`（Go）消费 `POST /api/agent/stream`，用于高频科研问答、证据追踪、会话恢复与导出。
-- Web 前端（Next.js）作为观览与下载入口：用于展示 Dashboard、趋势/图谱结果、报告与下载，不承接终端的主线交互。
-- 后端（Python）与数据层负责全部检索、RAG、证据、趋势和图谱推理能力，TUI 与 Web 共用同一套接口。
+- 后端（Python）与数据层负责全部检索、RAG、证据、趋势和图谱推理能力，TUI 消费同一套 FastAPI/SSE 接口。
+- 交互式 Web 工作台源码已从当前范围移除；landing page 作为品牌宣传、报告下载、安装说明与文档入口保留。
 
 > 关键边界：发布面向用户时以 `sciscope-tui` 作为主要可交付二进制；  
-> 文档、下载与观览体验通过 landing + frontend 承接，不与 TUI 功能主线抢位。
+> 对外品牌、下载与观览体验通过 landing page、README、runbook、报告 PDF 和发布说明承接。
 
 ## 用户旅程
 
@@ -34,7 +34,7 @@ SciScope 的交付链条采用 **“TUI 为主线、Web 为观察入口”** 的
 
 - 核心路径：在终端输入问题 → 观察 `plan/tool_call/tool_result/reflect/final` 流程 → 根据证据决定后续检索。
 - 产出路径：会话自动保存 `sciscope-session-YYYYMMDD-HHMMSS.md`，支持 `/export` 导出、`/sessions` 恢复、`/retry` 重试。
-- 外部交付：由前端入口查看 Dashboard / 报告 / 图谱视图，并从 landing 下载报告或补充文档。
+- 外部交付：通过报告 PDF、TUI 会话导出、README/runbook 和 API 文档查看成果。
 
 ### 4) 问题反馈
 
@@ -79,31 +79,23 @@ SciScope 的交付链条采用 **“TUI 为主线、Web 为观察入口”** 的
   - “先运行 `make backend`；如果要离线查看演示可直接 `sciscope-tui --demo`。”
   - “若报错，先跑 `sciscope-tui doctor`，按建议命令自修复。”
 
-## landing page 信息架构（不抢 TUI 主线）
+## Landing Page 范围
 
-### 现状确认
+landing page 保留，但它不是科研智能体的交互式 Web 前端。它的职责是让评委、潜在用户和社区访问者在浏览器中快速理解 SciScope、下载产物并进入文档。
 
-当前 `frontend/app/page.tsx` 直接渲染的是工作台面板（Dashboard、问答、趋势、推荐、图谱），还未形成独立“产品 landing”说明页。
+### 信息架构
 
-### 目标 IA（建议）
+- Hero：一句话定位 SciScope，突出“科研证据智能体 / TUI 主产品 / 可复现报告”。
+- Product proof：展示黄金会话、证据链、趋势图、图谱截图或录屏。
+- Downloads：提供 TUI 安装矩阵、GitHub Releases、报告 PDF、交付说明和样例会话下载。
+- Docs：入口指向 README、runbook、TUI README、API 文档与 FAQ。
+- Trust：列出数据来源、可复现命令、报告产物路径和版本信息。
 
-- 首屏：产品一句话、场景价值（科研问答、趋势、图谱）、一键安装区（含安装矩阵入口）。
-- 观览区：最近数据洞察（数据范围、论文数量、趋势快照）与报告预览入口。
-- 下载区：TUI 版本状态、安装命令、常见安装问题与兼容矩阵。
-- 文档区：README、runbook、TUI 说明、release guide、常见 FAQ。
-- 观测区：示例会话截图/输出片段，用于降低首次门槛。
+### 边界
 
-### 交付原则
-
-- landing 只承载“看得见、可下载、可开工”；  
-  真正工作流仍由 TUI 与终端命令驱动。
-- Web 前端将保持“观览/报告/下载”定位，不替代 TUI 的 `/agent` 交互与会话编排。
-
-### 待确认
-
-- 是否新增独立 landing 路由（如 `/` 与 `/landing` 分离）。  
-- 是否把导航中的报告下载与安装指南做可跳转组件化抽离。  
-- 是否为 Windows 提供可视化下载说明页（待补齐）。
+- 做：静态/内容型品牌宣传页、下载页、文档入口、报告与演示素材聚合。
+- 不做：恢复 `frontend/` 工作台、不做 Dashboard/RAG Chat/Graph Explorer 等浏览器内交互主流程。
+- 待补齐：landing 的托管方式、素材清单、URL、下载版本同步机制。
 
 ## 版本发布策略
 
@@ -151,6 +143,6 @@ SciScope 的交付链条采用 **“TUI 为主线、Web 为观察入口”** 的
 
 ## 与交付目标的一致性说明
 
-- 这份分发计划的核心是：把 SciScope 的可发布主线集中到 TUI，同时让 Web 成为可信、可审阅、可下载的入口层。  
-- 任何新增 Web 特性都不应吞掉终端主线价值；TUI 仍是用户第一次完成“研究工作流”的起点。  
+- 这份分发计划的核心是：把 SciScope 的可发布主线集中到 TUI，同时让 landing page 成为可信、可审阅、可下载的入口层。  
+- 任何新增交互式 Web 特性都不应吞掉终端主线价值；TUI 仍是用户第一次完成“研究工作流”的起点。  
 - 不确定项已按要求用“待补齐”标记，避免误导用户或写入未落地命令。

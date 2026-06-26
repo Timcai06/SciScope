@@ -32,12 +32,46 @@ the work focused on presentation, consistency, and judging clarity.
 - Runtime chunk embeddings: 367,773.
 - Runtime paper embeddings: 159,135.
 - Abstract coverage: 140,183 records, 83.22%.
-- Full-text field coverage: 15,144 records, 8.99%.
+- Full-text field coverage: 17,682 records, 10.50%.
+- RAG full-text chunks: 48,572 chunks covering 13,400 papers.
 - Title self-retrieval: recall@10 0.985, MRR@10 0.9583.
 - Cross-lingual relevance@5: 1.0.
 - Trend backtest Pearson: 0.9756.
 - Recommendation mean semantic similarity: 0.8918.
-- Backend automated tests: 98 passing when run in the project environment.
+- Backend automated tests: current acceptance baseline is 117 items; final value
+  should be taken from the last `make test` run.
+
+## Package Contents Beyond The Two Reports
+
+Use a whitelist package, not a whole-repository archive. Historical planning
+docs can mention earlier frontend ideas and should not be treated as submission
+truth unless refreshed.
+
+- [ ] Judge index and run instructions:
+  `交付说明.md`, `README.md`, `docs/runbook.md`,
+  `docs/final_submission_checklist.md`.
+- [ ] Competition source files:
+  `docs/competition/赛题.docx`, `docs/competition/数据集.docx`.
+- [ ] Python code and runtime schema:
+  `src/`, `backend/`, `data_pipeline/`, `infra/`, `configs/`, `Makefile`.
+- [ ] Terminal client:
+  `tui/`.
+- [ ] Model and index assets that are small enough to ship:
+  `models/trends/`, `models/recommend/`, `output/graphs/`, `output/eval/`.
+- [ ] Data assets needed for reproducibility:
+  `data/raw_canonical/`, `data/analysis/`, `data/processed/`.
+- [ ] Report figures and manifests:
+  `output/assets/sciscope_data_report/`,
+  `output/assets/sciscope_project_report/`.
+- [ ] Agent demonstration:
+  `docs/examples/golden_verify_claim_session.md` and, if generated before final
+  packaging, the latest real `sciscope-session-*.md` export.
+- [ ] Large replaceable dependencies decision:
+  explicitly include or document rebuild/download steps for
+  `models/embedder_local/`, `models/llm_local/`, and PostgreSQL runtime tables.
+- [ ] Exclude from the formal submission package unless deliberately refreshed:
+  `plan/archive/`, `docs/superpowers/`, `docs/2026-06-16-sciscope-product-architecture.md`,
+  and `output/pdf/sciscope_design/`.
 
 ## Report Polish Gates
 

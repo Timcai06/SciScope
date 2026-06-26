@@ -343,7 +343,8 @@ AI 生成内容和数据证据分离：
 
 ### 8.1 产品系统
 
-- Next.js 前端。
+- Go TUI / FastAPI API 为当前主交互与交付路径。
+- Next.js 前端保留为可选历史 Web 工作台。
 - FastAPI 后端。
 - DeepSeek 接入。
 - RAG / GraphRAG 问答。

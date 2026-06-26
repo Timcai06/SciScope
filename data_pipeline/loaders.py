@@ -7,11 +7,10 @@ from data_pipeline.models import Paper
 from data_pipeline.normalize import normalize_paper
 
 
-"""Load raw paper records from supported source files and normalize+validate them.
+"""Load sample paper records from JSON/CSV and normalize+validate them.
 
-This module is the first stop of the backend pipeline:
-JSON/CSV ingestion -> normalization -> pydantic shape validation.
-Keep this boundary narrow so upstream changes do not leak into downstream models.
+This legacy helper supports deterministic sample-mode services and tests. The
+production data layer is built by `src.harvest`, `src.analysis`, and `src.infra`.
 """
 
 

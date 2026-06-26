@@ -6,7 +6,6 @@ PYTHON ?= $(PROJECT_PYTHON)
 TEST_PYTHON ?= $(PROJECT_TEST_PYTHON)
 BACKEND_HOST ?= 127.0.0.1
 BACKEND_PORT ?= 8000
-FRONTEND_PORT ?= 3001
 DATA_PATH ?= data/sample/papers.sample.json
 HARVEST_SOURCE ?= openalex
 HARVEST_LIMIT ?= 500
@@ -78,7 +77,7 @@ GO_BUILD_CACHE ?= $(CURDIR)/.cache/go-build
 export SCISCOPE_APP_NAME ?= SciScope
 export SCISCOPE_ENV ?= local
 export SCISCOPE_DATA_PATH ?= $(DATA_PATH)
-export SCISCOPE_CORS_ORIGINS ?= http://localhost:$(FRONTEND_PORT)
+export SCISCOPE_CORS_ORIGINS ?=
 export SCISCOPE_USE_MOCK_LLM ?= true
 export SCISCOPE_LLM_PROVIDER ?= deepseek
 export LOCAL_LLM_BASE_URL ?= $(VLLM_BASE_URL)
@@ -87,7 +86,6 @@ export LOCAL_LLM_MODEL ?= $(VLLM_MODEL)
 # without them retrieval has no DB and every search returns "未检索到".
 export SCISCOPE_DB_DSN ?= $(POSTGRES_DSN)
 export SCISCOPE_EMBEDDER_PATH ?= $(EMBEDDER_PATH)
-export NEXT_PUBLIC_SCISCOPE_API_BASE ?= http://$(BACKEND_HOST):$(BACKEND_PORT)
 unexport VLLM_BASE_URL
 unexport VLLM_EXTRA_ARGS
 unexport VLLM_HOST
@@ -96,12 +94,12 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend install-frontend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf report backend frontend dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend typecheck build smoke clean
+.PHONY: help install install-backend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf report backend dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend smoke clean
 
 help:
 	@echo "SciScope local commands"
 	@echo ""
-	@echo "  make install          Install backend Python deps and frontend npm deps"
+	@echo "  make install          Install backend Python deps"
 	@echo "  make harvest-sample   Harvest public paper metadata into raw JSONL"
 	@echo "  make harvest-source   Harvest one source into data/raw/<source>/<source>_<limit>.jsonl"
 	@echo "  make harvest-all-sources Harvest $(HARVEST_LIMIT) records/source for configured public sources"
@@ -132,10 +130,10 @@ help:
 	@echo "  make report-figures   Build report-ready chart assets from data/analysis"
 	@echo "  make project-report-figures Build product/system figures for the project report"
 	@echo "  make data-report-pdf  Build the SciScope data analysis report PDF"
+	@echo "  make project-report-pdf Build the project/system report PDF"
 	@echo "  make report           Rebuild analysis tables, report figures, and data PDF"
 	@echo "  make backend          Start FastAPI backend on $(BACKEND_HOST):$(BACKEND_PORT)"
-	@echo "  make frontend         Start Next.js frontend on localhost:$(FRONTEND_PORT)"
-	@echo "  make dev              Start backend and frontend together"
+	@echo "  make dev              Start backend only (default development path)"
 	@echo "  make tui-demo         Play the offline SciScope TUI golden demo flow"
 	@echo "  make tui-doctor       Check TUI backend/LLM/session readiness"
 	@echo "  make tui-export-last  Print the latest saved TUI Markdown session"
@@ -144,21 +142,17 @@ help:
 	@echo "  make llm-stop        Stop the local LLM"
 	@echo "  make dev-vllm         Start app using local vLLM/Metal OpenAI-compatible server"
 	@echo "  make vllm-smoke       Check local vLLM OpenAI-compatible endpoint"
-	@echo "  make test             Run backend tests and frontend typecheck/build"
+	@echo "  make test             Run backend tests"
 	@echo "  make smoke            Check backend health endpoints with curl"
-	@echo "  make clean            Remove generated frontend build artifacts"
+	@echo "  make clean            Remove generated local cache/build artifacts"
 	@echo ""
-	@echo "Open frontend: http://localhost:$(FRONTEND_PORT)"
 	@echo "Backend docs:  http://$(BACKEND_HOST):$(BACKEND_PORT)/docs"
 
-install: install-backend install-frontend
+install: install-backend
 
 install-backend:
 	$(PYTHON) -m pip install --upgrade pip
 	$(PYTHON) -m pip install -r backend/requirements.txt
-
-install-frontend:
-	cd frontend && npm install
 
 harvest-sample:
 	$(PYTHON) -m src.harvest.cli harvest --source $(HARVEST_SOURCE) --limit $(HARVEST_LIMIT) --output $(RAW_PAPERS_PATH)
@@ -390,16 +384,10 @@ report: analysis-assets processed-corpus report-figures data-report-pdf
 backend:
 	$(PYTHON) -m uvicorn backend.app.main:app --reload --host $(BACKEND_HOST) --port $(BACKEND_PORT)
 
-frontend:
-	cd frontend && npm run dev -- --hostname 0.0.0.0 --port $(FRONTEND_PORT)
-
 dev:
-	@echo "Starting SciScope backend and frontend..."
-	@echo "Frontend: http://localhost:$(FRONTEND_PORT)"
+	@echo "Starting SciScope backend..."
 	@echo "Backend:  http://$(BACKEND_HOST):$(BACKEND_PORT)"
-	@trap 'kill 0' INT TERM EXIT; \
-	$(PYTHON) -m uvicorn backend.app.main:app --reload --host $(BACKEND_HOST) --port $(BACKEND_PORT) & \
-	cd frontend && npm run dev -- --hostname 0.0.0.0 --port $(FRONTEND_PORT)
+	$(PYTHON) -m uvicorn backend.app.main:app --reload --host $(BACKEND_HOST) --port $(BACKEND_PORT)
 
 dev-vllm:
 	@$(MAKE) dev SCISCOPE_USE_MOCK_LLM=false SCISCOPE_LLM_PROVIDER=vllm LOCAL_LLM_BASE_URL=$(VLLM_BASE_URL) LOCAL_LLM_MODEL=$(VLLM_MODEL)
@@ -432,16 +420,10 @@ vllm-smoke:
 		-H "Content-Type: application/json" \
 		-d '{"model":"$(VLLM_MODEL)","messages":[{"role":"user","content":"用一句话解释RAG是什么"}],"temperature":0.2}'
 
-test: test-backend typecheck build
+test: test-backend
 
 test-backend:
 	$(TEST_PYTHON) -m pytest backend/tests -v
-
-typecheck:
-	cd frontend && npm run typecheck
-
-build:
-	cd frontend && npm run build
 
 smoke:
 	curl -fsS http://$(BACKEND_HOST):$(BACKEND_PORT)/api/ingest/status
@@ -454,4 +436,6 @@ smoke:
 	@echo "chat ok"
 
 clean:
-	rm -rf frontend/.next frontend/tsconfig.tsbuildinfo
+	rm -rf .cache .pytest_cache tmp tui/dist tui/sciscope-tui
+	find . -name __pycache__ -type d -prune -exec rm -rf {} +
+	find . -name .DS_Store -type f -delete

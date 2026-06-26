@@ -1,13 +1,13 @@
 # SciScope 产品化与完整交付路线图
 
-本目录记录 SciScope 从比赛项目走向可交付产品的双线计划：一条面向赛题评委,一条面向最终用户。核心判断是 **TUI 是主产品入口,Web/landing page 是观览、下载与文档入口;赛题交付物必须做到无环境可核验、有环境可复现。**
+本目录记录 SciScope 从比赛项目走向可交付产品的双线计划：一条面向赛题评委,一条面向最终用户。核心判断是 **TUI 是主产品入口,landing page 是品牌宣传、观览、下载与文档入口;赛题交付物必须做到无环境可核验、有环境可复现。**
 
 ## 文件索引
 
 | 文件 | 读者 | 解决的问题 |
 |---|---|---|
 | `01_competition_reproducibility.md` | 评委、出题方、交付负责人 | 没有依赖环境时如何验收;有环境时如何复现关键成果 |
-| `02_product_distribution.md` | 产品负责人、最终用户、文档负责人 | TUI 主线如何分发;landing page 和 Web 前端承担什么角色 |
+| `02_product_distribution.md` | 产品负责人、最终用户、文档负责人 | TUI 主线如何分发;landing page 承担什么宣传、下载与文档入口角色 |
 | `03_cross_platform_installation.md` | 发布负责人、平台工程、运维 | macOS/Linux/Windows 如何安装、打包、校验和降级 |
 | `04_delivery_checklist_and_timeline.md` | 项目负责人、执行团队 | 从产品体验到最终验收的阶段拆分、边界和验收标准 |
 
@@ -15,11 +15,11 @@
 
 ### 1. 赛题交付
 
-评委拿到源码、报告和固定产物后,不应被迫先配置数据库、模型、LaTeX 或前端环境。即使零依赖,也能通过报告 PDF、章节源码、固定评测文件、图表 manifest、样例数据和说明文档确认项目成果。若评委愿意配置环境,则通过 `Makefile` 入口复现关键指标、服务接口和 TUI 演示。
+评委拿到源码、报告和固定产物后,不应被迫先配置数据库、模型、LaTeX 或交互式前端环境。即使零依赖,也能通过报告 PDF、章节源码、固定评测文件、图表 manifest、样例数据、landing 下载页和说明文档确认项目成果。若评委愿意配置环境,则通过 `Makefile` 入口复现关键指标、服务接口和 TUI 演示。
 
 ### 2. 最终用户产品化
 
-真实用户应优先通过终端安装和使用 SciScope TUI。短期以 macOS Homebrew 为首要分发方式,GitHub Releases 承担统一产物源;Linux/Windows 逐步补齐 tarball、安装脚本、WSL/PowerShell 路线。Web 前端和 landing page 用于说明产品、展示报告、提供安装方式和下载入口,不替代 TUI 的科研智能体主流程。
+真实用户应优先通过终端安装和使用 SciScope TUI。短期以 macOS Homebrew 为首要分发方式,GitHub Releases 承担统一产物源;Linux/Windows 逐步补齐 tarball、安装脚本、WSL/PowerShell 路线。landing page 用于说明产品、展示报告、提供安装方式和下载入口,不替代 TUI 的科研智能体主流程；交互式 Web 工作台不在当前范围。
 
 ## 执行顺序
 

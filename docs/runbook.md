@@ -8,11 +8,11 @@ It is aligned to `Makefile` targets and current code behavior.
 - Use Makefile targets as the source of truth for runnable workflows.
 - `docs/project_structure.md` defines directory ownership and boundaries.
 - When behavior conflicts with text in older notes, runtime code + Makefile wins.
+- Current default path is backend + data/RAG/agent + TUI. Web frontend code is not part of the current scope.
 
 ## Requirements
 
 - Python 3.11+
-- Node.js 20+ and npm
 - PostgreSQL (for RAG/search/trends/recommend workflows)
 - Go (for local TUI build/run)
 
@@ -20,7 +20,6 @@ It is aligned to `Makefile` targets and current code behavior.
 
 ```text
 Backend: 127.0.0.1:8000
-Frontend: 3001
 vLLM server: 127.0.0.1:8001
 ```
 
@@ -30,7 +29,6 @@ vLLM server: 127.0.0.1:8001
 export SCISCOPE_APP_NAME=SciScope
 export SCISCOPE_ENV=local
 export SCISCOPE_DATA_PATH=data/sample/papers.sample.json
-export SCISCOPE_CORS_ORIGINS=http://localhost:3001
 export SCISCOPE_DB_DSN=postgresql://tim@localhost:5432/sciscope
 export SCISCOPE_USE_MOCK_LLM=true
 export SCISCOPE_LLM_PROVIDER=deepseek
@@ -40,34 +38,27 @@ export SCISCOPE_LLM_PROVIDER=deepseek
 
 ```bash
 make install
-make dev
+make backend
 ```
 
 打开：
 
-- Frontend: `http://localhost:3001`
 - Backend Docs: `http://127.0.0.1:8000/docs`
 
 ## 运行入口
 
-### 全栈联动（推荐）
+### 后端联动（推荐）
 
 ```bash
 make dev
 ```
 
-- 同时启动后端与前端。
+- 启动后端，用于 API、RAG、Agent 和 TUI。
 
 ### 后端独立
 
 ```bash
 make backend
-```
-
-### 前端独立
-
-```bash
-make frontend
 ```
 
 ### Go TUI
@@ -95,6 +86,14 @@ make postgres-refresh
 make report-figures
 make data-report-pdf
 ```
+
+项目/系统报告更新：
+
+```bash
+make project-report-pdf
+```
+
+`project-report-pdf` 会先刷新 `output/assets/sciscope_project_report/` 的项目报告图表，再编译 `output/pdf/sciscope_project_report/sciscope_project_report.pdf`。如果项目报告引用评估指标，先跑 `make eval-all`；如果只更新数据层规模、chunk 数、报告图表，确认 `data/analysis` 与 `data/processed` 已刷新即可。
 
 关键一键入口：
 
@@ -173,6 +172,10 @@ SSE events: plan, text, tool_call, tool_result, reflect, final, error
   - 检查 `data/analysis/` 和 `output/assets/sciscope_data_report/`。
   - 执行 `make report-figures && make data-report-pdf`。
 
+- 项目报告过期
+  - 检查 `data/analysis/`、`data/processed/` 和 `output/eval/` 是否已刷新。
+  - 执行 `make project-report-pdf`。
+
 - Go TUI 图标错乱
   - 终端不支持 Nerd Font 时，先设置 `SCISCOPE_TUI_ICONS=off`。
 
@@ -181,12 +184,11 @@ SSE events: plan, text, tool_call, tool_result, reflect, final, error
 ```bash
 make install
 make full-rebuild
-make dev
+make backend
 ```
 
 然后：
 
-- 打开 `http://localhost:3001`
 - 运行 `make smoke`
 - 跑一次 `curl` 提问并确认返回有 `answer` / `evidence`
 - 运行 `make tui` 验证 SSE 可达（按需）

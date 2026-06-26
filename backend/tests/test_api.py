@@ -63,15 +63,16 @@ def test_chat_endpoint_rejects_whitespace_question(client):
 
     assert response.status_code == 422
 
-
-def test_cors_allows_configured_localhost_origin(client):
-    response = client.options(
-        "/api/ingest/status",
-        headers={
-            "Origin": "http://localhost:3001",
-            "Access-Control-Request-Method": "GET",
-        },
-    )
+def test_cors_allows_configured_origin(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_CORS_ORIGINS", "https://example.com")
+    with TestClient(create_app()) as client:
+        response = client.options(
+            "/api/ingest/status",
+            headers={
+                "Origin": "https://example.com",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
 
     assert response.status_code == 200
-    assert response.headers["access-control-allow-origin"] == "http://localhost:3001"
+    assert response.headers["access-control-allow-origin"] == "https://example.com"

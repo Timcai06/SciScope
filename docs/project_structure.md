@@ -4,13 +4,17 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 
 - Python 承载数据治理、RAG、检索、证据接地和 Agent 逻辑。
 - `backend` 与 `src` 是核心运行逻辑层，`tui` 只消费 SSE。
-- `frontend` 复用后端接口，作为展示和交互工作台。
+- Web 前端源码已移除；当前客户端边界是 Go TUI 与 FastAPI API。
 
 ## 六层职责（从底到上）
 
 1. 数据层
-   - `data_pipeline/`：入库规范化工具（loaders/normalize/analytics）
-   - `data/`：`raw`、`raw_canonical`、`processed`、`analysis`、`sample`
+   - `data/`：可重建资产层，不是 PostgreSQL 的重复备份。
+   - `data/raw/`：新增采集 landing zone，治理后可清空到 `.gitkeep`。
+   - `data/raw_canonical/`：source/year 分区的原始底账，支持审计与重建。
+   - `data/analysis/`：报告、趋势、关键词/作者网络的分析资产。
+   - `data/processed/`：`papers_corpus.json` 与 `paper_chunks.jsonl`，是 PostgreSQL/RAG 的导入边界。
+   - `data_pipeline/`：legacy sample pipeline，服务旧 sample tests 和兼容层；核心生产链路以 `src/` 为准。
 
 2. 模型与索引输入层
    - `src/harvest/`：源采集与文本补全
@@ -30,7 +34,6 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 
 6. 客户端层
    - `tui/`：Go/TUI 协议客户端（SSE 消费）
-   - `frontend/`：Next.js 仪表盘与 API 工作台
 
 ## 目录总览
 
@@ -51,10 +54,9 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 │   ├── processed/
 │   ├── analysis/
 │   └── sample/
-├── data_pipeline/            原始清洗与规范化工具
+├── data_pipeline/            legacy sample pipeline / 兼容层
 ├── docs/                     交接、竞赛资料、runbook、发布说明
 ├── evaluation/               检索/推荐/趋势评估
-├── frontend/                 Next.js 仪表盘
 ├── infra/                    PostgreSQL SQL 与部署相关配置
 ├── models/                   模型文件（常见 Git 忽略）
 ├── output/                   报告图表、PDF、评估结果
@@ -79,11 +81,12 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 
 ## 运行关系（交接最重要）
 
-- `data` / `src/harvest`：采集、治理与分析资产源。
+- `data` / `src/harvest`：采集、治理与分析资产源。数据库可由它们重建，不能替代它们的审计角色。
 - `data/analysis` + `src/models`：输出数据视图与模型训练/重排输入。
 - `backend/app/services`：构建检索/证据/趋势/推荐功能与 `/api` 套件。
 - `backend/app/agent`：单一 LangGraph StateGraph 编排 prepare / plan / llm_step / execute_tools / reflect / force_synthesis；`session_id` 映射 LangGraph `thread_id`，支持同会话 `/retry` 错误恢复；统一经 SSE（`/api/agent/stream`）对外输出。`runtime.py` 为稳定入口，`langgraph_runtime.py` 为编排实现，`planning/reflection/tool_runner/llm/events` 为共享原语。
-- `frontend` + `tui`：同源接口消费层，复用同一后端能力。
+- `tui`：当前主交互端。
+- Web 前端不在当前范围；相关源目录已删除。
 
 ## 数据链路（按 Makefile 命令）
 
@@ -94,6 +97,7 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 - `make report-figures` → `make data-report-pdf` / `make project-report-pdf`
 
 `make full-rebuild` 是 raw governance 之后的默认重建入口；`make agent-build` 为模型侧快速重建入口。
+项目报告更新入口是 `make project-report-pdf`；该目标会先跑 `project-report-figures`，从 `data/analysis`、`data/processed` 和 `output/eval` 读取最新资产。
 
 ## 接口与发布边界
 
@@ -102,6 +106,7 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 - `make tui-build`：产出 `tui/sciscope-tui`（仅客户端二进制）。
 - Homebrew 只覆盖 Go 客户端，不包含 Python 后端、数据库和大模型制品。
 - 数据治理与 Agent 工具边界见 `docs/data-agent-boundary.md`。
+- `plan/archive/` 仅作历史决策记录；当前可执行口径以 `README.md`、本文件、`docs/runbook.md`、`docs/data-agent-boundary.md` 与 `Makefile` 为准。
 
 ## 生成产物与 Git 约定
 
@@ -110,8 +115,9 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 - `data/`（除 `data/sample/`）
 - `models/`
 - `output/graphs/`
-- `frontend/.next/`, `frontend/.tsconfig.tsbuildinfo`
 - `tui/sciscope-tui`, `tui/dist/`
+
+其中 `data/raw_canonical/`、`data/analysis/`、`data/processed/papers_corpus.json`、`data/processed/paper_chunks.jsonl` 是可复现交付资产，不能因为 PostgreSQL 已加载而删除；如需节省空间，应先归档而不是直接删除。
 
 ## 常见入口文件
 

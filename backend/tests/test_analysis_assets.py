@@ -4,7 +4,16 @@ import json
 from src.analysis.assets import build_analysis_assets
 
 
-def _wrapper(source_id: str, *, title: str, year: int, authors: list[str], keywords: list[str], source: str = "pubmed"):
+def _wrapper(
+    source_id: str,
+    *,
+    title: str,
+    year: int,
+    authors: list[str],
+    keywords: list[str],
+    source: str = "pubmed",
+    doi: str = "",
+):
     if source == "doaj":
         raw = {
             "id": source_id,
@@ -26,6 +35,8 @@ def _wrapper(source_id: str, *, title: str, year: int, authors: list[str], keywo
             "year": year,
             "keywords": keywords,
         }
+    if doi:
+        raw["doi"] = doi
     return {
         "source": source,
         "source_id": source_id,
@@ -42,6 +53,7 @@ def _openalex_wrapper(
     year: int,
     authorships: list[dict],
     keywords: list[str] | None = None,
+    doi: str = "",
 ):
     return {
         "source": "openalex",
@@ -51,6 +63,7 @@ def _openalex_wrapper(
         "raw": {
             "id": f"https://openalex.org/{source_id}",
             "display_name": title,
+            "doi": doi,
             "publication_year": year,
             "authorships": authorships,
             "keywords": [{"display_name": keyword} for keyword in (keywords or ["Knowledge Graph"])],
@@ -192,6 +205,38 @@ def test_build_analysis_assets_creates_report_ready_tables(tmp_path):
 
     saved_summary = json.loads(output_dir.joinpath("summary.json").read_text(encoding="utf-8"))
     assert saved_summary == summary
+
+
+def test_build_analysis_assets_clears_ambiguous_pubmed_doi_collisions(tmp_path):
+    raw_dir = tmp_path / "raw"
+    output_dir = tmp_path / "analysis"
+    for source in ("openalex", "pubmed"):
+        (raw_dir / source).mkdir(parents=True)
+
+    openalex_record = _openalex_wrapper(
+        "W1",
+        title="Gradient-based learning applied to document recognition",
+        year=1998,
+        authorships=[],
+        doi="https://doi.org/10.1109/5.726791",
+    )
+    pubmed_record = _wrapper(
+        "42232482",
+        title="The Rich and the Simple: On the Implicit Bias of Adam and SGD",
+        year=2025,
+        authors=[],
+        keywords=["optimization"],
+        doi="10.1109/5.726791",
+    )
+    (raw_dir / "openalex" / "openalex.jsonl").write_text(json.dumps(openalex_record) + "\n", encoding="utf-8")
+    (raw_dir / "pubmed" / "pubmed.jsonl").write_text(json.dumps(pubmed_record) + "\n", encoding="utf-8")
+
+    summary = build_analysis_assets(raw_dir=raw_dir, output_dir=output_dir, sources=("openalex", "pubmed"))
+    papers = json.loads(output_dir.joinpath("papers_clean.json").read_text(encoding="utf-8"))
+
+    assert summary["doi_collisions_cleared"] == 1
+    assert next(paper for paper in papers if paper["source"] == "openalex")["doi"] == "https://doi.org/10.1109/5.726791"
+    assert next(paper for paper in papers if paper["source"] == "pubmed")["doi"] == ""
 
 
 def test_build_analysis_assets_writes_taxonomy_layers(tmp_path):

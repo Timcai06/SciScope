@@ -8,18 +8,17 @@ SciScope is a local-first scientific literature intelligence stack.
 
 - Python 是底座：数据治理、RAG、检索、证据接地、Agent 工具编排都在 `backend/` 与 `src/` 体系中实现。
 - Go TUI (`tui/`) 是终端客户端，不承载推理，只消费后端的 SSE 事件。
-- Next.js 前端 (`frontend/`) 是界面层，复用后端 REST + SSE 接口。
+- Web 前端已从当前项目路径移除；主交互端为 Go TUI 与 FastAPI API。
 
 仓库启动面向 Makefile，以下信息优先于旧文档口径。
 
 ## 一句话理解项目
 
 - 目标：把论文源数据变成可检索、可问答、可分析的交付资产（图表、报告、证据链）。
-- 数据入口：`data/raw`（原始采集）、`data_pipeline`（清洗工具）、`src/harvest`（采集入口）。
+- 数据入口：`data/raw`（新增采集 landing zone）、`data/raw_canonical`（可审计原始底账）、`src/harvest`（采集/治理入口）。
 - 服务出口：`backend/app` 的 FastAPI（搜索、趋势、推荐、Agent 流式问答）。
 - 访问端：
-  - 浏览器端：`frontend/`
-  - 终端端：`tui/`
+  - 终端端：`tui/`（当前主交互端）
 
 项目目录和运行边界见 [`docs/project_structure.md`](docs/project_structure.md)。
 
@@ -28,7 +27,6 @@ SciScope is a local-first scientific literature intelligence stack.
 环境要求：
 
 - Python 3.11+
-- Node.js 20+ / npm
 - PostgreSQL（RAG/检索链条和 `/api/search` 需要）
 - Go（如运行 `make tui`）
 
@@ -36,17 +34,16 @@ SciScope is a local-first scientific literature intelligence stack.
 
 ```bash
 make install
-make dev
+make backend
 ```
 
 打开：
 
-- 前端：`http://localhost:3001`
 - 后端文档：`http://127.0.0.1:8000/docs`
 
 ### 常见运行路径
 
-- 后端 + 前端：`make backend`，`make frontend`，或 `make dev`。
+- 后端：`make backend` 或 `make dev`。
 - 仅 TUI：`make backend`（先起后端）→ `make tui`。
 - 本地模型端到端：先保证可用 OpenAI-compatible 服务，再用 `make dev-vllm`。
 - 离线演示：`make tui-demo`。
@@ -61,9 +58,11 @@ make dev
 - `make processed-corpus`：生成 `data/processed/papers_corpus.json`。
 - `make report-figures`：生成图表资源到 `output/assets/sciscope_data_report/`。
 - `make data-report-pdf`：生成 `sciscope_data_report.pdf`。
-- `make project-report-pdf`：生成项目报告 PDF。
+- `make project-report-pdf`：先刷新项目报告图表，再生成 `sciscope_project_report.pdf`。
 - `make full-rebuild`：从分析资产开始重建入库、向量、模型、图谱与数据报告；原始治理需先跑 `make raw-governance`。
 - `make data-layer-refresh`：分析资产 + 语料 + 报表重建的轻量入口。
+
+`data/` 不是 PostgreSQL 的重复备份：它是数据库、RAG、模型、报告的可重建资产层。数据库负责在线查询服务；`data/raw_canonical`、`data/analysis`、`data/processed/papers_corpus.json`、`data/processed/paper_chunks.jsonl` 负责复现、审计与报告。
 
 ### 模型层与工具链
 
@@ -75,7 +74,7 @@ make dev
 
 ### 服务与验证
 
-- `make test`：后端测试 + 前端 typecheck/build。
+- `make test`：后端测试。
 - `make test-backend`：仅后端测试。
 - `make smoke`：基础 API 健康检查。
 - `make vllm-smoke`：检查本地 OpenAI-compatible 模型端点。
@@ -125,8 +124,11 @@ make tui-doctor # 检查后端/LLM/会话目录/图谱资产
 - 检索/趋势为空：确认 PostgreSQL 已准备好，执行 `make postgres-refresh` 或至少 `make postgres-load + make rag-chunks`。
 - LLM 报错：切回 `SCISCOPE_USE_MOCK_LLM=true` 做快速验证；或先 `make llm` 提供本地模型。
 - 图表/PDF 缺失：检查 `data/analysis` 和 `output/assets/sciscope_data_report`，再跑 `make report-figures && make data-report-pdf`。
+- 项目报告缺失或指标过期：先确认 `data/processed` 和 `output/eval` 是否为最新，再跑 `make project-report-pdf`。
 
 ## 现有边界
 
 - 该分支的主运行路径是：Python agent/data layer 为核心，Go TUI 为终端消费端。
+- Web 前端源码已移除；若未来重启 Web 界面，应作为新范围重新设计和接入。
+- `data_pipeline/` 保留为 legacy sample pipeline 与旧测试兼容层；核心数据治理以 `src/harvest`、`src/analysis`、`src/infra` 为准。
 - DeepSeek 路径当前以配置占位为主；确定性本地验证以 mock 模式为主，LLM 本地通路以 `make dev-vllm` / `make llm` 为主。

@@ -70,7 +70,7 @@ explanation factors.
 ## Knowledge graph (`/api/graph`)
 
 `src/models/graph_export.py` (`make graph-export`) exports pruned
-frontend-friendly graphs (`graphs/{author,keyword,paper_topic}_graph.json` +
+client-friendly graphs (`graphs/{author,keyword,paper_topic}_graph.json` +
 `graph_metrics.json`) — top-centrality nodes and the edges among them.
 `backend/app/services/graph_service.py` serves overviews from the JSON and live
 author ego-graphs from `coauthor_edges`.
@@ -85,11 +85,12 @@ make trend-model graph-export                                         # forecast
 # or: make agent-build   (embeddings + recommend + trend + graph)
 ```
 
-## Frontend
+## Client Boundary
 
-`SearchPanel`, `TrendsPanel`, `RecommendPanel`, `GraphPanel`
-(`frontend/src/components/`) call the corresponding APIs and degrade gracefully
-when a model is not yet built (503).
+The current client boundary is FastAPI + Go TUI. Web frontend code has been
+removed; any future Web client should consume the same `/api/search`,
+`/api/trends`, `/api/recommend`, `/api/graph`, and `/api/agent/stream`
+contracts as a new scope.
 
 ## Not yet done / future
 

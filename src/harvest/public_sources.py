@@ -206,6 +206,29 @@ def _first_text(parent: ET.Element, paths: list[str]) -> str:
     return ""
 
 
+def _pubmed_article_doi(article: ET.Element) -> str:
+    """Return only DOI values attached to the PubMed article itself."""
+    return _first_text(
+        article,
+        [
+            "./MedlineCitation/Article/ELocationID[@EIdType='doi']",
+            "./PubmedData/ArticleIdList/ArticleId[@IdType='doi']",
+        ],
+    )
+
+
+def _pmc_article_meta_text(article: ET.Element, path: str) -> str:
+    return _text(article.find(f"./{{*}}front/{{*}}article-meta/{path}"))
+
+
+def _pmc_article_doi(article: ET.Element) -> str:
+    return _pmc_article_meta_text(article, "{*}article-id[@pub-id-type='doi']")
+
+
+def _pmc_article_id(article: ET.Element) -> str:
+    return _pmc_article_meta_text(article, "{*}article-id[@pub-id-type='pmc']")
+
+
 def _write_wrappers(
     *,
     output_path: str | Path,
@@ -434,7 +457,7 @@ def _pubmed_fetch_ids(*, query: str, ids: list[str]) -> list[dict[str, Any]]:
                 "year": _first_text(article, [".//PubDate/Year", ".//ArticleDate/Year"]),
                 "keywords": [_text(node) for node in article.findall(".//KeywordList/Keyword")],
                 "journal": _first_text(article, [".//Journal/Title"]),
-                "doi": _first_text(article, [".//ArticleId[@IdType='doi']"]),
+                "doi": _pubmed_article_doi(article),
             }
             items.append({"source_id": pmid, "raw": raw})
         time.sleep(0.35)
@@ -472,7 +495,7 @@ def _pmc_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any]
             timeout=120,
         )
         for index, article in enumerate(root.findall(".//{*}article")):
-            pmc_id = _first_text(article, [".//{*}article-id[@pub-id-type='pmc']"])
+            pmc_id = _pmc_article_id(article)
             source_id = f"PMC{pmc_id}" if pmc_id and not pmc_id.startswith("PMC") else pmc_id
             if not source_id and index < len(batch):
                 source_id = f"PMC{batch[index]}"
@@ -492,7 +515,7 @@ def _pmc_fetch(_field: str, query: str, query_limit: int) -> list[dict[str, Any]
                 ],
                 "year": _first_text(article, [".//{*}pub-date/{*}year"]),
                 "keywords": [_text(node) for node in article.findall(".//{*}kwd")],
-                "doi": _first_text(article, [".//{*}article-id[@pub-id-type='doi']"]),
+                "doi": _pmc_article_doi(article),
                 "body_excerpt": " ".join(paragraphs)[:2500],
             }
             items.append({"source_id": source_id, "raw": raw})
@@ -584,7 +607,7 @@ def harvest_pmc_year(*, output_path: str | Path, limit: int, year: int) -> int:
                 timeout=120,
             )
             for index, article in enumerate(root.findall(".//{*}article")):
-                pmc_id = _first_text(article, [".//{*}article-id[@pub-id-type='pmc']"])
+                pmc_id = _pmc_article_id(article)
                 source_id = f"PMC{pmc_id}" if pmc_id and not pmc_id.startswith("PMC") else pmc_id
                 if not source_id and index < len(batch):
                     source_id = f"PMC{batch[index]}"
@@ -607,7 +630,7 @@ def harvest_pmc_year(*, output_path: str | Path, limit: int, year: int) -> int:
                     ],
                     "year": _first_text(article, [".//{*}pub-date/{*}year"]) or str(year),
                     "keywords": [_text(node) for node in article.findall(".//{*}kwd")],
-                    "doi": _first_text(article, [".//{*}article-id[@pub-id-type='doi']"]),
+                    "doi": _pmc_article_doi(article),
                     "body_excerpt": " ".join(paragraphs)[:2500],
                 }
                 if _year_from_text(raw["year"]) != year:

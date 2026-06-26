@@ -25,8 +25,11 @@ Reproducible pipeline, PostgreSQL as the serving layer:
 
 ```text
 raw JSONL -> processed corpus -> analysis/model assets
-          -> PostgreSQL + pgvector serving layer -> FastAPI -> Next.js
+          -> PostgreSQL + pgvector serving layer -> FastAPI -> TUI/API
 ```
+
+Web frontend code has been removed from the current delivery path; future Web
+work should be treated as a new scope.
 
 The research agent = Python code + reproducible model files:
 - pgvector embeddings (`chunk_embeddings`, `paper_embeddings`)

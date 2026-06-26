@@ -78,7 +78,7 @@
 适用于仓库已含 `data/raw_canonical`、`data/analysis`、`data/processed` 时。
 
 ```bash
-make install                 # 安装依赖（Python + frontend）
+make install                 # 安装后端/Python 依赖
 export SCISCOPE_DB_DSN=postgresql://<user>@localhost:5432/sciscope
 make data-layer-refresh      # 生成分析资产 + data report PDF
 make postgres-schema         # 无该步骤会影响检索/推荐/趋势测试链
@@ -108,8 +108,8 @@ SCISCOPE_DB_DSN=postgresql://<user>@localhost:5432/sciscope make dev
 端口与访问口径：
 
 - 后端：`http://127.0.0.1:8000`
-- 前端：`http://localhost:3001`
 - 后端 API 文档：`http://127.0.0.1:8000/docs`
+- TUI：`make tui` 或 `sciscope-tui`
 
 可复核命令：
 

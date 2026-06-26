@@ -8,6 +8,7 @@ these files, so this layer should be treated as immutable after materialization.
 """
 
 import csv
+import difflib
 import hashlib
 import json
 import math
@@ -19,6 +20,7 @@ from typing import Any
 
 import numpy as np
 
+from src.infra.chunks import looks_like_pdf_garbage
 from src.harvest.normalize import paper_wrapper_to_paper
 
 
@@ -282,6 +284,7 @@ def _write_incremental_cache(path: Path, records: Any) -> None:
 
 def _paper_with_source(wrapper: dict[str, Any]) -> dict[str, Any]:
     paper = paper_wrapper_to_paper(wrapper)
+    paper = {**paper, "full_text": _clean_full_text(paper.get("full_text"))}
     raw_metadata = _raw_metadata(wrapper)
     year_status = str(wrapper.get("_sciscope_year_status") or "normal")
     if year_status == "future_year_suspect":
@@ -345,6 +348,18 @@ def _text_for_analysis(paper: dict[str, Any]) -> str:
     return re.sub(r"\s+", " ", f"{title} {title} {abstract}").strip()
 
 
+def _clean_full_text(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if looks_like_pdf_garbage(text):
+        return ""
+    lowered = text[:4000].lower()
+    if "<script" in lowered or "radware bot manager" in lowered or "hcaptcha" in lowered:
+        return ""
+    return text
+
+
 def _extract_text_signal_terms(paper: dict[str, Any]) -> set[str]:
     text = str(paper.get("text_for_analysis") or "")
     if not text:
@@ -368,6 +383,46 @@ def _raw_metadata(wrapper: dict[str, Any]) -> dict[str, str]:
         "full_text_source": str(raw.get("full_text_source") or "").strip(),
         "full_text_url": str(raw.get("full_text_url") or "").strip(),
     }
+
+
+def _normalize_doi(value: Any) -> str:
+    doi = str(value or "").strip().lower()
+    doi = re.sub(r"^https?://(dx\.)?doi\.org/", "", doi)
+    return doi.rstrip("/")
+
+
+def _titles_are_similar(left: str, right: str) -> bool:
+    left_norm = re.sub(r"\s+", " ", str(left or "").strip().lower())
+    right_norm = re.sub(r"\s+", " ", str(right or "").strip().lower())
+    if not left_norm or not right_norm:
+        return True
+    if left_norm in right_norm or right_norm in left_norm:
+        return True
+    return difflib.SequenceMatcher(None, left_norm, right_norm).ratio() >= 0.88
+
+
+def _clear_ambiguous_biomedical_dois(papers: list[dict[str, Any]]) -> int:
+    by_doi: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for paper in papers:
+        doi = _normalize_doi(paper.get("doi"))
+        if doi.startswith("10."):
+            by_doi[doi].append(paper)
+
+    cleared = 0
+    for group in by_doi.values():
+        titles = [str(paper.get("title") or "") for paper in group]
+        has_divergent_titles = any(
+            not _titles_are_similar(left, right)
+            for index, left in enumerate(titles)
+            for right in titles[index + 1 :]
+        )
+        if not has_divergent_titles:
+            continue
+        for paper in group:
+            if str(paper.get("source") or "").lower() in {"pubmed", "pmc"} and paper.get("doi"):
+                paper["doi"] = ""
+                cleared += 1
+    return cleared
 
 
 def _clean_taxon(value: Any) -> str:
@@ -2010,6 +2065,8 @@ def build_analysis_assets(
         papers.append(paper)
         paper_taxonomy.append(_taxonomy_for_paper(wrapper, paper))
 
+    doi_collisions_cleared = _clear_ambiguous_biomedical_dois(papers)
+
     (
         paper_keywords,
         paper_keyword_signals,
@@ -2322,6 +2379,7 @@ def build_analysis_assets(
         "papers": len(papers),
         "duplicates": duplicates,
         "invalid_records": invalid_records,
+        "doi_collisions_cleared": doi_collisions_cleared,
         **collection_summary,
         "sources": sorted({paper.get("source") for paper in papers if paper.get("source")}),
         "paper_authors": len(paper_authors),

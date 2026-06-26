@@ -9,57 +9,46 @@
 - 保证指标口径一致：原始采集 / 分析资产 / 入库语料 / 报告资产分层清晰。
 
 ### 最终用户产品化目标
-- 形成面向真实用户的“工作流可信体验”：前端能稳定消费后端能力、TUI 与 SSE 协议一致、关键链路可一键演示。
-- 完成交付收敛：发布、落地页、验收闭环。
+- 形成面向真实用户的“工作流可信体验”：TUI 与 SSE 协议一致，关键链路可一键演示。
+- 完成交付收敛：发布、品牌宣传/下载页、验收闭环。
 
 ## 总时间线（先产品力，后交付收敛）
 
 | 阶段 | 时间窗 | 主要交付 |
 |---|---|---|
-| 1 产品体验打磨 | W1-W2 | 前端工作流打磨、Dashboard 与数据展示稳定 |
+| 1 产品体验打磨 | W1-W2 | TUI 工作流打磨、API 与数据展示口径稳定 |
 | 2 LangGraph 工作流升级 | W3-W4 | 流式运行时收敛、回归与恢复策略固化 |
 | 3 报告与固定产物 | W4 | 数据/项目报告与评测资产固定化 |
 | 4 打包发布 | W5 | TUI 打包发布链路闭环、版本化 |
-| 5 landing page | W6 | 外部展示页与产品入口收口 |
+| 5 landing page | W6 | 品牌宣传页、下载入口与文档入口收口 |
 | 6 最终验收 | W7 | 赛题与产品化双线验收通过 |
 
 > 其中“W”表示按周推进；当前阶段建议从下一个计划日（T0）开始，按顺序执行。
 
 ---
 
-## 1）阶段：产品体验打磨
+## 1）阶段：产品体验打磨（交互式 Web 已取消）
 
 ### 阶段目标
-以产品可用性为主，先把用户触点打磨到可演示、可复用、可解释的状态，再做交付收敛。
+交互式 Web 工作台已从当前范围移除。本阶段不再跟踪 frontend 组件，只保留 TUI/API 的产品体验打磨。
 
 ### 关键任务
-- 核对前端关键入口是否直接绑定真实服务而非静态 mock：
-  - `frontend/src/components/DashboardOverview.tsx`
-  - `frontend/src/components/EvidenceChat.tsx`
-  - `frontend/src/components/SearchPanel.tsx`
-  - `frontend/src/components/TrendsPanel.tsx`
-  - `frontend/src/components/RecommendPanel.tsx`
-  - `frontend/src/components/GraphPanel.tsx`
-  - `frontend/app/page.tsx`
-  - `frontend/src/api/client.ts`
-- 统一体验语义：错误文案、loading、空态、证据不充分提示，避免“无后端时看起来成功但数据空洞”。
-- 检查并补齐导航语义与一级信息入口（当前 `AppShell` 以研究工作台为主，未见独立 Report Studio 路由入口行为）。
-- 优先保证 `/api/dashboard/overview`、`/api/search`、`/api/trends`、`/api/recommend`、`/api/graph`、`/api/chat` 在本阶段具备一致降级信息。
+- 优先保证 `/api/agent/stream`、`/api/search`、`/api/trends`、`/api/recommend`、`/api/graph`、`/api/chat` 具备一致降级信息。
+- 统一 TUI 的错误文案、doctor 检查、会话导出和证据不足提示。
 
 ### 关键文件/产物
-- `frontend/src/api/client.ts`（接口路径与错误语义）
-- `frontend/src/app/page.tsx`
-- `frontend/src/components/*`
-- `frontend/src/types.ts`
-- `frontend/app/globals.css`（主题与可读性）
+- `tui/main.go`
+- `backend/app/api/routes_agent.py`
+- `backend/app/agent/*`
+- `docs/runbook.md`
 
 ### 负责人角色建议
 - 产品/PM：定义演示脚本（“三分钟体验路径”）
-- 前端：组件状态、导航结构、可视化一致性
+- TUI：终端体验、状态提示、会话导出
 - 后端：接口稳定性与错误码语义对齐
 
 ### 验收标准（阶段内）
-- `make dev` + 浏览器访问 `http://localhost:3001` 能完整加载真实数据概览卡片。
+- `make backend` + `make tui` 能完成真实 agent 问答流程。
 - 至少 5 条核心查询路径可演示：
   - Overview（总量与年限）
   - Search（检索结果返回）
@@ -70,7 +59,7 @@
 
 ### 风险与依赖
 - 依赖：`make dev` 联合启动后端端口 `127.0.0.1:8000`、`SCISCOPE_DB_DSN` 配置及 corpus 可用状态。
-- 风险：前端现有布局更偏向“研发工作台”，若未统一交互文案会被评委判定为展示不足；需在该阶段补足交互闭环。
+- 风险：TUI 的状态提示、证据链与错误恢复若不够清楚，会让评委误判为“只是在跑接口”；需在该阶段补足可解释演示闭环。
 
 ### 做 / 不做边界
 - 做：稳定体验、可复现演示路径、错误可解释性、真实接口打通。
@@ -171,7 +160,7 @@
 ## 4）阶段：打包发布
 
 ### 阶段目标
-建立可重复发布动作，先完成 TUI 客户端发布闭环（现有链路已存在），并明确后端/前端的发布缺口。
+建立可重复发布动作，先完成 TUI 客户端发布闭环（现有链路已存在），并明确后端、数据库与模型资产的发布缺口。
 
 ### 关键任务
 - 固定 TUI 发布流程：
@@ -181,7 +170,7 @@
 - 明确发布范围边界：
   - 现有发布只覆盖 Go 客户端（`tui/sciscope-tui` 与 homebrew tap）。
   - 后端、数据库、模型资产不在当前 Homebrew 发布边界（在文档中显式声明）。
-- 待补齐项：如需面向最终用户一键部署 web/backend，新增容器化或镜像发布流程。
+- 待补齐项：如需面向最终用户一键部署 backend/数据库/模型资产，新增容器化或镜像发布流程。
 
 ### 关键文件/产物
 - `tui/README.md`
@@ -213,39 +202,40 @@
 ## 5）阶段：landing page
 
 ### 阶段目标
-在现有工作台入口之上补齐对外展示入口，给最终用户提供“什么是 SciScope、如何开始”的第一接触页。
+保留 landing page 作为品牌宣传、知识展示、下载与文档入口；它不是交互式 Web 前端，也不承载科研智能体主流程。
 
 ### 关键任务
-- 评估现状：当前 `frontend/app/page.tsx` 即为工作台视图入口（`DashboardOverview + EvidenceChat + Search/Trends/Recommend/Graph`），尚未确认独立 landing 模块。
-- 待补齐项（待补齐）：
-  - `/landing` 或主页切换为“产品价值说明 + 立即开始按钮”与工作台入口；
-  - 跳转到当前 Workspace 的首屏引导；
-  - 在评估版本标注“当前是产品工作台版，不是最终营销站”。
-- 明确 landing 与 dashboard 的边界：landing 可静态展示，工作台保持数据驱动真实检索。
+- 固定 landing 信息架构：定位、核心能力、黄金会话、报告下载、安装矩阵、文档入口、FAQ。
+- 汇总可展示素材：报告 PDF、图件、TUI 录屏/截图、黄金会话样例、版本与 release 链接。
+- 明确下载入口：GitHub Releases、Homebrew 命令、报告 PDF、交付说明和样例会话。
+- 不维护 frontend 工作台；如未来恢复交互式 Web，应新建独立范围与验收标准。
 
 ### 关键文件/产物
-- `frontend/app/page.tsx`（是否共用或分拆）
-- `frontend/src/components/*`（复用现有组件/导航）
-- `frontend/src/api/client.ts`（统一后端基地址）
-- `docs/` 下新增 landing 说明页（待补齐）
+- `README.md`
+- `docs/runbook.md`
+- `tui/README.md`
+- `docs/examples/golden_verify_claim_session.md`
+- `output/pdf/**`
+- landing 内容稿、截图/录屏素材、下载链接清单（待补齐）
 
 ### 负责人角色建议
 - UX/产品：内容结构、转化路径文案
-- 前端：路由与首屏实现
+- TUI/文档：首次使用说明、doctor、demo 与导出路径
 - 后端/运维：演示环境可达性与健康检测
 
 ### 验收标准（阶段内）
-- 访问首页能直观看到“产品定位 + 进入方式 + 示例价值”；
-- 1 次点击即可到达可用工作台；
-- landing 与工作台的依赖、端口、后端要求不混淆。
+- 用户打开 landing 后能在首屏理解 SciScope 的定位与主产品入口。
+- 下载区能找到 TUI 安装方式、报告 PDF、交付说明和 GitHub Releases。
+- 文档区能进入 README/runbook/TUI README/API 或 FAQ。
+- `make tui-demo` 或黄金会话样例可支撑页面中的演示内容。
 
 ### 风险与依赖
-- 依赖：设计决策（是否保留当前“首页即工作台”原则）。
-- 风险：新增页面与现有 “research command center” 风格冲突；建议以最小内容替代重构。
+- 依赖：发布产物、报告 PDF、截图/录屏、版本链接稳定。
+- 风险：landing 如果做成第二套产品入口，会重新引入 Web 前端维护成本；必须保持静态宣传/下载/文档边界。
 
 ### 做 / 不做边界
-- 做：对外可展示结构、最短进入路径。
-- 不做：新增复杂内容管理系统（暂不在本阶段）—待后续迭代。
+- 做：品牌宣传页、下载页、文档入口、报告和 demo 素材聚合。
+- 不做：浏览器内 Dashboard、RAG Chat、Graph Explorer、用户会话等交互式 Web 工作台。
 
 ---
 
@@ -265,18 +255,16 @@
 - 产物齐全性：`交付说明.md` 对应文件路径存在且可重建
 
 ### 用户产品化验收清单
-- `make dev` 能同时启动前后端
+- `make backend` 能启动后端
 - `/api/agent/stream` SSE 与 `meta` 字段可观测
-- 前端关键流程从搜索到答复再到图谱/趋势可闭环演示
 - `make tui-build` + `make tui-doctor` + TUI 演示可用
 - 打包与发布步骤可复现（含版本号、tag、workflow）
-- Landing 路由/页面可达（若在本阶段纳入）
 
 ### 关键文件/产物
 - 全链路命令与产物路径同上
 - `docs/runbook.md`（最终交付前统一核对）
 - `交付说明.md`（提交口径统一）
-- `backend/tests/*`、`frontend` Typecheck/Build
+- `backend/tests/*`、`tui` Go tests/build
 
 ### 风险与依赖
 - 依赖：数据库、模型文件、外部模型端口状态、评测环境。

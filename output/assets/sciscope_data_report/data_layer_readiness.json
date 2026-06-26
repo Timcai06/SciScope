@@ -32,24 +32,24 @@
     "materials science": 28096
   },
   "text_coverage": {
-    "abstract_records": 140183,
-    "abstract_rate": 0.8322,
-    "full_text_records": 15144,
-    "full_text_rate": 0.0899,
+    "abstract_records": 146685,
+    "abstract_rate": 0.8708,
+    "full_text_records": 17682,
+    "full_text_rate": 0.105,
     "full_text_gap_to_15000": 0
   },
   "rag_field_coverage": {
     "doi": {
-      "count": 129904,
-      "rate": 0.7712
+      "count": 129826,
+      "rate": 0.7707
     },
     "title": {
       "count": 168444,
       "rate": 1.0
     },
     "abstract": {
-      "count": 140183,
-      "rate": 0.8322
+      "count": 146685,
+      "rate": 0.8708
     },
     "authors": {
       "count": 167781,
@@ -76,8 +76,8 @@
       "rate": 1.0
     },
     "full_text": {
-      "count": 15144,
-      "rate": 0.0899
+      "count": 17682,
+      "rate": 0.105
     }
   },
   "next_data_layer_tasks": [
