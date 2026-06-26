@@ -1,0 +1,15 @@
+{
+  "_comment": "Copy to configs/mcp_servers.json to let the SciScope agent consume external MCP servers. Each server's tools are wrapped as mcp__<server>__<tool> and merged into the agent's tool registry at backend startup. See docs/mcp.md.",
+  "servers": {
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "env": {}
+    },
+    "sciscope_self": {
+      "command": "/opt/homebrew/Caskroom/miniconda/base/envs/ai/bin/python",
+      "args": ["-m", "backend.app.mcp_server"],
+      "env": {}
+    }
+  }
+}

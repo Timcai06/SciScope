@@ -657,4 +657,23 @@ def tools_prompt() -> str:
     Mirrors Claude Code's per-tool self-description: the catalog the model sees
     is built from the registry, so it never drifts from the actual tool set.
     """
-    return "\n".join(f"- {t.name}:{t.prompt_fragment}" for t in TOOLS if t.prompt_fragment)
+    return "\n".join(
+        f"- {t.name}:{t.prompt_fragment}" for t in _REGISTRY.values() if t.prompt_fragment
+    )
+
+
+def register_tools(extra: list[Tool]) -> list[str]:
+    """Merge additional tools (e.g. wrapped external MCP tools) into the registry.
+
+    Mutates the shared registry + TOOL_SCHEMAS in place so the agent loop (which
+    holds the same TOOL_SCHEMAS list) and execute_tool dispatch pick them up
+    without any change to the runtime. Returns the names actually added.
+    """
+    added: list[str] = []
+    for tool in extra:
+        if tool.name in _REGISTRY:
+            continue
+        _REGISTRY[tool.name] = tool
+        TOOL_SCHEMAS.append(tool.schema)
+        added.append(tool.name)
+    return added

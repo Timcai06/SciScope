@@ -62,3 +62,6 @@ deploy/.env
 
 # local secrets (DeepSeek key etc.)
 .env.local
+
+# local MCP server config (may contain paths/secrets)
+configs/mcp_servers.json

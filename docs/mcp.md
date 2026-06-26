@@ -58,3 +58,34 @@ This server is the **generation-agnostic** face of SciScope: it provides grounde
 *tools*, not an agent loop. The client's own model decides when to call them. The
 SciScope agent (LangGraph) and the MCP server share the same tool layer but are
 independent entry points.
+
+---
+
+# Consuming external MCP servers (direction ②)
+
+The SciScope agent can also go the other way: use tools from **external** MCP
+servers. Declare them in `configs/mcp_servers.json` (copy
+`configs/mcp_servers.json.example`):
+
+```json
+{
+  "servers": {
+    "fetch": { "command": "uvx", "args": ["mcp-server-fetch"], "env": {} }
+  }
+}
+```
+
+At backend startup (`make backend`), each server's tools are discovered and
+wrapped as agent tools named `mcp__<server>__<tool>`, merged into the same
+registry the agent and `execute_tool` use — so the model can call them like any
+native tool. No config file = nothing happens (no external processes).
+
+`backend/app/agent/mcp_client.py` is the adapter: it lists/calls remote tools
+over stdio (async bridged to our sync tool layer per call) and wraps them via the
+`Tool` contract. External tools are marked non-read-only (run sequentially,
+conservative). This means new capabilities (web fetch, web search, etc.) are
+added by **plugging an MCP server**, not by writing native tool code — keeping the
+9 native tools focused on the curated corpus.
+
+Verified by loopback: pointing the consumer at SciScope's own MCP server (①)
+discovers all 9 tools and calls them successfully.

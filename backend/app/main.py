@@ -47,6 +47,17 @@ def create_app() -> FastAPI:
     app.include_router(graph_router)
     app.include_router(agent_router)
 
+    # Opt-in: merge external MCP tools into the agent registry when a config
+    # exists (no config = no-op, no external processes). Failures must never
+    # block startup.
+    from backend.app.agent.mcp_client import CONFIG_PATH, activate_mcp_tools
+
+    if CONFIG_PATH.exists():
+        try:
+            activate_mcp_tools()
+        except Exception:  # noqa: BLE001
+            pass
+
     return app
 
 
