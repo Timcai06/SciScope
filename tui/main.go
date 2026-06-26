@@ -118,17 +118,17 @@ type slashCmd struct {
 }
 
 var slashCmds = []slashCmd{
-	{cmd: "/demo", title: "Golden demo", desc: "播放可验证证据流", category: "Suggested", key: "demo", suggested: true},
-	{cmd: "/doctor", title: "Status check", desc: "检查后端、LLM、会话与图谱", category: "Suggested", key: "doctor", suggested: true},
-	{cmd: "/retry", title: "Retry last turn", desc: "同一 LangGraph 会话线程恢复上一问", category: "Suggested", key: "retry", suggested: true},
-	{cmd: "/export", title: "Export report", desc: "导出 Markdown 会话与证据", category: "Suggested", key: "export", suggested: true},
-	{cmd: "/sessions", title: "Recent sessions", desc: "列出最近研究会话", category: "Session", key: "sessions"},
-	{cmd: "/resume", title: "Resume session", desc: "恢复会话: /resume 1", category: "Session", key: "resume N"},
-	{cmd: "/timeline", title: "Execution timeline", desc: "查看本轮 LangGraph 与工具轨迹", category: "Evidence", key: "timeline"},
-	{cmd: "/tools", title: "Agent tools", desc: "列出 LLM 可自主调用的科研工具", category: "Evidence", key: "tools"},
-	{cmd: "/help", title: "Help", desc: "显示命令与快捷键", category: "System", key: "?"},
-	{cmd: "/clear", title: "Clear view", desc: "清空当前对话视图", category: "System", key: "clear"},
-	{cmd: "/quit", title: "Quit", desc: "退出 SciScope TUI", category: "System", key: "ctrl+c"},
+	{cmd: "/demo", title: "黄金演示", desc: "播放可验证证据流", category: "常用", key: "demo", suggested: true},
+	{cmd: "/doctor", title: "状态体检", desc: "检查后端、LLM、会话与图谱", category: "常用", key: "doctor", suggested: true},
+	{cmd: "/retry", title: "重试上一问", desc: "同一 LangGraph 会话线程恢复上一问", category: "常用", key: "retry", suggested: true},
+	{cmd: "/export", title: "导出报告", desc: "导出 Markdown 会话与证据", category: "常用", key: "export", suggested: true},
+	{cmd: "/sessions", title: "最近会话", desc: "列出最近研究会话", category: "会话", key: "sessions"},
+	{cmd: "/resume", title: "恢复会话", desc: "恢复会话: /resume 1", category: "会话", key: "resume N"},
+	{cmd: "/timeline", title: "执行时间线", desc: "查看本轮 LangGraph 与工具轨迹", category: "证据", key: "timeline"},
+	{cmd: "/tools", title: "智能体工具", desc: "列出 LLM 可自主调用的科研工具", category: "证据", key: "tools"},
+	{cmd: "/help", title: "帮助", desc: "显示命令与快捷键", category: "系统", key: "?"},
+	{cmd: "/clear", title: "清空视图", desc: "清空当前对话视图", category: "系统", key: "clear"},
+	{cmd: "/quit", title: "退出", desc: "退出 SciScope TUI", category: "系统", key: "ctrl+c"},
 }
 
 func filterCmds(prefix string) []slashCmd {
@@ -671,7 +671,7 @@ func metaDetail(meta eventMeta) string {
 		parts = append(parts, fmt.Sprintf("%dms", meta.ElapsedMS))
 	}
 	if meta.Retry {
-		parts = append(parts, "retry")
+		parts = append(parts, "重试")
 	}
 	return strings.Join(parts, " · ")
 }
@@ -797,7 +797,7 @@ func renderWorkflowStatus(meta eventMeta, nodes []string, kind string, elapsed t
 		stFaint.Render(fmt.Sprintf("%.0fs", elapsed.Seconds())),
 	}
 	if meta.Retry {
-		status = append(status, stWarn.Render("retry"))
+		status = append(status, stWarn.Render("重试"))
 	}
 	if meta.ElapsedMS > 0 {
 		status = append(status, stFaint.Render(fmt.Sprintf("%dms", meta.ElapsedMS)))
@@ -806,7 +806,7 @@ func renderWorkflowStatus(meta eventMeta, nodes []string, kind string, elapsed t
 		strings.Join(status, stFaint.Render(" · ")),
 	}
 	body = append(body, phaseLines...)
-	body = append(body, stFaint.Render("thread "+clip(session, 42)))
+	body = append(body, stFaint.Render("线程 "+clip(session, 42)))
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), true, false, true, false).
 		BorderForeground(cFaint).
@@ -888,7 +888,7 @@ func renderStreamRail(events []timelineEvent, meta eventMeta, nodes []string, ki
 		stFaint.Render(fmt.Sprintf("%.0fs", elapsed.Seconds())),
 	}
 	if meta.Retry {
-		status = append(status, stWarn.Render("retry"))
+		status = append(status, stWarn.Render("重试"))
 	}
 	if meta.ElapsedMS > 0 {
 		status = append(status, stFaint.Render(fmt.Sprintf("%dms", meta.ElapsedMS)))
@@ -896,7 +896,7 @@ func renderStreamRail(events []timelineEvent, meta eventMeta, nodes []string, ki
 
 	body := []string{
 		strings.Join(status, stFaint.Render(" · ")),
-		stFaint.Render("thread " + clip(session, 38)),
+		stFaint.Render("线程 " + clip(session, 38)),
 	}
 	if len(nodes) > 0 {
 		labels := []string{}
@@ -907,10 +907,10 @@ func renderStreamRail(events []timelineEvent, meta eventMeta, nodes []string, ki
 		for _, node := range nodes[start:] {
 			labels = append(labels, nodeLabel(node))
 		}
-		body = append(body, stFaint.Render("graph  ")+stInk.Render(strings.Join(labels, stFaint.Render(" → "))))
+		body = append(body, stFaint.Render("图谱  ")+stInk.Render(strings.Join(labels, stFaint.Render(" → "))))
 	}
 	if len(events) > 0 {
-		body = append(body, stFaint.Render("latest"))
+		body = append(body, stFaint.Render("最新"))
 		start := len(events) - 4
 		if start < 0 {
 			start = 0
@@ -981,7 +981,7 @@ func (m model) renderComposer(width int) string {
 	}
 	value := raw
 	if value == "" {
-		value = stFaint.Render("Ask a research question, verify a claim, or type /")
+		value = stFaint.Render("输入研究问题 / 待核查论断,或输入 / 调用命令")
 	} else {
 		value = strings.ReplaceAll(value, "\n", "\n"+strings.Repeat(" ", 2))
 	}
@@ -995,13 +995,13 @@ func (m model) renderComposer(width int) string {
 	hint := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		stAccent.Render("Enter"),
-		stFaint.Render(" send"),
+		stFaint.Render(" 发送"),
 		stFaint.Render("  ·  "),
 		stAccent.Render("Esc"),
-		stFaint.Render(" interrupt"),
+		stFaint.Render(" 中断"),
 		stFaint.Render("  ·  "),
 		stAccent.Render("/"),
-		stFaint.Render(" commands"),
+		stFaint.Render(" 命令"),
 	)
 	body := strings.Join([]string{
 		inputLine,
@@ -1078,16 +1078,6 @@ func panelRow(kind, title, meta string, body []string) string {
 	return strings.Join(lines, "\n")
 }
 
-func miniPanel(title string, lines []string, width int) string {
-	body := append([]string{stAccent.Render(title)}, lines...)
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(cFaint).
-		Padding(0, 1).
-		Width(width).
-		Render(strings.Join(body, "\n"))
-}
-
 func asciiBrand(width int) string {
 	if width < 86 {
 		return stAccent.Render("SciScope")
@@ -1108,11 +1098,11 @@ func renderSplash(width int, sessions []sessionFile) string {
 	if width < 60 {
 		width = 60
 	}
-	subtitle := "Evidence-grounded research agent for literature intelligence"
+	subtitle := "证据接地的科研文献智能体"
 	if width < 76 {
-		subtitle = "Evidence-grounded research agent"
+		subtitle = "证据接地的科研智能体"
 	}
-	prompt := "Start with a claim, paper, topic, or trend. Type / for commands."
+	prompt := "从一个论断、论文、主题或趋势开始;输入 / 查看命令。"
 	body := []string{
 		asciiBrand(width),
 		stInk.Render("科研智能体终端"),
@@ -1185,8 +1175,8 @@ func (m model) renderCommandPalette(width int) string {
 	rows := []string{
 		lipgloss.JoinHorizontal(
 			lipgloss.Top,
-			stAccent.Render("Commands"),
-			stFaint.Render(" · type to filter · ↑/↓ select · Enter run"),
+			stAccent.Render("命令"),
+			stFaint.Render(" · 输入以过滤 · ↑/↓ 选择 · Enter 执行"),
 		),
 	}
 	lastCategory := ""
@@ -2123,7 +2113,7 @@ func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
 	case "/timeline":
 		m.appendBlock(renderTimelineBlock(m.timeline))
 	case "/doctor":
-		m.appendBlock(panelRow("doctor", "System status", "", []string{
+		m.appendBlock(panelRow("doctor", "系统状态", "", []string{
 			"Backend: " + healthURL(),
 			"LLM: " + llmURL(),
 			"Sessions: " + sessionDir(),
@@ -2202,7 +2192,7 @@ func (m model) View() string {
 	}
 	banner := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).BorderForeground(cAccent).Padding(0, 1)
-	header := banner.Render(stAccent.Render("◆ SciScope") + "  " + stInk.Render("科研智能体终端") + "  " + stFaint.Render("evidence · timeline · retry · export"))
+	header := banner.Render(stAccent.Render("◆ SciScope") + "  " + stInk.Render("科研智能体终端") + "  " + stFaint.Render("证据 · 时间线 · 重试 · 导出"))
 	parts := []string{header, m.vp.View()}
 
 	// thinking spinner (Claude Code-style verb + esc hint) while a turn runs
