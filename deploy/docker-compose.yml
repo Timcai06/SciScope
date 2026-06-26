@@ -12,10 +12,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-sciscope}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    # Exposed to the host so you can pg_restore the corpus dump from the box.
-    # Keep this off the public security group; restore over the loopback only.
-    ports:
-      - "127.0.0.1:5432:5432"
+    # No host port: the api reaches the db over the compose network (db:5432),
+    # and the corpus is restored via `docker compose exec db pg_restore` (stdin).
+    # This also avoids clashing with a Postgres already on the host's 5432.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sciscope} -d ${POSTGRES_DB:-sciscope}"]
       interval: 10s
