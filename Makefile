@@ -74,12 +74,18 @@ LLM_LOCAL_DIR ?= models/llm_local/Qwen2.5-7B-Instruct-4bit
 TUI_VERSION ?= dev
 GO_BUILD_CACHE ?= $(CURDIR)/.cache/go-build
 
+# Local secrets, gitignored. Put your key in .env.local as:  DEEPSEEK_API_KEY = sk-...
+# Then `make backend` / `make dev` / `make tui` use DeepSeek by default.
+-include .env.local
+
 export SCISCOPE_APP_NAME ?= SciScope
 export SCISCOPE_ENV ?= local
 export SCISCOPE_DATA_PATH ?= $(DATA_PATH)
 export SCISCOPE_CORS_ORIGINS ?=
 export SCISCOPE_USE_MOCK_LLM ?= true
 export SCISCOPE_LLM_PROVIDER ?= deepseek
+export DEEPSEEK_API_KEY ?=
+export DEEPSEEK_MODEL ?= deepseek-chat
 export LOCAL_LLM_BASE_URL ?= $(VLLM_BASE_URL)
 export LOCAL_LLM_MODEL ?= $(VLLM_MODEL)
 # So `make backend` / `make dev` serve the real corpus (the agent/RAG need these);
