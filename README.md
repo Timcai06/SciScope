@@ -48,6 +48,7 @@ make backend
 - 本地模型端到端：先保证可用 OpenAI-compatible 服务，再用 `make dev-vllm`。
 - 离线演示：`make tui-demo`。
 - TUI 体检：`make tui-doctor`。
+- MCP 服务端：`make mcp`（把工具暴露给 Claude Desktop 等 MCP 客户端，详见 [`docs/mcp.md`](docs/mcp.md)）。
 
 ## 核心命令（按场景）
 
