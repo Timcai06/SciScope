@@ -1220,6 +1220,9 @@ func permissionNotice(name string) (string, bool) {
 }
 
 func toolResultLabel(name, result string) string {
+	if strings.HasPrefix(result, "[未执行]") {
+		return "校验拦截"
+	}
 	switch name {
 	case "search_literature", "summarize_field":
 		var papers []evidencePaper
@@ -1328,6 +1331,12 @@ func renderReflectBlock(s string) string {
 }
 
 func renderToolResult(name, result string, width int, elapsed time.Duration) string {
+	// A validation gate rejected the call (e.g. fabricated paper_id). Surface it
+	// as a distinct recovery card — the model also gets this back and self-corrects.
+	if strings.HasPrefix(result, "[未执行]") {
+		reason := strings.TrimSpace(strings.TrimPrefix(result, "[未执行]"))
+		return panelRow("recovery", "校验拦截 · "+toolPlainLabel(name), durationText(elapsed), []string{stWarn.Render(reason)})
+	}
 	switch name {
 	case "search_literature", "summarize_field":
 		var papers []evidencePaper
