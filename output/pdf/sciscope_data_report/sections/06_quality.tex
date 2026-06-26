@@ -18,13 +18,13 @@
 
 \subsection{摘要与正文覆盖}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
   \centering
   \figasset[0.88\textwidth]{abstract_fulltext_coverage.png}
   \caption{摘要与正文片段覆盖率对比。摘要覆盖较高, 正文片段覆盖较低且来源集中, 因此全文级分析需要单独标注证据范围。}
 \end{figure}
 
-\begin{center}
+\begin{tableblock}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{30mm}X X}
 \toprule
 风险 & 表现 & 处理方式 \\
@@ -39,7 +39,7 @@
 社区参数敏感 & Louvain 社区数量会随 resolution 改变 & 输出 \texttt{author\_louvain\_sensitivity.csv}, 仅保留跨参数稳定的结构性解释。 \\
 \bottomrule
 \end{tabularx}
-\end{center}
+\end{tableblock}
 
 \subsection{网络稳健性检查}
 
@@ -47,7 +47,7 @@
 
 \subsection{可信度分层}
 
-\begin{center}
+\begin{tableblock}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{30mm}X X}
 \toprule
 层级 & 可采用结论 & 边界说明 \\
@@ -58,6 +58,6 @@
 暂不强写 & 精确机构网络、单个作者影响力排名、全文级跨来源比较 & 当前机构字段和正文覆盖尚不均衡。 \\
 \bottomrule
 \end{tabularx}
-\end{center}
+\end{tableblock}
 
 \clearpage

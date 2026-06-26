@@ -498,16 +498,19 @@ def _plot_top_keywords(keywords: pd.DataFrame, output_dir: Path, *, top_n: int =
     data = data[data["keyword"].map(_is_report_keyword)]
     if "paper_id" in data.columns:
         data = data.drop_duplicates(subset=["paper_id", "keyword"])
-    counts = data["keyword"].dropna().astype(str).value_counts().head(top_n).sort_values(ascending=True)
-    labels = [_wrap_label(label, width=28) for label in counts.index]
-    fig, ax = plt.subplots(figsize=(7.0, 4.6))
+    counts = data["keyword"].dropna().astype(str).value_counts().head(12).sort_values(ascending=True)
+    labels = [_wrap_label(label, width=24) for label in counts.index]
+    fig, ax = plt.subplots(figsize=(8.2, 4.25))
     colors = [SERIES_COLORS[index % len(SERIES_COLORS)] for index in range(len(labels))]
-    ax.barh(labels, counts.values, color=colors, height=0.6)
-    ax.set_title(f"Top Fused Keyword Signals ({RECENT_YEAR_START}-{RECENT_YEAR_END})")
+    ax.barh(labels, counts.values, color=colors, height=0.58)
+    ax.set_title(f"Fused keyword signals ({RECENT_YEAR_START}-{RECENT_YEAR_END})", fontsize=12, pad=10)
     ax.set_xlabel("Papers")
-    ax.grid(axis="x", linestyle="--")
+    ax.grid(axis="x", linestyle="--", alpha=0.35)
+    ax.spines[["top", "right", "left"]].set_visible(False)
+    ax.tick_params(axis="y", length=0)
     for index, value in enumerate(counts.values):
-        ax.text(value + max(counts.values) * 0.01, index, str(int(value)), va="center", fontsize=7)
+        ax.text(value + max(counts.values) * 0.012, index, str(int(value)), va="center", fontsize=7.5)
+    fig.subplots_adjust(left=0.29, right=0.93, top=0.86, bottom=0.14)
     save_figure(fig, output_dir / "top_keywords.png")
     return {
         "figure_id": "top_keywords",

@@ -4,7 +4,7 @@
 架构以\textbf{数据资产可复现、证据可追溯、决策可复核}为主线。系统分为数据治理与分析资产层、模型与索引层、服务与接口层、智能体编排层四类能力;各层既可独立评估,也共享同一数据口径,便于持续更新与复现。
 图~\ref{fig:project-architecture} 展示底层数据到智能体交互的完整链路,图~\ref{fig:capability-map} 则把工程组件收束为评委可快速识别的能力地图。
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \begin{tikzpicture}[
   x=1mm, y=1mm, font=\small,
@@ -47,7 +47,7 @@
 \label{fig:project-architecture}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \figasset[0.94\textwidth]{system_capability_map.png}
 \caption{SciScope 能力地图:从可复现数据资产到证据接地智能体,再到终端产品化客户端。数据来源:系统实现与交付目录映射。}
@@ -60,7 +60,7 @@
 问答不直接交给大模型臆测,而是\textbf{先检索证据、再据证生成},每条回答都可追溯到具体论文:
 见图~\ref{fig:grounded-rag-flow}。
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \begin{tikzpicture}[
   x=1mm, y=1mm, font=\scriptsize,
@@ -90,7 +90,7 @@
 \subsection{智能体编排层:从"固定管线"到"自主 agent"}
 上节的检索增强生成(Retrieval-Augmented Generation, RAG)问答是\textbf{固定流程}。在其之上,我们构建了\textbf{自主科研智能体}:大模型不再被动接收检索结果,而是\textbf{自己规划步骤、自主选择并调用工具、观察结果后决定下一步},必要时\textbf{自我纠错重试}。图~\ref{fig:agent-loop} 与图~\ref{fig:agent-trace} 展示了从后端编排到终端可视化的同一条事件链。
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \begin{tikzpicture}[
   x=1mm, y=1mm, font=\scriptsize,
@@ -115,7 +115,7 @@
 \label{fig:agent-loop}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
 \centering
 \figasset[0.94\textwidth]{agent_trace_timeline.png}
 \caption{TUI 中可见的智能体执行轨迹:科研工作流阶段、工具调用、证据卡、reflect 与 final 均通过 SSE 事件流呈现,便于评委复核系统不是黑盒问答。}
@@ -136,7 +136,7 @@
 \textbf{当前产品化路线}:Agent 由单一 LangGraph StateGraph 编排,无运行时开关。\texttt{meta.phase} 将底层节点翻译为用户可理解的科研工作流阶段;TUI 在运行中显示阶段条,并用分组 \texttt{/timeline} 回看证据链。\texttt{session\_id} 映射为 \texttt{thread\_id},checkpoint 保存会话态,\texttt{/retry} 支持同线程错误恢复。下一阶段聚焦持久化 checkpoint、Human-in-the-Loop、多 Agent 分工与节点级恢复;检索、趋势、推荐、图谱和 \texttt{verify\_claim} 工具保持不变。
 \end{plainbox}
 
-\begin{center}
+\begin{tableblock}
 \begin{tabularx}{0.96\textwidth}{>{\bfseries}p{30mm}XX}
 \toprule
 用户可见阶段 & 对应节点 & TUI 呈现 \\
@@ -149,9 +149,9 @@
 综合回答 & \texttt{force\_synthesis/final} & 输出"研究结论 + 证据工具 + 过程入口" \\
 \bottomrule
 \end{tabularx}
-\end{center}
+\end{tableblock}
 
-\begin{center}
+\begin{tableblock}
 \begin{tabularx}{0.96\textwidth}{p{42mm}X}
 \toprule
 \textbf{工具} & \textbf{作用} \\
@@ -167,7 +167,7 @@
 \texttt{verify\_claim} & \textbf{跨语言论断核查}:用语义接地度判定支持等级并给出处 \\
 \bottomrule
 \end{tabularx}
-\end{center}
+\end{tableblock}
 
 \subsection{方案功能}
 \begin{itemize}
@@ -221,7 +221,7 @@ g(c,e)=\alpha\,sim(c,e)+\beta\,source(e)+\gamma\,recency(e)
 }
 \end{codepanel}
 
-\begin{center}
+\begin{tableblock}
 \begin{tabularx}{0.96\textwidth}{>{\bfseries}p{22mm}X}
 \toprule
 分层 & 职责与代码位置 \\
@@ -234,4 +234,4 @@ g(c,e)=\alpha\,sim(c,e)+\beta\,source(e)+\gamma\,recency(e)
 6. 客户端 & Go / Bubble Tea 终端(\texttt{tui/main.go}),纯 SSE 消费;将 \texttt{phase} 渲染为科研工作流阶段条与分组 \texttt{/timeline},Web 前端复用同一接口 \\
 \bottomrule
 \end{tabularx}
-\end{center}
+\end{tableblock}

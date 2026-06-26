@@ -28,7 +28,7 @@
 \begin{plainbox}
 \textbf{种子论文}:\texttt{PMC13273979}(AI 药物发现方向)\par\vspace{2pt}
 \textbf{推荐}(每条附可解释因子 semantic / keyword / author / recency):
-\begin{center}
+\begin{tableblock}
 \begin{tabularx}{\textwidth}{Xccc}
 \toprule
 \textbf{推荐论文} & \textbf{年份} & \textbf{语义相似} & \textbf{融合因子} \\
@@ -38,7 +38,7 @@ Editorial: Advancing drug discovery with AI & 2025 & 0.934 & sem .56 / kw .10 \\
 Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem .55 / kw .10 \\
 \bottomrule
 \end{tabularx}
-\end{center}
+\end{tableblock}
 \end{plainbox}
 
 \subsection{用例四:趋势热点(模型输出)}
@@ -90,7 +90,7 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 \begin{plainbox}
 \textbf{黄金会话样例}:\texttt{docs/examples/golden\_verify\_claim\_session.md}\par\vspace{2pt}
 \textbf{用户问题}:RAG 能否降低科研问答系统中的幻觉风险?请给出证据和判断边界。\par\vspace{2pt}
-\begin{center}
+\begin{tableblock}
 \begin{tabularx}{0.92\textwidth}{>{\bfseries}p{28mm}X}
 \toprule
 阶段 & 样例中的可见动作 \\
@@ -101,6 +101,6 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 综合回答 & 输出研究结论、依据、判断边界和可复现入口 \\
 \bottomrule
 \end{tabularx}
-\end{center}
+\end{tableblock}
 \textbf{输出边界}:结论表述为"降低幻觉风险并提升可核验性";证据工具与 \texttt{/timeline} 入口保留给评委复核。
 \end{plainbox}

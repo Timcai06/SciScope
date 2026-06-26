@@ -9,6 +9,7 @@
 \usepackage{enumitem}
 \usepackage{fancyhdr}
 \usepackage{float}
+\usepackage[section]{placeins}
 \usepackage{titlesec}
 \usepackage{hyperref}
 \usepackage[most]{tcolorbox}
@@ -38,11 +39,12 @@
 \setlist[enumerate]{leftmargin=1.55em,itemsep=1.6pt,topsep=2pt}
 \hypersetup{hidelinks}
 \graphicspath{{../../assets/sciscope_data_report/}{../../assets/sciscope_project_report/}}
-\captionsetup{font={small,bf},labelfont=bf,labelsep=quad,skip=3pt}
+\captionsetup{font=small,labelfont=bf,labelsep=quad,skip=3pt}
 \arrayrulecolor{SciLine}
 \setlength{\floatsep}{5pt plus 1pt minus 1pt}
 \setlength{\textfloatsep}{6pt plus 1pt minus 1pt}
 \setlength{\intextsep}{5pt plus 1pt minus 1pt}
+\raggedbottom
 
 \pagestyle{fancy}
 \fancyhf{}
@@ -84,6 +86,15 @@
   #1
   \end{equation*}
   {\small\color{SciMuted}#2\par}
+}
+
+\newenvironment{tableblock}{%
+  \begin{center}
+  \small
+  \setlength{\tabcolsep}{4.6pt}
+  \renewcommand{\arraystretch}{1.13}
+}{%
+  \end{center}
 }
 
 \newcommand{\statusbadge}[1]{%

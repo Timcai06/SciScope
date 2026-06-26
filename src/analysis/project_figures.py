@@ -58,10 +58,10 @@ def _box(ax, xy, width, height, title, detail, face, edge=LINE):
         facecolor=face,
     )
     ax.add_patch(rect)
-    ax.text(xy[0] + width / 2, xy[1] + height * 0.62, title, ha="center", va="center",
-            fontsize=10, fontweight="bold", color=INK)
+    ax.text(xy[0] + width / 2, xy[1] + height * 0.64, title, ha="center", va="center",
+            fontsize=9.2, fontweight="bold", color=INK)
     ax.text(xy[0] + width / 2, xy[1] + height * 0.32, detail, ha="center", va="center",
-            fontsize=7.8, color=MUTED)
+            fontsize=7.2, color=MUTED)
 
 
 def _arrow(ax, start, end, color=MUTED):
@@ -142,28 +142,28 @@ def _figure_agent_trace(output_dir: Path) -> Path:
 
 
 def _figure_claim_grounding(output_dir: Path) -> Path:
-    fig, ax = plt.subplots(figsize=(10.5, 4.5))
+    fig, ax = plt.subplots(figsize=(10.5, 3.9))
     ax.set_axis_off()
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
-    ax.text(0.04, 0.90, "verify_claim grounding flow", fontsize=14, fontweight="bold", color=INK)
+    ax.text(0.04, 0.90, "verify_claim grounding workflow", fontsize=14, fontweight="bold", color=INK)
     boxes = [
-        ("Chinese claim", "RAG reduces\nhallucination risk", 0.06, 0.50, LAYER_FILLS[0]),
-        ("Query expansion", "Chinese -> English\nresearch terms", 0.28, 0.50, LAYER_FILLS[2]),
-        ("Evidence pool", "top retrieval\npapers/snippets", 0.50, 0.50, LAYER_FILLS[4]),
-        ("Similarity", "e5 cosine\n0.846 demo", 0.72, 0.50, LAYER_FILLS[6]),
+        ("Claim", "Chinese assertion\nabout RAG", 0.06, 0.52, LAYER_FILLS[0]),
+        ("Ground", "expand to English\nresearch terms", 0.28, 0.52, LAYER_FILLS[2]),
+        ("Retrieve", "ranked papers\nand snippets", 0.50, 0.52, LAYER_FILLS[4]),
+        ("Score", "semantic match\n0.846 demo", 0.72, 0.52, LAYER_FILLS[6]),
     ]
     for b in boxes:
-        _box(ax, (b[2], b[3]), 0.16, 0.20, b[0], b[1], b[4])
+        _box(ax, (b[2], b[3]), 0.17, 0.20, b[0], b[1], b[4])
     for i in range(len(boxes) - 1):
-        _arrow(ax, (boxes[i][2] + 0.16, 0.60), (boxes[i + 1][2], 0.60), GRAPHITE)
-    ax.add_patch(patches.FancyBboxPatch((0.34, 0.14), 0.32, 0.16, boxstyle="round,pad=0.02",
+        _arrow(ax, (boxes[i][2] + 0.17, 0.62), (boxes[i + 1][2], 0.62), GRAPHITE)
+    ax.add_patch(patches.FancyBboxPatch((0.28, 0.15), 0.44, 0.16, boxstyle="round,pad=0.02",
                                         facecolor=PANEL, edgecolor=GRAPHITE, linewidth=1.1))
-    ax.text(0.50, 0.23, "Output: support level + traceable evidence", ha="center",
-            fontsize=10, fontweight="bold", color=INK)
-    ax.text(0.50, 0.17, "Not a logic oracle; it constrains conclusion strength by retrieved evidence.",
-            ha="center", fontsize=7.8, color=MUTED)
-    _arrow(ax, (0.80, 0.50), (0.62, 0.30), GRAPHITE)
+    ax.text(0.50, 0.245, "Output: support level + traceable evidence", ha="center",
+            fontsize=9.6, fontweight="bold", color=INK)
+    ax.text(0.50, 0.185, "Evidence constrains conclusion strength; it is not a formal logic proof.",
+            ha="center", fontsize=6.8, color=MUTED)
+    _arrow(ax, (0.805, 0.52), (0.67, 0.31), GRAPHITE)
     path = output_dir / "claim_grounding_flow.png"
     save_figure(fig, path)
     return path
