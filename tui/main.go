@@ -2201,16 +2201,7 @@ func (m model) View() string {
 		}
 	}
 
-	runtime := m.lastMeta.Runtime
-	if runtime == "" {
-		runtime = "langgraph"
-	}
-	statusText := fmt.Sprintf("  %s · turns %d · /timeline · /retry · /doctor · Ctrl+C", runtime, len(m.history)/2)
-	if m.lastExport != "" {
-		statusText += " · saved " + filepath.Base(m.lastExport)
-	}
-	status := stFaint.Render(statusText)
-	parts = append(parts, m.renderComposer(m.vp.Width), status)
+	parts = append(parts, m.renderComposer(m.vp.Width))
 	return strings.Join(parts, "\n")
 }
 
