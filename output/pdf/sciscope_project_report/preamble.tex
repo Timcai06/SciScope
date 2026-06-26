@@ -13,6 +13,7 @@
 \usepackage{hyperref}
 \usepackage[most]{tcolorbox}
 \usepackage{dirtree}
+\usepackage{amsmath}
 \usetikzlibrary{arrows.meta,positioning,fit,calc}
 
 \definecolor{SciTealDark}{HTML}{000000}
@@ -59,14 +60,30 @@
 \titleformat{\subsubsection}{\normalsize\bfseries\color{SciInk}}{\thesubsubsection}{0.6em}{}
 
 \newtcolorbox{reportbox}[2][]{
-  enhanced, breakable, colback=SciPanel, colframe=SciTealDark,
-  colbacktitle=SciTealDark, coltitle=white, fonttitle=\bfseries, title=#2,
-  boxrule=0.45pt, arc=1.2mm, left=2.8mm, right=2.8mm, top=1.8mm, bottom=1.8mm, #1
+  enhanced, breakable, frame hidden, colback=white,
+  coltitle=SciTealDark, fonttitle=\bfseries\large, title=#2,
+  attach title to upper={\par\smallskip},
+  borderline west={0.7pt}{0pt}{SciTealDark},
+  boxrule=0pt, arc=0pt, left=3.2mm, right=2.8mm, top=1mm, bottom=1.4mm, #1
 }
 
 \newtcolorbox{plainbox}[1][]{
-  enhanced, breakable, colback=SciPanel, colframe=SciLine,
-  boxrule=0.42pt, arc=1.2mm, left=2.8mm, right=2.8mm, top=1.8mm, bottom=1.8mm, #1
+  enhanced, breakable, frame hidden, colback=white,
+  borderline west={0.55pt}{0pt}{SciLine},
+  boxrule=0pt, arc=0pt, left=3.1mm, right=2.8mm, top=1.2mm, bottom=1.2mm, #1
+}
+
+\newtcolorbox{codepanel}[1][]{
+  enhanced, breakable, frame hidden, colback=white,
+  borderline west={0.55pt}{0pt}{SciLine},
+  boxrule=0pt, arc=0pt, left=3.1mm, right=2.8mm, top=1mm, bottom=1mm, #1
+}
+
+\newcommand{\formulaline}[2]{%
+  \begin{equation*}
+  #1
+  \end{equation*}
+  {\small\color{SciMuted}#2\par}
 }
 
 \newcommand{\statusbadge}[1]{%

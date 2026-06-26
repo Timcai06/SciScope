@@ -82,6 +82,11 @@
 \label{fig:grounded-rag-flow}
 \end{figure}
 
+\textbf{检索融合口径}: 字面检索与语义检索分别给出排序后, 系统使用倒数排名融合(Reciprocal Rank Fusion, RRF)合并多路结果:
+\formulaline{
+\operatorname{RRF}(d)=\sum_{r\in R}\frac{1}{k+\operatorname{rank}_r(d)},\quad k=60
+}{其中 $R$ 表示参与融合的检索路由, $d$ 为候选论文或片段;该口径能让字面命中和语义相关共同进入证据池。}
+
 \subsection{智能体编排层:从"固定管线"到"自主 agent"}
 上节的检索增强生成(Retrieval-Augmented Generation, RAG)问答是\textbf{固定流程}。在其之上,我们构建了\textbf{自主科研智能体}:大模型不再被动接收检索结果,而是\textbf{自己规划步骤、自主选择并调用工具、观察结果后决定下一步},必要时\textbf{自我纠错重试}。图~\ref{fig:agent-loop} 与图~\ref{fig:agent-trace} 展示了从后端编排到终端可视化的同一条事件链。
 
@@ -178,12 +183,17 @@
 \begin{itemize}
 \item \textbf{向量化}:本地 \texttt{multilingual-e5-base}(768 维,中英跨语言),fp16 加速、断点续传;向量入 pgvector。
 \item \textbf{混合检索与 RRF}:全文索引(\texttt{tsvector}) + 余弦向量索引(\texttt{ivfflat}),两路按 $1/(k+\text{rank})$ 融合(k=60)。
-\item \textbf{趋势模型}:逐年归一化词频上最小二乘外推 + 残差不确定带;主题模型 LDA/NMF 各 40 主题。
-\item \textbf{推荐模型}:论文级平均向量(pgvector \texttt{avg})+ 多信号加权,逐条给出可解释因子。
+\item \textbf{趋势模型}:逐年归一化词频上最小二乘外推 + 残差不确定带;主题模型 LDA/NMF 各 40 主题。趋势热度 $h_{k,y}=n_{k,y}/N_y$,预测采用 $\hat{h}_{k,y+1}=a_k y+b_k$ 作为排序信号,不作确定性预言。
+\item \textbf{推荐模型}:论文级平均向量(pgvector \texttt{avg})+ 多信号加权,逐条给出可解释因子;重排采用最大边际相关(Maximum Marginal Relevance, MMR),即 $\lambda sim(q,d)-(1-\lambda)\max_{d'\in S}sim(d,d')$,兼顾相关性与多样性。
 \item \textbf{知识图谱}:NetworkX 中心度/社区,百万级边按中心度剪枝导出 JSON,作者 ego 图走 SQL 实时查询。
 \item \textbf{生成层}:OpenAI 兼容本地服务,输出限长防失控,可平滑切换更大/远程模型。
 \item \textbf{智能体编排}:基于 LangGraph StateGraph 的科研智能体运行时。prepare / plan / LLM step / tool execution / reflect / final synthesis 被拆为可观察节点;底层使用本地 \texttt{Qwen2.5-7B}(vLLM,hermes 工具解析),支持流式选工具、只读工具并行执行、调用去重、plan/reflect 自校验、会话 checkpoint 与同线程 \texttt{/retry};事件流通过 \texttt{phase} 字段向用户呈现科研工作流阶段。
 \end{itemize}
+
+\textbf{证据接地口径}: \texttt{verify\_claim} 不把语义相似度包装为形式逻辑证明, 而是将论断 $c$ 与证据片段 $e$ 的接地强度表达为可解释评分:
+\formulaline{
+g(c,e)=\alpha\,sim(c,e)+\beta\,source(e)+\gamma\,recency(e)
+}{该评分用于支持等级与证据排序;最终结论仍必须展示出处,并由 reflect 节点检查关键论断是否有证据支撑。}
 
 \subsection{实现过程}
 \textbf{数据生成与采集} → 6 源按领域/年份抓取,落 \texttt{data/raw\_canonical} 分区 JSONL。\\
@@ -194,7 +204,7 @@
 \subsection{项目结构与分层}
 代码按"数据 → 模型 → 服务/RAG → 智能体 → 接口 → 客户端"\textbf{六层}组织,职责单一、依赖自底向上:\textbf{Python 承载全部智能}(从数据到 agent),\textbf{Go 仅作终端客户端}(经 SSE 消费,可替换、不绑定)。
 
-\begin{plainbox}\scriptsize
+\begin{codepanel}\scriptsize
 \dirtree{%
 .1 \texttt{数据要素/}.
 .2 \texttt{data\_pipeline/}\quad [1] 加载 / 规范化.
@@ -209,7 +219,7 @@
 .2 \texttt{tui/}\quad [6] Go·Bubble Tea 终端客户端(消费 SSE).
 .2 \texttt{PostgreSQL + pgvector}\quad 运行时:papers·chunk\_embeddings·….
 }
-\end{plainbox}
+\end{codepanel}
 
 \begin{center}
 \begin{tabularx}{0.96\textwidth}{>{\bfseries}p{22mm}X}

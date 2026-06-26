@@ -8,12 +8,12 @@
 \end{itemize}
 
 \subsection{一键安装}
-\begin{plainbox}\ttfamily\small
+\begin{codepanel}\ttfamily\small
 make install\hfill\# 安装后端 Python 依赖与前端 npm 依赖
-\end{plainbox}
+\end{codepanel}
 
 \subsection{构建服务层与模型文件}
-\begin{plainbox}\ttfamily\small
+\begin{codepanel}\ttfamily\small
 \# 1. 服务层(建库 + 装载语料/片段)\\
 createdb sciscope\\
 make postgres-schema POSTGRES\_DSN=postgresql://USER@localhost:5432/sciscope\\
@@ -26,10 +26,10 @@ make dedupe-db APPLY=1\hfill\# 实际去重\\[3pt]
 SCISCOPE\_EMBEDDER\_PATH=models/embedder\_local/multilingual-e5-base make embeddings\\
 make recommend-model trend-model graph-export\\
 \# 或一键:make agent-build
-\end{plainbox}
+\end{codepanel}
 
 \subsection{启动与体验}
-\begin{plainbox}\ttfamily\small
+\begin{codepanel}\ttfamily\small
 \# 带数据库 + 本地嵌入启动前后端\\
 SCISCOPE\_DB\_DSN=postgresql://USER@localhost:5432/sciscope \textbackslash\\
 SCISCOPE\_EMBEDDER\_PATH=models/embedder\_local/multilingual-e5-base make dev\\[3pt]
@@ -38,20 +38,20 @@ make backend \&  make llm \&  make tui\\[3pt]
 \# 接本地大模型生成(需 :8001 上的 OpenAI 兼容服务)\\
 make vllm-serve\hfill\# 启动本地模型\\
 ... make dev\hfill\# 配 LOCAL\_LLM\_* 指向该模型
-\end{plainbox}
-打开 \texttt{http://localhost:3000} 使用工作台;后端接口文档见 \texttt{http://127.0.0.1:8000/docs}。
+\end{codepanel}
+打开 \texttt{http://localhost:3001} 使用工作台;后端接口文档见 \texttt{http://127.0.0.1:8000/docs}。
 
 \subsection{质量与效果验证}
-\begin{plainbox}\ttfamily\small
+\begin{codepanel}\ttfamily\small
 make test\hfill\# 后端测试 + 前端类型检查 + 构建(以当前环境输出为准)\\
 make eval-retrieval\hfill\# 自检索评估:recall@k / MRR / 延迟
-\end{plainbox}
+\end{codepanel}
 
 \subsection{全量重建(数据更新后)}
 持续爬取积累新数据后,一次性重建并自动并入去重与全部模型:
-\begin{plainbox}\ttfamily\small
+\begin{codepanel}\ttfamily\small
 make data-layer-refresh \&\& make rag-chunks \&\& make postgres-refresh \&\& make agent-build
-\end{plainbox}
+\end{codepanel}
 
 \subsection{交付物清单}
 \begin{itemize}
