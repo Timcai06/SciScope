@@ -5,6 +5,17 @@ from __future__ import annotations
 from backend.app.agent import langgraph_runtime, runtime
 from backend.app.agent.events import event_parts
 from backend.app.agent.llm import SYSTEM_PROMPT
+from backend.app.agent.reflection import reflect_reason
+
+
+def test_reflect_does_not_force_tools_for_common_sense_question():
+    # No literature intent + tool-free answer -> let it stand, no retry.
+    assert reflect_reason("机器学习是让计算机从数据中学习的方法。", 0, "什么是机器学习?") is None
+
+
+def test_reflect_pushes_tools_for_literature_question_without_tools():
+    reason = reflect_reason("RAG 是一种检索增强方法。", 0, "RAG 领域最新研究趋势如何?")
+    assert reason is not None and "search_literature" in reason
 
 
 def test_runtime_entrypoint_delegates_to_langgraph():

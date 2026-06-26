@@ -11,13 +11,29 @@ WEAK_ANSWER = (
     "没有相关", "缺乏", "无相关信息", "i don't", "cannot find", "no relevant",
 )
 
+# Signals that a question is actually about the literature corpus and therefore
+# should be grounded in tool-retrieved evidence. General/common-sense questions
+# carry none of these and are allowed to be answered without calling tools.
+LITERATURE_INTENT = (
+    "论文", "文献", "研究", "综述", "趋势", "进展", "最新", "近年", "近期",
+    "推荐", "作者", "引用", "发表", "期刊", "数据集", "对比", "比较",
+    "知识图谱", "领域", "前沿", "sota", "state of the art",
+    "paper", "literature", "research", "review", "survey", "trend",
+    "recommend", "citation", "cite", "author", "dataset", "recent",
+)
+
 
 def reflect_reason(answer: str, tools_used: int, question: str) -> str | None:
-    """Return a retry instruction for ungrounded or weak answers."""
+    """Return a retry instruction for ungrounded or weak answers.
+
+    A tool-free answer is only pushed back when the question shows literature
+    intent — common-sense / general questions legitimately need no tools.
+    """
     answer_lower = (answer or "").lower()
     question_lower = question.strip().lower()
     is_meta = len(question_lower) < 4 or any(marker in question_lower for marker in META_PROMPTS)
-    if tools_used == 0 and not is_meta:
+    needs_literature = any(marker in question_lower for marker in LITERATURE_INTENT)
+    if tools_used == 0 and not is_meta and needs_literature:
         return "你没有调用任何工具就回答了。请先用 search_literature 等工具检索证据,再据实回答。"
     if any(marker in answer_lower for marker in WEAK_ANSWER):
         return "上次检索证据不足。请换用不同的关键词(或英文术语)重新检索,再回答。"
