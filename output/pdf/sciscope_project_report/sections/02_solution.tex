@@ -130,6 +130,9 @@
 \item \textbf{上下文压缩}:长会话自动压缩历史工具结果,避免超出上下文窗口。
 \item \textbf{会话态与错误恢复}:TUI 传入 \texttt{session\_id},后端映射为 LangGraph \texttt{thread\_id} 并通过 checkpoint 保留会话态;\texttt{/retry} 在同一线程内携带 \texttt{retry=true} 触发恢复。
 \item \textbf{服务/客户端分离}:agent 核心运行于 \texttt{/api/agent/stream}(SSE 流式)。事件 \texttt{meta} 同时返回运行时、节点、用户可读阶段(\texttt{phase})、耗时、会话与 retry 标记;当前客户端为 Go TUI,通过同一 SSE 契约消费智能体核心。
+\item \textbf{可插拔生成层}:生成大模型经 OpenAI 兼容接口接入,一处配置即可在\textbf{本地 7B(离线/涉密)}与\textbf{DeepSeek 云端(更强质量)}之间切换,检索、接地与编排逻辑保持不变——模型成为可替换组件而非锁定项。
+\item \textbf{工具契约 + 执行前校验门}:每个工具是带契约的一等对象(自声明只读性、参数校验、结果上限);调用前做\textbf{确定性校验}——如 \texttt{recommend\_papers}/\texttt{get\_paper} 的 \texttt{paper\_id} 必须真实,\textbf{在访问数据库之前即拦截模型编造的 ID} 并提示其先检索,从机制上消除"凭空捏造主键"的失败模式。工具目录由各工具\textbf{自描述}拼装,与实际工具集永不漂移。
+\item \textbf{自适应检索 + 可观测终止}:模型自行判断是否需要检索(概念/常识类问题直接作答而非空转检索),且检索讲求效率;每轮在 \texttt{meta} 中返回\textbf{终止原因(\texttt{stop\_reason})与 token 用量},使智能体的停止条件可解释、调用成本可计量。
 \end{itemize}
 
 \begin{plainbox}
