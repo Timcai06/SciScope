@@ -612,7 +612,7 @@ type model struct {
 
 func initialModel() model {
 	ti := textinput.New()
-	ti.Placeholder = "输入科研问题,或 / 看命令"
+	ti.Placeholder = "输入研究问题 / 待核查论断,或输入 / 调用命令"
 	ti.Prompt = stAccent.Render("❯ ")
 	ti.Focus()
 	ti.CharLimit = 2000
@@ -974,24 +974,10 @@ func (m model) renderComposer(width int) string {
 	if width < 48 {
 		width = 48
 	}
-	raw := strings.TrimSpace(m.ti.Value())
-	inputWidth := width - 8
-	if inputWidth < 34 {
-		inputWidth = 34
-	}
-	value := raw
-	if value == "" {
-		value = stFaint.Render("输入研究问题 / 待核查论断,或输入 / 调用命令")
-	} else {
-		value = strings.ReplaceAll(value, "\n", "\n"+strings.Repeat(" ", 2))
-	}
-	promptSymbol := "❯"
-	if m.answering {
-		promptSymbol = "●"
-	}
-	inputLine := lipgloss.NewStyle().
-		Width(inputWidth).
-		Render(stAccent.Render(promptSymbol+" ") + value)
+	// Render the real textinput widget so the cursor is drawn inside the
+	// composer box (rendering Value() as static text left the hardware cursor
+	// stranded at the bottom of the screen).
+	inputLine := m.ti.View()
 	hint := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		stAccent.Render("Enter"),
@@ -1039,6 +1025,21 @@ func preview(s string) string {
 		return string(r[:84]) + "…"
 	}
 	return s
+}
+
+// clipWidth truncates by terminal display width (CJK runes count as 2), so
+// columns stay aligned regardless of Chinese/ASCII mix. lipgloss.Width measures
+// display cells.
+func clipWidth(s string, w int) string {
+	s = strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
+	if lipgloss.Width(s) <= w {
+		return s
+	}
+	r := []rune(s)
+	for len(r) > 0 && lipgloss.Width(string(r))+1 > w {
+		r = r[:len(r)-1]
+	}
+	return string(r) + "…"
 }
 
 func clip(s string, n int) string {
@@ -1172,40 +1173,27 @@ func (m model) renderCommandPalette(width int) string {
 		inner = 38
 	}
 	idx := m.menuIdx % len(matches)
-	rows := []string{
-		lipgloss.JoinHorizontal(
-			lipgloss.Top,
-			stAccent.Render("命令"),
-			stFaint.Render(" · 输入以过滤 · ↑/↓ 选择 · Enter 执行"),
-		),
+	cmdW, titleW, keyW := 12, 14, 12
+	descW := inner - cmdW - titleW - keyW
+	if descW < 10 {
+		descW = 10
 	}
-	lastCategory := ""
+	rows := []string{
+		stAccent.Render("命令") + stFaint.Render("  · 输入过滤 · ↑/↓ 选择 · Tab 补全 · Enter 执行"),
+	}
 	for i, c := range matches {
-		if c.category != lastCategory {
-			rows = append(rows, stFaint.Render("  "+c.category))
-			lastCategory = c.category
-		}
-		marker := " "
-		if c.suggested {
-			marker = "•"
-		}
-		left := fmt.Sprintf("%s %-12s %-18s", marker, c.cmd, clip(c.title, 18))
-		midWidth := inner - lipgloss.Width(left) - 16
-		if midWidth < 12 {
-			midWidth = 12
-		}
-		row := lipgloss.JoinHorizontal(
+		cols := lipgloss.JoinHorizontal(
 			lipgloss.Top,
-			stInk.Render(left),
-			stFaint.Render(lipgloss.NewStyle().Width(midWidth).Render(clip(c.desc, midWidth))),
-			stFaint.Render(" "+clip(c.key, 14)),
+			lipgloss.NewStyle().Width(cmdW).Render(c.cmd),
+			lipgloss.NewStyle().Width(titleW).Render(clipWidth(c.title, titleW-1)),
+			lipgloss.NewStyle().Width(descW).Render(clipWidth(c.desc, descW-1)),
+			lipgloss.NewStyle().Width(keyW).Render(clipWidth(c.key, keyW-1)),
 		)
-		row = lipgloss.NewStyle().Width(inner).Render(row)
 		if i == idx {
-			rows = append(rows, stSelCmd.Width(inner).Render(row))
-			continue
+			rows = append(rows, stSelCmd.Width(inner).Render(cols))
+		} else {
+			rows = append(rows, stCmd.Width(inner).Render(cols))
 		}
-		rows = append(rows, stCmd.Width(inner).Render(row))
 	}
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), true, false, true, false).
@@ -1954,7 +1942,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.addTimeline(timelineEvent{Kind: "plan", Phase: "制定研究计划", Label: "执行计划", Detail: strings.Join([]string(msg), " / ")})
 		m.record("plan", "", strings.Join(plain, "\n"))
 		m.livePlan = append([]string(nil), msg...)
-		m.refresh()
+		planLines := []string{stBullet.Render("⏺ ") + stAccent.Render("研究计划")}
+		for _, s := range msg {
+			planLines = append(planLines, stConn.Render("  ⎿ ")+stInk.Render(s))
+		}
+		m.appendBlock(strings.Join(planLines, "\n"))
 		return m, listen(m.sub)
 
 	case toolCallMsg:
@@ -1977,6 +1969,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.addTimeline(timelineEvent{Kind: "tool_call", Phase: metaPhase(msg.meta), Tool: msg.name, Label: toolPlainLabel(msg.name), Detail: detail})
+		callLine := stBullet.Render("⏺ ") + stTool.Render(toolLabel(msg.name))
+		if a := m.argsStr(msg.args); a != "" {
+			callLine += stFaint.Render("  " + clip(a, 56))
+		}
+		m.appendBlock(callLine)
 		if notice, ok := permissionNotice(msg.name); ok {
 			m.record("permission", msg.name, notice)
 			m.addTimeline(timelineEvent{Kind: "permission", Phase: metaPhase(msg.meta), Tool: msg.name, Label: "权限提示", Detail: notice})
@@ -1990,6 +1987,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.addTimeline(timelineEvent{Kind: "tool_result", Phase: metaPhase(msg.meta), Tool: msg.name, Label: toolResultLabel(msg.name, msg.result), Detail: metaDetail(msg.meta), Duration: elapsed})
 		m.record("tool_result", msg.name, summarizeToolResultMarkdown(msg.name, msg.result))
+		m.appendBlock(stConn.Render("  ⎿ ") + stFaint.Render(toolResultLabel(msg.name, msg.result)))
 		return m, listen(m.sub)
 
 	case reflectMsg:
@@ -1997,7 +1995,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.record("reflect", "", string(msg))
 		m.liveReflect = string(msg)
 		m.addTimeline(timelineEvent{Kind: "reflect", Phase: "自检修正", Label: "自检修正", Detail: string(msg)})
-		m.refresh()
+		m.appendBlock(stBullet.Render("⏺ ") + stWarn.Render("自检修正") + "\n" + stConn.Render("  ⎿ ") + stFaint.Render(string(msg)))
 		return m, listen(m.sub)
 
 	case textMsg:
@@ -2198,9 +2196,7 @@ func (m model) View() string {
 	// thinking spinner (Claude Code-style verb + esc hint) while a turn runs
 	if m.answering {
 		parts = append(parts, renderWorkflowStatus(m.lastMeta, m.nodeSeen, m.lastStreamKind, time.Since(m.start), m.vp.Width))
-		if thinking := renderThinkingShelf(m.livePlan, m.liveReflect, m.vp.Width); thinking != "" {
-			parts = append(parts, thinking)
-		}
+		// plan/reflect now stream inline in the transcript, so no separate shelf.
 		elapsed := int(time.Since(m.start).Seconds())
 		parts = append(parts, m.spin.View()+" "+stAccent.Render(m.verb+"…")+stFaint.Render(fmt.Sprintf("  (%ds · esc 中断)", elapsed)))
 	} else if strings.HasPrefix(m.ti.Value(), "/") {
