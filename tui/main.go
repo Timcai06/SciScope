@@ -1987,7 +1987,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.addTimeline(timelineEvent{Kind: "tool_result", Phase: metaPhase(msg.meta), Tool: msg.name, Label: toolResultLabel(msg.name, msg.result), Detail: metaDetail(msg.meta), Duration: elapsed})
 		m.record("tool_result", msg.name, summarizeToolResultMarkdown(msg.name, msg.result))
-		m.appendBlock(stConn.Render("  ⎿ ") + stFaint.Render(toolResultLabel(msg.name, msg.result)))
+		// Render the rich evidence/verify/trend card by default (not just in /demo
+		// or /timeline) so the evidence chain is always visible inline.
+		m.appendBlock(renderToolResult(msg.name, msg.result, m.vp.Width, elapsed))
 		return m, listen(m.sub)
 
 	case reflectMsg:
