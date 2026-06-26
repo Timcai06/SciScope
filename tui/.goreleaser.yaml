@@ -1,7 +1,7 @@
 # GoReleaser config for the SciScope terminal client.
 # Release flow:  git tag v0.1.0 && git push origin v0.1.0
 # CI (.github/workflows/release.yml) runs goreleaser from this dir and publishes
-# multi-platform binaries + a Homebrew cask to the tap repo below.
+# multi-platform binaries, Windows zip archives, and a Homebrew cask to the tap repo below.
 #
 # Prereqs (one-time): create an empty GitHub repo  Timcai06/homebrew-sciscope
 # and give the release job a token with write access to it (HOMEBREW_TAP_GITHUB_TOKEN).
@@ -14,7 +14,7 @@ builds:
     binary: sciscope-tui
     env:
       - CGO_ENABLED=0
-    goos: [darwin, linux]
+    goos: [darwin, linux, windows]
     goarch: [amd64, arm64]
     ldflags:
       - -s -w -X main.version={{ .Version }}
@@ -22,6 +22,9 @@ builds:
 archives:
   - id: default
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
 
 checksum:
   name_template: "checksums.txt"

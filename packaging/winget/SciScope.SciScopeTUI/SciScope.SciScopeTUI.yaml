@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.singleton.1.10.0.schema.json
+PackageIdentifier: SciScope.SciScopeTUI
+PackageVersion: __VERSION__
+PackageLocale: en-US
+Publisher: SciScope
+PublisherUrl: https://github.com/Timcai06
+PublisherSupportUrl: https://github.com/Timcai06/SciScope/issues
+Author: SciScope contributors
+PackageName: SciScope TUI
+PackageUrl: https://github.com/Timcai06/SciScope
+License: Proprietary
+ShortDescription: Terminal client for the SciScope research agent.
+Description: SciScope TUI is a terminal client for a grounded research agent. It can run an offline demo or connect to a SciScope backend through SCISCOPE_BACKEND.
+Moniker: sciscope-tui
+Tags:
+  - ai
+  - agent
+  - research
+  - tui
+  - literature
+Commands:
+  - sciscope-tui
+ReleaseNotesUrl: https://github.com/Timcai06/SciScope/releases/tag/v__VERSION__
+Installers:
+  - Architecture: x64
+    InstallerType: zip
+    NestedInstallerType: portable
+    NestedInstallerFiles:
+      - RelativeFilePath: sciscope-tui.exe
+        PortableCommandAlias: sciscope-tui
+    InstallerUrl: https://github.com/Timcai06/SciScope/releases/download/v__VERSION__/sciscope-tui_windows_amd64.zip
+    InstallerSha256: __AMD64_SHA256__
+  - Architecture: arm64
+    InstallerType: zip
+    NestedInstallerType: portable
+    NestedInstallerFiles:
+      - RelativeFilePath: sciscope-tui.exe
+        PortableCommandAlias: sciscope-tui
+    InstallerUrl: https://github.com/Timcai06/SciScope/releases/download/v__VERSION__/sciscope-tui_windows_arm64.zip
+    InstallerSha256: __ARM64_SHA256__
+ManifestType: singleton
+ManifestVersion: 1.10.0
