@@ -78,6 +78,7 @@ make backend
 - `make test`：后端测试。
 - `make test-backend`：仅后端测试。
 - `make smoke`：基础 API 健康检查。
+- `make agent-smoke`：live agent 黑盒验收，检查真实库表规模、skills 工具链路与工具预算。
 - `make vllm-smoke`：检查本地 OpenAI-compatible 模型端点。
 - `make tui-build TUI_VERSION=0.1.0`：产出 Go 客户端二进制。
 

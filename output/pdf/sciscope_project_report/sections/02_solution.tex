@@ -126,17 +126,18 @@
 \begin{itemize}
 \item \textbf{显式规划(plan)}:复杂问题先生成可执行步骤计划(仅引用内置工具,且 recommend/compare 等依赖 paper\_id 的工具会被安排在 search 之后),再据计划逐步执行;计划对用户与评委\textbf{可见}。
 \item \textbf{工具自主编排}:大模型按需调用 9 个原生语料工具和 1 个 \texttt{delegate} 专员委派工具,可\textbf{多步链式}(如先 \texttt{search} 拿到真实 paper\_id 再 \texttt{recommend\_papers} / \texttt{get\_trends});只读工具\textbf{并行执行};相同参数调用\textbf{自动去重}防止空转。
+\item \textbf{专业技能工作流}:TUI 的 \texttt{/verify}、\texttt{/review}、\texttt{/trend}、\texttt{/recommend} 会展开为 \texttt{.sciscope/skills} 中的可审计工作流模板,分别约束论断核查、综述、趋势分析和论文推荐的工具使用顺序。
 \item \textbf{反思与自评(reflect)}:回答后由模型自评"是否充分、关键论断是否都有证据支撑",不足则改写检索\textbf{重试一次}。
 \item \textbf{上下文压缩}:长会话自动压缩历史工具结果,避免超出上下文窗口。
 \item \textbf{会话态与错误恢复}:TUI 传入 \texttt{session\_id},后端映射为 LangGraph \texttt{thread\_id} 并通过 checkpoint 保留会话态;\texttt{/retry} 在同一线程内携带 \texttt{retry=true} 触发恢复。
 \item \textbf{服务/客户端分离}:agent 核心运行于 \texttt{/api/agent/stream}(SSE 流式)。事件 \texttt{meta} 同时返回运行时、节点、用户可读阶段(\texttt{phase})、耗时、会话与 retry 标记;当前客户端为 Go TUI,通过同一 SSE 契约消费智能体核心。
 \item \textbf{可插拔生成层}:生成大模型经 OpenAI 兼容接口接入,一处配置即可在\textbf{本地 7B(离线/涉密)}与\textbf{DeepSeek 云端(更强质量)}之间切换,检索、接地与编排逻辑保持不变——模型成为可替换组件而非锁定项。
-\item \textbf{工具契约 + 执行前校验门}:每个工具是带契约的一等对象(自声明只读性、参数校验、结果上限);调用前做\textbf{确定性校验}——如 \texttt{recommend\_papers}/\texttt{get\_paper} 的 \texttt{paper\_id} 必须真实,\textbf{在访问数据库之前即拦截模型编造的 ID} 并提示其先检索,从机制上消除"凭空捏造主键"的失败模式。工具目录由各工具\textbf{自描述}拼装,与实际工具集永不漂移。
+\item \textbf{工具契约 + 执行前校验门}:每个工具是带契约的一等对象(自声明只读性、参数校验、结果上限);调用前做\textbf{确定性校验}——如 \texttt{recommend\_papers}/\texttt{get\_paper} 的 \texttt{paper\_id} 必须真实,\textbf{在访问数据库之前即拦截模型编造的 ID} 并提示其先检索,从机制上消除"凭空捏造主键"的失败模式。显式技能若首轮跳过必需工具,运行时会强制补上主工具调用;技能默认 2 次工具预算后强制综合,避免空跑和无限检索。工具目录由各工具\textbf{自描述}拼装,与实际工具集永不漂移。
 \item \textbf{自适应检索 + 可观测终止}:模型自行判断是否需要检索(概念/常识类问题直接作答而非空转检索),且检索讲求效率;每轮在 \texttt{meta} 中返回\textbf{终止原因(\texttt{stop\_reason})与 token 用量},使智能体的停止条件可解释、调用成本可计量。
 \end{itemize}
 
 \begin{plainbox}
-\textbf{当前产品化路线}:Agent 由单一 LangGraph StateGraph 编排,无运行时开关。\texttt{meta.phase} 将底层节点翻译为用户可理解的科研工作流阶段;TUI 在运行中显示阶段条,并用分组 \texttt{/timeline} 回看证据链。\texttt{session\_id} 映射为 \texttt{thread\_id},checkpoint 保存会话态,\texttt{/retry} 支持同线程错误恢复。\textbf{MCP 双向互通与专员子智能体已落地}(见后文"开放与可扩展"小节);下一阶段聚焦持久化 checkpoint 与 Human-in-the-Loop。9 个原生语料工具与 \texttt{delegate} 专员工具均通过同一 \texttt{Tool} 注册表维护。
+\textbf{当前产品化路线}:Agent 由单一 LangGraph StateGraph 编排,无运行时开关。\texttt{meta.phase} 将底层节点翻译为用户可理解的科研工作流阶段;TUI 在运行中显示阶段条,并用分组 \texttt{/timeline} 回看证据链。\texttt{session\_id} 映射为 \texttt{thread\_id},checkpoint 保存会话态,\texttt{/retry} 支持同线程错误恢复。\textbf{MCP 双向互通与专员子智能体已落地}(见后文"开放与可扩展"小节);下一阶段聚焦持久化 checkpoint 与 Human-in-the-Loop。9 个原生语料工具与 1 个 \texttt{delegate} 专员工具(共 10 个运行时工具)均通过同一 \texttt{Tool} 注册表维护。
 \end{plainbox}
 
 \begin{tableblock}
@@ -186,7 +187,7 @@
 
 \subsection{方案功能}
 \begin{itemize}
-\item \textbf{科研智能体 \texttt{/api/agent/stream}}:大模型\textbf{自主规划并编排}上述能力(9 个原生语料工具 + 1 个 \texttt{delegate} 工具),多步推理、自我纠错、据证作答;终端助手 \texttt{make tui} 提供 Claude Code 风格的流式交互。
+\item \textbf{科研智能体 \texttt{/api/agent/stream}}:大模型\textbf{自主规划并编排}上述能力(9 个原生语料工具 + 1 个 \texttt{delegate} 工具),多步推理、自我纠错、据证作答;终端助手 \texttt{make tui} 提供 Claude Code 风格的流式交互,并通过 \texttt{/verify}/\texttt{/trend}/\texttt{/recommend} 等技能命令把常见科研任务展开为可审计工具链。
 \item \textbf{文献问答 \texttt{/api/chat}}:\textbf{GraphRAG}(查询抽取关键词实体 → 沿共现图扩展邻居 → query expansion)+ 混合检索证据 → 本地大模型据证生成带引用回答 → \textbf{答案可被证据支撑性校验}(低置信明确提示)。
 \item \textbf{混合检索 \texttt{/api/search}}:FTS + 向量 + RRF 融合,去重到论文级,返回命中片段。
 \item \textbf{趋势预测 \texttt{/api/trends}}:关键词/主题的增长率、burst、生命周期与下一年线性外推(含不确定区间)。

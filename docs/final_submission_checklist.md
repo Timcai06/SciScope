@@ -38,8 +38,10 @@ the work focused on presentation, consistency, and judging clarity.
 - Cross-lingual relevance@5: 1.0.
 - Trend backtest Pearson: 0.9756.
 - Recommendation mean semantic similarity: 0.8918.
-- Backend automated tests: current acceptance baseline is 133 items; final value
-  should be taken from the last `make test-backend` run.
+- Backend automated tests: `make test-backend` currently reports 141 passed.
+- Live agent smoke: `make agent-smoke` currently passes for corpus size,
+  capability boundary, claim-check, trend-analysis, and paper-recommendation
+  skill workflows.
 
 ## Package Contents Beyond The Two Reports
 
@@ -54,6 +56,8 @@ truth unless refreshed.
   `docs/competition/赛题.docx`, `docs/competition/数据集.docx`.
 - [ ] Python code and runtime schema:
   `src/`, `backend/`, `data_pipeline/`, `infra/`, `configs/`, `Makefile`.
+- [ ] Agent skill workflows and live smoke:
+  `.sciscope/skills/`, `scripts/agent_smoke.py`.
 - [ ] Terminal client:
   `tui/`.
 - [ ] Model and index assets that are small enough to ship:

@@ -44,6 +44,7 @@ make vllm-serve\hfill\# 启动本地模型\\
 \subsection{质量与效果验证}
 \begin{codepanel}\ttfamily\small
 make test\hfill\# 后端自动化测试(以当前环境输出为准)\\
+make agent-smoke\hfill\# live agent 黑盒验收:库表规模、skills、工具预算\\
 make eval-retrieval\hfill\# 自检索评估:recall@k / MRR / 延迟
 \end{codepanel}
 
@@ -59,6 +60,7 @@ make data-layer-refresh \&\& make rag-chunks \&\& make postgres-refresh \&\& mak
 \item \textbf{模型文件}:pgvector 向量索引、\texttt{models/}(嵌入器/趋势/推荐)、\texttt{output/graphs/}(图谱 JSON)、RAG 片段语料;均可由 \texttt{make agent-build} 复现。
 \item \textbf{报告}:本《项目报告书》与同级《数据分析报告》(\texttt{output/pdf/sciscope\_data\_report})。
 \item \textbf{演示样例}:\texttt{docs/examples/golden\_verify\_claim\_session.md} 给出一轮跨语言论断核查黄金会话,评委即使不启动环境也可查看工作流阶段、证据时间线与最终结论格式。
+\item \textbf{黑盒验收}:\texttt{make agent-smoke} 调用 live \texttt{/api/agent},检查数据库级语料规模、能力边界、论断核查、趋势分析与论文推荐工具链路。
 \item \textbf{基础大模型}:声明为可替换依赖(任意 OpenAI 兼容端点),不绑定特定模型。
 \end{itemize}
 
