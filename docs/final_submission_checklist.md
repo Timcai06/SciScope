@@ -38,8 +38,8 @@ the work focused on presentation, consistency, and judging clarity.
 - Cross-lingual relevance@5: 1.0.
 - Trend backtest Pearson: 0.9756.
 - Recommendation mean semantic similarity: 0.8918.
-- Backend automated tests: current acceptance baseline is 117 items; final value
-  should be taken from the last `make test` run.
+- Backend automated tests: current acceptance baseline is 133 items; final value
+  should be taken from the last `make test-backend` run.
 
 ## Package Contents Beyond The Two Reports
 
@@ -49,7 +49,7 @@ truth unless refreshed.
 
 - [ ] Judge index and run instructions:
   `交付说明.md`, `README.md`, `docs/runbook.md`,
-  `docs/final_submission_checklist.md`.
+  `docs/final_submission_checklist.md`, `docs/submission_manifest.md`.
 - [ ] Competition source files:
   `docs/competition/赛题.docx`, `docs/competition/数据集.docx`.
 - [ ] Python code and runtime schema:
@@ -69,6 +69,8 @@ truth unless refreshed.
 - [ ] Large replaceable dependencies decision:
   explicitly include or document rebuild/download steps for
   `models/embedder_local/`, `models/llm_local/`, and PostgreSQL runtime tables.
+- [ ] Build the whitelist package with `make submission-package`; inspect
+  `output/submission/SciScope_submission_manifest.csv` before upload.
 - [ ] Exclude from the formal submission package unless deliberately refreshed:
   `plan/archive/`, `docs/superpowers/`, `docs/2026-06-16-sciscope-product-architecture.md`,
   and `output/pdf/sciscope_design/`.

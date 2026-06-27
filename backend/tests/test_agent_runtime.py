@@ -4,13 +4,25 @@ from __future__ import annotations
 
 from backend.app.agent import langgraph_runtime, runtime
 from backend.app.agent.events import event_parts
-from backend.app.agent.llm import SYSTEM_PROMPT
+from backend.app.agent.llm import SYSTEM_PROMPT, build_system_prompt
 from backend.app.agent.reflection import reflect_reason
+from backend.app.agent.skills import list_skill_summaries, skills_prompt
+from backend.app.agent.tools import _REGISTRY
 
 
 def test_reflect_does_not_force_tools_for_common_sense_question():
     # No literature intent + tool-free answer -> let it stand, no retry.
     assert reflect_reason("机器学习是让计算机从数据中学习的方法。", 0, "什么是机器学习?") is None
+
+
+def test_reflect_does_not_force_tools_for_capability_boundary_question():
+    answer = "除了科研文献分析,我还能帮助你解释概念、整理写作结构、规划复现步骤,但不能替代通用联网搜索。"
+    assert reflect_reason(answer, 0, "除了科研文献,你还会什么?") is None
+
+
+def test_reflect_still_forces_tools_for_exceptive_literature_question():
+    reason = reflect_reason("还有知识图谱和重排序等方法。", 0, "除了RAG,最近文献里还有哪些检索增强方法?")
+    assert reason is not None and "search_literature" in reason
 
 
 def test_reflect_pushes_tools_for_literature_question_without_tools():
@@ -27,6 +39,36 @@ def test_system_prompt_requires_synthesis_not_paper_by_paper():
     assert "不要默认按单篇论文逐篇复述" in SYSTEM_PROMPT
     assert "论文只能作为证据例子" in SYSTEM_PROMPT
     assert "不要把动量、burst、Mann-Kendall、Sen's 斜率等内部指标名直接列成用户答案" in SYSTEM_PROMPT
+
+
+def test_system_prompt_is_sectioned_and_catalog_backed_by_registry():
+    prompt = build_system_prompt()
+    for section in (
+        "# identity",
+        "# capability_boundary",
+        "# tool_policy",
+        "# evidence_policy",
+        "# answer_style",
+        "# tone",
+        "# skill_catalog",
+        "# tool_catalog",
+    ):
+        assert section in prompt
+    assert "search_literature" in prompt
+    assert "verify_claim" in prompt
+    assert "/claim-check" in prompt
+    assert "/literature-review" in prompt
+    assert "除了科研文献还能做什么" in prompt
+
+
+def test_skill_catalog_is_backed_by_real_tools():
+    summaries = list_skill_summaries()
+    assert {skill.name for skill in summaries} >= {"claim-check", "literature-review", "trend-analysis"}
+    assert "/claim-check" in skills_prompt()
+
+    for skill in summaries:
+        for tool in skill.tools:
+            assert tool in _REGISTRY, f"{skill.name} declares missing tool {tool}"
 
 
 def test_langgraph_runtime_streams_plan_tool_and_grounded_answer(monkeypatch):
@@ -80,6 +122,80 @@ def test_langgraph_runtime_streams_plan_tool_and_grounded_answer(monkeypatch):
     assert parts[-1][2]["tokens_in"] >= 0 and parts[-1][2]["tokens_out"] >= 0
     assert result["stop_reason"] == "completed"
     assert "tokens_out" in result
+
+
+def test_langgraph_runtime_uses_fresh_system_prompt_builder(monkeypatch):
+    monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
+    monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: False)
+    monkeypatch.setattr(langgraph_runtime, "build_system_prompt", lambda: "fresh prompt from builder")
+
+    def fake_stream_chat(messages, model, tools):
+        if False:
+            yield ("text", "")
+        assert messages[0] == {"role": "system", "content": "fresh prompt from builder"}
+        return "ok", []
+
+    monkeypatch.setattr(langgraph_runtime, "stream_chat", fake_stream_chat)
+
+    parts = [event_parts(event) for event in runtime.stream_agent("你好")]
+    assert parts[-1][0:2] == ("final", "ok")
+
+
+def test_skill_prompt_caps_tool_loop_and_forces_synthesis(monkeypatch):
+    monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
+    monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: False)
+    monkeypatch.setattr(langgraph_runtime, "run_tools", lambda tool_calls, executed: ["trend evidence"] * len(tool_calls))
+
+    def fake_stream_chat(messages, model, tools):
+        if False:
+            yield ("text", "")
+        if tools is None:
+            return "final from capped skill evidence", []
+        return (
+            "",
+            [
+                {
+                    "id": "call-trend",
+                    "type": "function",
+                    "function": {"name": "get_trends", "arguments": '{"keyword": "rag"}'},
+                }
+            ],
+        )
+
+    monkeypatch.setattr(langgraph_runtime, "stream_chat", fake_stream_chat)
+
+    question = "你正在执行 SciScope 技能: 趋势分析。\n研究主题:\nrag"
+    result = runtime.run_agent(question, session_id="skill-budget")
+
+    assert result["steps"] == 2
+    assert result["tools_used"] == [
+        {"name": "get_trends", "args": {"keyword": "rag"}},
+        {"name": "get_trends", "args": {"keyword": "rag"}},
+    ]
+    assert result["stop_reason"] == "tool_budget"
+    assert result["answer"] == "final from capped skill evidence"
+
+
+def test_skill_prompt_forces_required_first_tool_when_model_skips(monkeypatch):
+    monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
+    monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: False)
+    monkeypatch.setattr(langgraph_runtime, "run_tools", lambda tool_calls, executed: ["claim evidence"])
+
+    def fake_stream_chat(messages, model, tools):
+        if False:
+            yield ("text", "")
+        if tools is None or any(message.get("role") == "tool" for message in messages):
+            return "final after forced claim evidence", []
+        return "model tried to answer without tools", []
+
+    monkeypatch.setattr(langgraph_runtime, "stream_chat", fake_stream_chat)
+
+    question = "你正在执行 SciScope 技能: 论断核查。\n\n输入论断:\nRAG 能降低大模型幻觉\n\n工作要求:\n- 第一动作必须调用 verify_claim"
+    result = runtime.run_agent(question, session_id="skill-forced-tool")
+
+    assert result["steps"] == 1
+    assert result["tools_used"] == [{"name": "verify_claim", "args": {"claim": "RAG 能降低大模型幻觉"}}]
+    assert result["answer"] == "final after forced claim evidence"
 
 
 def test_langgraph_runtime_marks_retry_requests(monkeypatch):

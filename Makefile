@@ -100,7 +100,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf report backend mcp dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend smoke clean
+.PHONY: help install install-backend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf submission-package report backend mcp dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend smoke agent-smoke clean
 
 help:
 	@echo "SciScope local commands"
@@ -137,6 +137,7 @@ help:
 	@echo "  make project-report-figures Build product/system figures for the project report"
 	@echo "  make data-report-pdf  Build the SciScope data analysis report PDF"
 	@echo "  make project-report-pdf Build the project/system report PDF"
+	@echo "  make submission-package Build the whitelist final submission zip"
 	@echo "  make report           Rebuild analysis tables, report figures, and data PDF"
 	@echo "  make backend          Start FastAPI backend on $(BACKEND_HOST):$(BACKEND_PORT)"
 	@echo "  make dev              Start backend only (default development path)"
@@ -150,6 +151,7 @@ help:
 	@echo "  make vllm-smoke       Check local vLLM OpenAI-compatible endpoint"
 	@echo "  make test             Run backend tests"
 	@echo "  make smoke            Check backend health endpoints with curl"
+	@echo "  make agent-smoke      Check live agent skills, tools, and corpus size"
 	@echo "  make clean            Remove generated local cache/build artifacts"
 	@echo ""
 	@echo "Backend docs:  http://$(BACKEND_HOST):$(BACKEND_PORT)/docs"
@@ -385,6 +387,9 @@ project-report-pdf: project-report-figures
 		output/pdf/sciscope_project_report/main.toc \
 		output/pdf/sciscope_project_report/main.xdv
 
+submission-package: data-report-pdf project-report-pdf
+	$(PYTHON) scripts/build_submission_package.py $(if $(INCLUDE_LARGE_MODELS),--include-large-models,)
+
 report: analysis-assets processed-corpus report-figures data-report-pdf
 
 backend:
@@ -443,6 +448,9 @@ smoke:
 		-H "Content-Type: application/json" \
 		-d '{"question":"What does RAG improve?"}' >/dev/null
 	@echo "chat ok"
+
+agent-smoke:
+	$(PYTHON) scripts/agent_smoke.py --base-url http://$(BACKEND_HOST):$(BACKEND_PORT)
 
 clean:
 	rm -rf .cache .pytest_cache tmp tui/dist tui/sciscope-tui

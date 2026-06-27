@@ -616,7 +616,7 @@ func TestSplashScreenShowsProductCurtain(t *testing.T) {
 	}
 	for _, removed := range []string{
 		"Quick actions",
-		"Golden demo",
+		"黄金演示",
 		"System status",
 		"Recent work",
 		"/demo",
@@ -687,16 +687,15 @@ func TestSlashCommandPaletteUsesFullWidth(t *testing.T) {
 	palette := m.renderCommandPalette(100)
 
 	for _, want := range []string{
-		"Commands",
-		"Suggested",
-		"Session",
-		"Evidence",
-		"System",
+		"命令启动器",
+		"↑/↓ 选择",
+		"Enter 执行",
+		"Esc 关闭",
+		"▶",
 		"/demo",
 		"/timeline",
 		"/sessions",
-		"Golden demo",
-		"Enter run",
+		"黄金演示",
 	} {
 		if !strings.Contains(palette, want) {
 			t.Fatalf("palette missing %q:\n%s", want, palette)
@@ -715,15 +714,255 @@ func TestSlashCommandPaletteFiltersByCategoryAndDescription(t *testing.T) {
 	palette := m.renderCommandPalette(100)
 
 	for _, want := range []string{
-		"Recent sessions",
-		"Resume session",
+		"最近会话",
+		"/sessions",
 	} {
 		if !strings.Contains(palette, want) {
 			t.Fatalf("filtered palette missing %q:\n%s", want, palette)
 		}
 	}
-	if strings.Contains(palette, "Golden demo") {
+	if strings.Contains(palette, "黄金演示") {
 		t.Fatalf("filtered palette should not include demo:\n%s", palette)
+	}
+}
+
+func TestSlashCommandRegistryClassifiesCommandsByExecutionKind(t *testing.T) {
+	for _, cmd := range slashCmds {
+		registered, ok := slashRegistry[cmd.cmd]
+		if !ok {
+			t.Fatalf("command %s missing from registry", cmd.cmd)
+		}
+		if registered.kind == "" || registered.run == nil {
+			t.Fatalf("command %s has incomplete registry metadata: %#v", cmd.cmd, registered)
+		}
+	}
+	if slashRegistry["/theme"].kind != commandUI || slashRegistry["/theme"].submenu != "theme" {
+		t.Fatalf("/theme should be a UI command with theme submenu: %#v", slashRegistry["/theme"])
+	}
+	if slashRegistry["/verify"].kind != commandPrompt || slashRegistry["/review"].kind != commandPrompt || slashRegistry["/trend"].kind != commandPrompt || slashRegistry["/recommend"].kind != commandPrompt {
+		t.Fatalf("/verify, /review, /trend, and /recommend should be prompt commands")
+	}
+	if slashRegistry["/export"].kind != commandLocal {
+		t.Fatalf("/export should be local command")
+	}
+}
+
+func TestPromptSlashCommandExpandsIntoAgentQuestion(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+
+	next, cmd := m.runSlash("/verify RAG 能降低幻觉")
+	got := next.(model)
+
+	if cmd == nil {
+		t.Fatalf("expected /verify to start an agent stream")
+	}
+	if !got.answering {
+		t.Fatalf("expected prompt command to enter answering state")
+	}
+	if got.lastQuestion == "RAG 能降低幻觉" || !strings.Contains(got.lastQuestion, "SciScope 技能: 论断核查") {
+		t.Fatalf("expected /verify to expand the task, got %q", got.lastQuestion)
+	}
+	if len(got.history) == 0 || !strings.Contains(got.history[len(got.history)-1].Content, "RAG 能降低幻觉") {
+		t.Fatalf("expected expanded question in history, got %#v", got.history)
+	}
+}
+
+func TestSkillTemplateLoadsFromSciscopeDirectory(t *testing.T) {
+	template, err := loadSkillTemplate("claim-check")
+	if err != nil {
+		t.Fatalf("expected claim-check skill template to load: %v", err)
+	}
+	if !strings.Contains(template, "{{input}}") {
+		t.Fatalf("expected raw template placeholder, got %q", template)
+	}
+
+	rendered := renderSkillPrompt("claim-check", "RAG 能降低幻觉", "fallback")
+	if !strings.Contains(rendered, "RAG 能降低幻觉") || strings.Contains(rendered, "{{input}}") {
+		t.Fatalf("expected rendered skill prompt to inject input, got %q", rendered)
+	}
+}
+
+func TestTrendSlashCommandUsesSkillTemplate(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+
+	next, cmd := m.runSlash("/trend graph rag")
+	got := next.(model)
+
+	if cmd == nil {
+		t.Fatalf("expected /trend to start an agent stream")
+	}
+	if !got.answering {
+		t.Fatalf("expected /trend to enter answering state")
+	}
+	if !strings.Contains(got.lastQuestion, "SciScope 技能: 趋势分析") || !strings.Contains(got.lastQuestion, "graph rag") {
+		t.Fatalf("expected /trend to render trend skill, got %q", got.lastQuestion)
+	}
+}
+
+func TestRecommendSlashCommandUsesSkillTemplate(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+
+	next, cmd := m.runSlash("/recommend graph rag")
+	got := next.(model)
+
+	if cmd == nil {
+		t.Fatalf("expected /recommend to start an agent stream")
+	}
+	if !got.answering {
+		t.Fatalf("expected /recommend to enter answering state")
+	}
+	if !strings.Contains(got.lastQuestion, "SciScope 技能: 论文推荐") || !strings.Contains(got.lastQuestion, "graph rag") {
+		t.Fatalf("expected /recommend to render recommendation skill, got %q", got.lastQuestion)
+	}
+}
+
+func TestSlashCommandOpensToolsDoctorAndConfirmSubmenus(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+
+	next, _ := m.runSlash("/tools")
+	got := next.(model)
+	if got.submenu != "tools" {
+		t.Fatalf("expected tools submenu, got %q", got.submenu)
+	}
+	if !strings.Contains(got.View(), "选择工具") {
+		t.Fatalf("expected tools submenu in view:\n%s", got.View())
+	}
+
+	next, _ = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = next.(model)
+	if !strings.Contains(got.vp.View(), "工具名:") {
+		t.Fatalf("expected selected tool detail:\n%s", got.vp.View())
+	}
+
+	next, _ = got.runSlash("/doctor")
+	got = next.(model)
+	if got.submenu != "doctor" {
+		t.Fatalf("expected doctor submenu, got %q", got.submenu)
+	}
+	if !strings.Contains(got.View(), "查看检查项") {
+		t.Fatalf("expected doctor submenu in view:\n%s", got.View())
+	}
+
+	got.blocks = []string{"keep"}
+	next, _ = got.runSlash("/clear")
+	got = next.(model)
+	if got.submenu != "clear" {
+		t.Fatalf("expected clear submenu, got %q", got.submenu)
+	}
+	next, _ = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = next.(model)
+	if len(got.blocks) == 0 || !strings.Contains(got.blocks[len(got.blocks)-1], "已取消清空") {
+		t.Fatalf("clear cancel should preserve blocks and append notice: %#v", got.blocks)
+	}
+}
+
+func TestSlashCommandOpensResumeSubmenuAndExecutesSelection(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("SCISCOPE_SESSION_DIR", dir)
+	path, err := writeSessionMarkdown(dir, []transcriptEvent{{Kind: "user", Content: "核查 RAG 是否降低幻觉"}}, time.Now())
+	if err != nil {
+		t.Fatalf("write session: %v", err)
+	}
+	_ = path
+
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+	m.ti.SetValue("/")
+	for i, cmd := range filterCmds("/") {
+		if cmd.cmd == "/resume" {
+			m.menuIdx = i
+			break
+		}
+	}
+
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := next.(model)
+	if got.submenu != "resume" {
+		t.Fatalf("expected resume submenu, got %q", got.submenu)
+	}
+	if !strings.Contains(got.View(), "恢复会话") {
+		t.Fatalf("expected resume submenu in view:\n%s", got.View())
+	}
+	next, _ = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = next.(model)
+	if got.submenu != "" {
+		t.Fatalf("submenu should close after resume")
+	}
+	if !strings.Contains(got.vp.View(), "已恢复会话") {
+		t.Fatalf("expected restored session output:\n%s", got.vp.View())
+	}
+}
+
+func TestSlashCommandOpensThemeSubmenuAndExecutesSelection(t *testing.T) {
+	applyTheme("dark")
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+	m.ti.SetValue("/")
+	for i, cmd := range filterCmds("/") {
+		if cmd.cmd == "/theme" {
+			m.menuIdx = i
+			break
+		}
+	}
+
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got := next.(model)
+	if got.submenu != "theme" {
+		t.Fatalf("expected theme submenu, got %q", got.submenu)
+	}
+	if !strings.Contains(got.View(), "选择主题") {
+		t.Fatalf("expected submenu palette in view:\n%s", got.View())
+	}
+	got.submenuIdx = 1 // paper
+	next, _ = got.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	got = next.(model)
+	if currentTheme != "paper" {
+		t.Fatalf("expected paper theme after submenu enter, got %q", currentTheme)
+	}
+	if got.submenu != "" {
+		t.Fatalf("submenu should close after execution")
+	}
+}
+
+func TestThemeCommandListsAndSwitchesThemes(t *testing.T) {
+	applyTheme("dark")
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+
+	next, _ := m.runSlash("/theme")
+	got := next.(model)
+	if !strings.Contains(got.vp.View(), "paper") {
+		t.Fatalf("/theme should list available themes:\n%s", got.vp.View())
+	}
+
+	next, _ = got.runSlash("/theme paper")
+	got = next.(model)
+	if currentTheme != "paper" {
+		t.Fatalf("expected current theme paper, got %q", currentTheme)
+	}
+	if !strings.Contains(got.vp.View(), "已切换主题: paper") {
+		t.Fatalf("/theme paper should confirm switch:\n%s", got.vp.View())
+	}
+}
+
+func TestApplyThemeRejectsUnknownTheme(t *testing.T) {
+	applyTheme("dark")
+	if applyTheme("not-a-theme") {
+		t.Fatalf("unknown theme should be rejected")
+	}
+	if currentTheme != "dark" {
+		t.Fatalf("rejected theme should not change current theme, got %q", currentTheme)
 	}
 }
 
@@ -875,6 +1114,17 @@ func TestRenderAnswerUsesChatMessageStyle(t *testing.T) {
 	}
 	if strings.Contains(plain, "╭─ answer") {
 		t.Fatalf("answer should not render as isolated card:\n%s", rendered)
+	}
+}
+
+func TestStyleAnswerBodyHighlightsSemanticLines(t *testing.T) {
+	applyTheme("paper")
+	body := styleAnswerBody("结论: RAG 有帮助\n证据: [1] 2025 年论文\n风险: 但取决于检索质量\n推荐相似度 0.8918")
+	plain := plainANSI(body)
+	for _, want := range []string{"结论", "证据", "[1]", "风险", "0.8918"} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("styled answer missing %q:\n%s", want, body)
+		}
 	}
 }
 

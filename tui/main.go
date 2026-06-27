@@ -41,29 +41,108 @@ type cliOptions struct {
 	Help       bool
 }
 
-// ---- palette (cyan research console, à la Claude Code structure) ----
+// ---- themes (research-console palettes, à la Claude Code structure) ----
+type tuiTheme struct {
+	Name     string
+	Title    string
+	Desc     string
+	Accent   lipgloss.Color
+	Tool     lipgloss.Color
+	Warn     lipgloss.Color
+	User     lipgloss.Color
+	Error    lipgloss.Color
+	Muted    lipgloss.Color
+	Faint    lipgloss.Color
+	Ink      lipgloss.Color
+	Selected lipgloss.Color
+}
+
 var (
-	cAccent  = lipgloss.Color("#5fd7d7")
-	cTool    = lipgloss.Color("#87afff")
-	cWarn    = lipgloss.Color("#d7af5f")
-	cUser    = lipgloss.Color("#87d787")
-	cError   = lipgloss.Color("#ff8787")
-	cMuted   = lipgloss.Color("#808080")
-	cFaint   = lipgloss.Color("#5f5f5f")
-	cInk     = lipgloss.Color("#d7d7d7")
+	themes = map[string]tuiTheme{
+		"dark": {
+			Name: "dark", Title: "深色研究台", Desc: "默认青色证据流,适合深色终端和演示录屏",
+			Accent: "#5fd7d7", Tool: "#87afff", Warn: "#d7af5f", User: "#87d787", Error: "#ff8787",
+			Muted: "#808080", Faint: "#5f5f5f", Ink: "#d7d7d7", Selected: "#1c1c1c",
+		},
+		"paper": {
+			Name: "paper", Title: "报告纸面", Desc: "贴近 PDF 报告的青绿品牌色,适合答辩截图",
+			Accent: "#16847D", Tool: "#4E6F40", Warn: "#B8872B", User: "#0B4F4A", Error: "#B55A5A",
+			Muted: "#667276", Faint: "#9AA8A6", Ink: "#1C2326", Selected: "#F7FBFA",
+		},
+		"light": {
+			Name: "light", Title: "浅色终端", Desc: "提高浅色背景可读性,减少低对比灰字",
+			Accent: "#006D77", Tool: "#255C99", Warn: "#8A5A00", User: "#2F6F3E", Error: "#A23B3B",
+			Muted: "#5D666A", Faint: "#8A9498", Ink: "#1B1F22", Selected: "#F4F7F7",
+		},
+		"contrast": {
+			Name: "contrast", Title: "高对比", Desc: "更亮的强调色和警告色,适合投影或低质量屏幕",
+			Accent: "#00FFFF", Tool: "#5FA8FF", Warn: "#FFD166", User: "#7CFF6B", Error: "#FF5C8A",
+			Muted: "#B8B8B8", Faint: "#777777", Ink: "#FFFFFF", Selected: "#000000",
+		},
+	}
+	themeOrder   = []string{"dark", "paper", "light", "contrast"}
+	currentTheme = "dark"
+
+	cAccent lipgloss.Color
+	cTool   lipgloss.Color
+	cWarn   lipgloss.Color
+	cUser   lipgloss.Color
+	cError  lipgloss.Color
+	cMuted  lipgloss.Color
+	cFaint  lipgloss.Color
+	cInk    lipgloss.Color
+
+	stAccent lipgloss.Style
+	stBullet lipgloss.Style
+	stConn   lipgloss.Style
+	stTool   lipgloss.Style
+	stWarn   lipgloss.Style
+	stError  lipgloss.Style
+	stUser   lipgloss.Style
+	stMuted  lipgloss.Style
+	stFaint  lipgloss.Style
+	stInk    lipgloss.Style
+	stSelCmd lipgloss.Style
+	stCmd    lipgloss.Style
+)
+
+func init() {
+	if name := strings.TrimSpace(os.Getenv("SCISCOPE_TUI_THEME")); name != "" {
+		applyTheme(name)
+		return
+	}
+	applyTheme(currentTheme)
+}
+
+func applyTheme(name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	theme, ok := themes[name]
+	if !ok {
+		return false
+	}
+	currentTheme = name
+	cAccent = theme.Accent
+	cTool = theme.Tool
+	cWarn = theme.Warn
+	cUser = theme.User
+	cError = theme.Error
+	cMuted = theme.Muted
+	cFaint = theme.Faint
+	cInk = theme.Ink
 	stAccent = lipgloss.NewStyle().Foreground(cAccent).Bold(true)
 	stBullet = lipgloss.NewStyle().Foreground(cAccent).Bold(true) // ⏺
-	stConn   = lipgloss.NewStyle().Foreground(cFaint)             // ⎿
-	stTool   = lipgloss.NewStyle().Foreground(cTool)
-	stWarn   = lipgloss.NewStyle().Foreground(cWarn)
-	stError  = lipgloss.NewStyle().Foreground(cError)
-	stUser   = lipgloss.NewStyle().Foreground(cUser).Bold(true)
-	stMuted  = lipgloss.NewStyle().Foreground(cMuted)
-	stFaint  = lipgloss.NewStyle().Foreground(cFaint)
-	stInk    = lipgloss.NewStyle().Foreground(cInk)
-	stSelCmd = lipgloss.NewStyle().Background(cAccent).Foreground(lipgloss.Color("#1c1c1c")).Bold(true)
-	stCmd    = lipgloss.NewStyle().Foreground(cMuted)
-)
+	stConn = lipgloss.NewStyle().Foreground(cFaint)               // ⎿
+	stTool = lipgloss.NewStyle().Foreground(cTool)
+	stWarn = lipgloss.NewStyle().Foreground(cWarn)
+	stError = lipgloss.NewStyle().Foreground(cError)
+	stUser = lipgloss.NewStyle().Foreground(cUser).Bold(true)
+	stMuted = lipgloss.NewStyle().Foreground(cMuted)
+	stFaint = lipgloss.NewStyle().Foreground(cFaint)
+	stInk = lipgloss.NewStyle().Foreground(cInk)
+	stSelCmd = lipgloss.NewStyle().Background(cAccent).Foreground(theme.Selected).Bold(true)
+	stCmd = lipgloss.NewStyle().Foreground(cMuted)
+	return true
+}
 
 // rotating "spinner verbs" (Claude Code signature) — localized, research-flavored.
 var verbs = []string{
@@ -108,27 +187,74 @@ func toolPlainLabel(name string) string {
 	return name
 }
 
+type slashCommandKind string
+
+const (
+	commandLocal  slashCommandKind = "local"
+	commandPrompt slashCommandKind = "prompt"
+	commandUI     slashCommandKind = "ui"
+)
+
+type slashExecutor func(model, []string) (model, tea.Cmd)
+
 type slashCmd struct {
 	cmd       string
 	title     string
 	desc      string
 	category  string
 	key       string
+	kind      slashCommandKind
+	submenu   string
 	suggested bool
+	run       slashExecutor
 }
 
 var slashCmds = []slashCmd{
-	{cmd: "/demo", title: "黄金演示", desc: "播放可验证证据流", category: "常用", key: "demo", suggested: true},
-	{cmd: "/doctor", title: "状态体检", desc: "检查后端、LLM、会话与图谱", category: "常用", key: "doctor", suggested: true},
-	{cmd: "/retry", title: "重试上一问", desc: "同一 LangGraph 会话线程恢复上一问", category: "常用", key: "retry", suggested: true},
-	{cmd: "/export", title: "导出报告", desc: "导出 Markdown 会话与证据", category: "常用", key: "export", suggested: true},
-	{cmd: "/sessions", title: "最近会话", desc: "列出最近研究会话", category: "会话", key: "sessions"},
-	{cmd: "/resume", title: "恢复会话", desc: "恢复会话: /resume 1", category: "会话", key: "resume N"},
-	{cmd: "/timeline", title: "执行时间线", desc: "查看本轮 LangGraph 与工具轨迹", category: "证据", key: "timeline"},
-	{cmd: "/tools", title: "智能体工具", desc: "列出 LLM 可自主调用的科研工具", category: "证据", key: "tools"},
-	{cmd: "/help", title: "帮助", desc: "显示命令与快捷键", category: "系统", key: "?"},
-	{cmd: "/clear", title: "清空视图", desc: "清空当前对话视图", category: "系统", key: "clear"},
-	{cmd: "/quit", title: "退出", desc: "退出 SciScope TUI", category: "系统", key: "ctrl+c"},
+	{cmd: "/demo", title: "黄金演示", desc: "播放可验证证据流", category: "常用", key: "demo", kind: commandLocal, suggested: true},
+	{cmd: "/verify", title: "论断核查", desc: "把论断展开为证据核查任务", category: "常用", key: "verify <claim>", kind: commandPrompt, suggested: true},
+	{cmd: "/review", title: "文献综述", desc: "把主题展开为综述/研究现状任务", category: "常用", key: "review <topic>", kind: commandPrompt, suggested: true},
+	{cmd: "/trend", title: "趋势分析", desc: "把主题展开为趋势预测任务", category: "常用", key: "trend <topic>", kind: commandPrompt, suggested: true},
+	{cmd: "/recommend", title: "论文推荐", desc: "把主题或种子论文展开为推荐任务", category: "常用", key: "recommend <topic|paper_id>", kind: commandPrompt, suggested: true},
+	{cmd: "/doctor", title: "状态体检", desc: "检查后端、LLM、会话与图谱", category: "常用", key: "doctor", kind: commandUI, submenu: "doctor", suggested: true},
+	{cmd: "/retry", title: "重试上一问", desc: "同一 LangGraph 会话线程恢复上一问", category: "常用", key: "retry", kind: commandLocal, suggested: true},
+	{cmd: "/export", title: "导出报告", desc: "导出 Markdown 会话与证据", category: "常用", key: "export", kind: commandLocal, suggested: true},
+	{cmd: "/sessions", title: "最近会话", desc: "列出最近研究会话", category: "会话", key: "sessions", kind: commandUI, submenu: "resume"},
+	{cmd: "/resume", title: "恢复会话", desc: "恢复会话: /resume 1", category: "会话", key: "resume N", kind: commandUI, submenu: "resume"},
+	{cmd: "/timeline", title: "执行时间线", desc: "查看本轮 LangGraph 与工具轨迹", category: "证据", key: "timeline", kind: commandLocal},
+	{cmd: "/tools", title: "智能体工具", desc: "列出 LLM 可自主调用的科研工具", category: "证据", key: "tools", kind: commandUI, submenu: "tools"},
+	{cmd: "/theme", title: "视觉主题", desc: "查看或切换 TUI 主题: /theme paper", category: "系统", key: "theme", kind: commandUI, submenu: "theme"},
+	{cmd: "/help", title: "帮助", desc: "显示命令与快捷键", category: "系统", key: "?", kind: commandLocal},
+	{cmd: "/clear", title: "清空视图", desc: "清空当前对话视图", category: "系统", key: "clear", kind: commandUI, submenu: "clear"},
+	{cmd: "/quit", title: "退出", desc: "退出 SciScope TUI", category: "系统", key: "ctrl+c", kind: commandUI, submenu: "quit"},
+}
+
+var slashExecutors = map[string]slashExecutor{
+	"/clear":     runClearCommand,
+	"/demo":      runDemoCommand,
+	"/doctor":    runDoctorCommand,
+	"/export":    runExportCommand,
+	"/help":      runHelpCommand,
+	"/quit":      runQuitCommand,
+	"/recommend": runRecommendCommand,
+	"/resume":    runResumeCommand,
+	"/review":    runReviewCommand,
+	"/retry":     runRetryCommand,
+	"/sessions":  runSessionsCommand,
+	"/theme":     runThemeCommand,
+	"/timeline":  runTimelineCommand,
+	"/tools":     runToolsCommand,
+	"/trend":     runTrendCommand,
+	"/verify":    runVerifyCommand,
+}
+var slashRegistry = buildSlashRegistry(slashCmds)
+
+func buildSlashRegistry(commands []slashCmd) map[string]slashCmd {
+	registry := map[string]slashCmd{}
+	for _, command := range commands {
+		command.run = slashExecutors[command.cmd]
+		registry[command.cmd] = command
+	}
+	return registry
 }
 
 func filterCmds(prefix string) []slashCmd {
@@ -606,6 +732,8 @@ type model struct {
 	sub            chan tea.Msg
 	cancel         context.CancelFunc
 	menuIdx        int
+	submenu        string
+	submenuIdx     int
 	ready          bool
 	demo           bool
 }
@@ -623,7 +751,9 @@ func initialModel() model {
 		FPS:    time.Second / 8,
 	}
 	sp.Style = stAccent
-	return model{ti: ti, spin: sp, sub: make(chan tea.Msg, 64), demo: demoMode(), sessionID: newSessionID()}
+	m := model{ti: ti, spin: sp, sub: make(chan tea.Msg, 64), demo: demoMode(), sessionID: newSessionID()}
+	m.syncThemeStyles()
+	return m
 }
 
 func newSessionID() string {
@@ -643,6 +773,11 @@ func (m model) Init() tea.Cmd {
 func (m *model) appendBlock(s string) {
 	m.blocks = append(m.blocks, s)
 	m.refresh()
+}
+
+func (m *model) syncThemeStyles() {
+	m.ti.Prompt = stAccent.Render("❯ ")
+	m.spin.Style = stAccent
 }
 
 func (m *model) record(kind, tool, content string) {
@@ -1106,6 +1241,23 @@ func renderSplash(width int, sessions []sessionFile) string {
 		Render(strings.Join(body, "\n"))
 }
 
+func renderThemeBlock() string {
+	lines := []string{stFaint.Render("  可用主题:")}
+	for _, name := range themeOrder {
+		theme := themes[name]
+		mark := " "
+		style := stCmd
+		if name == currentTheme {
+			mark = "◆"
+			style = stAccent
+		}
+		lines = append(lines, style.Render(fmt.Sprintf("  %s %-8s %s · %s", mark, theme.Name, theme.Title, theme.Desc)))
+	}
+	lines = append(lines, "")
+	lines = append(lines, stFaint.Render("  用法: /theme paper  或启动前设置 SCISCOPE_TUI_THEME=paper"))
+	return strings.Join(lines, "\n")
+}
+
 func minInt(a, b int) int {
 	if a < b {
 		return a
@@ -1158,17 +1310,22 @@ func (m model) renderCommandPalette(width int) string {
 		inner = 38
 	}
 	idx := m.menuIdx % len(matches)
-	cmdW, titleW, keyW := 12, 14, 12
-	descW := inner - cmdW - titleW - keyW
+	cursorW, cmdW, titleW, keyW := 3, 12, 14, 12
+	descW := inner - cursorW - cmdW - titleW - keyW
 	if descW < 10 {
 		descW = 10
 	}
 	rows := []string{
-		stAccent.Render("命令") + stFaint.Render("  · 输入过滤 · ↑/↓ 选择 · Tab 补全 · Enter 执行"),
+		stAccent.Render("命令启动器") + stFaint.Render("  · ↑/↓ 选择 · Enter 执行 · Tab 补全 · Esc 关闭"),
 	}
 	for i, c := range matches {
+		marker := "  "
+		if i == idx {
+			marker = "▶ "
+		}
 		cols := lipgloss.JoinHorizontal(
 			lipgloss.Top,
+			lipgloss.NewStyle().Width(cursorW).Render(marker),
 			lipgloss.NewStyle().Width(cmdW).Render(c.cmd),
 			lipgloss.NewStyle().Width(titleW).Render(clipWidth(c.title, titleW-1)),
 			lipgloss.NewStyle().Width(descW).Render(clipWidth(c.desc, descW-1)),
@@ -1888,6 +2045,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "esc":
+			if m.submenu != "" && !m.answering {
+				m.submenu = ""
+				m.submenuIdx = 0
+				m.ti.SetValue("/")
+				return m, nil
+			}
+			if strings.HasPrefix(m.ti.Value(), "/") && !m.answering {
+				m.ti.SetValue("")
+				m.menuIdx = 0
+				return m, nil
+			}
 			if m.answering && m.cancel != nil {
 				m.cancel()
 			}
@@ -1897,6 +2065,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.vp, cmd = m.vp.Update(msg)
 			return m, cmd
 		case "up", "down", "tab":
+			if m.submenu != "" {
+				items := m.submenuItems()
+				if len(items) > 0 {
+					switch msg.String() {
+					case "up":
+						m.submenuIdx = (m.submenuIdx - 1 + len(items)) % len(items)
+					case "down":
+						m.submenuIdx = (m.submenuIdx + 1) % len(items)
+					case "tab":
+						m.ti.SetValue(items[m.submenuIdx%len(items)].command)
+					}
+					return m, nil
+				}
+			}
 			if strings.HasPrefix(m.ti.Value(), "/") {
 				ms := filterCmds(m.ti.Value())
 				if len(ms) > 0 {
@@ -1912,6 +2094,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "enter":
+			if m.submenu != "" {
+				items := m.submenuItems()
+				if len(items) > 0 {
+					v := items[m.submenuIdx%len(items)].command
+					m.submenu = ""
+					m.submenuIdx = 0
+					m.ti.SetValue("")
+					return m.runSlash(v)
+				}
+				return m, nil
+			}
 			v := strings.TrimSpace(m.ti.Value())
 			if v == "" || m.answering {
 				return m, nil
@@ -1919,6 +2112,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.HasPrefix(v, "/") {
 				if ms := filterCmds(m.ti.Value()); len(ms) > 0 && m.menuIdx < len(ms) && !strings.Contains(v, " ") {
 					v = ms[m.menuIdx].cmd
+				}
+				if submenu := commandSubmenu(v); submenu != "" {
+					m.openSubmenu(submenu)
+					m.menuIdx = 0
+					return m, nil
 				}
 				m.ti.SetValue("")
 				m.menuIdx = 0
@@ -2063,6 +2261,7 @@ func (m model) renderAnswer() string {
 			body = strings.Trim(out, "\n")
 		}
 	}
+	body = styleAnswerBody(body)
 	header := stBullet.Render("⏺ ") + stAccent.Render("研究结论")
 	out := header + "\n" + body
 	if len(m.used) > 0 {
@@ -2079,105 +2278,599 @@ func (m model) renderAnswer() string {
 	return out
 }
 
-func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
-	fields := strings.Fields(v)
-	cmdName := v
-	if len(fields) > 0 {
-		cmdName = fields[0]
+func styleAnswerBody(body string) string {
+	lines := strings.Split(body, "\n")
+	for i, line := range lines {
+		lines[i] = styleAnswerLine(line)
 	}
-	switch cmdName {
-	case "/quit":
-		return m, tea.Quit
-	case "/clear":
-		m.blocks = nil
-		m.history = nil
-		m.transcript = nil
-		m.timeline = nil
-		m.lastExport = ""
-		m.lastQuestion = ""
-		m.refresh()
-	case "/help":
-		m.appendBlock(stFaint.Render("  命令: /help /tools /timeline /demo /sessions /resume N /export /retry /clear /quit · Esc 中断 · Ctrl+C 退出"))
-	case "/tools":
-		lines := []string{stFaint.Render("  可用工具(LLM 自主调用):")}
-		for _, name := range []string{"search_literature", "get_trends", "recommend_papers", "get_paper", "summarize_field", "compare_papers", "export_bibliography", "query_knowledge_graph", "verify_claim"} {
-			lines = append(lines, "    "+toolLabel(name))
+	return strings.Join(lines, "\n")
+}
+
+func styleAnswerLine(line string) string {
+	raw := strings.TrimSpace(stripANSI(line))
+	if raw == "" {
+		return line
+	}
+	indent := leadingWhitespace(line)
+	if label := answerSectionLabel(raw); label != "" {
+		text := strings.TrimLeft(strings.TrimPrefix(raw, label), "：: #")
+		if text == "" {
+			return indent + stAccent.Render(label)
 		}
-		m.appendBlock(strings.Join(lines, "\n"))
-	case "/timeline":
-		m.appendBlock(renderTimelineBlock(m.timeline))
-	case "/doctor":
-		m.appendBlock(panelRow("doctor", "系统状态", "", []string{
-			"Backend: " + healthURL(),
-			"LLM: " + llmURL(),
-			"Sessions: " + sessionDir(),
-			"Run `sciscope-tui doctor` for live checks.",
-		}))
-	case "/demo":
-		go playDemo(m.sub)
-		return m, listen(m.sub)
-	case "/sessions":
+		return indent + stAccent.Render(label) + stInk.Render("  "+text)
+	}
+	if strings.Contains(raw, "[") && strings.Contains(raw, "]") {
+		return indent + stTool.Render(raw)
+	}
+	if hasMetricToken(raw) {
+		return indent + stAccent.Render(raw)
+	}
+	if hasCautionToken(raw) {
+		return indent + stWarn.Render(raw)
+	}
+	return line
+}
+
+func answerSectionLabel(s string) string {
+	s = strings.TrimLeft(s, "#-*0123456789. ")
+	s = strings.TrimSpace(strings.TrimSuffix(strings.TrimSuffix(s, ":"), "："))
+	switch {
+	case strings.HasPrefix(s, "结论"), strings.HasPrefix(s, "研究结论"), strings.HasPrefix(s, "最终结论"):
+		return "结论"
+	case strings.HasPrefix(s, "证据"), strings.HasPrefix(s, "依据"), strings.HasPrefix(s, "出处"):
+		return "证据"
+	case strings.HasPrefix(s, "风险"), strings.HasPrefix(s, "限制"), strings.HasPrefix(s, "边界"), strings.HasPrefix(s, "注意"):
+		return "边界"
+	case strings.HasPrefix(s, "建议"), strings.HasPrefix(s, "下一步"), strings.HasPrefix(s, "行动"):
+		return "建议"
+	case strings.HasPrefix(s, "摘要"), strings.HasPrefix(s, "概括"):
+		return "摘要"
+	default:
+		return ""
+	}
+}
+
+func hasCautionToken(s string) bool {
+	for _, token := range []string{"风险", "限制", "边界", "但", "然而", "取决于", "不应", "不能", "可能", "仍需", "谨慎"} {
+		if strings.Contains(s, token) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasMetricToken(s string) bool {
+	if strings.ContainsAny(s, "%％") {
+		return true
+	}
+	digits := 0
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			digits++
+			if digits >= 2 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func leadingWhitespace(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r != ' ' && r != '\t' {
+			break
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+func stripANSI(s string) string {
+	var b strings.Builder
+	inEsc := false
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if inEsc {
+			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
+				inEsc = false
+			}
+			continue
+		}
+		if ch == 0x1b {
+			inEsc = true
+			continue
+		}
+		b.WriteByte(ch)
+	}
+	return b.String()
+}
+
+type submenuItem struct {
+	label   string
+	desc    string
+	command string
+}
+
+func commandSubmenu(cmd string) string {
+	fields := strings.Fields(cmd)
+	if len(fields) == 0 {
+		return ""
+	}
+	if command, ok := slashRegistry[fields[0]]; ok {
+		return command.submenu
+	}
+	return ""
+}
+
+type toolInfo struct {
+	name string
+	desc string
+	when string
+}
+
+func toolCatalog() []toolInfo {
+	return []toolInfo{
+		{"search_literature", "混合检索论文证据", "文献问答、查新、证据补充"},
+		{"get_trends", "查看关键词趋势与生命周期", "趋势预测、热点监测"},
+		{"recommend_papers", "按种子论文推荐相似研究", "延伸阅读、相关工作"},
+		{"get_paper", "读取单篇论文详情", "已知 paper_id 后深读"},
+		{"summarize_field", "生成领域综述证据", "主题综述、背景整理"},
+		{"compare_papers", "对比两篇论文", "方法差异、贡献比较"},
+		{"export_bibliography", "导出引用文本", "写报告、整理参考文献"},
+		{"query_knowledge_graph", "查询作者/关键词/主题图谱", "合作网络、主题关系"},
+		{"verify_claim", "核查论断并返回证据", "事实核查、降低幻觉"},
+	}
+}
+
+func toolInfoByName(name string) (toolInfo, bool) {
+	for _, tool := range toolCatalog() {
+		if tool.name == name || toolPlainLabel(tool.name) == name {
+			return tool, true
+		}
+	}
+	return toolInfo{}, false
+}
+
+func submenuTitle(name string) string {
+	switch name {
+	case "theme":
+		return "选择主题"
+	case "resume":
+		return "恢复会话"
+	case "tools":
+		return "选择工具"
+	case "doctor":
+		return "查看检查项"
+	case "clear":
+		return "确认清空"
+	case "quit":
+		return "确认退出"
+	default:
+		return "二级选择"
+	}
+}
+
+func (m model) submenuItems() []submenuItem {
+	switch m.submenu {
+	case "theme":
+		items := []submenuItem{}
+		for _, name := range themeOrder {
+			theme := themes[name]
+			items = append(items, submenuItem{label: theme.Name, desc: theme.Title + " · " + theme.Desc, command: "/theme " + theme.Name})
+		}
+		return items
+	case "resume":
+		items := []submenuItem{}
+		for _, session := range m.recentSessions {
+			question := session.LastQuestion
+			if question == "" {
+				question = strings.TrimSuffix(session.Name, filepath.Ext(session.Name))
+			}
+			items = append(items, submenuItem{
+				label:   fmt.Sprintf("%d", session.Index),
+				desc:    clip(question, 58) + " · " + session.ModTime.Format("01-02 15:04"),
+				command: fmt.Sprintf("/resume %d", session.Index),
+			})
+		}
+		return items
+	case "tools":
+		items := []submenuItem{}
+		for _, tool := range toolCatalog() {
+			items = append(items, submenuItem{label: toolPlainLabel(tool.name), desc: tool.desc + " · " + tool.when, command: "/tools " + tool.name})
+		}
+		return items
+	case "doctor":
+		items := []submenuItem{}
+		for _, check := range collectDoctorChecks() {
+			items = append(items, submenuItem{label: check.Name, desc: check.Status + " · " + check.Detail, command: "/doctor " + check.Name})
+		}
+		return items
+	case "clear":
+		return []submenuItem{{label: "取消", desc: "保留当前对话", command: "/clear no"}, {label: "清空", desc: "清空当前视图、历史和时间线", command: "/clear yes"}}
+	case "quit":
+		return []submenuItem{{label: "取消", desc: "继续当前会话", command: "/quit no"}, {label: "退出", desc: "关闭 SciScope TUI", command: "/quit yes"}}
+	default:
+		return nil
+	}
+}
+
+func (m model) renderSubmenuPalette(width int) string {
+	if width < 48 {
+		width = 48
+	}
+	items := m.submenuItems()
+	if len(items) == 0 {
+		return panelRow("launcher", submenuTitle(m.submenu), "empty", []string{"暂无可选项。Esc 返回。"})
+	}
+	inner := width - 6
+	if inner < 38 {
+		inner = 38
+	}
+	idx := m.submenuIdx % len(items)
+	labelW := 14
+	descW := inner - 3 - labelW - 16
+	if descW < 16 {
+		descW = 16
+	}
+	title := submenuTitle(m.submenu)
+	rows := []string{stAccent.Render(title) + stFaint.Render("  · ↑/↓ 选择 · Enter 执行 · Esc 返回")}
+	for i, item := range items {
+		marker := "  "
+		if i == idx {
+			marker = "▶ "
+		}
+		cols := lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			lipgloss.NewStyle().Width(3).Render(marker),
+			lipgloss.NewStyle().Width(labelW).Render(item.label),
+			lipgloss.NewStyle().Width(descW).Render(clipWidth(item.desc, descW-1)),
+			lipgloss.NewStyle().Width(16).Render(clipWidth(item.command, 15)),
+		)
+		if i == idx {
+			rows = append(rows, stSelCmd.Width(inner).Render(cols))
+		} else {
+			rows = append(rows, stCmd.Width(inner).Render(cols))
+		}
+	}
+	return lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true, false, true, false).
+		BorderForeground(cFaint).
+		Padding(0, 1).
+		Width(width - 2).
+		Render(strings.Join(rows, "\n"))
+}
+
+func (m *model) openSubmenu(name string) {
+	m.submenu = name
+	m.submenuIdx = 0
+	switch name {
+	case "theme":
+		m.ti.SetValue("/theme ")
+	case "resume":
+		sessions, err := listSessionFiles(sessionDir(), 8)
+		if err == nil {
+			m.recentSessions = sessions
+		}
+		m.ti.SetValue("/resume ")
+	case "tools":
+		m.ti.SetValue("/tools ")
+	case "doctor":
+		m.ti.SetValue("/doctor ")
+	case "clear":
+		m.ti.SetValue("/clear ")
+	case "quit":
+		m.ti.SetValue("/quit ")
+	}
+}
+
+func renderSlashHelpBlock() string {
+	groups := map[string][]slashCmd{}
+	for _, cmd := range slashCmds {
+		groups[cmd.category] = append(groups[cmd.category], cmd)
+	}
+	order := []string{"常用", "会话", "证据", "系统"}
+	body := []string{"使用 / 打开命令启动器; ↑/↓ 选择, Enter 执行, Tab 补全。"}
+	for _, group := range order {
+		cmds := groups[group]
+		if len(cmds) == 0 {
+			continue
+		}
+		body = append(body, "")
+		body = append(body, stAccent.Render(group))
+		for _, cmd := range cmds {
+			body = append(body, fmt.Sprintf("  %-10s %s", cmd.cmd, cmd.desc))
+		}
+	}
+	return panelRow("launcher", "命令启动器", "slash", body)
+}
+
+func renderToolsBlock() string {
+	type toolInfo struct {
+		name string
+		desc string
+	}
+	tools := []toolInfo{
+		{"search_literature", "混合检索论文证据"},
+		{"get_trends", "查看关键词趋势与生命周期"},
+		{"recommend_papers", "按种子论文推荐相似研究"},
+		{"get_paper", "读取单篇论文详情"},
+		{"summarize_field", "生成领域综述证据"},
+		{"compare_papers", "对比两篇论文"},
+		{"export_bibliography", "导出引用文本"},
+		{"query_knowledge_graph", "查询作者/关键词/主题图谱"},
+		{"verify_claim", "核查论断并返回证据"},
+	}
+	body := []string{"这些工具由 LLM 按问题自主调用; /timeline 查看每次调用过程。"}
+	for _, tool := range tools {
+		body = append(body, fmt.Sprintf("  %-18s %s", toolPlainLabel(tool.name), tool.desc))
+	}
+	return panelRow("tools", "智能体工具", "read-only", body)
+}
+
+func renderInlineDoctorBlock() string {
+	body := []string{}
+	for _, check := range collectDoctorChecks() {
+		line := fmt.Sprintf("%s  %s", check.Status, check.Name)
+		if check.Detail != "" {
+			line += " · " + check.Detail
+		}
+		body = append(body, line)
+	}
+	return panelRow("doctor", "系统状态", "live", body)
+}
+
+func runQuitCommand(m model, args []string) (model, tea.Cmd) {
+	if len(args) >= 1 && args[0] == "yes" {
+		return m, tea.Quit
+	}
+	m.appendBlock(stFaint.Render("  已取消退出。"))
+	return m, nil
+}
+
+func runClearCommand(m model, args []string) (model, tea.Cmd) {
+	if len(args) < 1 {
+		m.openSubmenu("clear")
+		return m, nil
+	}
+	if args[0] != "yes" {
+		m.appendBlock(stFaint.Render("  已取消清空。"))
+		return m, nil
+	}
+	m.blocks = nil
+	m.history = nil
+	m.transcript = nil
+	m.timeline = nil
+	m.lastExport = ""
+	m.lastQuestion = ""
+	m.refresh()
+	return m, nil
+}
+
+func runHelpCommand(m model, args []string) (model, tea.Cmd) {
+	m.appendBlock(renderSlashHelpBlock())
+	return m, nil
+}
+
+func runToolsCommand(m model, args []string) (model, tea.Cmd) {
+	if len(args) >= 1 {
+		if tool, ok := toolInfoByName(args[0]); ok {
+			m.appendBlock(panelRow("tools", toolPlainLabel(tool.name), "detail", []string{tool.desc, "适用场景: " + tool.when, "工具名: " + tool.name}))
+			return m, nil
+		}
+		m.appendBlock(stWarn.Render("  未找到工具 " + args[0] + "。输入 /tools 查看工具列表。"))
+		return m, nil
+	}
+	m.openSubmenu("tools")
+	return m, nil
+}
+
+func runThemeCommand(m model, args []string) (model, tea.Cmd) {
+	if len(args) < 1 {
+		m.appendBlock(renderThemeBlock())
+		return m, nil
+	}
+	nextTheme := args[0]
+	if !applyTheme(nextTheme) {
+		m.appendBlock(stWarn.Render("  未知主题 " + nextTheme + "。输入 /theme 查看可选主题。"))
+		return m, nil
+	}
+	m.syncThemeStyles()
+	m.appendBlock(stAccent.Render("  已切换主题: "+currentTheme) + stFaint.Render(" · "+themes[currentTheme].Title))
+	return m, nil
+}
+
+func runTimelineCommand(m model, args []string) (model, tea.Cmd) {
+	m.appendBlock(renderTimelineBlock(m.timeline))
+	return m, nil
+}
+
+func runDoctorCommand(m model, args []string) (model, tea.Cmd) {
+	if len(args) >= 1 {
+		name := strings.Join(args, " ")
+		for _, check := range collectDoctorChecks() {
+			if strings.EqualFold(check.Name, name) {
+				m.appendBlock(panelRow("doctor", check.Name, check.Status, []string{check.Detail}))
+				return m, nil
+			}
+		}
+		m.appendBlock(stWarn.Render("  未找到检查项 " + name + "。输入 /doctor 查看状态。"))
+		return m, nil
+	}
+	m.openSubmenu("doctor")
+	return m, nil
+}
+
+func runDemoCommand(m model, args []string) (model, tea.Cmd) {
+	go playDemo(m.sub)
+	return m, listen(m.sub)
+}
+
+func runSessionsCommand(m model, args []string) (model, tea.Cmd) {
+	sessions, err := listSessionFiles(sessionDir(), 8)
+	if err != nil {
+		m.appendBlock(stWarn.Render("  读取会话失败: " + err.Error()))
+		return m, nil
+	}
+	m.recentSessions = sessions
+	m.appendBlock(renderSessionsList(sessions) + "\n" + stFaint.Render("  输入 /resume N 恢复对应会话。"))
+	m.openSubmenu("resume")
+	return m, nil
+}
+
+func runResumeCommand(m model, args []string) (model, tea.Cmd) {
+	if len(args) < 1 {
 		sessions, err := listSessionFiles(sessionDir(), 8)
 		if err != nil {
 			m.appendBlock(stWarn.Render("  读取会话失败: " + err.Error()))
 			return m, nil
 		}
 		m.recentSessions = sessions
-		m.appendBlock(renderSessionsList(sessions))
-	case "/resume":
-		if len(fields) < 2 {
-			m.appendBlock(stWarn.Render("  用法: /resume 1。先输入 /sessions 查看最近会话。"))
-			return m, nil
-		}
-		if len(m.recentSessions) == 0 {
-			sessions, err := listSessionFiles(sessionDir(), 8)
-			if err != nil {
-				m.appendBlock(stWarn.Render("  读取会话失败: " + err.Error()))
-				return m, nil
-			}
-			m.recentSessions = sessions
-		}
-		var idx int
-		if _, err := fmt.Sscanf(fields[1], "%d", &idx); err != nil || idx < 1 || idx > len(m.recentSessions) {
-			m.appendBlock(stWarn.Render("  未找到该会话编号。输入 /sessions 查看可恢复的会话。"))
-			return m, nil
-		}
-		session, err := loadSessionMarkdown(m.recentSessions[idx-1].Path)
-		if err != nil {
-			m.appendBlock(stWarn.Render("  恢复会话失败: " + err.Error()))
-			return m, nil
-		}
-		m.blocks = []string{
-			stBullet.Render("⏺ ") + stAccent.Render("已恢复会话 ") + stFaint.Render(filepath.Base(session.Path)),
-			stFaint.Render(strings.TrimSpace(session.Content)),
-		}
-		m.transcript = []transcriptEvent{{Kind: "session", Content: session.Content}}
-		m.lastQuestion = session.LastQuestion
-		m.lastExport = session.Path
-		m.refresh()
-	case "/retry":
-		if m.lastQuestion == "" {
-			m.appendBlock(stWarn.Render("  暂无可重试的问题。先提一个问题, 或从会话记录中复制问题。"))
-			return m, nil
-		}
-		cmd := m.startQuestion(m.lastQuestion, true)
-		return m, cmd
-	case "/export":
-		if len(m.transcript) == 0 {
-			m.appendBlock(stWarn.Render("  暂无可导出的会话。先提一个问题, 再使用 /export。"))
-			return m, nil
-		}
-		path, err := writeSessionMarkdown(sessionDir(), m.transcript, time.Now())
-		if err != nil {
-			m.appendBlock(stWarn.Render("  导出失败: " + err.Error()))
-			return m, nil
-		}
-		m.lastExport = path
-		m.appendBlock(stFaint.Render("  已导出 Markdown: " + path))
-	default:
-		m.appendBlock(stWarn.Render("  未知命令 " + v))
+		m.appendBlock(renderSessionsList(sessions) + "\n" + stFaint.Render("  输入 /resume N 恢复对应会话。"))
+		return m, nil
 	}
+	if len(m.recentSessions) == 0 {
+		sessions, err := listSessionFiles(sessionDir(), 8)
+		if err != nil {
+			m.appendBlock(stWarn.Render("  读取会话失败: " + err.Error()))
+			return m, nil
+		}
+		m.recentSessions = sessions
+	}
+	var idx int
+	if _, err := fmt.Sscanf(args[0], "%d", &idx); err != nil || idx < 1 || idx > len(m.recentSessions) {
+		m.appendBlock(stWarn.Render("  未找到该会话编号。输入 /sessions 查看可恢复的会话。"))
+		return m, nil
+	}
+	session, err := loadSessionMarkdown(m.recentSessions[idx-1].Path)
+	if err != nil {
+		m.appendBlock(stWarn.Render("  恢复会话失败: " + err.Error()))
+		return m, nil
+	}
+	m.blocks = []string{
+		stBullet.Render("⏺ ") + stAccent.Render("已恢复会话 ") + stFaint.Render(filepath.Base(session.Path)),
+		stFaint.Render(strings.TrimSpace(session.Content)),
+	}
+	m.transcript = []transcriptEvent{{Kind: "session", Content: session.Content}}
+	m.lastQuestion = session.LastQuestion
+	m.lastExport = session.Path
+	m.refresh()
 	return m, nil
+}
+
+func runRetryCommand(m model, args []string) (model, tea.Cmd) {
+	if m.lastQuestion == "" {
+		m.appendBlock(stWarn.Render("  暂无可重试的问题。先提一个问题, 或从会话记录中复制问题。"))
+		return m, nil
+	}
+	cmd := m.startQuestion(m.lastQuestion, true)
+	return m, cmd
+}
+
+func runExportCommand(m model, args []string) (model, tea.Cmd) {
+	if len(m.transcript) == 0 {
+		m.appendBlock(stWarn.Render("  暂无可导出的会话。先提一个问题, 再使用 /export。"))
+		return m, nil
+	}
+	path, err := writeSessionMarkdown(sessionDir(), m.transcript, time.Now())
+	if err != nil {
+		m.appendBlock(stWarn.Render("  导出失败: " + err.Error()))
+		return m, nil
+	}
+	m.lastExport = path
+	m.appendBlock(stFaint.Render("  已导出 Markdown: " + path))
+	return m, nil
+}
+
+func skillTemplatePaths(name string) []string {
+	filename := name + ".md"
+	return []string{
+		filepath.Join(".sciscope", "skills", filename),
+		filepath.Join("..", ".sciscope", "skills", filename),
+	}
+}
+
+func loadSkillTemplate(name string) (string, error) {
+	var lastErr error
+	for _, path := range skillTemplatePaths(name) {
+		body, err := os.ReadFile(path)
+		if err == nil {
+			return string(body), nil
+		}
+		lastErr = err
+	}
+	return "", fmt.Errorf("skill %s not found: %w", name, lastErr)
+}
+
+func renderSkillPrompt(name, input, fallback string) string {
+	input = strings.TrimSpace(input)
+	template, err := loadSkillTemplate(name)
+	if err != nil {
+		return fallback
+	}
+	return strings.ReplaceAll(template, "{{input}}", input)
+}
+
+func runVerifyCommand(m model, args []string) (model, tea.Cmd) {
+	claim := strings.TrimSpace(strings.Join(args, " "))
+	if claim == "" {
+		m.appendBlock(stWarn.Render("  用法: /verify <需要核查的论断>"))
+		return m, nil
+	}
+	fallback := "请核查这个论断是否有科研文献支持,给出支持等级、关键证据和谨慎表述: " + claim
+	q := renderSkillPrompt("claim-check", claim, fallback)
+	cmd := m.startQuestion(q, false)
+	return m, cmd
+}
+
+func runReviewCommand(m model, args []string) (model, tea.Cmd) {
+	topic := strings.TrimSpace(strings.Join(args, " "))
+	if topic == "" {
+		m.appendBlock(stWarn.Render("  用法: /review <研究主题>"))
+		return m, nil
+	}
+	fallback := "请围绕这个主题做一份简洁的科研文献综述,包含研究现状、代表方向、趋势判断和可追溯证据: " + topic
+	q := renderSkillPrompt("literature-review", topic, fallback)
+	cmd := m.startQuestion(q, false)
+	return m, cmd
+}
+
+func runTrendCommand(m model, args []string) (model, tea.Cmd) {
+	topic := strings.TrimSpace(strings.Join(args, " "))
+	if topic == "" {
+		m.appendBlock(stWarn.Render("  用法: /trend <研究主题>"))
+		return m, nil
+	}
+	fallback := "请围绕这个主题做趋势分析,说明热度变化、代表证据、趋势边界和未来判断: " + topic
+	q := renderSkillPrompt("trend-analysis", topic, fallback)
+	cmd := m.startQuestion(q, false)
+	return m, cmd
+}
+
+func runRecommendCommand(m model, args []string) (model, tea.Cmd) {
+	request := strings.TrimSpace(strings.Join(args, " "))
+	if request == "" {
+		m.appendBlock(stWarn.Render("  用法: /recommend <研究主题或真实 paper_id>"))
+		return m, nil
+	}
+	fallback := "请基于这个研究主题或种子论文推荐后续阅读论文,并先确认真实 paper_id: " + request
+	q := renderSkillPrompt("paper-recommendation", request, fallback)
+	cmd := m.startQuestion(q, false)
+	return m, cmd
+}
+
+func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
+	fields := strings.Fields(v)
+	if len(fields) == 0 {
+		return m, nil
+	}
+	command, ok := slashRegistry[fields[0]]
+	if !ok || command.run == nil {
+		m.appendBlock(stWarn.Render("  未知命令 " + v))
+		return m, nil
+	}
+	next, cmd := command.run(m, fields[1:])
+	return next, cmd
 }
 
 func (m model) View() string {
@@ -2195,6 +2888,8 @@ func (m model) View() string {
 		// plan/reflect now stream inline in the transcript, so no separate shelf.
 		elapsed := int(time.Since(m.start).Seconds())
 		parts = append(parts, m.spin.View()+" "+stAccent.Render(m.verb+"…")+stFaint.Render(fmt.Sprintf("  (%ds · esc 中断)", elapsed)))
+	} else if m.submenu != "" {
+		parts = append(parts, m.renderSubmenuPalette(m.vp.Width))
 	} else if strings.HasPrefix(m.ti.Value(), "/") {
 		if menu := m.renderCommandPalette(m.vp.Width); menu != "" {
 			parts = append(parts, menu)

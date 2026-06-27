@@ -28,6 +28,45 @@ def test_ingest_status_returns_ready_with_paper_count(client):
     assert response.json() == {"status": "ready", "papers": 5}
 
 
+def test_ingest_status_prefers_database_count(monkeypatch, client):
+    class FakeCursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def execute(self, query):
+            assert query == "SELECT count(*) FROM papers"
+
+        def fetchone(self):
+            return (159187,)
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def cursor(self):
+            return FakeCursor()
+
+    class FakePsycopg:
+        @staticmethod
+        def connect(dsn):
+            assert dsn == "postgresql://example/sciscope"
+            return FakeConnection()
+
+    monkeypatch.setenv("SCISCOPE_DB_DSN", "postgresql://example/sciscope")
+    monkeypatch.setitem(__import__("sys").modules, "psycopg", FakePsycopg)
+
+    response = client.get("/api/ingest/status")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ready", "papers": 159187}
+
+
 def test_dashboard_overview_returns_sample_corpus_summary(client):
     response = client.get("/api/dashboard/overview")
 

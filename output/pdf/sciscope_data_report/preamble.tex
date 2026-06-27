@@ -16,20 +16,20 @@
 \usepackage{amsmath}
 \usetikzlibrary{arrows.meta,positioning,fit,calc}
 
-\definecolor{SciTealDark}{HTML}{000000}
-\definecolor{SciTeal}{HTML}{000000}
-\definecolor{SciMint}{HTML}{FFFFFF}
-\definecolor{SciClay}{HTML}{000000}
-\definecolor{SciGold}{HTML}{000000}
-\definecolor{SciMoss}{HTML}{000000}
-\definecolor{SciPlum}{HTML}{000000}
-\definecolor{SciInk}{HTML}{000000}
-\definecolor{SciMuted}{HTML}{000000}
-\definecolor{SciLine}{HTML}{000000}
-\definecolor{SciPanel}{HTML}{FFFFFF}
-\definecolor{SciPanelWarm}{HTML}{FFFFFF}
+\definecolor{SciTealDark}{HTML}{0B4F4A}
+\definecolor{SciTeal}{HTML}{16847D}
+\definecolor{SciMint}{HTML}{E7F5F2}
+\definecolor{SciClay}{HTML}{8A4B32}
+\definecolor{SciGold}{HTML}{B8872B}
+\definecolor{SciMoss}{HTML}{4E6F40}
+\definecolor{SciPlum}{HTML}{5D4E7B}
+\definecolor{SciInk}{HTML}{1C2326}
+\definecolor{SciMuted}{HTML}{667276}
+\definecolor{SciLine}{HTML}{C7D4D2}
+\definecolor{SciPanel}{HTML}{F7FBFA}
+\definecolor{SciPanelWarm}{HTML}{FBF8F1}
 
-\geometry{left=17mm,right=17mm,top=16mm,bottom=18mm,headheight=18pt}
+\geometry{left=17mm,right=17mm,top=17mm,bottom=18mm,headheight=18pt}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{3.8pt}
 \setlength{\tabcolsep}{5pt}
@@ -43,6 +43,8 @@
 \setlength{\floatsep}{5pt plus 1pt minus 1pt}
 \setlength{\textfloatsep}{6pt plus 1pt minus 1pt}
 \setlength{\intextsep}{5pt plus 1pt minus 1pt}
+\setlength{\abovedisplayskip}{4pt plus 1pt minus 1pt}
+\setlength{\belowdisplayskip}{4pt plus 1pt minus 1pt}
 \raggedbottom
 
 \pagestyle{fancy}
@@ -50,45 +52,48 @@
 \lhead{\scriptsize\bfseries\color{SciTealDark} SciScope 数据分析报告}
 \rhead{\scriptsize\color{SciMuted} 169,324 条记录 · 2022--2026 · 主题演化 · 合作网络}
 \cfoot{\scriptsize\color{SciMuted}\thepage}
-\renewcommand{\headrulewidth}{0.35pt}
+\renewcommand{\headrulewidth}{0.45pt}
 \renewcommand{\footrulewidth}{0pt}
 \renewcommand{\headrule}{\hbox to\headwidth{\color{SciLine}\leaders\hrule height \headrulewidth\hfill}}
 
-\titleformat{\section}{\LARGE\bfseries\color{SciTealDark}}{\thesection}{0.62em}{}
-\titlespacing*{\section}{0pt}{2pt}{6pt}
+\titleformat{\section}
+  {\LARGE\bfseries\color{SciTealDark}}
+  {\llap{\color{SciTeal}\rule[-1.8pt]{2.2pt}{15pt}\hspace{7pt}}\thesection}
+  {0.62em}{}
+\titlespacing*{\section}{0pt}{3pt}{7pt}
 \titleformat{\subsection}{\large\bfseries\color{SciInk}}{\thesubsection}{0.62em}{}
 \titlespacing*{\subsection}{0pt}{7pt}{3pt}
-\titleformat{\subsubsection}{\normalsize\bfseries\color{SciInk}}{\thesubsubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{SciTealDark}}{\thesubsubsection}{0.6em}{}
 
 \newtcolorbox{reportbox}[2][]{
   enhanced,
   breakable,
-  frame hidden,
-  colback=white,
+  colback=SciPanel,
+  colframe=SciTeal,
   coltitle=SciTealDark,
   fonttitle=\bfseries\large,
   title=#2,
   attach title to upper={\par\smallskip},
-  borderline west={0.7pt}{0pt}{SciTealDark},
-  boxrule=0pt,
-  arc=0pt,
-  left=3.2mm,
-  right=2.8mm,
-  top=1mm,
-  bottom=1.4mm,
+  borderline west={1.2pt}{0pt}{SciTealDark},
+  boxrule=0.35pt,
+  arc=1.2mm,
+  left=3.5mm,
+  right=3.2mm,
+  top=1.2mm,
+  bottom=1.5mm,
   #1
 }
 
 \newtcolorbox{plainbox}[1][]{
   enhanced,
   breakable,
-  frame hidden,
   colback=white,
-  borderline west={0.55pt}{0pt}{SciLine},
-  boxrule=0pt,
-  arc=0pt,
-  left=3.1mm,
-  right=2.8mm,
+  colframe=SciLine,
+  borderline west={0.8pt}{0pt}{SciTeal},
+  boxrule=0.3pt,
+  arc=1mm,
+  left=3.3mm,
+  right=3mm,
   top=1.2mm,
   bottom=1.2mm,
   #1
@@ -97,10 +102,11 @@
 \newtcolorbox{methodnote}[1][]{
   enhanced,
   breakable,
-  frame hidden,
-  colback=white,
+  colback=SciPanelWarm,
+  colframe=SciLine,
   borderline west={0.7pt}{0pt}{SciTealDark},
-  boxrule=0pt,
+  boxrule=0.3pt,
+  arc=1mm,
   left=3.1mm,
   right=2mm,
   top=1mm,
@@ -136,6 +142,17 @@
   \textbf{#1}\par
   {\Large #2}
   \end{plainbox}
+}
+
+\newcommand{\metriccard}[3]{%
+  \begin{tcolorbox}[enhanced, colback=white, colframe=SciLine, boxrule=0.35pt, arc=1.2mm,
+    left=2.2mm, right=2.2mm, top=1.4mm, bottom=1.3mm, height=17.5mm]
+    {\scriptsize\bfseries\color{SciMuted}#1\par}
+    \vspace{0.7mm}
+    {\Large\bfseries\color{SciTealDark}#2\par}
+    \vspace{0.2mm}
+    {\tiny\color{SciMuted}#3\par}
+  \end{tcolorbox}%
 }
 
 \newcommand{\statusmark}[1]{%

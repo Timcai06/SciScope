@@ -11,13 +11,14 @@ existing SSE contract consumed by the TUI and future web clients.
 from __future__ import annotations
 
 import json
+import re
 import time
 from uuid import uuid4
 from functools import lru_cache
 from typing import Any, Callable, Iterator, Literal, TypedDict
 
 from backend.app.agent.events import AgentEvent, summarize_events
-from backend.app.agent.llm import SYSTEM_PROMPT, compact, detect_model, drain, stream_chat
+from backend.app.agent.llm import build_system_prompt, compact, detect_model, drain, stream_chat
 from backend.app.agent.planning import make_plan, needs_plan
 from backend.app.agent.reflection import reflect_reason, self_critique
 from backend.app.agent.tool_runner import run_tools
@@ -56,6 +57,57 @@ def _messages_tokens(messages: list[dict]) -> int:
     return sum(_estimate_tokens(str(m.get("content") or "")) for m in messages)
 
 
+def _skill_tool_budget(question: str) -> int | None:
+    """Hard cap tool loops for explicit SciScope skill prompts."""
+    if "你正在执行 SciScope 技能" not in question:
+        return None
+    return 2
+
+
+def _skill_input(question: str, label: str) -> str:
+    match = re.search(rf"{re.escape(label)}:\s*\n(?P<input>.*?)(?:\n\n工作要求:|\Z)", question, flags=re.S)
+    if not match:
+        return ""
+    return match.group("input").strip()
+
+
+def _forced_skill_tool_call(question: str) -> dict[str, Any] | None:
+    """Deterministically recover when a skill prompt skips its required first tool."""
+    if "SciScope 技能: 论断核查" in question:
+        claim = _skill_input(question, "输入论断")
+        if claim:
+            return {
+                "id": "forced_" + uuid4().hex,
+                "type": "function",
+                "function": {"name": "verify_claim", "arguments": json.dumps({"claim": claim}, ensure_ascii=False)},
+            }
+    if "SciScope 技能: 趋势分析" in question:
+        keyword = _skill_input(question, "研究主题")
+        if keyword:
+            return {
+                "id": "forced_" + uuid4().hex,
+                "type": "function",
+                "function": {"name": "get_trends", "arguments": json.dumps({"keyword": keyword}, ensure_ascii=False)},
+            }
+    if "SciScope 技能: 论文推荐" in question:
+        query = _skill_input(question, "用户需求")
+        if query:
+            return {
+                "id": "forced_" + uuid4().hex,
+                "type": "function",
+                "function": {"name": "search_literature", "arguments": json.dumps({"query": query}, ensure_ascii=False)},
+            }
+    if "SciScope 技能: 文献综述" in question:
+        topic = _skill_input(question, "研究主题")
+        if topic:
+            return {
+                "id": "forced_" + uuid4().hex,
+                "type": "function",
+                "function": {"name": "summarize_field", "arguments": json.dumps({"topic": topic}, ensure_ascii=False)},
+            }
+    return None
+
+
 class AgentState(TypedDict, total=False):
     question: str
     session_id: str | None
@@ -75,6 +127,7 @@ class AgentState(TypedDict, total=False):
     node_meta: dict[str, Any]
     tokens_in: int
     tokens_out: int
+    stop_reason: str
 
 
 def _load_langgraph():
@@ -127,7 +180,7 @@ def _prepare(state: AgentState) -> AgentState:
             "route": "end",
             "emit": [("final", "本地大模型未运行(:8001)。请先 `make llm`,或设置 DEEPSEEK_API_KEY 使用云端模型。")],
         }, extra={"stop_reason": "no_model", "tokens_in": 0, "tokens_out": 0})
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages = [{"role": "system", "content": build_system_prompt()}]
     messages.extend(state.get("history") or [])
     messages.append({"role": "user", "content": state["question"]})
     if state.get("retry"):
@@ -185,6 +238,14 @@ def _llm_step(state: AgentState) -> AgentState:
         stream_chat(messages, state["model"], TOOL_SCHEMAS),
         lambda kind, payload: text_events.append((kind, payload)),
     )
+    if not tool_calls and int(state.get("tools_total") or 0) == 0:
+        forced_call = _forced_skill_tool_call(state["question"])
+        if forced_call:
+            tool_calls = [forced_call]
+    budget = _skill_tool_budget(state["question"])
+    if budget is not None and tool_calls:
+        remaining = max(budget - int(state.get("tools_total") or 0), 0)
+        tool_calls = tool_calls[:remaining]
     next_state: AgentState = {
         "messages": messages,
         "last_answer": full_text,
@@ -225,8 +286,20 @@ def _execute_tools(state: AgentState) -> AgentState:
         emit.append(("tool_result", {"name": name, "result": result}))
         messages.append({"role": "tool", "tool_call_id": tool_call.get("id", name), "content": result})
 
-    route: GraphRoute = "force_synthesis" if int(state.get("step") or 0) >= MAX_STEPS else "llm_step"
-    return _finish_node("execute_tools", started_at, state, {"messages": messages, "executed": executed, "tool_calls": [], "route": route, "emit": emit})
+    budget = _skill_tool_budget(state["question"])
+    tools_total = int(state.get("tools_total") or 0)
+    if budget is not None and tools_total >= budget:
+        route: GraphRoute = "force_synthesis"
+        stop_reason = "tool_budget"
+    else:
+        route = "force_synthesis" if int(state.get("step") or 0) >= MAX_STEPS else "llm_step"
+        stop_reason = "max_steps" if route == "force_synthesis" else ""
+    return _finish_node(
+        "execute_tools",
+        started_at,
+        state,
+        {"messages": messages, "executed": executed, "tool_calls": [], "route": route, "stop_reason": stop_reason, "emit": emit},
+    )
 
 
 def _reflect(state: AgentState) -> AgentState:
@@ -278,7 +351,7 @@ def _force_synthesis(state: AgentState) -> AgentState:
     return _finish_node(
         "force_synthesis", started_at, state,
         {"messages": messages, "last_answer": full_text, "route": "end", "emit": [*text_events, ("final", full_text)]},
-        extra=_final_extra(state, "max_steps", call_in, _estimate_tokens(full_text)),
+        extra=_final_extra(state, state.get("stop_reason") or "max_steps", call_in, _estimate_tokens(full_text)),
     )
 
 

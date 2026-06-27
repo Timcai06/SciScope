@@ -38,6 +38,7 @@ make llm         # 本地兼容 LLM：127.0.0.1:8001
 
 - `SCISCOPE_BACKEND`：自定义后端地址（默认 `http://127.0.0.1:8000`）
 - `SCISCOPE_TUI_ICONS=off`：无 Nerd Font 时仅保留文本标签
+- `SCISCOPE_TUI_THEME=paper`：启动时选择主题，可选 `dark`、`paper`、`light`、`contrast`
 
 ### 2.2 命令行
 
@@ -68,6 +69,9 @@ sciscope-tui export --last
 - `/export` 会导出当前 transcript 的 Markdown（与历史恢复格式一致）。
 - `sciscope-tui export --last` 可在 shell 中打印最近一条 Markdown 会话，便于管道保存或粘贴到报告。
 - `sciscope-tui doctor` 执行后端、LLM、会话目录和图谱资产的产品化体检。
+- `/theme` 在 slash 启动器中进入二级主题菜单；`/theme paper` 可直接切换到与报告 PDF 更一致的青绿色品牌主题。
+- 最终回答会对“结论、证据、边界、建议”和含引用/指标的行做语义高亮，避免整段输出颜色过于单一。
+- `/` 是多级命令启动器：一级菜单用 ↑/↓ 选择命令，Enter 执行；需要继续选择的命令会进入二级菜单，Esc 返回或关闭。
 
 ## 5. UI 语义：Splash / Dashboard / panel row
 
@@ -106,4 +110,4 @@ sciscope-tui export --last
 - `make tui` 连接真实后端，执行一条测试问题，观察 plan/tool/result/final 流。
 - `make tui-demo`，确认完整离线演示可完整播完。
 - `make tui-export-last`，确认最近会话可从命令行导出。
-- `/sessions` 能列出最近会话，`/export` 与 `/resume` 可用。
+- `/sessions` 能列出最近会话，`/resume` 和 `/sessions` 可在 slash 启动器中进入二级会话菜单，`/tools` 可进入工具详情菜单，`/doctor` 可进入检查项菜单，`/clear` 与 `/quit` 会先进入确认菜单，`/export` 可用。

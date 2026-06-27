@@ -125,7 +125,7 @@
 \textbf{核心机制}:
 \begin{itemize}
 \item \textbf{显式规划(plan)}:复杂问题先生成可执行步骤计划(仅引用内置工具,且 recommend/compare 等依赖 paper\_id 的工具会被安排在 search 之后),再据计划逐步执行;计划对用户与评委\textbf{可见}。
-\item \textbf{工具自主编排}:大模型按需调用 9 个工具,可\textbf{多步链式}(如先 \texttt{search} 拿到真实 paper\_id 再 \texttt{recommend\_papers} / \texttt{get\_trends});只读工具\textbf{并行执行};相同参数调用\textbf{自动去重}防止空转。
+\item \textbf{工具自主编排}:大模型按需调用 9 个原生语料工具和 1 个 \texttt{delegate} 专员委派工具,可\textbf{多步链式}(如先 \texttt{search} 拿到真实 paper\_id 再 \texttt{recommend\_papers} / \texttt{get\_trends});只读工具\textbf{并行执行};相同参数调用\textbf{自动去重}防止空转。
 \item \textbf{反思与自评(reflect)}:回答后由模型自评"是否充分、关键论断是否都有证据支撑",不足则改写检索\textbf{重试一次}。
 \item \textbf{上下文压缩}:长会话自动压缩历史工具结果,避免超出上下文窗口。
 \item \textbf{会话态与错误恢复}:TUI 传入 \texttt{session\_id},后端映射为 LangGraph \texttt{thread\_id} 并通过 checkpoint 保留会话态;\texttt{/retry} 在同一线程内携带 \texttt{retry=true} 触发恢复。
@@ -136,7 +136,7 @@
 \end{itemize}
 
 \begin{plainbox}
-\textbf{当前产品化路线}:Agent 由单一 LangGraph StateGraph 编排,无运行时开关。\texttt{meta.phase} 将底层节点翻译为用户可理解的科研工作流阶段;TUI 在运行中显示阶段条,并用分组 \texttt{/timeline} 回看证据链。\texttt{session\_id} 映射为 \texttt{thread\_id},checkpoint 保存会话态,\texttt{/retry} 支持同线程错误恢复。\textbf{MCP 双向互通与专员子智能体已落地}(见后文"开放与可扩展"小节);下一阶段聚焦持久化 checkpoint 与 Human-in-the-Loop。检索、趋势、推荐、图谱和 \texttt{verify\_claim} 工具保持不变。
+\textbf{当前产品化路线}:Agent 由单一 LangGraph StateGraph 编排,无运行时开关。\texttt{meta.phase} 将底层节点翻译为用户可理解的科研工作流阶段;TUI 在运行中显示阶段条,并用分组 \texttt{/timeline} 回看证据链。\texttt{session\_id} 映射为 \texttt{thread\_id},checkpoint 保存会话态,\texttt{/retry} 支持同线程错误恢复。\textbf{MCP 双向互通与专员子智能体已落地}(见后文"开放与可扩展"小节);下一阶段聚焦持久化 checkpoint 与 Human-in-the-Loop。9 个原生语料工具与 \texttt{delegate} 专员工具均通过同一 \texttt{Tool} 注册表维护。
 \end{plainbox}
 
 \begin{tableblock}
@@ -168,6 +168,7 @@
 \texttt{query\_knowledge\_graph} & 作者/关键词/主题图谱与研究社区主题 \\
 \texttt{export\_bibliography} & 导出 BibTeX 引文条目 \\
 \texttt{verify\_claim} & \textbf{跨语言论断核查}:用语义接地度判定支持等级并给出处 \\
+\texttt{delegate} & 将聚焦子任务交给综述员、趋势分析师或批判核查员三类专员子智能体 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
@@ -175,7 +176,7 @@
 \subsection{开放与可扩展:MCP 双向互通 + 专员子智能体}
 在固定的领域工具之外,智能体层做了三项可扩展性升级,使 SciScope 从"封闭工具集"走向\textbf{开放智能体生态}:
 \begin{itemize}
-\item \textbf{① SciScope 作为 MCP 服务端}:全部工具经模型上下文协议(Model Context Protocol, MCP)对外暴露,\textbf{任意 MCP 客户端}(Claude Desktop、Cursor 等)可直接调用我们的接地语料检索与 \texttt{verify\_claim} 核查——把护城河(16 万语料)开放成生态入口而非自用孤岛;复用同一工具契约,零重复实现。
+\item \textbf{① SciScope 作为 MCP 服务端}:当前 \texttt{Tool} 注册表经模型上下文协议(Model Context Protocol, MCP)对外暴露,\textbf{任意 MCP 客户端}(Claude Desktop、Cursor 等)可直接调用我们的接地语料检索与 \texttt{verify\_claim} 核查——把护城河(16 万语料)开放成生态入口而非自用孤岛;复用同一工具契约,零重复实现。
 \item \textbf{② 消费外部 MCP 工具}:智能体可将外部 MCP 服务端的工具按 \texttt{mcp\_\_server\_\_tool} 命名并入工具注册表,与原生工具统一调度。\textbf{新增能力(如联网取全文、Web 检索)由"插入 MCP 服务"获得,而非新增原生代码},核心工具保持精简、聚焦治理语料。
 \item \textbf{③ 专员子智能体(多 Agent 分工)}:复杂多面任务可经 \texttt{delegate} 工具下派给\textbf{综述员 / 趋势分析师 / 批判核查员}三类专员,各携受限工具集独立完成子任务;专员工具集不含 \texttt{delegate},\textbf{结构上杜绝递归}。
 \end{itemize}
@@ -185,7 +186,7 @@
 
 \subsection{方案功能}
 \begin{itemize}
-\item \textbf{科研智能体 \texttt{/api/agent/stream}}:大模型\textbf{自主规划并编排}上述能力(9 个工具),多步推理、自我纠错、据证作答;终端助手 \texttt{make tui} 提供 Claude Code 风格的流式交互。
+\item \textbf{科研智能体 \texttt{/api/agent/stream}}:大模型\textbf{自主规划并编排}上述能力(9 个原生语料工具 + 1 个 \texttt{delegate} 工具),多步推理、自我纠错、据证作答;终端助手 \texttt{make tui} 提供 Claude Code 风格的流式交互。
 \item \textbf{文献问答 \texttt{/api/chat}}:\textbf{GraphRAG}(查询抽取关键词实体 → 沿共现图扩展邻居 → query expansion)+ 混合检索证据 → 本地大模型据证生成带引用回答 → \textbf{答案可被证据支撑性校验}(低置信明确提示)。
 \item \textbf{混合检索 \texttt{/api/search}}:FTS + 向量 + RRF 融合,去重到论文级,返回命中片段。
 \item \textbf{趋势预测 \texttt{/api/trends}}:关键词/主题的增长率、burst、生命周期与下一年线性外推(含不确定区间)。
@@ -228,7 +229,7 @@ g(c,e)=\alpha\,sim(c,e)+\beta\,source(e)+\gamma\,recency(e)
 .2 \texttt{models/, output/graphs/}\quad [2] 模型文件 / 知识图谱 JSON.
 .2 \texttt{backend/app/}.
 .3 \texttt{services/}\quad [3] 混合检索(RAG)·GraphRAG·证据接地.
-.3 \texttt{agent/}\quad [4] LangGraph StateGraph(plan->执行->观察->反思,session/retry,9 工具).
+.3 \texttt{agent/}\quad [4] LangGraph StateGraph(plan->执行->观察->反思,session/retry,9 原生工具+delegate).
 .3 \texttt{api/}\quad [5] \texttt{/api/agent/stream}(SSE meta)+ search / chat / trends.
 .2 \texttt{tui/}\quad [6] Go·Bubble Tea 终端客户端(消费 SSE).
 .2 \texttt{PostgreSQL + pgvector}\quad 运行时:papers·chunk\_embeddings·….

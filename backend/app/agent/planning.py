@@ -7,8 +7,9 @@ from backend.app.agent.llm import complete
 
 META_PROMPTS = (
     "你好", "您好", "你是谁", "你是什么", "你能做什么", "你能干什么", "你会什么",
-    "自我介绍", "介绍一下你", "怎么用", "如何使用", "帮助", "谢谢", "多谢", "再见",
-    "hello", "hi ", "who are you", "what can you", "help", "thanks",
+    "你还会什么", "还能做什么", "除了科研文献", "除了文献", "除了论文", "能力", "边界", "局限", "自我介绍",
+    "介绍一下你", "怎么用", "如何使用", "帮助", "谢谢", "多谢", "再见",
+    "hello", "hi ", "who are you", "what can you", "what else can you", "help", "thanks",
 )
 
 PLAN_MARKERS = (
