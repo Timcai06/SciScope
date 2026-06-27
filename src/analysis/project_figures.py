@@ -19,22 +19,28 @@ import numpy as np
 from src.analysis.plotting import configure_plot_style, save_figure
 
 
-INK = "#202124"
-MUTED = "#626b76"
+CHARCOAL = "#2a272a"
+GRAPHITE = "#4b4a54"
+STEEL = "#677381"
+BLUEGREY = "#82a0aa"
+MINTGREY = "#a3cfcd"
 PAPER = "#ffffff"
-CANVAS = "#fbfcfc"
-PANEL = "#f4f7f7"
-LINE = "#cbd5dc"
-BLUE = "#2f6f8f"
-TEAL = "#2d9a8a"
-GREEN = "#57a773"
-GOLD = "#b68b2f"
-ROSE = "#b65b6a"
-SLATE = "#46515c"
+PANEL = "#f5f7f7"
+SOFT = "#edf1f1"
+LINE = "#c8d0d4"
+INK = CHARCOAL
+MUTED = STEEL
+CANVAS = PAPER
+BLUE = CHARCOAL
+TEAL = GRAPHITE
+GREEN = STEEL
+GOLD = BLUEGREY
+ROSE = MINTGREY
+SLATE = GRAPHITE
 TESTS_PASSED = 141
 
-LAYER_FILLS = ["#edf4f3", "#e4eeee", "#d9e8e8", "#cee0e2", "#bfd5d8", "#afc9cd"]
-SERIES_COLORS = [BLUE, TEAL, GREEN, GOLD, ROSE, SLATE]
+LAYER_FILLS = [SOFT, "#e5ebeb", "#dbe4e4", "#cfdcdc", "#c1d2d4", "#b1c6c9", MINTGREY]
+SERIES_COLORS = [CHARCOAL, GRAPHITE, STEEL, BLUEGREY, MINTGREY, "#bccacc"]
 
 
 def _load_json(path: Path) -> dict[str, Any]:
