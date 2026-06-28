@@ -81,10 +81,178 @@ func TestAgentRequestBodySanitizesHistoryForBackendSchema(t *testing.T) {
 	}
 }
 
+func TestTranscriptViewportUsesFasterWheelDelta(t *testing.T) {
+	vp := newTranscriptViewport(100, 20)
+
+	if vp.MouseWheelDelta != 6 {
+		t.Fatalf("MouseWheelDelta = %d, want 6", vp.MouseWheelDelta)
+	}
+}
+
+func TestVerticalWheelFilterIgnoresNonScrollMouseEvents(t *testing.T) {
+	cases := []struct {
+		name string
+		msg  tea.MouseMsg
+		want bool
+	}{
+		{
+			name: "wheel up",
+			msg:  tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonWheelUp},
+			want: true,
+		},
+		{
+			name: "wheel down",
+			msg:  tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonWheelDown},
+			want: true,
+		},
+		{
+			name: "motion",
+			msg:  tea.MouseMsg{Action: tea.MouseActionMotion},
+		},
+		{
+			name: "click",
+			msg:  tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonLeft},
+		},
+		{
+			name: "horizontal wheel",
+			msg:  tea.MouseMsg{Action: tea.MouseActionPress, Button: tea.MouseButtonWheelLeft},
+		},
+	}
+	for _, c := range cases {
+		if got := isVerticalWheel(c.msg); got != c.want {
+			t.Fatalf("%s: isVerticalWheel = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestSemanticHighlightStylesResearchTokens(t *testing.T) {
+	raw := "强支持: verify_claim 命中 W4411065983, 2025, 相似度 0.846; /timeline 查看, 但仍需谨慎"
+
+	spans := resolveHighlightSpans(semanticHighlightSpans(raw))
+	if len(spans) < 6 {
+		t.Fatalf("expected semantic spans for verdict/tool/paper/metric/command/caution, got %#v", spans)
+	}
+	styled := styleSemanticText(raw)
+	plain := plainANSI(styled)
+	for _, want := range []string{"强支持", "verify_claim", "W4411065983", "0.846", "/timeline", "谨慎"} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("highlighted text missing %q:\n%s", want, plain)
+		}
+	}
+}
+
+func TestKaomojiTracksAgentState(t *testing.T) {
+	cases := []struct {
+		name string
+		kind string
+		meta eventMeta
+		want string
+	}{
+		{name: "plan", kind: "plan", want: "(。-`ω´-)"},
+		{name: "tool", kind: "tool_call", meta: eventMeta{Node: "execute_tools"}, want: "(つ•̀ω•́)つ"},
+		{name: "reflect", kind: "reflect", want: "( ･᷄ὢ･᷅ )"},
+		{name: "final", kind: "final", want: "(๑•̀ㅂ•́)و✧"},
+		{name: "retry", kind: "text", meta: eventMeta{Retry: true}, want: "(ง •̀_•́)ง"},
+		{name: "idle", kind: "", want: "(´▽`)"},
+	}
+	for _, c := range cases {
+		answering := c.name != "idle"
+		if got := kaomojiForState(c.kind, c.meta, answering); got != c.want {
+			t.Fatalf("%s: kaomoji = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestToolResultMentionsTimelineForCollapsedEvidence(t *testing.T) {
+	result := `[
+		{"paper_id":"W1","标题":"A","年份":2025},
+		{"paper_id":"W2","标题":"B","年份":2025},
+		{"paper_id":"W3","标题":"C","年份":2025},
+		{"paper_id":"W4","标题":"D","年份":2025},
+		{"paper_id":"W5","标题":"E","年份":2025}
+	]`
+
+	rendered := renderToolResult("search_literature", result, 120, 0)
+
+	if !strings.Contains(rendered, "+1 篇更多证据 · /timeline 查看完整证据链") {
+		t.Fatalf("collapsed evidence should point to /timeline:\n%s", rendered)
+	}
+}
+
+func TestAppendBlockMaintainsStructuredBlockCache(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+
+	m.appendBlock("第一条")
+
+	if len(m.blockItems) != 1 {
+		t.Fatalf("appendBlock should add one structured block, got %#v", m.blockItems)
+	}
+	if m.blockItems[0].Raw != "第一条" || m.blockItems[0].Kind != "message" {
+		t.Fatalf("unexpected structured block: %#v", m.blockItems[0])
+	}
+}
+
+func TestRenderBlocksContentReusesWidthCache(t *testing.T) {
+	m := initialModel()
+	m.blocks = []string{"alpha", "beta"}
+
+	first := m.renderBlocksContent(80)
+	if first != "alpha\nbeta" {
+		t.Fatalf("unexpected rendered content: %q", first)
+	}
+	if len(m.blockItems) != 2 {
+		t.Fatalf("expected fallback blocks to populate structured cache, got %#v", m.blockItems)
+	}
+	version := m.blockItems[0].RenderVersion
+
+	second := m.renderBlocksContent(80)
+	if second != first {
+		t.Fatalf("same width should render same content: %q vs %q", second, first)
+	}
+	if m.blockItems[0].RenderVersion != version {
+		t.Fatalf("same-width render should reuse cache, version %d -> %d", version, m.blockItems[0].RenderVersion)
+	}
+
+	_ = m.renderBlocksContent(72)
+	if m.blockItems[0].RenderVersion == version {
+		t.Fatalf("width change should invalidate per-block render cache")
+	}
+}
+
+func TestRenderTranscriptContentReusesWholeTranscriptCache(t *testing.T) {
+	m := initialModel()
+	m.blocks = []string{"alpha", "beta"}
+
+	first := m.renderTranscriptContent(80)
+	if first != "alpha\nbeta" {
+		t.Fatalf("unexpected transcript content: %q", first)
+	}
+	cacheVersion := m.transcriptCacheVersion
+
+	second := m.renderTranscriptContent(80)
+	if second != first {
+		t.Fatalf("same width should reuse transcript text: %q vs %q", second, first)
+	}
+	if m.transcriptCacheVersion != cacheVersion {
+		t.Fatalf("same-width transcript render should reuse cache, version %d -> %d", cacheVersion, m.transcriptCacheVersion)
+	}
+
+	m.appendBlock("gamma")
+	third := m.renderTranscriptContent(80)
+	if third != "alpha\nbeta\ngamma" {
+		t.Fatalf("append should invalidate transcript cache, got %q", third)
+	}
+	if m.transcriptCacheVersion == cacheVersion {
+		t.Fatalf("append should rebuild transcript cache")
+	}
+}
+
 func TestMetaDetailFormatsLangGraphNodeTiming(t *testing.T) {
 	got := metaDetail(eventMeta{Runtime: "langgraph", Node: "execute_tools", Phase: "证据检索", ElapsedMS: 42, Retry: true})
 
-	if got != "阶段 证据检索 · 42ms · retry" {
+	if got != "阶段 证据检索 · 42ms · 重试" {
 		t.Fatalf("unexpected meta detail: %q", got)
 	}
 }
@@ -104,9 +272,9 @@ func TestRenderStreamRailShowsLangGraphObservability(t *testing.T) {
 		"阶段",
 		"证据检索",
 		"tool call",
-		"retry",
+		"重试",
 		"42ms",
-		"thread tui-20260625T120000",
+		"线程 tui-20260625T120000",
 		"理解问题",
 		"制定研究计划",
 		"检索文献",
@@ -136,7 +304,7 @@ func TestRenderWorkflowStatusShowsCurrentResearchPhase(t *testing.T) {
 		"自检修正",
 		"综合回答",
 		"tui-20260625T120000",
-		"retry",
+		"重试",
 	} {
 		if !strings.Contains(plain, want) {
 			t.Fatalf("workflow status missing %q:\n%s", want, plain)
@@ -606,9 +774,9 @@ func TestSplashScreenShowsProductCurtain(t *testing.T) {
 	for _, want := range []string{
 		"███████╗ ██████╗██╗███████╗ ██████╗ ██████╗ ██████╗ ███████╗",
 		"科研智能体终端",
-		"Evidence-grounded research agent",
-		"Start with a claim",
-		"Type / for commands",
+		"证据接地的科研文献智能体",
+		"从一个论断",
+		"输入 / 查看命令",
 	} {
 		if !strings.Contains(splash, want) {
 			t.Fatalf("splash missing %q:\n%s", want, splash)
@@ -647,8 +815,8 @@ func TestSplashScalesDownWithoutLosingActions(t *testing.T) {
 	for _, want := range []string{
 		"SciScope",
 		"科研智能体终端",
-		"Type /",
-		"commands",
+		"输入 /",
+		"查看命令",
 	} {
 		if !strings.Contains(splash, want) {
 			t.Fatalf("compact splash missing %q:\n%s", want, splash)
@@ -664,9 +832,6 @@ func TestComposerRendersPolishedInputBox(t *testing.T) {
 
 	for _, want := range []string{
 		"核查 RAG",
-		"Enter",
-		"Esc",
-		"commands",
 	} {
 		if !strings.Contains(composer, want) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)
@@ -689,7 +854,7 @@ func TestSlashCommandPaletteUsesFullWidth(t *testing.T) {
 	for _, want := range []string{
 		"命令启动器",
 		"↑/↓ 选择",
-		"Enter 执行",
+		"Enter 填入/执行",
 		"Esc 关闭",
 		"▶",
 		"/demo",
@@ -1004,7 +1169,7 @@ func TestThinkingShelfRendersAboveComposerState(t *testing.T) {
 	}
 }
 
-func TestPlanAndReflectStayOutOfConversationBlocks(t *testing.T) {
+func TestPlanAndReflectStreamInlineAndUpdateLiveState(t *testing.T) {
 	m := initialModel()
 	m.ready = true
 	m.answering = true
@@ -1012,8 +1177,8 @@ func TestPlanAndReflectStayOutOfConversationBlocks(t *testing.T) {
 
 	next, _ := m.Update(planMsg{"检索证据", "综合回答"})
 	got := next.(model)
-	if len(got.blocks) != 0 {
-		t.Fatalf("plan should not append to conversation blocks: %#v", got.blocks)
+	if len(got.blocks) != 1 {
+		t.Fatalf("plan should stream inline as one block: %#v", got.blocks)
 	}
 	if len(got.livePlan) != 2 {
 		t.Fatalf("expected live plan to update, got %#v", got.livePlan)
@@ -1021,18 +1186,18 @@ func TestPlanAndReflectStayOutOfConversationBlocks(t *testing.T) {
 
 	next, _ = got.Update(reflectMsg("需要补充证据"))
 	got = next.(model)
-	if len(got.blocks) != 0 {
-		t.Fatalf("reflect should not append to conversation blocks: %#v", got.blocks)
+	if len(got.blocks) != 2 {
+		t.Fatalf("reflect should stream inline as another block: %#v", got.blocks)
 	}
 	if got.liveReflect != "需要补充证据" {
 		t.Fatalf("expected live reflect to update, got %q", got.liveReflect)
 	}
 	if !strings.Contains(got.View(), "需要补充证据") {
-		t.Fatalf("view should show live reflect above composer:\n%s", got.View())
+		t.Fatalf("view should show reflect:\n%s", got.View())
 	}
 }
 
-func TestToolEventsStayOutOfConversationBlocks(t *testing.T) {
+func TestToolEventsStreamInlineAndAppearInTimeline(t *testing.T) {
 	m := initialModel()
 	m.ready = true
 	m.answering = true
@@ -1040,17 +1205,17 @@ func TestToolEventsStayOutOfConversationBlocks(t *testing.T) {
 
 	next, _ := m.Update(toolCallMsg{name: "search_literature", args: map[string]any{"query": "RAG"}})
 	got := next.(model)
-	if len(got.blocks) != 0 {
-		t.Fatalf("tool call should not append to conversation blocks: %#v", got.blocks)
+	if len(got.blocks) != 1 {
+		t.Fatalf("tool call should stream inline as one block: %#v", got.blocks)
 	}
 
 	next, _ = got.Update(toolResultMsg{name: "search_literature", result: `[{"paper_id":"W1","标题":"RAG","年份":2025}]`})
 	got = next.(model)
-	if len(got.blocks) != 0 {
-		t.Fatalf("tool result should not append to conversation blocks: %#v", got.blocks)
+	if len(got.blocks) != 2 {
+		t.Fatalf("tool result should stream inline as another block: %#v", got.blocks)
 	}
 	if len(got.timeline) < 2 {
-		t.Fatalf("tool events should still be available in timeline: %#v", got.timeline)
+		t.Fatalf("tool events should also be available in timeline: %#v", got.timeline)
 	}
 }
 
@@ -1272,9 +1437,6 @@ func TestComposerShowsMultilineAndRecoveryHints(t *testing.T) {
 	for _, want := range []string{
 		"第一行",
 		"第二行",
-		"Esc",
-		"/",
-		"commands",
 	} {
 		if !strings.Contains(composer, want) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)
@@ -1283,6 +1445,48 @@ func TestComposerShowsMultilineAndRecoveryHints(t *testing.T) {
 	for _, removed := range []string{"agent", "langgraph", "/retry"} {
 		if strings.Contains(composer, removed) {
 			t.Fatalf("composer should stay minimal, found %q:\n%s", removed, composer)
+		}
+	}
+}
+
+func TestPaletteStagesArgCommandTemplate(t *testing.T) {
+	rec := slashCmd{cmd: "/recommend", key: "recommend <topic|paper_id>"}
+	demo := slashCmd{cmd: "/demo", key: "demo"}
+	if !commandNeedsArg(rec) {
+		t.Fatal("/recommend (usage has <...>) should need an argument")
+	}
+	if commandNeedsArg(demo) {
+		t.Fatal("/demo should not need an argument")
+	}
+
+	// An arg command is staged as "/recommend <>" with the cursor between < and >.
+	m := stageCommand(initialModel(), rec)
+	if got := m.ti.Value(); got != "/recommend <>" {
+		t.Fatalf("staged value = %q, want %q", got, "/recommend <>")
+	}
+	if pos, want := m.ti.Position(), len("/recommend <>")-1; pos != want {
+		t.Fatalf("cursor at %d, want %d (between < and >)", pos, want)
+	}
+
+	// An argument-less command just completes to the bare command.
+	if got := stageCommand(initialModel(), demo).ti.Value(); got != "/demo" {
+		t.Fatalf("staged value = %q, want %q", got, "/demo")
+	}
+}
+
+func TestStripPlaceholderArgument(t *testing.T) {
+	cases := []struct {
+		in   []string
+		want string
+	}{
+		{[]string{"<graph", "nn>"}, "graph|nn"}, // typed inside the staged <>
+		{[]string{"<>"}, ""},                    // untouched placeholder -> empty arg
+		{[]string{"graph", "nn"}, "graph|nn"},   // typed without brackets
+		{nil, ""},
+	}
+	for _, c := range cases {
+		if got := strings.Join(stripPlaceholder(c.in), "|"); got != c.want {
+			t.Fatalf("stripPlaceholder(%v) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }

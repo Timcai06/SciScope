@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -149,6 +150,18 @@ var verbs = []string{
 	"检索中", "推敲中", "归纳中", "研判中", "爬梳中", "斟酌中", "综合中",
 	"推演中", "酝酿中", "梳理中", "求证中", "琢磨中", "盘点中", "沉思中",
 }
+
+const streamRefreshInterval = 45 * time.Millisecond
+
+var (
+	paperIDPattern  = regexp.MustCompile(`\b(?:W\d{6,}|[a-zA-Z]+:\S+|\d{4}\.\d{4,5})\b`)
+	yearPattern     = regexp.MustCompile(`\b20(?:1[9]|2[0-9])\b`)
+	metricPattern   = regexp.MustCompile(`(?:\b\d+(?:\.\d+)?%|\b0\.\d{2,4}\b|\b\d+(?:,\d{3})+(?:\.\d+)?\b|\b\d+\.\d+\b)`)
+	commandPattern  = regexp.MustCompile(`/(?:timeline|retry|doctor|export|demo|tools|theme|sessions|resume|verify|trend|recommend|review)\b`)
+	toolNamePattern = regexp.MustCompile(`\b(?:verify_claim|search_literature|get_trends|recommend_papers|get_paper|summarize_field|compare_papers|query_knowledge_graph|export_bibliography)\b`)
+	verdictPattern  = regexp.MustCompile(`强支持|弱支持|不支持|支持等级|论断核查|证据卡|趋势卡|相似度|最高接地相似度`)
+	cautionPattern  = regexp.MustCompile(`风险|限制|边界|注意|谨慎|可能|取决于|不应|不能|然而|但是|仍需|不足`)
+)
 
 // ---- tool icons/labels (Nerd Font / Font Awesome glyphs, U+F0xx PUA) ----
 var toolLabels = map[string][2]string{
@@ -313,6 +326,7 @@ type reflectMsg string
 type finalMsg string
 type errMsg string
 type doneMsg struct{}
+type refreshTickMsg struct{}
 type demoStartMsg string
 type nodePulseMsg struct {
 	kind string
@@ -706,36 +720,52 @@ func listen(sub chan tea.Msg) tea.Cmd {
 
 // ---- model ----
 type model struct {
-	ti             textinput.Model
-	vp             viewport.Model
-	spin           spinner.Model
-	blocks         []string // finalized conversation lines
-	answer         string   // current streaming answer
-	answering      bool
-	verb           string
-	tick           int
-	start          time.Time // when the current turn began (for the elapsed timer)
-	used           []string  // tools called this turn (for the answer footer)
-	toolStart      map[string]time.Time
-	history        []turn
-	transcript     []transcriptEvent
-	timeline       []timelineEvent
-	recentSessions []sessionFile
-	lastExport     string
-	lastQuestion   string
-	sessionID      string
-	lastMeta       eventMeta
-	lastStreamKind string
-	nodeSeen       []string
-	livePlan       []string
-	liveReflect    string
-	sub            chan tea.Msg
-	cancel         context.CancelFunc
-	menuIdx        int
-	submenu        string
-	submenuIdx     int
-	ready          bool
-	demo           bool
+	ti                          textinput.Model
+	vp                          viewport.Model
+	spin                        spinner.Model
+	blocks                      []string // finalized conversation lines
+	blockItems                  []conversationBlock
+	blocksVersion               int
+	transcriptCache             string
+	transcriptCacheWidth        int
+	transcriptCacheBlockVersion int
+	transcriptCacheVersion      int
+	answer                      string // current streaming answer
+	answering                   bool
+	verb                        string
+	tick                        int
+	start                       time.Time // when the current turn began (for the elapsed timer)
+	used                        []string  // tools called this turn (for the answer footer)
+	toolStart                   map[string]time.Time
+	history                     []turn
+	transcript                  []transcriptEvent
+	timeline                    []timelineEvent
+	recentSessions              []sessionFile
+	lastExport                  string
+	lastQuestion                string
+	sessionID                   string
+	lastMeta                    eventMeta
+	lastStreamKind              string
+	nodeSeen                    []string
+	livePlan                    []string
+	liveReflect                 string
+	lastRefresh                 time.Time
+	refreshPending              bool
+	sub                         chan tea.Msg
+	cancel                      context.CancelFunc
+	menuIdx                     int
+	submenu                     string
+	submenuIdx                  int
+	ready                       bool
+	demo                        bool
+}
+
+type conversationBlock struct {
+	Kind          string
+	Raw           string
+	Rendered      string
+	RenderWidth   int
+	RenderVersion int
 }
 
 func initialModel() model {
@@ -756,6 +786,21 @@ func initialModel() model {
 	return m
 }
 
+func newTranscriptViewport(width, height int) viewport.Model {
+	vp := viewport.New(width, height)
+	// macOS trackpads emit many small wheel events; the default delta (3 lines)
+	// feels choppy in an alt-screen transcript, especially with styled ANSI text.
+	vp.MouseWheelDelta = 6
+	return vp
+}
+
+func isVerticalWheel(msg tea.MouseMsg) bool {
+	if msg.Action != tea.MouseActionPress {
+		return false
+	}
+	return msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown
+}
+
 func newSessionID() string {
 	return "tui-" + time.Now().UTC().Format("20060102T150405.000000000")
 }
@@ -772,7 +817,59 @@ func (m model) Init() tea.Cmd {
 
 func (m *model) appendBlock(s string) {
 	m.blocks = append(m.blocks, s)
+	m.blockItems = append(m.blockItems, conversationBlock{Kind: "message", Raw: s})
+	m.blocksVersion++
 	m.refresh()
+}
+
+func (m *model) syncBlockItems() {
+	if len(m.blockItems) == len(m.blocks) {
+		matched := true
+		for i := range m.blocks {
+			if m.blockItems[i].Raw != m.blocks[i] {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return
+		}
+	}
+	m.blockItems = make([]conversationBlock, len(m.blocks))
+	for i, raw := range m.blocks {
+		m.blockItems[i] = conversationBlock{Kind: "message", Raw: raw}
+	}
+	m.blocksVersion++
+}
+
+func (m *model) renderBlocksContent(width int) string {
+	m.syncBlockItems()
+	if len(m.blockItems) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(m.blockItems))
+	for i := range m.blockItems {
+		block := &m.blockItems[i]
+		if block.Rendered == "" || block.RenderWidth != width {
+			block.Rendered = block.Raw
+			block.RenderWidth = width
+			block.RenderVersion++
+		}
+		parts = append(parts, block.Rendered)
+	}
+	return strings.Join(parts, "\n")
+}
+
+func (m *model) renderTranscriptContent(width int) string {
+	m.syncBlockItems()
+	if m.transcriptCacheWidth == width && m.transcriptCacheBlockVersion == m.blocksVersion {
+		return m.transcriptCache
+	}
+	m.transcriptCache = m.renderBlocksContent(width)
+	m.transcriptCacheWidth = width
+	m.transcriptCacheBlockVersion = m.blocksVersion
+	m.transcriptCacheVersion++
+	return m.transcriptCache
 }
 
 func (m *model) syncThemeStyles() {
@@ -885,6 +982,37 @@ func streamKindLabel(kind string) string {
 	}
 }
 
+func kaomojiForState(kind string, meta eventMeta, answering bool) string {
+	if !answering {
+		return "(´▽`)"
+	}
+	if kind == "error" {
+		return "(；￣Д￣)"
+	}
+	if meta.Retry {
+		return "(ง •̀_•́)ง"
+	}
+	switch kind {
+	case "tool_call", "tool_result":
+		switch meta.Node {
+		case "execute_tools":
+			return "(つ•̀ω•́)つ"
+		default:
+			return "(｀・ω・´)"
+		}
+	case "reflect":
+		return "( ･᷄ὢ･᷅ )"
+	case "final":
+		return "(๑•̀ㅂ•́)و✧"
+	case "plan":
+		return "(。-`ω´-)"
+	case "text":
+		return "( ..)φ"
+	default:
+		return "(。-`ω´-)"
+	}
+}
+
 func renderWorkflowStatus(meta eventMeta, nodes []string, kind string, elapsed time.Duration, width int) string {
 	if width < 56 {
 		width = 56
@@ -926,6 +1054,7 @@ func renderWorkflowStatus(meta eventMeta, nodes []string, kind string, elapsed t
 		session = "local session"
 	}
 	status := []string{
+		stAccent.Render(kaomojiForState(kind, meta, true)),
 		stAccent.Render("当前阶段"),
 		stInk.Render(current),
 		stFaint.Render(streamKindLabel(kind)),
@@ -980,7 +1109,7 @@ func formatHTTPError(resp *http.Response) string {
 }
 
 func (m *model) refresh() {
-	content := strings.Join(m.blocks, "\n")
+	content := m.renderTranscriptContent(m.vp.Width)
 	if m.answering && m.answer != "" {
 		content += "\n" + stBullet.Render("⏺ ") + stInk.Render(m.answer)
 	}
@@ -995,6 +1124,26 @@ func (m *model) refresh() {
 	if atBottom {
 		m.vp.GotoBottom()
 	}
+	m.lastRefresh = time.Now()
+	m.refreshPending = false
+}
+
+func (m *model) requestStreamRefresh() tea.Cmd {
+	if m.lastRefresh.IsZero() || time.Since(m.lastRefresh) >= streamRefreshInterval {
+		m.refresh()
+		return nil
+	}
+	if m.refreshPending {
+		return nil
+	}
+	m.refreshPending = true
+	wait := streamRefreshInterval - time.Since(m.lastRefresh)
+	if wait < 0 {
+		wait = 0
+	}
+	return tea.Tick(wait, func(time.Time) tea.Msg {
+		return refreshTickMsg{}
+	})
 }
 
 func renderStreamRail(events []timelineEvent, meta eventMeta, nodes []string, kind string, elapsed time.Duration, width int) string {
@@ -1297,6 +1446,28 @@ func recentSplashLines(sessions []sessionFile) []string {
 	return lines
 }
 
+// kindIcon previews what a command does before it is run: ◇ expands into an
+// agent question, ▤ opens a submenu, • runs instantly.
+func kindIcon(k slashCommandKind) string {
+	switch k {
+	case commandPrompt:
+		return "◇"
+	case commandUI:
+		return "▤"
+	default:
+		return "•"
+	}
+}
+
+// styleUsageCell dims a usage hint but renders its "<...>" argument placeholder in
+// the accent colour, so commands that take an argument stand out at a glance.
+func styleUsageCell(cell string) string {
+	if i := strings.IndexByte(cell, '<'); i >= 0 {
+		return stFaint.Render(cell[:i]) + stAccent.Render(cell[i:])
+	}
+	return stFaint.Render(cell)
+}
+
 func (m model) renderCommandPalette(width int) string {
 	if width < 48 {
 		width = 48
@@ -1310,32 +1481,41 @@ func (m model) renderCommandPalette(width int) string {
 		inner = 38
 	}
 	idx := m.menuIdx % len(matches)
-	cursorW, cmdW, titleW, keyW := 3, 12, 14, 12
-	descW := inner - cursorW - cmdW - titleW - keyW
+	cursorW, iconW, cmdW, titleW, keyW := 2, 2, 12, 10, 18
+	descW := inner - cursorW - iconW - cmdW - titleW - keyW
 	if descW < 10 {
 		descW = 10
 	}
+	pad := func(s string, w int) string { return lipgloss.NewStyle().Width(w).Render(s) }
 	rows := []string{
-		stAccent.Render("命令启动器") + stFaint.Render("  · ↑/↓ 选择 · Enter 执行 · Tab 补全 · Esc 关闭"),
+		stAccent.Render("命令启动器") + stFaint.Render("  · ↑/↓ 选择 · Enter 填入/执行 · Tab 补全 · Esc 关闭"),
 	}
+	lastCat := ""
 	for i, c := range matches {
+		if c.category != lastCat { // group commands under faint category headers
+			rows = append(rows, stFaint.Render("  "+c.category))
+			lastCat = c.category
+		}
+		sel := i == idx
 		marker := "  "
-		if i == idx {
+		if sel {
 			marker = "▶ "
 		}
-		cols := lipgloss.JoinHorizontal(
-			lipgloss.Top,
-			lipgloss.NewStyle().Width(cursorW).Render(marker),
-			lipgloss.NewStyle().Width(cmdW).Render(c.cmd),
-			lipgloss.NewStyle().Width(titleW).Render(clipWidth(c.title, titleW-1)),
-			lipgloss.NewStyle().Width(descW).Render(clipWidth(c.desc, descW-1)),
-			lipgloss.NewStyle().Width(keyW).Render(clipWidth(c.key, keyW-1)),
-		)
-		if i == idx {
-			rows = append(rows, stSelCmd.Width(inner).Render(cols))
-		} else {
-			rows = append(rows, stCmd.Width(inner).Render(cols))
+		cells := []string{
+			pad(marker, cursorW),
+			pad(kindIcon(c.kind), iconW),
+			pad(c.cmd, cmdW),
+			pad(clipWidth(c.title, titleW-1), titleW),
+			pad(clipWidth(c.desc, descW-1), descW),
+			pad(clipWidth(c.key, keyW-1), keyW),
 		}
+		if sel { // uniform high-contrast highlight for the selected row
+			rows = append(rows, stSelCmd.Width(inner).Render(strings.Join(cells, "")))
+			continue
+		}
+		styled := stFaint.Render(cells[0]) + stAccent.Render(cells[1]) + stInk.Render(cells[2]) +
+			stMuted.Render(cells[3]) + stFaint.Render(cells[4]) + styleUsageCell(cells[5])
+		rows = append(rows, lipgloss.NewStyle().Width(inner).Render(styled))
 	}
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), true, false, true, false).
@@ -1486,7 +1666,7 @@ func renderToolResult(name, result string, width int, elapsed time.Duration) str
 			body := []string{}
 			for i, p := range papers {
 				if i >= 4 {
-					body = append(body, fmt.Sprintf("+%d 篇更多证据", len(papers)-i))
+					body = append(body, fmt.Sprintf("+%d 篇更多证据 · /timeline 查看完整证据链", len(papers)-i))
 					break
 				}
 				meta := []string{p.PaperID}
@@ -1520,6 +1700,7 @@ func renderToolResult(name, result string, width int, elapsed time.Duration) str
 			}
 			for i, ev := range cr.Evidence {
 				if i >= 4 {
+					body = append(body, fmt.Sprintf("+%d 条更多证据 · /timeline 查看", len(cr.Evidence)-i))
 					break
 				}
 				meta := []string{ev.PaperID}
@@ -1540,6 +1721,7 @@ func renderToolResult(name, result string, width int, elapsed time.Duration) str
 			body := []string{}
 			for i, row := range rows {
 				if i >= 3 {
+					body = append(body, fmt.Sprintf("+%d 条更多趋势 · /timeline 查看", len(rows)-i))
 					break
 				}
 				kw := fmt.Sprintf("%v", row["关键词"])
@@ -1983,7 +2165,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			vh = 3
 		}
 		if !m.ready {
-			m.vp = viewport.New(msg.Width, vh)
+			m.vp = newTranscriptViewport(msg.Width, vh)
 			m.loadRecentSessions()
 			m.vp.SetContent(renderSplash(msg.Width, m.recentSessions))
 			m.ready = true
@@ -2021,8 +2203,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastMeta = msg.meta
 		m.lastStreamKind = msg.kind
 		m.nodeSeen = appendUniqueNode(m.nodeSeen, msg.meta.Node)
-		m.refresh()
 		return m, listen(m.sub)
+
+	case refreshTickMsg:
+		if m.refreshPending {
+			m.refresh()
+		}
+		return m, nil
 
 	case spinner.TickMsg:
 		if !m.answering {
@@ -2037,7 +2224,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseMsg:
 		// Mouse wheel scrolls the transcript viewport.
-		m.vp, cmd = m.vp.Update(msg)
+		if isVerticalWheel(msg) {
+			m.vp, cmd = m.vp.Update(msg)
+		}
 		return m, cmd
 
 	case tea.KeyMsg:
@@ -2088,7 +2277,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					case "down":
 						m.menuIdx = (m.menuIdx + 1) % len(ms)
 					case "tab":
-						m.ti.SetValue(ms[m.menuIdx%len(ms)].cmd)
+						m = stageCommand(m, ms[m.menuIdx%len(ms)])
 					}
 					return m, nil
 				}
@@ -2111,7 +2300,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if strings.HasPrefix(v, "/") {
 				if ms := filterCmds(m.ti.Value()); len(ms) > 0 && m.menuIdx < len(ms) && !strings.Contains(v, " ") {
-					v = ms[m.menuIdx].cmd
+					selected := ms[m.menuIdx]
+					// A command that takes an argument is staged as "/cmd <>" with the
+					// cursor in the slot, instead of running with an empty argument.
+					if commandNeedsArg(selected) {
+						m = stageCommand(m, selected)
+						m.menuIdx = 0
+						return m, nil
+					}
+					v = selected.cmd
 				}
 				if submenu := commandSubmenu(v); submenu != "" {
 					m.openSubmenu(submenu)
@@ -2194,13 +2391,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case textMsg:
 		m.answer += string(msg)
-		m.refresh()
-		return m, listen(m.sub)
+		return m, tea.Batch(m.requestStreamRefresh(), listen(m.sub))
 
 	case finalMsg:
 		if m.answer == "" {
 			m.answer = string(msg)
 		}
+		m.refreshPending = false
 		m.refresh()
 		return m, listen(m.sub)
 
@@ -2297,18 +2494,92 @@ func styleAnswerLine(line string) string {
 		if text == "" {
 			return indent + stAccent.Render(label)
 		}
-		return indent + stAccent.Render(label) + stInk.Render("  "+text)
+		return indent + stAccent.Render(label) + stInk.Render("  ") + styleSemanticText(text)
 	}
-	if strings.Contains(raw, "[") && strings.Contains(raw, "]") {
-		return indent + stTool.Render(raw)
-	}
-	if hasMetricToken(raw) {
-		return indent + stAccent.Render(raw)
-	}
-	if hasCautionToken(raw) {
-		return indent + stWarn.Render(raw)
+	if highlighted := styleSemanticText(raw); highlighted != raw {
+		return indent + highlighted
 	}
 	return line
+}
+
+type highlightSpan struct {
+	start    int
+	end      int
+	priority int
+	style    lipgloss.Style
+}
+
+func styleSemanticText(text string) string {
+	spans := semanticHighlightSpans(text)
+	if len(spans) == 0 {
+		return text
+	}
+	resolved := resolveHighlightSpans(spans)
+	if len(resolved) == 0 {
+		return text
+	}
+	var b strings.Builder
+	cursor := 0
+	for _, span := range resolved {
+		if span.start > cursor {
+			b.WriteString(text[cursor:span.start])
+		}
+		b.WriteString(span.style.Render(text[span.start:span.end]))
+		cursor = span.end
+	}
+	if cursor < len(text) {
+		b.WriteString(text[cursor:])
+	}
+	return b.String()
+}
+
+func semanticHighlightSpans(text string) []highlightSpan {
+	spans := []highlightSpan{}
+	addPatternSpans := func(pattern *regexp.Regexp, priority int, style lipgloss.Style) {
+		for _, loc := range pattern.FindAllStringIndex(text, -1) {
+			spans = append(spans, highlightSpan{start: loc[0], end: loc[1], priority: priority, style: style})
+		}
+	}
+	addPatternSpans(commandPattern, 80, stAccent)
+	addPatternSpans(toolNamePattern, 78, stTool)
+	addPatternSpans(paperIDPattern, 72, stTool)
+	addPatternSpans(verdictPattern, 70, stAccent)
+	addPatternSpans(cautionPattern, 64, stWarn)
+	addPatternSpans(metricPattern, 58, stAccent)
+	addPatternSpans(yearPattern, 48, stFaint)
+	return spans
+}
+
+func resolveHighlightSpans(spans []highlightSpan) []highlightSpan {
+	sort.SliceStable(spans, func(i, j int) bool {
+		if spans[i].start != spans[j].start {
+			return spans[i].start < spans[j].start
+		}
+		if spans[i].priority != spans[j].priority {
+			return spans[i].priority > spans[j].priority
+		}
+		return spans[i].end > spans[j].end
+	})
+	resolved := []highlightSpan{}
+	for _, span := range spans {
+		if span.start >= span.end {
+			continue
+		}
+		overlap := false
+		for _, used := range resolved {
+			if span.start < used.end && span.end > used.start {
+				overlap = true
+				break
+			}
+		}
+		if !overlap {
+			resolved = append(resolved, span)
+		}
+	}
+	sort.SliceStable(resolved, func(i, j int) bool {
+		return resolved[i].start < resolved[j].start
+	})
+	return resolved
 }
 
 func answerSectionLabel(s string) string {
@@ -2638,6 +2909,8 @@ func runClearCommand(m model, args []string) (model, tea.Cmd) {
 		return m, nil
 	}
 	m.blocks = nil
+	m.blockItems = nil
+	m.blocksVersion++
 	m.history = nil
 	m.transcript = nil
 	m.timeline = nil
@@ -2751,6 +3024,7 @@ func runResumeCommand(m model, args []string) (model, tea.Cmd) {
 		stBullet.Render("⏺ ") + stAccent.Render("已恢复会话 ") + stFaint.Render(filepath.Base(session.Path)),
 		stFaint.Render(strings.TrimSpace(session.Content)),
 	}
+	m.syncBlockItems()
 	m.transcript = []transcriptEvent{{Kind: "session", Content: session.Content}}
 	m.lastQuestion = session.LastQuestion
 	m.lastExport = session.Path
@@ -2859,6 +3133,41 @@ func runRecommendCommand(m model, args []string) (model, tea.Cmd) {
 	return m, cmd
 }
 
+// commandNeedsArg reports whether a palette command takes a typed argument
+// (its usage hint carries a "<...>" placeholder, e.g. "recommend <topic|paper_id>").
+func commandNeedsArg(c slashCmd) bool {
+	return strings.Contains(c.key, "<")
+}
+
+// stageCommand fills the composer from a palette selection. A command that takes
+// an argument is staged as "/cmd <>" with the cursor inside the placeholder, so
+// pressing Enter on it readies the argument instead of running with an empty one;
+// an argument-less command just completes to "/cmd".
+func stageCommand(m model, c slashCmd) model {
+	if commandNeedsArg(c) {
+		tmpl := c.cmd + " <>"
+		m.ti.SetValue(tmpl)
+		m.ti.SetCursor(len(tmpl) - 1) // between the < and >
+	} else {
+		m.ti.SetValue(c.cmd)
+	}
+	return m
+}
+
+// stripPlaceholder removes a surrounding "<...>" placeholder pair the palette may
+// have inserted, so "/recommend <graph nn>" and "/recommend graph nn" behave the
+// same and an untouched "/recommend <>" submits as an empty argument.
+func stripPlaceholder(args []string) []string {
+	joined := strings.TrimSpace(strings.Join(args, " "))
+	if strings.HasPrefix(joined, "<") && strings.HasSuffix(joined, ">") {
+		joined = strings.TrimSpace(joined[1 : len(joined)-1])
+	}
+	if joined == "" {
+		return nil
+	}
+	return strings.Fields(joined)
+}
+
 func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
 	fields := strings.Fields(v)
 	if len(fields) == 0 {
@@ -2869,7 +3178,7 @@ func (m model) runSlash(v string) (tea.Model, tea.Cmd) {
 		m.appendBlock(stWarn.Render("  未知命令 " + v))
 		return m, nil
 	}
-	next, cmd := command.run(m, fields[1:])
+	next, cmd := command.run(m, stripPlaceholder(fields[1:]))
 	return next, cmd
 }
 
@@ -2887,7 +3196,8 @@ func (m model) View() string {
 		parts = append(parts, renderWorkflowStatus(m.lastMeta, m.nodeSeen, m.lastStreamKind, time.Since(m.start), m.vp.Width))
 		// plan/reflect now stream inline in the transcript, so no separate shelf.
 		elapsed := int(time.Since(m.start).Seconds())
-		parts = append(parts, m.spin.View()+" "+stAccent.Render(m.verb+"…")+stFaint.Render(fmt.Sprintf("  (%ds · esc 中断)", elapsed)))
+		mood := kaomojiForState(m.lastStreamKind, m.lastMeta, true)
+		parts = append(parts, m.spin.View()+" "+stAccent.Render(m.verb+"…")+" "+stFaint.Render(mood)+stFaint.Render(fmt.Sprintf("  (%ds · esc 中断)", elapsed)))
 	} else if m.submenu != "" {
 		parts = append(parts, m.renderSubmenuPalette(m.vp.Width))
 	} else if strings.HasPrefix(m.ti.Value(), "/") {
