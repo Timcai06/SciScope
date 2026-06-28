@@ -22,6 +22,7 @@ from backend.app.agent.compaction import estimate_tokens as _estimate_tokens
 from backend.app.agent.compaction import messages_tokens as _messages_tokens
 from backend.app.agent.events import AgentEvent, summarize_events
 from backend.app.agent.llm import build_system_prompt, compact, complete, detect_model, drain, stream_chat
+from backend.app.agent import session_memory
 from backend.app.agent.planning import make_plan, needs_plan
 from backend.app.agent.reflection import reflect_reason, self_critique
 from backend.app.agent.tool_runner import run_tools
@@ -167,6 +168,13 @@ def _prepare(state: AgentState) -> AgentState:
             "emit": [("final", "本地大模型未运行(:8001)。请先 `make llm`,或设置 DEEPSEEK_API_KEY 使用云端模型。")],
         }, extra={"stop_reason": "no_model", "tokens_in": 0, "tokens_out": 0})
     messages = [{"role": "system", "content": build_system_prompt()}]
+    # Session memory (Claude Code SessionMemory): recall prior research focus, then
+    # record this question for future turns. No-ops without a session id.
+    session_id = state.get("session_id")
+    recalled = session_memory.recall_prompt(session_id)
+    if recalled:
+        messages.append({"role": "system", "content": recalled})
+    session_memory.remember(session_id, "研究关注: " + (state["question"] or "")[:80])
     messages.extend(state.get("history") or [])
     messages.append({"role": "user", "content": state["question"]})
     if state.get("retry"):

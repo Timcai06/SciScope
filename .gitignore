@@ -65,3 +65,6 @@ deploy/.env
 
 # local MCP server config (may contain paths/secrets)
 configs/mcp_servers.json
+
+# Agent session memory (runtime, per-session)
+data/.agent_memory/
