@@ -96,7 +96,7 @@ def _wrap(server_name: str, spec: dict[str, Any], remote: dict[str, Any]) -> Too
             },
         },
         run=lambda args, _spec=spec, _name=remote["name"]: call_remote_tool(_spec, _name, args),
-        is_read_only=False,  # external side effects unknown → run sequentially, be conservative
+        side_effect="external",  # unknown side effects → run sequentially, but user opted in via config
         prompt_fragment=f"(外部 MCP·{server_name}){remote.get('description', '')}"[:80],
     )
 

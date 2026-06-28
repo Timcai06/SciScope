@@ -76,7 +76,7 @@ def test_langgraph_runtime_streams_plan_tool_and_grounded_answer(monkeypatch):
     monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: True)
     monkeypatch.setattr(langgraph_runtime, "make_plan", lambda question, model: ["search evidence"])
     monkeypatch.setattr(langgraph_runtime, "self_critique", lambda *args: None)
-    monkeypatch.setattr(langgraph_runtime, "run_tools", lambda tool_calls, executed: ["ok"])
+    monkeypatch.setattr(langgraph_runtime, "run_tools", lambda tool_calls, executed, on_progress=None: ["ok"])
 
     def fake_stream_chat(messages, model, tools):
         if False:
@@ -144,7 +144,7 @@ def test_langgraph_runtime_uses_fresh_system_prompt_builder(monkeypatch):
 def test_skill_prompt_caps_tool_loop_and_forces_synthesis(monkeypatch):
     monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
     monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: False)
-    monkeypatch.setattr(langgraph_runtime, "run_tools", lambda tool_calls, executed: ["trend evidence"] * len(tool_calls))
+    monkeypatch.setattr(langgraph_runtime, "run_tools", lambda tool_calls, executed, on_progress=None: ["trend evidence"] * len(tool_calls))
 
     def fake_stream_chat(messages, model, tools):
         if False:
@@ -179,7 +179,7 @@ def test_skill_prompt_caps_tool_loop_and_forces_synthesis(monkeypatch):
 def test_skill_prompt_forces_required_first_tool_when_model_skips(monkeypatch):
     monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
     monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: False)
-    monkeypatch.setattr(langgraph_runtime, "run_tools", lambda tool_calls, executed: ["claim evidence"])
+    monkeypatch.setattr(langgraph_runtime, "run_tools", lambda tool_calls, executed, on_progress=None: ["claim evidence"])
 
     def fake_stream_chat(messages, model, tools):
         if False:

@@ -4,25 +4,39 @@ from __future__ import annotations
 
 import json
 from concurrent.futures import ThreadPoolExecutor
+from typing import Callable
 
 from backend.app.agent.tools import execute_tool, is_read_only
 
 
 REPEAT_NOTE = "(已用相同参数调用过该工具,结果同上。请改用不同参数或其他工具,或据已有结果作答,不要重复调用。)"
 
+# (tool_name, progress_message) — emitted while a streaming tool runs.
+ProgressFn = Callable[[str, str], None]
 
-def run_tools(tool_calls: list[dict], executed: dict[str, str]) -> list[str]:
-    """Execute read-only SciScope tool calls and deduplicate exact repeats."""
+
+def run_tools(
+    tool_calls: list[dict],
+    executed: dict[str, str],
+    on_progress: ProgressFn | None = None,
+) -> list[str]:
+    """Execute read-only SciScope tool calls and deduplicate exact repeats.
+
+    ``on_progress`` (optional) is called ``(tool_name, message)`` for each progress
+    string a streaming tool yields, so runtimes can surface a live tool timeline.
+    """
 
     def one(tool_call: dict) -> str:
-        sig = tool_call["function"]["name"] + "|" + (tool_call["function"].get("arguments") or "{}")
+        name = tool_call["function"]["name"]
+        sig = name + "|" + (tool_call["function"].get("arguments") or "{}")
         if sig in executed:
             return REPEAT_NOTE
         try:
             args = json.loads(tool_call["function"].get("arguments") or "{}")
         except json.JSONDecodeError:
             args = {}
-        result = execute_tool(tool_call["function"]["name"], args)
+        progress = (lambda message: on_progress(name, message)) if on_progress else None
+        result = execute_tool(name, args, on_progress=progress)
         executed[sig] = result
         return result
 

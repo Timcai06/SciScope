@@ -28,6 +28,8 @@ import inspect
 from dataclasses import dataclass
 from typing import Any, Callable, Iterator, Literal
 
+from backend.app.agent.tools.hooks import post_tool_use, pre_tool_use
+
 SideEffect = Literal["read", "write", "external"]
 
 # Policy switch for data-mutating tools. Off by default: SciScope's native tools
@@ -176,6 +178,11 @@ def execute_tool(
     if tool is None:
         # Unknown tool names are rejected here to keep the call boundary explicit.
         return f"未知工具: {name}"
+    # PreToolUse hooks (Claude Code lifecycle): may block the call or inject context.
+    deny_reason, pre_context = pre_tool_use(name, args)
+    if deny_reason:
+        return f"[未授权] {deny_reason}"
+    # Built-in side-effect permission gate (the default PreToolUse policy).
     denial = check_permission(tool, args)
     if denial:
         return f"[未授权] {denial}"
@@ -187,6 +194,10 @@ def execute_tool(
         result = invoke_tool(tool, args, on_progress)
     except Exception as exc:  # noqa: BLE001 — surface failures to the model, don't crash the loop
         return f"工具 {name} 执行出错: {type(exc).__name__}: {exc}"
+    # PostToolUse hooks: observe/annotate the result before it reaches the model.
+    result = post_tool_use(name, args, result)
+    if pre_context:
+        result = "\n".join(pre_context) + "\n" + result
     if isinstance(result, str) and len(result) > tool.max_result_chars:
         result = result[: tool.max_result_chars] + " …(结果过长已截断,请用更具体的参数缩小检索范围)"
     return result

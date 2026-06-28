@@ -279,12 +279,22 @@ def _execute_tools(state: AgentState) -> AgentState:
     messages = list(state.get("messages") or [])
     tool_calls = list(state.get("tool_calls") or [])
     executed = dict(state.get("executed") or {})
-    emit: list[AgentEvent] = [_tool_call_event(tool_call) for tool_call in tool_calls]
-    results = run_tools(tool_calls, executed) if tool_calls else []
+    call_events: list[AgentEvent] = [_tool_call_event(tool_call) for tool_call in tool_calls]
+    # Streaming tools yield progress strings while they run; collect them for a
+    # finer tool timeline. (LangGraph's "updates" stream surfaces a node's events
+    # only after it returns, so these batch with the node — the contract is
+    # plumbed end to end; real-time surfacing would need event-level streaming.)
+    progress_events: list[AgentEvent] = []
+    on_progress = lambda name, message: progress_events.append(
+        ("tool_progress", {"name": name, "message": message})
+    )
+    results = run_tools(tool_calls, executed, on_progress=on_progress) if tool_calls else []
+    result_events: list[AgentEvent] = []
     for tool_call, result in zip(tool_calls, results):
         name = tool_call["function"]["name"]
-        emit.append(("tool_result", {"name": name, "result": result}))
+        result_events.append(("tool_result", {"name": name, "result": result}))
         messages.append({"role": "tool", "tool_call_id": tool_call.get("id", name), "content": result})
+    emit: list[AgentEvent] = [*call_events, *progress_events, *result_events]
 
     budget = _skill_tool_budget(state["question"])
     tools_total = int(state.get("tools_total") or 0)
