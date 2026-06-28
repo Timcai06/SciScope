@@ -17,10 +17,11 @@ from uuid import uuid4
 from functools import lru_cache
 from typing import Any, Callable, Iterator, Literal, TypedDict
 
+from backend.app.agent.compaction import autocompact
 from backend.app.agent.compaction import estimate_tokens as _estimate_tokens
 from backend.app.agent.compaction import messages_tokens as _messages_tokens
 from backend.app.agent.events import AgentEvent, summarize_events
-from backend.app.agent.llm import build_system_prompt, compact, detect_model, drain, stream_chat
+from backend.app.agent.llm import build_system_prompt, compact, complete, detect_model, drain, stream_chat
 from backend.app.agent.planning import make_plan, needs_plan
 from backend.app.agent.reflection import reflect_reason, self_critique
 from backend.app.agent.tool_runner import run_tools
@@ -213,10 +214,40 @@ def _plan(state: AgentState) -> AgentState:
     return _finish_node("plan", started_at, state, {"messages": messages, "route": "llm_step", "emit": [("plan", plan)]})
 
 
+AUTOCOMPACT_BUDGET = 6000  # tokens; above this, summarize older turns (Claude Code autoCompact)
+
+
+def _summarize_transcript(transcript: str, model: str) -> str:
+    """LLM summarizer injected into autocompact — condenses older turns."""
+    messages = [
+        {"role": "system", "content": "你是对话摘要器。用 3-5 句中文概括以下科研对话的关键信息(用户问题、已检索到的证据、结论方向),供后续轮次参考,不要展开。"},
+        {"role": "user", "content": transcript},
+    ]
+    return complete(messages, model)
+
+
+def _maybe_autocompact(messages: list[dict], model: str | None) -> dict[str, Any] | None:
+    """When the running context is still over budget, summarize older turns.
+
+    Returns compaction telemetry (for the node meta) or None when nothing fired.
+    """
+    if not model or _messages_tokens(messages) <= AUTOCOMPACT_BUDGET:
+        return None
+    result = autocompact(messages, lambda t: _summarize_transcript(t, model), token_budget=AUTOCOMPACT_BUDGET)
+    if result.strategy == "none":
+        return None
+    return {"compaction": {
+        "strategy": result.strategy,
+        "tokens_freed": result.tokens_freed,
+        "messages_summarized": result.messages_summarized,
+    }}
+
+
 def _llm_step(state: AgentState) -> AgentState:
     started_at = time.perf_counter()
     messages = list(state.get("messages") or [])
-    compact(messages)
+    compact(messages)  # cheap microcompact first
+    compaction_meta = _maybe_autocompact(messages, state.get("model"))  # LLM summary if still over budget
     tokens_in = int(state.get("tokens_in") or 0) + _messages_tokens(messages)
     text_events: list[AgentEvent] = []
     full_text, tool_calls = drain(
@@ -248,7 +279,7 @@ def _llm_step(state: AgentState) -> AgentState:
     else:
         next_state["tools_total"] = int(state.get("tools_total") or 0)
         next_state["route"] = "reflect"
-    return _finish_node("llm_step", started_at, state, next_state)
+    return _finish_node("llm_step", started_at, state, next_state, extra=compaction_meta)
 
 
 def _tool_call_event(tool_call: dict) -> AgentEvent:

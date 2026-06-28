@@ -3,6 +3,27 @@
 from __future__ import annotations
 
 from backend.app.agent import compaction as C
+from backend.app.agent import langgraph_runtime as R
+
+
+def test_maybe_autocompact_noop_under_budget():
+    assert R._maybe_autocompact([{"role": "user", "content": "hi"}], "test-model") is None
+
+
+def test_maybe_autocompact_noop_without_model():
+    big = [{"role": "user", "content": "数" * 5000} for _ in range(6)]
+    assert R._maybe_autocompact(big, None) is None
+
+
+def test_maybe_autocompact_summarizes_over_budget(monkeypatch):
+    monkeypatch.setattr(R, "_summarize_transcript", lambda transcript, model: "摘要")
+    messages = [{"role": "system", "content": "S"}]
+    messages += [{"role": "user", "content": "数" * 2000} for _ in range(7)]  # well over the 6000-token budget
+    meta = R._maybe_autocompact(messages, "test-model")
+    assert meta is not None
+    assert meta["compaction"]["strategy"] == "autocompact"
+    assert meta["compaction"]["messages_summarized"] >= 1
+    assert meta["compaction"]["tokens_freed"] > 0
 
 
 def test_estimate_tokens_cjk_vs_latin():
