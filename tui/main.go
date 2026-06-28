@@ -666,7 +666,8 @@ func formatHTTPError(resp *http.Response) string {
 func (m *model) refresh() {
 	content := m.renderTranscriptContent(m.vp.Width)
 	if m.answering && m.answer != "" {
-		content += "\n" + stBullet.Render("⏺ ") + stInk.Render(m.answer)
+		// Live answer with a streaming cursor block, for a "being written" feel.
+		content += "\n" + stBullet.Render("⏺ ") + stInk.Render(m.answer) + stAccent.Render("▌")
 	}
 	if strings.TrimSpace(content) == "" && m.vp.Width > 0 {
 		m.loadRecentSessions()
