@@ -13,17 +13,25 @@ consume this through the agent stream without any change here.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Literal
 
 
 @dataclass(frozen=True)
 class Command:
-    """A user-invocable command. ``run`` takes the argument string after the name."""
+    """A user-invocable command. ``run`` takes the argument string after the name.
+
+    ``kind`` decides what the runtime does with ``run``'s return value:
+    * ``"answer"`` — the string is a final answer (e.g. /help, /search results).
+    * ``"prompt"`` — the string is a skill-expanded prompt to run through the
+      agent loop (e.g. /review, /trend), so a slash command behaves identically
+      whether typed in the TUI or sent to the API.
+    """
 
     name: str                       # without the leading slash
     description: str                # one-line "what it does", shown by /help
     run: Callable[[str], str]
     arg_hint: str = ""              # e.g. "<主题>", shown by /help
+    kind: Literal["answer", "prompt"] = "answer"
 
 
 _COMMANDS: dict[str, Command] = {}
@@ -93,13 +101,15 @@ def _help(_arg: str) -> str:
     return "\n".join(lines)
 
 
-def _delegate_to(role: str, usage: str):
+def _skill(skill_name: str, usage: str):
+    """A prompt command: expand a skill template with the user input (or show usage)."""
+
     def handler(arg: str) -> str:
         if not arg.strip():
             return usage
-        from backend.app.agent.specialists import run_specialist
+        from backend.app.agent.skills import render_skill_prompt
 
-        return run_specialist(role, arg)
+        return render_skill_prompt(skill_name, arg, fallback="请就以下内容完成研究任务:" + arg)
 
     return handler
 
@@ -112,11 +122,18 @@ def _search(arg: str) -> str:
     return execute_tool("search_literature", {"query": arg})
 
 
+def command_kind(text: str) -> str:
+    """Whether a command produces a final answer or a prompt to run through the loop."""
+    cmd = command_for(text)
+    return cmd.kind if cmd else "answer"
+
+
 def _register_builtins() -> None:
     register_command(Command("help", "列出所有可用命令", _help))
-    register_command(Command("review", "就给定主题产出研究现状综述", _delegate_to("reviewer", "用法:/review <主题> — 产出该主题的研究现状综述。"), "<主题>"))
-    register_command(Command("trend", "分析给定主题的研究趋势", _delegate_to("trend", "用法:/trend <主题> — 分析该主题的研究趋势。"), "<主题>"))
-    register_command(Command("verify", "核查一句论断是否有文献支持", _delegate_to("critic", "用法:/verify <论断> — 对该论断做证据接地核查。"), "<论断>"))
+    register_command(Command("review", "就给定主题产出研究现状综述", _skill("literature-review", "用法:/review <主题> — 产出该主题的研究现状综述。"), "<主题>", kind="prompt"))
+    register_command(Command("trend", "分析给定主题的研究趋势", _skill("trend-analysis", "用法:/trend <主题> — 分析该主题的研究趋势。"), "<主题>", kind="prompt"))
+    register_command(Command("verify", "核查一句论断是否有文献支持", _skill("claim-check", "用法:/verify <论断> — 对该论断做证据接地核查。"), "<论断>", kind="prompt"))
+    register_command(Command("recommend", "按主题或种子论文推荐论文", _skill("paper-recommendation", "用法:/recommend <主题或 paper_id> — 推荐后续阅读。"), "<主题|paper_id>", kind="prompt"))
     register_command(Command("search", "在文献库中检索相关论文", _search, "<查询>"))
 
 

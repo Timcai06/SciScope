@@ -463,11 +463,18 @@ def stream_agent(
     A leading-slash message is intercepted as a slash command and answered without
     invoking the LLM loop; everything else runs through the LangGraph StateGraph.
     """
-    from backend.app.agent.commands import is_command
+    from backend.app.agent.commands import command_kind, is_command, parse_command, run_command
 
     if is_command(question):
-        yield from _stream_command(question, session_id)
-        return
+        _, arg = parse_command(question) or ("", "")
+        # Prompt commands (/review, /trend, …) expand a skill template and run
+        # through the loop like any question; answer commands (/help, /search,
+        # or a prompt command with no argument) reply directly.
+        if command_kind(question) == "prompt" and arg.strip():
+            question = run_command(question) or question
+        else:
+            yield from _stream_command(question, session_id)
+            return
     thread_id = session_id or f"sciscope-turn-{uuid4().hex}"
     inputs = {"question": question, "history": history or [], "model": model, "session_id": session_id, "retry": retry}
     config = {"configurable": {"thread_id": thread_id}}

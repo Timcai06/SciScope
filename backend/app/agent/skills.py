@@ -67,6 +67,24 @@ def list_skill_summaries(start: Path | None = None) -> tuple[SkillSummary, ...]:
     return tuple(summaries)
 
 
+def render_skill_prompt(name: str, user_input: str, fallback: str = "", start: Path | None = None) -> str:
+    """Expand a skill template (``.sciscope/skills/<name>.md`` body) with the user
+    input, substituting ``{{input}}``. Mirrors the Go TUI's renderSkillPrompt so a
+    slash command produces the same prompt whichever client invoked it. Falls back
+    to ``fallback`` (or the raw input) when the skill file is missing.
+    """
+    user_input = (user_input or "").strip()
+    path = skills_dir(start) / f"{name}.md"
+    if not path.is_file():
+        return fallback or user_input
+    text = path.read_text(encoding="utf-8")
+    if text.startswith("---"):  # drop YAML frontmatter, keep the template body
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            text = parts[2]
+    return text.strip().replace("{{input}}", user_input)
+
+
 def skills_prompt(start: Path | None = None) -> str:
     summaries = list_skill_summaries(start)
     if not summaries:

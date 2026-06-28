@@ -41,14 +41,21 @@ def test_command_without_argument_returns_usage(monkeypatch):
     assert called == []  # the specialist is not invoked for an empty argument
 
 
-def test_review_delegates_to_reviewer_specialist(monkeypatch):
-    seen: dict = {}
-    monkeypatch.setattr(
-        "backend.app.agent.specialists.run_specialist",
-        lambda role, task: seen.update(role=role, task=task) or "综述结果",
-    )
-    assert C.run_command("/review 图神经网络") == "综述结果"
-    assert seen == {"role": "reviewer", "task": "图神经网络"}
+def test_review_renders_skill_prompt_and_is_a_prompt_command():
+    out = C.run_command("/review 图神经网络")
+    assert "图神经网络" in out                  # the user input is substituted into the skill template
+    assert C.command_kind("/review x") == "prompt"
+    assert C.command_kind("/help") == "answer"
+
+
+def test_prompt_command_runs_through_the_loop_not_the_command_path(monkeypatch):
+    # No model -> the graph ends at the "no model" branch with runtime "langgraph";
+    # that proves /review expanded and ran through the loop, not the command path.
+    monkeypatch.setattr(R, "detect_model", lambda: None)
+    events = list(R.stream_agent("/review 图神经网络"))
+    final = next(e for e in events if e[0] == "final")
+    assert final[2]["runtime"] == "langgraph"
+    assert final[2].get("node") != "command"
 
 
 def test_search_command_dispatches_to_tool(monkeypatch):
