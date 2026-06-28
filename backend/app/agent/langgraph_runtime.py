@@ -17,6 +17,8 @@ from uuid import uuid4
 from functools import lru_cache
 from typing import Any, Callable, Iterator, Literal, TypedDict
 
+from backend.app.agent.compaction import estimate_tokens as _estimate_tokens
+from backend.app.agent.compaction import messages_tokens as _messages_tokens
 from backend.app.agent.events import AgentEvent, summarize_events
 from backend.app.agent.llm import build_system_prompt, compact, detect_model, drain, stream_chat
 from backend.app.agent.planning import make_plan, needs_plan
@@ -38,23 +40,6 @@ NODE_PHASES = {
     "reflect": "自检修正",
     "force_synthesis": "综合回答",
 }
-
-
-def _estimate_tokens(text: str) -> int:
-    """Rough token estimate (CJK ~1.5 chars/token, else ~4) for usage/cost telemetry.
-
-    An estimate, labeled as such (mirrors Claude Code's tokenCountWithEstimation
-    fallback). With a cloud provider it tracks billable volume closely enough to
-    surface per-query cost.
-    """
-    if not text:
-        return 0
-    cjk = sum(1 for ch in text if "一" <= ch <= "鿿")
-    return int(cjk / 1.5 + (len(text) - cjk) / 4)
-
-
-def _messages_tokens(messages: list[dict]) -> int:
-    return sum(_estimate_tokens(str(m.get("content") or "")) for m in messages)
 
 
 def _skill_tool_budget(question: str) -> int | None:

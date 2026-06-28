@@ -218,11 +218,15 @@ def complete(messages: list[dict], model: str) -> str:
     return text
 
 
-def compact(messages: list[dict], budget_chars: int = 20000) -> None:
-    """Trim older large tool results while preserving recent conversation shape."""
-    total = sum(len(str(message.get("content") or "")) for message in messages)
-    if total <= budget_chars:
-        return
-    for message in messages[1:-4]:
-        if message.get("role") == "tool" and len(str(message.get("content") or "")) > 400:
-            message["content"] = str(message["content"])[:400] + " …(结果已压缩)"
+def compact(messages: list[dict], budget_chars: int = 20000):
+    """Cheap in-place context compaction (microcompact) — see compaction service.
+
+    Backed by :mod:`backend.app.agent.compaction`: keeps the most recent tool
+    results and clears older large ones. ``budget_chars`` is converted to a token
+    budget (~4 chars/token) for backward compatibility. Returns the
+    :class:`CompactionResult` so callers can surface telemetry (older callers that
+    ignore the return value are unaffected).
+    """
+    from backend.app.agent.compaction import compact as _compact
+
+    return _compact(messages, token_budget=max(budget_chars // 4, 1))
