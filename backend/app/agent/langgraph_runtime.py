@@ -390,6 +390,28 @@ def _events_from_update(update: dict[str, Any]) -> list[AgentEvent]:
     return events
 
 
+def _stream_command(question: str, session_id: str | None) -> Iterator[AgentEvent]:
+    """Handle a slash command outside the LLM loop (Claude Code command interception)."""
+    from backend.app.agent.commands import parse_command, run_command
+
+    started_at = time.perf_counter()
+    name = (parse_command(question) or ("help", ""))[0]
+    output = run_command(question) or ""
+    meta: dict[str, Any] = {
+        "runtime": "command",
+        "node": "command",
+        "phase": f"/{name}",
+        "elapsed_ms": int((time.perf_counter() - started_at) * 1000),
+        "stop_reason": "command",
+        "tokens_in": 0,
+        "tokens_out": 0,
+    }
+    if session_id:
+        meta["session_id"] = session_id
+    yield ("plan", [f"执行命令 /{name}"], meta)
+    yield ("final", output, meta)
+
+
 def stream_agent(
     question: str,
     history: list[dict] | None = None,
@@ -397,7 +419,16 @@ def stream_agent(
     session_id: str | None = None,
     retry: bool = False,
 ) -> Iterator[AgentEvent]:
-    """Run one agent turn through the LangGraph StateGraph and stream node events."""
+    """Run one agent turn and stream node events.
+
+    A leading-slash message is intercepted as a slash command and answered without
+    invoking the LLM loop; everything else runs through the LangGraph StateGraph.
+    """
+    from backend.app.agent.commands import is_command
+
+    if is_command(question):
+        yield from _stream_command(question, session_id)
+        return
     thread_id = session_id or f"sciscope-turn-{uuid4().hex}"
     inputs = {"question": question, "history": history or [], "model": model, "session_id": session_id, "retry": retry}
     config = {"configurable": {"thread_id": thread_id}}
@@ -426,12 +457,13 @@ def run_agent(
     if session_id:
         response["session_id"] = session_id
     response["retry"] = retry
-    # Carry stop_reason + token usage from the final event's meta to the aggregate.
+    # Carry stop_reason + token usage (and runtime, e.g. the command path) from the
+    # final event's meta to the aggregate.
     for event in events:
         kind, _payload, *rest = event
         meta = rest[0] if rest else {}
         if kind == "final" and isinstance(meta, dict):
-            for key in ("stop_reason", "tokens_in", "tokens_out"):
+            for key in ("stop_reason", "tokens_in", "tokens_out", "runtime"):
                 if key in meta:
                     response[key] = meta[key]
     return response
