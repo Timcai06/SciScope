@@ -50,5 +50,5 @@ def configure_plot_style() -> None:
 
 def save_figure(fig, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path)
+    fig.savefig(path, dpi=300)
     plt.close(fig)

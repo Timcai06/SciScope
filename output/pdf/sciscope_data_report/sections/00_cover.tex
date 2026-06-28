@@ -1,42 +1,49 @@
 \begin{titlepage}
 \thispagestyle{empty}
-\begin{tikzpicture}[remember picture,overlay]
-  \fill[white] (current page.south west) rectangle (current page.north east);
-  \fill[SciTealDark] (current page.north west) rectangle ([xshift=3.2mm]current page.south west);
-  \draw[SciLine,line width=0.45pt] ([xshift=19mm,yshift=-24mm]current page.north west) -- ([xshift=-18mm,yshift=-24mm]current page.north east);
-  \draw[SciLine,line width=0.45pt] ([xshift=19mm,yshift=29mm]current page.south west) -- ([xshift=-18mm,yshift=29mm]current page.south east);
+% Magazine "image-hero" cover: the real author-collaboration network is a large
+% offset hero image; the title layers over it; metadata is right-aligned to break
+% the single left axis. All placement is on an absolute mm grid for art direction.
+\begin{tikzpicture}[remember picture,overlay,x=1mm,y=1mm,shift={(current page.north west)}]
+  \fill[white] (0,0) rectangle (210,-297);
+  % Large author network as the hero image — near full-bleed, anchored to the
+  % lower-right so it dominates the middle-lower page and the stat layers over it.
+  \node[opacity=0.20,anchor=north east,inner sep=0] at (218,-86)
+    {\includegraphics[width=214mm]{author_collaboration_network_cover.png}};
+
+  % Masthead: ink wordmark (left), right-aligned issue meta, gold hairline.
+  \node[anchor=west,inner sep=0,font=\coverSans\bfseries\LARGE] at (17,-14)
+    {\textcolor{SciGold}{$\blacklozenge$}\,\textcolor{SciInk}{SciScope}};
+  \node[anchor=east,inner sep=0,font=\coverCJK\footnotesize,text=SciMuted] at (193,-13.4)
+    {数据分析报告 · 交付物 · 公开科技文献 2022–2026};
+  \draw[SciGold,line width=0.9pt] (17,-20) -- (193,-20);
+
+  % Title block (left), gold kicker stroke, layered over the network.
+  \draw[SciGold,line width=2.6pt] (17.5,-72) -- (33,-72);
+  \node[anchor=north west,inner sep=0,font=\coverTitle\fontsize{62}{68}\selectfont,text=SciInk] at (16,-80)
+    {数据分析报告};
+  % Deck — RIGHT aligned, two lines, to set up asymmetry against the title.
+  \node[anchor=north east,inner sep=0,align=right,font=\coverCJK\fontsize{15}{21}\selectfont,text=SciTealDark] at (193,-110)
+    {近五年公开科技文献的\\分布、主题演化与合作网络};
+
+  % Hero stat (left, Bodoni) with gold underline; caption RIGHT aligned alongside.
+  \node[anchor=north west,inner sep=0,font=\coverSans\footnotesize,text=SciMuted] at (17,-150)
+    {CORPUS AT A GLANCE \;/\; 核心规模};
+  \node[anchor=north west,inner sep=0,font=\coverNum\bfseries\fontsize{37}{39}\selectfont,text=SciTealDark] at (16,-156)
+    {168,447};
+  \draw[SciGold,line width=1.4pt] (17,-172) -- (45,-172);
+
+  % Coverlines — the report's facets, like a magazine's cover lines, set low and
+  % overlaid on the hero image.
+  \node[anchor=west,inner sep=0,font=\coverSans\scriptsize,text=SciGold] at (17,-236)
+    {IN THIS REPORT};
+  \node[anchor=north west,inner sep=0,font=\coverCJK\large,text=SciTealDark] at (17,-243)
+    {文献分布\goldsep 关键词演化\goldsep 作者合作网络\goldsep 数据质量边界};
+
+  % Footer: hairline + muted scope notes (left object / right boundary).
+  \draw[SciLine,line width=0.5pt] (17,-280) -- (193,-280);
+  \node[anchor=west,inner sep=0,font=\coverCJK\scriptsize,text=SciMuted] at (17,-286)
+    {分析对象:公开科技文献元数据 · 摘要 · 作者 · 关键词 · 年份 · 来源};
+  \node[anchor=east,inner sep=0,font=\coverCJK\scriptsize,text=SciMuted] at (193,-286)
+    {结论限定在公开数据 · 近五年窗口 · 当前字段完整度之内};
 \end{tikzpicture}
-
-\vspace*{7mm}
-{\small\bfseries\color{SciTealDark} SciScope\quad 数据分析报告交付物\par}
-\vspace{2mm}
-{\scriptsize\color{SciMuted} 面向科技文献智能分析的科研智能体构建\par}
-
-\vspace*{31mm}
-{\fontsize{34}{39}\selectfont\bfseries\color{SciInk} 数据分析报告\par}
-\vspace{5mm}
-{\Large\color{SciTealDark} 近五年公开科技文献的分布、主题演化与合作网络\par}
-\vspace{8mm}
-{\normalsize\color{SciMuted} 文献分布 · 关键词演化 · 作者合作网络 · 数据质量边界\par}
-
-\vspace{24mm}
-\begin{tabularx}{0.78\textwidth}{XXX}
-\metriccard{原始记录}{169{,}324}{6 个公开来源} &
-\metriccard{分析语料}{168{,}447}{治理后分析口径} &
-\metriccard{主窗口}{2022--2026}{159{,}382 条}
-\end{tabularx}
-
-\vspace{23mm}
-\begin{tikzpicture}[x=1mm,y=1mm]
-  \draw[SciLine,line width=0.45pt] (0,20) -- (150,20);
-  \node[anchor=west,font=\scriptsize\bfseries,text=SciTealDark] at (0,11) {ANALYTIC FOCUS};
-  \node[anchor=west,text width=148mm,align=left,font=\normalsize,text=SciInk] at (0,0) {
-    本报告从公开科技文献中识别数据覆盖结构、研究热点演化、作者合作格局与结论可信边界,为后续科研智能体的问答、推荐、趋势和图谱能力提供可复核的数据底座。
-  };
-\end{tikzpicture}
-
-\vfill
-\begin{tabularx}{0.94\textwidth}{>{\scriptsize\color{SciMuted}}X>{\scriptsize\color{SciMuted}\raggedleft\arraybackslash}X}
-分析对象:公开科技文献元数据、摘要、作者、关键词、年份、来源及部分正文片段 & 所有结论均限定在公开数据、近五年窗口和当前字段完整度之内。
-\end{tabularx}
 \end{titlepage}

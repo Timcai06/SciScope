@@ -56,6 +56,16 @@
 
 \textbf{设计原则}:(1) 离线可复现,每层产物由 \texttt{make} 目标生成;(2) 大模型可替换,生成层走 OpenAI 兼容接口;(3) 证据可追溯,回答必带引用;(4) 本地优先,数据与索引均在本地,支持涉密场景。
 
+\subsection{终端产品形态}
+SciScope 不止是代码与模型文件,而是一个可运行的\textbf{终端智能体客户端}(Go TUI):用户输入研究问题或待核查论断,客户端消费后端 \texttt{/agent/stream} 的 SSE 事件,实时渲染规划、工具调用、证据与最终回答;它本身不承载推理与检索决策,只做协议消费与呈现,见图~\ref{fig:tui-product}。
+
+\begin{figure}[!htbp]
+\centering
+\figasset[0.96\textwidth]{tui_product.png}
+\caption{终端智能体客户端(Go TUI)实景:顶部为证据/时间线/调试/导出面板与品牌引导,底部为“研究问题 / 待核查论断”输入栏。客户端只消费 \texttt{/agent/stream} 的 SSE 事件并渲染工具时间线与证据链。数据来源:运行中的 \texttt{make tui} 客户端截图。}
+\label{fig:tui-product}
+\end{figure}
+
 \subsection{核心链路:证据接地的检索增强问答}
 问答不直接交给大模型臆测,而是\textbf{先检索证据、再据证生成},每条回答都可追溯到具体论文:
 见图~\ref{fig:grounded-rag-flow}。

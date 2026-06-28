@@ -14,6 +14,7 @@
 \usepackage{hyperref}
 \usepackage[most]{tcolorbox}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usetikzlibrary{arrows.meta,positioning,fit,calc}
 
 \definecolor{SciTealDark}{HTML}{0B4F4A}
@@ -28,6 +29,29 @@
 \definecolor{SciLine}{HTML}{C7D4D2}
 \definecolor{SciPanel}{HTML}{F7FBFA}
 \definecolor{SciPanelWarm}{HTML}{FBF8F1}
+
+% --- Cover-scoped artistic typography (XeLaTeX + macOS system fonts) --------
+% Display: Weibei SC (魏碑 brushstroke) for the title, Songti SC (Ming serif)
+% for elegant supporting text, Bodoni 72 (high-contrast Didone) for Latin &
+% numerals. Body text keeps the portable fandol set so the rest still compiles
+% on any TeX Live.
+\newCJKfontfamily\coverTitle{Weibei SC}
+\newCJKfontfamily\coverCJK{Songti SC}
+\newfontfamily\coverNum{Bodoni 72}
+\newfontfamily\coverSans{Bodoni 72}
+
+% One oversized focal statistic: high-contrast numerals, gold underline, caption.
+\newcommand{\heronum}[2]{%
+  {\coverNum\bfseries\fontsize{56}{58}\selectfont\color{SciTealDark}#1\par}%
+  \vspace{3.4mm}{\color{SciGold}\rule{40mm}{1.6pt}}\par
+  \vspace{2.2mm}{\coverCJK\normalsize\color{SciMuted}#2\par}%
+}
+
+% Gold middot separator for an elegant inline term series.
+\newcommand{\goldsep}{\hspace{2mm}\textcolor{SciGold}{\raisebox{0.15ex}{\small\textbullet}}\hspace{2mm}}
+
+% Gold editorial index numeral preceding a capability label.
+\newcommand{\capnum}[1]{{\coverNum\bfseries\color{SciGold}#1}\hspace{1.4mm}}
 
 \geometry{left=17mm,right=17mm,top=17mm,bottom=18mm,headheight=18pt}
 \setlength{\parindent}{0pt}

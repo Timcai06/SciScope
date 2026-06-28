@@ -1,42 +1,46 @@
 \begin{titlepage}
 \thispagestyle{empty}
-\begin{tikzpicture}[remember picture,overlay]
-  \fill[white] (current page.south west) rectangle (current page.north east);
-  \fill[SciTealDark] (current page.north west) rectangle ([xshift=3.2mm]current page.south west);
-  \draw[SciLine,line width=0.45pt] ([xshift=19mm,yshift=-24mm]current page.north west) -- ([xshift=-18mm,yshift=-24mm]current page.north east);
-  \draw[SciLine,line width=0.45pt] ([xshift=19mm,yshift=29mm]current page.south west) -- ([xshift=-18mm,yshift=29mm]current page.south east);
+% Magazine "image-hero" cover: the real terminal product (Go TUI) is the large
+% focal image, layered over a faint keyword knowledge network; title and metadata
+% are placed on an absolute mm grid with mixed alignment for an editorial feel.
+\begin{tikzpicture}[remember picture,overlay,x=1mm,y=1mm,shift={(current page.north west)}]
+  \fill[white] (0,0) rectangle (210,-297);
+  % Faint keyword knowledge network — depth layer, near full-bleed lower-right.
+  \node[opacity=0.12,anchor=north east,inner sep=0] at (218,-120)
+    {\includegraphics[width=210mm]{keyword_cooccurrence_network_cover.png}};
+
+  % Masthead: ink wordmark (left), right-aligned issue meta, gold hairline.
+  \node[anchor=west,inner sep=0,font=\coverSans\bfseries\LARGE] at (17,-14)
+    {\textcolor{SciGold}{$\blacklozenge$}\,\textcolor{SciInk}{SciScope}};
+  \node[anchor=east,inner sep=0,font=\coverCJK\footnotesize,text=SciMuted] at (193,-13.4)
+    {智能体开发赛道 · 终端智能体 · Go TUI · 2026};
+  \draw[SciGold,line width=0.9pt] (17,-20) -- (193,-20);
+
+  % Title block (left), gold kicker stroke, layered over the faint network.
+  \draw[SciGold,line width=2.6pt] (17.5,-66) -- (33,-66);
+  \node[anchor=north west,inner sep=0,font=\coverTitle\fontsize{50}{56}\selectfont,text=SciInk] at (16,-72)
+    {项目报告书};
+  % Deck — RIGHT aligned to break the left axis.
+  \node[anchor=north east,inner sep=0,align=right,font=\coverCJK\fontsize{15}{21}\selectfont,text=SciTealDark] at (193,-104)
+    {可复现文献资产驱动的\\证据接地科研智能体};
+
+  % Hero image: the real terminal client, large and framed — the visual focus.
+  \node[anchor=north west,inner sep=0,draw=SciTeal,line width=0.6pt,rounded corners=2pt] at (17,-134)
+    {\includegraphics[width=176mm]{tui_product.png}};
+  \node[anchor=north west,inner sep=0,font=\coverCJK\footnotesize,text=SciMuted] at (17,-208)
+    {SciScope 终端智能体客户端(Go TUI):输入研究问题 / 待核查论断 → 实时渲染规划、工具调用、证据与回答。};
+
+  % Coverlines (left) — five capabilities, demoted to a quiet series.
+  \node[anchor=west,inner sep=0,font=\coverSans\scriptsize,text=SciGold] at (17,-224)
+    {FIVE CAPABILITIES};
+  \node[anchor=north west,inner sep=0,font=\coverCJK\normalsize,text=SciTealDark] at (17,-230)
+    {文献问答\goldsep 趋势预测\goldsep 论文推荐\goldsep 知识图谱\goldsep 论断核查};
+
+  % Footer: hairline + muted notes (left delivery / right boundary).
+  \draw[SciLine,line width=0.5pt] (17,-280) -- (193,-280);
+  \node[anchor=west,inner sep=0,font=\coverCJK\scriptsize,text=SciMuted] at (17,-286)
+    {交付物:数据分析报告 + 科研智能体模型(Python 代码 + 模型文件)};
+  \node[anchor=east,inner sep=0,font=\coverCJK\scriptsize,text=SciMuted] at (193,-286)
+    {规模 · 指标 · 能力均以当前代码库与验收命令为准};
 \end{tikzpicture}
-
-\vspace*{7mm}
-{\small\bfseries\color{SciTealDark} SciScope\quad 智能体开发赛道\par}
-\vspace{2mm}
-{\scriptsize\color{SciMuted} 面向科技文献智能分析的科研智能体构建\par}
-
-\vspace*{31mm}
-{\fontsize{34}{39}\selectfont\bfseries\color{SciInk} 项目报告书\par}
-\vspace{5mm}
-{\Large\color{SciTealDark} 可复现文献资产驱动的证据接地科研智能体\par}
-\vspace{8mm}
-{\normalsize\color{SciMuted} 文献问答 · 趋势预测 · 论文推荐 · 知识图谱 · 论断核查\par}
-
-\vspace{24mm}
-\begin{tabularx}{0.78\textwidth}{XXX}
-\metriccard{入库论文}{159{,}187}{运行时 PostgreSQL 口径} &
-\metriccard{片段向量}{367{,}773}{pgvector 检索资产} &
-\metriccard{自动化测试}{141 passed}{后端实测基线}
-\end{tabularx}
-
-\vspace{23mm}
-\begin{tikzpicture}[x=1mm,y=1mm]
-  \draw[SciLine,line width=0.45pt] (0,20) -- (150,20);
-  \node[anchor=west,font=\scriptsize\bfseries,text=SciTealDark] at (0,11) {ONE-LINE POSITIONING};
-  \node[anchor=west,text width=148mm,align=left,font=\normalsize,text=SciInk] at (0,0) {
-    SciScope 将公开科技文献转化为可检索、可问答、可预测趋势、可推荐、可核查的科研智能体;大模型仅作可替换生成层,关键知识沉淀在本地可复现索引与模型文件中。
-  };
-\end{tikzpicture}
-
-\vfill
-\begin{tabularx}{0.94\textwidth}{>{\scriptsize\color{SciMuted}}X>{\scriptsize\color{SciMuted}\raggedleft\arraybackslash}X}
-交付物:数据分析报告 + 科研智能体模型(Python 代码 + 模型文件) & 所有规模、指标与能力描述均以当前代码库、评测文件和验收命令为准。
-\end{tabularx}
 \end{titlepage}

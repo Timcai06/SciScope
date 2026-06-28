@@ -656,6 +656,11 @@ def _plot_keyword_normalized_trends(keyword_trends: pd.DataFrame, output_dir: Pa
     ax.set_xticks(years, [f"{year} YTD" if year == RECENT_YEAR_END else str(year) for year in years])
     ax.grid(axis="y", linestyle="--")
     ax.legend(loc="center left", bbox_to_anchor=(1.0, 0.5), fontsize=6.8, frameon=False)
+    _save_trend_cover_background(
+        [[float(row.get(f"normalized_df_{year}") or 0) for year in years] for _, row in data.iterrows()],
+        years,
+        output_dir / "keyword_normalized_trends_cover.png",
+    )
     save_figure(fig, output_dir / "keyword_normalized_trends.png")
     return {
         "figure_id": "keyword_normalized_trends",
@@ -665,6 +670,91 @@ def _plot_keyword_normalized_trends(keyword_trends: pd.DataFrame, output_dir: Pa
         "message": "使用融合信号的年度文档占比展示关键词趋势, 避免关键词字段滞后误导。",
         "status": "final",
     }
+
+
+COVER_TEAL = "#16847D"
+
+
+def _save_network_cover_background(
+    graph: "nx.Graph",
+    pos: dict,
+    degree: dict,
+    path: Path,
+    *,
+    figsize: tuple[float, float] = (8.6, 6.5),
+    tint: str = COVER_TEAL,
+) -> None:
+    """Render a label-free, single-tone, transparent variant of a network for use
+    as a faint cover background.
+
+    Reuses the already-computed layout so the cover motif is the report's *real*
+    graph (author collaboration / keyword knowledge network), not decoration. The
+    canvas is transparent and the graph is drawn in solid teal; final faintness is
+    set in LaTeX via layer opacity, which keeps this asset reusable at any tint.
+    """
+    from matplotlib import pyplot as plt
+
+    if not graph.number_of_nodes():
+        return
+    fig, ax = plt.subplots(figsize=figsize)
+    max_w = max((float(d.get("weight") or 0) for *_e, d in graph.edges(data=True)), default=1.0) or 1.0
+    for source, target, edge_data in graph.edges(data=True):
+        weight = float(edge_data.get("weight") or 0)
+        ax.plot(
+            [pos[source][0], pos[target][0]],
+            [pos[source][1], pos[target][1]],
+            color=tint,
+            alpha=0.18 + min(weight / max_w, 1) * 0.30,
+            linewidth=0.5 + min(weight / max_w, 1) * 2.2,
+            solid_capstyle="round",
+            zorder=1,
+        )
+    max_deg = max(degree.values(), default=1.0) or 1.0
+    xs = [pos[node][0] for node in graph.nodes]
+    ys = [pos[node][1] for node in graph.nodes]
+    sizes = [30 + 520 * math.sqrt(max(degree.get(node, 0), 0) / max_deg) for node in graph.nodes]
+    ax.scatter(xs, ys, s=sizes, c=tint, edgecolors="none", alpha=0.9, zorder=3)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_frame_on(False)
+    ax.margins(0.06)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, transparent=True, dpi=300, bbox_inches="tight", pad_inches=0.0)
+    plt.close(fig)
+
+
+def _save_trend_cover_background(
+    series_values: list[list[float]],
+    years: list[int],
+    path: Path,
+    *,
+    figsize: tuple[float, float] = (8.4, 4.8),
+    tint: str = COVER_TEAL,
+) -> None:
+    """Render a label-free, single-tone, transparent variant of the keyword trend
+    curves for use as a faint cover background — flowing lines read as "evolution".
+
+    Reuses the report's real normalized-share series; line weight scales with each
+    curve's peak so the standout trend (e.g. large language model) reads strongest.
+    """
+    from matplotlib import pyplot as plt
+
+    curves = [v for v in series_values if any(v)]
+    if not curves:
+        return
+    peak = max((max(v) for v in curves), default=1.0) or 1.0
+    fig, ax = plt.subplots(figsize=figsize)
+    for values in curves:
+        weight = 1.2 + 3.0 * (max(values) / peak)
+        ax.plot(years, values, color=tint, alpha=0.55, linewidth=weight, solid_capstyle="round", zorder=2)
+        ax.scatter(years, values, s=10 + 26 * (max(values) / peak), c=tint, alpha=0.6, edgecolors="none", zorder=3)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_frame_on(False)
+    ax.margins(0.04)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, transparent=True, dpi=300, bbox_inches="tight", pad_inches=0.0)
+    plt.close(fig)
 
 
 def _plot_keyword_cooccurrence_network(
@@ -799,6 +889,9 @@ def _plot_keyword_cooccurrence_network(
         transform=ax.transAxes,
         fontsize=6.4,
         color="0.25",
+    )
+    _save_network_cover_background(
+        graph, pos, graph_degree, output_dir / "keyword_cooccurrence_network_cover.png", figsize=(8.4, 6.1)
     )
     save_figure(fig, output_dir / "keyword_cooccurrence_network.png")
     return {
@@ -1174,6 +1267,9 @@ def _plot_author_core_network(
         transform=ax.transAxes,
         fontsize=6.5,
         color="0.25",
+    )
+    _save_network_cover_background(
+        graph, pos, degree, output_dir / "author_collaboration_network_cover.png", figsize=(8.6, 6.5)
     )
     save_figure(fig, output_dir / "author_collaboration_network.png")
     return {
