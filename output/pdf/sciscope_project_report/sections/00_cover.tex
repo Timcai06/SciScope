@@ -1,43 +1,42 @@
 \begin{titlepage}
 \thispagestyle{empty}
 \begin{tikzpicture}[remember picture,overlay]
-  \fill[SciPanel] (current page.north west) rectangle ([yshift=-34mm]current page.north east);
-  \fill[SciTealDark] (current page.north west) rectangle ([xshift=5mm]current page.south west);
-  \draw[SciLine,line width=0.5pt] ([yshift=-34mm]current page.north west) -- ([yshift=-34mm]current page.north east);
-\end{tikzpicture}
-\vspace*{12mm}
-\begin{center}
-{\fontsize{30}{34}\selectfont\bfseries\color{SciTealDark} SciScope 项目报告书\par}
-\vspace{3mm}
-{\Large\color{SciInk} 面向科技文献智能分析的科研智能体构建\par}
-\vspace{4mm}
-{\small\color{SciMuted} 智能体开发赛道 \quad 数据分析报告 + 科研智能体模型(代码 + 模型文件)\par}
-\vspace{7mm}
-\begin{tabularx}{0.88\textwidth}{XXXX}
-\metriccard{公开来源}{6 个}{公开采集口径} &
-\metriccard{分析语料}{168{,}447}{数据分析报告口径} &
-\metriccard{入库论文}{159{,}187}{运行时 PostgreSQL 口径} &
-\metriccard{片段向量}{367{,}773}{pgvector 检索资产}
-\end{tabularx}
-\vspace{6mm}
-\begin{tikzpicture}[x=1mm,y=1mm]
-  \node[anchor=west,font=\bfseries\color{SciTealDark}] at (0,8) {核心能力};
-  \node[anchor=west,text=SciInk] at (31,8) {文献问答 \quad 趋势预测 \quad 论文推荐 \quad 知识图谱 \quad 论断核查};
-  \node[anchor=west,font=\bfseries\color{SciTealDark}] at (0,0) {模型资产};
-  \node[anchor=west,text=SciInk] at (31,0) {159{,}135 篇论文级向量;本地索引与模型文件可由 Makefile 流水线重建};
+  \fill[white] (current page.south west) rectangle (current page.north east);
+  \fill[SciTealDark] (current page.north west) rectangle ([xshift=3.2mm]current page.south west);
+  \draw[SciLine,line width=0.45pt] ([xshift=19mm,yshift=-24mm]current page.north west) -- ([xshift=-18mm,yshift=-24mm]current page.north east);
+  \draw[SciLine,line width=0.45pt] ([xshift=19mm,yshift=29mm]current page.south west) -- ([xshift=-18mm,yshift=29mm]current page.south east);
 \end{tikzpicture}
 
+\vspace*{7mm}
+{\small\bfseries\color{SciTealDark} SciScope\quad 智能体开发赛道\par}
+\vspace{2mm}
+{\scriptsize\color{SciMuted} 面向科技文献智能分析的科研智能体构建\par}
+
+\vspace*{31mm}
+{\fontsize{34}{39}\selectfont\bfseries\color{SciInk} 项目报告书\par}
+\vspace{5mm}
+{\Large\color{SciTealDark} 可复现文献资产驱动的证据接地科研智能体\par}
 \vspace{8mm}
-\end{center}
+{\normalsize\color{SciMuted} 文献问答 · 趋势预测 · 论文推荐 · 知识图谱 · 论断核查\par}
 
-\begin{reportbox}{一句话定位}
-SciScope 把约 16 万篇公开科技文献炼成一个\textbf{可检索、可问答、可预测趋势、可推荐、可看图谱}的科研智能体。
-大语言模型仅作生成层、可任意替换;领域智能沉淀在\textbf{本地可复现的索引与模型文件}中,且每个回答都附\textbf{可追溯证据}(evidence-grounded)。
-这正是"科研智能体"区别于"直接问通用大模型"的核心价值。
-\end{reportbox}
+\vspace{24mm}
+\begin{tabularx}{0.78\textwidth}{XXX}
+\metriccard{入库论文}{159{,}187}{运行时 PostgreSQL 口径} &
+\metriccard{片段向量}{367{,}773}{pgvector 检索资产} &
+\metriccard{自动化测试}{141 passed}{后端实测基线}
+\end{tabularx}
+
+\vspace{23mm}
+\begin{tikzpicture}[x=1mm,y=1mm]
+  \draw[SciLine,line width=0.45pt] (0,20) -- (150,20);
+  \node[anchor=west,font=\scriptsize\bfseries,text=SciTealDark] at (0,11) {ONE-LINE POSITIONING};
+  \node[anchor=west,text width=148mm,align=left,font=\normalsize,text=SciInk] at (0,0) {
+    SciScope 将公开科技文献转化为可检索、可问答、可预测趋势、可推荐、可核查的科研智能体;大模型仅作可替换生成层,关键知识沉淀在本地可复现索引与模型文件中。
+  };
+\end{tikzpicture}
 
 \vfill
-\begin{center}
-{\scriptsize\color{SciMuted} 本报告所有规模、指标与能力描述均以当前代码库、评测文件和验收命令为准。}
-\end{center}
+\begin{tabularx}{0.94\textwidth}{>{\scriptsize\color{SciMuted}}X>{\scriptsize\color{SciMuted}\raggedleft\arraybackslash}X}
+交付物:数据分析报告 + 科研智能体模型(Python 代码 + 模型文件) & 所有规模、指标与能力描述均以当前代码库、评测文件和验收命令为准。
+\end{tabularx}
 \end{titlepage}

@@ -1,103 +1,42 @@
 \begin{titlepage}
 \thispagestyle{empty}
 \begin{tikzpicture}[remember picture,overlay]
-  \fill[SciPanel] (current page.north west) rectangle ([yshift=-34mm]current page.north east);
-  \fill[SciTealDark] (current page.north west) rectangle ([xshift=5mm]current page.south west);
-  \draw[SciLine,line width=0.5pt] ([yshift=-34mm]current page.north west) -- ([yshift=-34mm]current page.north east);
+  \fill[white] (current page.south west) rectangle (current page.north east);
+  \fill[SciTealDark] (current page.north west) rectangle ([xshift=3.2mm]current page.south west);
+  \draw[SciLine,line width=0.45pt] ([xshift=19mm,yshift=-24mm]current page.north west) -- ([xshift=-18mm,yshift=-24mm]current page.north east);
+  \draw[SciLine,line width=0.45pt] ([xshift=19mm,yshift=29mm]current page.south west) -- ([xshift=-18mm,yshift=29mm]current page.south east);
 \end{tikzpicture}
 
-\begin{center}
-\vspace*{12mm}
-{\fontsize{28}{32}\selectfont\bfseries\color{SciTealDark} SciScope 数据分析报告\par}
-\vspace{3mm}
-{\Large\color{SciInk} 近五年公开科技文献的分布、主题演化与合作网络\par}
-\vspace{4mm}
-{\small\color{SciMuted} 数据分析报告交付物 \quad 文献分布 · 关键词演化 · 作者合作网络 · 数据质量边界\par}
-\vspace{7mm}
-\begin{tabularx}{0.88\textwidth}{XXXX}
+\vspace*{7mm}
+{\small\bfseries\color{SciTealDark} SciScope\quad 数据分析报告交付物\par}
+\vspace{2mm}
+{\scriptsize\color{SciMuted} 面向科技文献智能分析的科研智能体构建\par}
+
+\vspace*{31mm}
+{\fontsize{34}{39}\selectfont\bfseries\color{SciInk} 数据分析报告\par}
+\vspace{5mm}
+{\Large\color{SciTealDark} 近五年公开科技文献的分布、主题演化与合作网络\par}
+\vspace{8mm}
+{\normalsize\color{SciMuted} 文献分布 · 关键词演化 · 作者合作网络 · 数据质量边界\par}
+
+\vspace{24mm}
+\begin{tabularx}{0.78\textwidth}{XXX}
 \metriccard{原始记录}{169{,}324}{6 个公开来源} &
 \metriccard{分析语料}{168{,}447}{治理后分析口径} &
-\metriccard{主窗口}{2022--2026}{159{,}382 条} &
-\metriccard{合作候选边}{10{,}499{,}041}{分数计数前}
+\metriccard{主窗口}{2022--2026}{159{,}382 条}
 \end{tabularx}
-\end{center}
 
-\vspace{6mm}
-
-\begin{tikzpicture}[
-  x=1mm,
-  y=1mm,
-  every node/.style={font=\small},
-  stage/.style={draw=SciLine, fill=white, rounded corners=1.2pt, line width=0.65pt, align=left, inner sep=4.2pt, minimum height=24mm, text=SciInk},
-  stageA/.style={stage, draw=SciTealDark, fill=SciMint},
-  stageB/.style={stage, draw=SciClay, fill=white},
-  stageC/.style={stage, draw=SciGold, fill=white},
-  stageD/.style={stage, draw=SciPlum, fill=SciPanel},
-  micro/.style={draw=SciLine, fill=SciPanel, rounded corners=1pt, line width=0.45pt, align=center, inner sep=3.1pt, text=SciInk},
-  badge/.style={draw=SciTealDark, fill=white, rounded corners=1pt, line width=0.45pt, align=center, inner sep=2.6pt, font=\scriptsize, text=SciInk},
-  arrow/.style={-{Latex[length=2mm]}, line width=0.7pt, draw=SciMuted},
-  rail/.style={line width=0.55pt, draw=SciLine},
-  label/.style={font=\scriptsize\bfseries, anchor=west, text=SciTealDark}
-]
-  \node[label] at (-24,83) {ANALYTIC FRAMEWORK};
-  \draw[rail] (-24,80) -- (141,80);
-
-  \node[stageA, text width=30mm, minimum width=38mm] (data) at (-5,64) {
-    {\bfseries 1. 数据范围}\\[1mm]
-    6 个公开来源\\
-    2022--2026 主窗口
-  };
-  \node[stageB, text width=30mm, minimum width=38mm] (distribution) at (42,64) {
-    {\bfseries 2. 分布结构}\\[1mm]
-    来源、年份、领域\\
-    覆盖率与偏差
-  };
-  \node[stageC, text width=30mm, minimum width=38mm] (trend) at (89,64) {
-    {\bfseries 3. 主题演化}\\[1mm]
-    关键词动量\\
-    主题年度占比
-  };
-  \node[stageD, text width=30mm, minimum width=38mm] (network) at (136,64) {
-    {\bfseries 4. 合作网络}\\[1mm]
-    作者社区\\
-    桥接节点与限制
-  };
-  \draw[arrow] (data) -- (distribution);
-  \draw[arrow] (distribution) -- (trend);
-  \draw[arrow] (trend) -- (network);
-
-  \node[label] at (-24,33) {MAIN FINDINGS};
-  \draw[rail] (-24,30) -- (141,30);
-  \node[micro, text width=36mm, minimum width=42mm, minimum height=18mm] at (-1,17) {
-    {\bfseries 年份覆盖均衡}\\
-    2022--2026 各年均超过 30,000 条
-  };
-  \node[micro, text width=36mm, minimum width=42mm, minimum height=18mm] at (47,17) {
-    {\bfseries 领域结构清晰}\\
-    计算机、生物医学、材料三线可比较
-  };
-  \node[micro, text width=36mm, minimum width=42mm, minimum height=18mm] at (95,17) {
-    {\bfseries 热点正在分化}\\
-    大语言模型(LLM)、检索增强生成(RAG)、知识图谱等主题升温
-  };
-  \node[micro, text width=36mm, minimum width=42mm, minimum height=18mm] at (143,17) {
-    {\bfseries 合作网络可解释}\\
-    分数计数降低长作者名单偏差
-  };
-
-  \node[draw=SciTealDark, fill=SciPanel, rounded corners=1pt, line width=0.5pt, text width=160mm, align=left, inner sep=4pt, text=SciInk] at (59,-10) {
-    {\bfseries\color{SciTealDark} 报告主线}\\
-    本报告以数据分析为核心, 依次呈现数据覆盖、文献分布、关键词和主题演化、作者合作网络以及结论可信度边界。所有结论均限定在公开数据、近五年窗口和当前字段完整度之内。
+\vspace{23mm}
+\begin{tikzpicture}[x=1mm,y=1mm]
+  \draw[SciLine,line width=0.45pt] (0,20) -- (150,20);
+  \node[anchor=west,font=\scriptsize\bfseries,text=SciTealDark] at (0,11) {ANALYTIC FOCUS};
+  \node[anchor=west,text width=148mm,align=left,font=\normalsize,text=SciInk] at (0,0) {
+    本报告从公开科技文献中识别数据覆盖结构、研究热点演化、作者合作格局与结论可信边界,为后续科研智能体的问答、推荐、趋势和图谱能力提供可复核的数据底座。
   };
 \end{tikzpicture}
 
 \vfill
-
-\begin{reportbox}{分析对象与边界}
-\begin{tabularx}{0.94\textwidth}{>{\bfseries\color{SciTealDark}}p{24mm}X}
-分析对象 & 公开科技文献元数据、摘要、作者、关键词、年份、来源及部分正文片段 \\
-核心窗口 & 2022--2026 年,覆盖计算机科学、生物医学、材料科学三类方向 \\
-报告目标 & 识别数据覆盖结构、热点主题变化、作者合作格局与结论可信边界 \\
+\begin{tabularx}{0.94\textwidth}{>{\scriptsize\color{SciMuted}}X>{\scriptsize\color{SciMuted}\raggedleft\arraybackslash}X}
+分析对象:公开科技文献元数据、摘要、作者、关键词、年份、来源及部分正文片段 & 所有结论均限定在公开数据、近五年窗口和当前字段完整度之内。
 \end{tabularx}
-\end{reportbox}
 \end{titlepage}
