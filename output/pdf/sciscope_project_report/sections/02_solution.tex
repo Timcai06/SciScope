@@ -118,58 +118,57 @@
 \begin{figure}[!htbp]
 \centering
 \figasset[0.94\textwidth]{agent_trace_timeline.png}
-\caption{TUI 中可见的智能体执行轨迹:科研工作流阶段、工具调用、证据卡、reflect 与 final 均通过 SSE 事件流呈现,便于评委复核系统不是黑盒问答。}
+\caption{TUI 中可见的智能体执行轨迹:科研工作流阶段、工具调用、证据卡、自检与最终回答均通过流式事件呈现,便于评委在不阅读源码的情况下复核系统不是黑盒问答。}
 \label{fig:agent-trace}
 \end{figure}
 
 \textbf{核心机制}:
 \begin{itemize}
-\item \textbf{显式规划(plan)}:复杂问题先生成可执行步骤计划(仅引用内置工具,且 recommend/compare 等依赖 paper\_id 的工具会被安排在 search 之后),再据计划逐步执行;计划对用户与评委\textbf{可见}。
-\item \textbf{工具自主编排}:大模型按需调用 9 个原生语料工具和 1 个 \texttt{delegate} 专员委派工具,可\textbf{多步链式}(如先 \texttt{search} 拿到真实 paper\_id 再 \texttt{recommend\_papers} / \texttt{get\_trends});只读工具\textbf{并行执行};相同参数调用\textbf{自动去重}防止空转。
-\item \textbf{专业技能工作流}:TUI 的 \texttt{/verify}、\texttt{/review}、\texttt{/trend}、\texttt{/recommend} 会展开为 \texttt{.sciscope/skills} 中的可审计工作流模板,分别约束论断核查、综述、趋势分析和论文推荐的工具使用顺序。
-\item \textbf{反思与自评(reflect)}:回答后由模型自评"是否充分、关键论断是否都有证据支撑",不足则改写检索\textbf{重试一次}。
+\item \textbf{显式规划}:复杂问题先生成可执行研究计划,再据计划逐步执行;计划对用户与评委\textbf{可见},避免"直接给答案"的黑盒感。
+\item \textbf{工具自主编排}:大模型按需调用检索、推荐、趋势、图谱、论断核查等 10 类运行时能力,可\textbf{多步链式}(例如先检索得到真实论文,再据此推荐相近论文或分析趋势);只读能力可并行执行,相同参数自动去重防止空转。
+\item \textbf{专业技能工作流}:终端命令把论断核查、文献综述、趋势分析和论文推荐展开为可审计流程模板,约束关键任务必须先取证、再综合。
+\item \textbf{反思与自评}:回答后由模型自评"是否充分、关键论断是否都有证据支撑",不足则改写检索\textbf{重试一次}。
 \item \textbf{上下文压缩}:长会话自动压缩历史工具结果,避免超出上下文窗口。
-\item \textbf{会话态与错误恢复}:TUI 传入 \texttt{session\_id},后端映射为 LangGraph \texttt{thread\_id} 并通过 checkpoint 保留会话态;\texttt{/retry} 在同一线程内携带 \texttt{retry=true} 触发恢复。
-\item \textbf{服务/客户端分离}:agent 核心运行于 \texttt{/api/agent/stream}(SSE 流式)。事件 \texttt{meta} 同时返回运行时、节点、用户可读阶段(\texttt{phase})、耗时、会话与 retry 标记;当前客户端为 Go TUI,通过同一 SSE 契约消费智能体核心。
+\item \textbf{会话态与错误恢复}:每轮交互携带会话标识,同一研究线程内可保存上下文并触发错误恢复,便于连续调研。
+\item \textbf{服务/客户端分离}:智能体核心以流式接口输出阶段、耗时、会话与重试标记;当前客户端为 Go TUI,通过同一契约消费智能体核心,后续也可替换为其他界面。
 \item \textbf{可插拔生成层}:生成大模型经 OpenAI 兼容接口接入,一处配置即可在\textbf{本地 7B(离线/涉密)}与\textbf{DeepSeek 云端(更强质量)}之间切换,检索、接地与编排逻辑保持不变——模型成为可替换组件而非锁定项。
-\item \textbf{工具契约 + 执行前校验门}:每个工具是带契约的一等对象(自声明只读性、参数校验、结果上限);调用前做\textbf{确定性校验}——如 \texttt{recommend\_papers}/\texttt{get\_paper} 的 \texttt{paper\_id} 必须真实,\textbf{在访问数据库之前即拦截模型编造的 ID} 并提示其先检索,从机制上消除"凭空捏造主键"的失败模式。显式技能若首轮跳过必需工具,运行时会强制补上主工具调用;技能默认 2 次工具预算后强制综合,避免空跑和无限检索。工具目录由各工具\textbf{自描述}拼装,与实际工具集永不漂移。
-\item \textbf{自适应检索 + 可观测终止}:模型自行判断是否需要检索(概念/常识类问题直接作答而非空转检索),且检索讲求效率;每轮在 \texttt{meta} 中返回\textbf{终止原因(\texttt{stop\_reason})与 token 用量},使智能体的停止条件可解释、调用成本可计量。
+\item \textbf{工具契约 + 执行前校验门}:每类能力声明只读性、参数校验与结果上限;需要论文主键的动作必须使用真实论文编号,\textbf{在访问数据库之前即拦截模型编造的 ID} 并提示其先检索,从机制上消除"凭空捏造主键"的失败模式。显式技能若首轮跳过必需取证步骤,运行时会强制补上主动作;默认工具预算后强制综合,避免空跑和无限检索。
+\item \textbf{自适应检索 + 可观测终止}:模型自行判断是否需要检索(概念/常识类问题直接作答而非空转检索),且检索讲求效率;每轮返回\textbf{终止原因与 token 用量},使智能体的停止条件可解释、调用成本可计量。
 \end{itemize}
 
 \begin{plainbox}
-\textbf{当前产品化路线}:Agent 由单一 LangGraph StateGraph 编排,无运行时开关。\texttt{meta.phase} 将底层节点翻译为用户可理解的科研工作流阶段;TUI 在运行中显示阶段条,并用分组 \texttt{/timeline} 回看证据链。\texttt{session\_id} 映射为 \texttt{thread\_id},checkpoint 保存会话态,\texttt{/retry} 支持同线程错误恢复。\textbf{MCP 双向互通与专员子智能体已落地}(见后文"开放与可扩展"小节);下一阶段聚焦持久化 checkpoint 与 Human-in-the-Loop。9 个原生语料工具与 1 个 \texttt{delegate} 专员工具(共 10 个运行时工具)均通过同一 \texttt{Tool} 注册表维护。
+\textbf{当前产品化路线}:智能体由单一可观测状态图编排,无运行时开关。底层节点被翻译为用户可理解的科研工作流阶段;TUI 在运行中显示阶段条,并用分组时间线回看证据链。会话标识支持同线程恢复与重试。\textbf{MCP 双向互通与专员子智能体已落地}(见后文"开放与可扩展"小节);下一阶段聚焦持久化 checkpoint 与 Human-in-the-Loop。10 类运行时能力通过同一契约维护,确保报告中的能力清单与实际系统不漂移。
 \end{plainbox}
 
 \begin{tableblock}
 \begin{tabularx}{0.96\textwidth}{>{\bfseries}p{30mm}XX}
 \toprule
-用户可见阶段 & 对应节点 & TUI 呈现 \\
+用户可见阶段 & 系统动作 & TUI 呈现 \\
 \midrule
-理解问题 & \texttt{prepare} & 解析问题、装载会话上下文 \\
-制定研究计划 & \texttt{plan} & 展示可执行研究步骤 \\
-推理与检索决策 & \texttt{llm\_step} & 选择是否调用工具与下一步动作 \\
-证据检索 & \texttt{execute\_tools} & 调用检索、趋势、推荐、核查等工具 \\
-自检修正 & \texttt{reflect} & 判断证据是否充分,必要时重试 \\
-综合回答 & \texttt{force\_synthesis/final} & 输出"研究结论 + 证据工具 + 过程入口" \\
+理解问题 & 解析问题、装载会话上下文 & 显示任务入口与问题摘要 \\
+制定研究计划 & 拆解为可执行研究步骤 & 展示计划,评委可直接复核 \\
+推理与检索决策 & 判断是否需要取证、调用哪类能力 & 显示当前阶段和后续动作 \\
+证据检索 & 调用检索、趋势、推荐、核查等能力 & 返回证据卡和来源信息 \\
+自检修正 & 判断证据是否充分,必要时重试 & 标明修正原因与边界 \\
+综合回答 & 生成"研究结论 + 证据工具 + 过程入口" & 工具日志不混入主回答 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
 
 \begin{tableblock}
-\begin{tabularx}{0.96\textwidth}{p{42mm}X}
+\begin{tabularx}{0.96\textwidth}{p{38mm}X}
 \toprule
-\textbf{工具} & \textbf{作用} \\
+\textbf{运行时能力} & \textbf{评委可见价值} \\
 \midrule
-\texttt{search\_literature} & 跨语言混合检索(FTS + 向量 + 倒数排名融合 RRF + 双语映射 + 重排) \\
-\texttt{get\_trends} & Mann-Kendall(MK) 趋势判定 + Sen's 斜率 + 下一年预测 \\
-\texttt{recommend\_papers} & 语义 + 关键词 + 作者 + 最大边际相关(Maximum Marginal Relevance, MMR)多样性的可解释推荐 \\
-\texttt{get\_paper} & 按 paper\_id 取论文详情 \\
-\texttt{summarize\_field} & 检索代表论文作为领域综述素材 \\
-\texttt{compare\_papers} & 取两篇论文详情用于多维对比 \\
-\texttt{query\_knowledge\_graph} & 作者/关键词/主题图谱与研究社区主题 \\
-\texttt{export\_bibliography} & 导出 BibTeX 引文条目 \\
-\texttt{verify\_claim} & \textbf{跨语言论断核查}:用语义接地度判定支持等级并给出处 \\
-\texttt{delegate} & 将聚焦子任务交给综述员、趋势分析师或批判核查员三类专员子智能体 \\
+跨语言文献检索 & 中文或英文问题均可命中英文论文,输出论文、年份、片段与来源 \\
+趋势预测 & 给出关键词/主题热度、增长趋势、生命周期与下一年外推,并标注不确定边界 \\
+论文推荐 & 基于语义、关键词、作者关系与时近性给出可解释推荐,不是单纯相似度排序 \\
+论文详情与对比 & 对真实论文编号取详情或做多维对比,用于综述与立项查新 \\
+领域综述素材 & 检索代表论文并组织成综述素材,支撑快速调研 \\
+知识图谱查询 & 展示作者合作、关键词共现、主题社区和 ego 子图,支撑潜在合作者识别 \\
+引文导出 & 输出规范 BibTeX 条目,服务论文写作与报告归档 \\
+论断核查 & 用跨语言语义接地度判定强支持/部分支持/证据不足,并给出可追溯证据 \\
+专员子智能体 & 将综述、趋势、批判核查等聚焦任务交给受限工具集的专员完成 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
@@ -177,9 +176,9 @@
 \subsection{开放与可扩展:MCP 双向互通 + 专员子智能体}
 在固定的领域工具之外,智能体层做了三项可扩展性升级,使 SciScope 从"封闭工具集"走向\textbf{开放智能体生态}:
 \begin{itemize}
-\item \textbf{① SciScope 作为 MCP 服务端}:当前 \texttt{Tool} 注册表经模型上下文协议(Model Context Protocol, MCP)对外暴露,\textbf{任意 MCP 客户端}(Claude Desktop、Cursor 等)可直接调用我们的接地语料检索与 \texttt{verify\_claim} 核查——把护城河(16 万语料)开放成生态入口而非自用孤岛;复用同一工具契约,零重复实现。
-\item \textbf{② 消费外部 MCP 工具}:智能体可将外部 MCP 服务端的工具按 \texttt{mcp\_\_server\_\_tool} 命名并入工具注册表,与原生工具统一调度。\textbf{新增能力(如联网取全文、Web 检索)由"插入 MCP 服务"获得,而非新增原生代码},核心工具保持精简、聚焦治理语料。
-\item \textbf{③ 专员子智能体(多 Agent 分工)}:复杂多面任务可经 \texttt{delegate} 工具下派给\textbf{综述员 / 趋势分析师 / 批判核查员}三类专员,各携受限工具集独立完成子任务;专员工具集不含 \texttt{delegate},\textbf{结构上杜绝递归}。
+\item \textbf{① SciScope 作为 MCP 服务端}:当前能力可经模型上下文协议(Model Context Protocol, MCP)对外暴露,\textbf{任意 MCP 客户端}(Claude Desktop、Cursor 等)可直接调用我们的接地语料检索与论断核查——把护城河(16 万语料)开放成生态入口而非自用孤岛。
+\item \textbf{② 消费外部 MCP 工具}:智能体可将外部 MCP 服务端能力并入统一调度。\textbf{新增能力(如联网取全文、Web 检索)由"插入 MCP 服务"获得,而非改造核心系统},核心工具保持精简、聚焦治理语料。
+\item \textbf{③ 专员子智能体(多 Agent 分工)}:复杂多面任务可下派给\textbf{综述员 / 趋势分析师 / 批判核查员}三类专员,各携受限能力集独立完成子任务;专员不再继续委派,\textbf{结构上杜绝递归}。
 \end{itemize}
 \begin{plainbox}
 \textbf{设计取舍(据实)}:不堆砌与科研场景无关的通用编程工具;核心保持领域工具精简,长尾能力靠 MCP 与子智能体扩展——与主流生产级智能体"核心工具精、扩展靠 MCP/sub-agent"的工程哲学一致。
@@ -187,67 +186,50 @@
 
 \subsection{方案功能}
 \begin{itemize}
-\item \textbf{科研智能体 \texttt{/api/agent/stream}}:大模型\textbf{自主规划并编排}上述能力(9 个原生语料工具 + 1 个 \texttt{delegate} 工具),多步推理、自我纠错、据证作答;终端助手 \texttt{make tui} 提供 Claude Code 风格的流式交互,并通过 \texttt{/verify}/\texttt{/trend}/\texttt{/recommend} 等技能命令把常见科研任务展开为可审计工具链。
-\item \textbf{文献问答 \texttt{/api/chat}}:\textbf{GraphRAG}(查询抽取关键词实体 → 沿共现图扩展邻居 → query expansion)+ 混合检索证据 → 本地大模型据证生成带引用回答 → \textbf{答案可被证据支撑性校验}(低置信明确提示)。
-\item \textbf{混合检索 \texttt{/api/search}}:FTS + 向量 + RRF 融合,去重到论文级,返回命中片段。
-\item \textbf{趋势预测 \texttt{/api/trends}}:关键词/主题的增长率、burst、生命周期与下一年线性外推(含不确定区间)。
-\item \textbf{论文推荐 \texttt{/api/recommend}}:语义相似 + 关键词重叠 + 作者关系 + 时近性融合,输出\textbf{可解释因子}。
-\item \textbf{知识图谱 \texttt{/api/graph}}:作者合作图、关键词共现图、论文-主题图;作者支持实时 ego 子图。
+\item \textbf{科研智能体}:大模型\textbf{自主规划并编排}检索、核查、趋势、推荐、图谱等能力,多步推理、自我纠错、据证作答;终端助手提供流式交互,并把常见科研任务展开为可审计工具链。
+\item \textbf{文献问答}:\textbf{GraphRAG}(查询抽取关键词实体 → 沿共现图扩展邻居 → query expansion)+ 混合检索证据 → 本地大模型据证生成带引用回答 → \textbf{答案可被证据支撑性校验}(低置信明确提示)。
+\item \textbf{混合检索}:全文检索 + 向量检索 + RRF 融合,去重到论文级,返回命中片段。
+\item \textbf{趋势预测}:关键词/主题的增长率、burst、生命周期与下一年线性外推(含不确定区间)。
+\item \textbf{论文推荐}:语义相似 + 关键词重叠 + 作者关系 + 时近性融合,输出\textbf{可解释因子}。
+\item \textbf{知识图谱}:作者合作图、关键词共现图、论文-主题图;作者支持实时 ego 子图。
 \end{itemize}
 
 \subsection{关键技术}
 \begin{itemize}
-\item \textbf{向量化}:本地 \texttt{multilingual-e5-base}(768 维,中英跨语言),fp16 加速、断点续传;向量入 pgvector。
-\item \textbf{混合检索与 RRF}:全文索引(\texttt{tsvector}) + 余弦向量索引(\texttt{ivfflat}),两路按 $1/(k+\text{rank})$ 融合(k=60)。
+\item \textbf{向量化}:本地 multilingual-e5-base 嵌入器(768 维,中英跨语言),fp16 加速、断点续传;向量入 pgvector。
+\item \textbf{混合检索与 RRF}:全文索引 + 余弦向量索引,两路按 $1/(k+\text{rank})$ 融合(k=60)。
 \item \textbf{趋势模型}:逐年归一化词频上最小二乘外推 + 残差不确定带;主题模型 LDA/NMF 各 40 主题。趋势热度 $h_{k,y}=n_{k,y}/N_y$,预测采用 $\hat{h}_{k,y+1}=a_k y+b_k$ 作为排序信号,不作确定性预言。
-\item \textbf{推荐模型}:论文级平均向量(pgvector \texttt{avg})+ 多信号加权,逐条给出可解释因子;重排采用最大边际相关(Maximum Marginal Relevance, MMR),即 $\lambda sim(q,d)-(1-\lambda)\max_{d'\in S}sim(d,d')$,兼顾相关性与多样性。
+\item \textbf{推荐模型}:论文级平均向量 + 多信号加权,逐条给出可解释因子;重排采用最大边际相关(Maximum Marginal Relevance, MMR),即 $\lambda sim(q,d)-(1-\lambda)\max_{d'\in S}sim(d,d')$,兼顾相关性与多样性。
 \item \textbf{知识图谱}:NetworkX 中心度/社区,百万级边按中心度剪枝导出 JSON,作者 ego 图走 SQL 实时查询。
 \item \textbf{生成层}:OpenAI 兼容本地服务,输出限长防失控,可平滑切换更大/远程模型。
-\item \textbf{智能体编排}:基于 LangGraph StateGraph 的科研智能体运行时。prepare / plan / LLM step / tool execution / reflect / final synthesis 被拆为可观察节点;底层使用本地 \texttt{Qwen2.5-7B}(vLLM,hermes 工具解析),支持流式选工具、只读工具并行执行、调用去重、plan/reflect 自校验、会话 checkpoint 与同线程 \texttt{/retry};事件流通过 \texttt{phase} 字段向用户呈现科研工作流阶段。
+\item \textbf{智能体编排}:基于 LangGraph StateGraph 的科研智能体运行时。理解问题、制定计划、选择能力、执行工具、观察结果、自检修正、综合回答被拆为可观察节点;底层使用本地 Qwen2.5-7B,支持流式选工具、只读工具并行执行、调用去重、规划/反思自校验、会话 checkpoint 与同线程重试;事件流向用户呈现科研工作流阶段。
 \end{itemize}
 
-\textbf{证据接地口径}: \texttt{verify\_claim} 不把语义相似度包装为形式逻辑证明, 而是将论断 $c$ 与证据片段 $e$ 的接地强度表达为可解释评分:
+\textbf{证据接地口径}:论断核查不把语义相似度包装为形式逻辑证明, 而是将论断 $c$ 与证据片段 $e$ 的接地强度表达为可解释评分:
 \formulaline{
 g(c,e)=\alpha\,sim(c,e)+\beta\,source(e)+\gamma\,recency(e)
 }{该评分用于支持等级与证据排序;最终结论仍必须展示出处,并由 reflect 节点检查关键论断是否有证据支撑。}
 
 \subsection{实现过程}
-\textbf{数据生成与采集} → 6 源按领域/年份抓取,落 \texttt{data/raw\_canonical} 分区 JSONL。\\
+\textbf{数据生成与采集} → 6 源按领域/年份抓取,形成可追溯的原始分区底账。\\
 \textbf{数据组织与治理} → 规范化字段;标题优先去重(合并跨源/预印本同篇,留最全一条)+ front-matter 剔除 + PDF 垃圾/ NUL 清洗;168{,}447 条分析语料进一步形成 159{,}164 篇处理后语料文件,运行时库表当前装载 159{,}187 篇论文。\\
-\textbf{信息汲取与建模} → 切片入库,计算片段/论文向量,拟合趋势/推荐/图谱/主题;关键词统一过滤 arXiv 码与超泛标签。\texttt{make agent-build} 一键重建。\\
-\textbf{服务与交互} → FastAPI 暴露检索/问答/趋势/推荐/图谱及\textbf{智能体流式}接口;终端 AI 助手 \texttt{make tui} 自主编排工具;数据库不可用时自动回退内存检索,保证演示鲁棒。
+\textbf{信息汲取与建模} → 切片入库,计算片段/论文向量,拟合趋势/推荐/图谱/主题;关键词统一过滤 arXiv 码与超泛标签。模型资产可由一键流水线重建。\\
+\textbf{服务与交互} → FastAPI 暴露检索/问答/趋势/推荐/图谱及\textbf{智能体流式}接口;终端 AI 助手自主编排工具;数据库不可用时自动回退内存检索,保证演示鲁棒。
 
-\subsection{项目结构与分层}
-代码按"数据 → 模型 → 服务/RAG → 智能体 → 接口 → 客户端"\textbf{六层}组织,职责单一、依赖自底向上:\textbf{Python 承载全部智能}(从数据到 agent),\textbf{Go 仅作终端客户端}(经 SSE 消费,可替换、不绑定)。
-
-\begin{codepanel}\scriptsize
-\dirtree{%
-.1 \texttt{数据要素/}.
-.2 \texttt{data\_pipeline/}\quad [1] 加载 / 规范化.
-.2 \texttt{src/}.
-.3 \texttt{harvest, analysis/}\quad [1] 6 源采集 / 分析资产 -> 数据报告.
-.3 \texttt{models/}\quad [2] 嵌入·趋势·推荐·图谱·双语·重排.
-.2 \texttt{models/, output/graphs/}\quad [2] 模型文件 / 知识图谱 JSON.
-.2 \texttt{backend/app/}.
-.3 \texttt{services/}\quad [3] 混合检索(RAG)·GraphRAG·证据接地.
-.3 \texttt{agent/}\quad [4] LangGraph StateGraph(plan->执行->观察->反思,session/retry,9 原生工具+delegate).
-.3 \texttt{api/}\quad [5] \texttt{/api/agent/stream}(SSE meta)+ search / chat / trends.
-.2 \texttt{tui/}\quad [6] Go·Bubble Tea 终端客户端(消费 SSE).
-.2 \texttt{PostgreSQL + pgvector}\quad 运行时:papers·chunk\_embeddings·….
-}
-\end{codepanel}
+\subsection{交付结构与复现索引}
+从评审视角看,本项目按"数据 → 模型 → 服务/RAG → 智能体 → 接口 → 客户端"\textbf{六层交付};职责单一、依赖自底向上:\textbf{Python 承载全部智能}(从数据到 agent),\textbf{Go 仅作终端客户端}(经流式接口消费,可替换、不绑定)。源码路径不作为正文卖点,仅作为复现索引列示。
 
 \begin{tableblock}
-\begin{tabularx}{0.96\textwidth}{>{\bfseries}p{22mm}X}
+\begin{tabularx}{0.96\textwidth}{>{\bfseries}p{22mm}XX}
 \toprule
-分层 & 职责与代码位置 \\
+分层 & 评委可见成果 & 复现索引 \\
 \midrule
-1. 数据层 & 6 源采集 -> 规范化 / 标题优先去重 -> 分析资产(\texttt{data\_pipeline}、\texttt{src/harvest}、\texttt{src/analysis}) \\
-2. 模型层 & 片段/论文向量、趋势、推荐、图谱等\textbf{模型文件},入 PostgreSQL + pgvector(\texttt{src/models}、\texttt{models/}、\texttt{output/graphs/}) \\
-3. 服务 / RAG & 混合检索(FTS + 向量 + RRF + 双语 + 重排)+ GraphRAG + 证据接地(\texttt{backend/app/services}) \\
-4. 智能体 & LangGraph StateGraph:prepare -> plan -> 选工具 -> 并行执行 -> 观察 -> 反思自评 -> 据证作答;支持 session checkpoint 与同线程 \texttt{/retry}(\texttt{backend/app/agent}) \\
-5. 接口 & FastAPI;智能体经 \texttt{/api/agent/stream} 以 SSE 流式输出,并在 \texttt{meta} 中暴露 runtime / node / phase / elapsed / session / retry(\texttt{backend/app/api}) \\
-6. 客户端 & Go / Bubble Tea 终端(\texttt{tui/main.go}),纯 SSE 消费;将 \texttt{phase} 渲染为科研工作流阶段条与分组 \texttt{/timeline};浏览器侧仅作为品牌宣传、下载与文档入口规划 \\
+1. 数据层 & 6 源采集、规范化、标题优先去重、分析资产与数据报告 & \texttt{data\_pipeline/}, \texttt{src/harvest}, \texttt{src/analysis} \\
+2. 模型层 & 片段/论文向量、趋势、推荐、图谱等\textbf{模型文件} & \texttt{src/models}, \texttt{models/}, \texttt{output/graphs} \\
+3. 服务 / RAG & 混合检索、GraphRAG、证据接地、可解释推荐与趋势查询 & \texttt{backend/app/services} \\
+4. 智能体 & 可观测状态图:规划、选能力、取证、观察、自检、据证作答 & \texttt{backend/app/agent}, \texttt{.sciscope/skills} \\
+5. 接口 & FastAPI 流式接口与常规检索/问答/趋势/推荐/图谱接口 & \texttt{backend/app/api} \\
+6. 客户端 & Go 终端客户端;展示科研阶段条、时间线、会话导出与重试 & \texttt{tui/} \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}

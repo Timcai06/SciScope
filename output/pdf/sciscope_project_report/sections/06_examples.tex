@@ -43,7 +43,7 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 
 \subsection{用例四:趋势热点(模型输出)}
 \begin{plainbox}
-\textbf{\texttt{/api/trends} 新兴热点排行}(关键词清洗后):
+\textbf{新兴热点排行}(关键词清洗后):
 \texttt{retrieval augmented generation} → \texttt{large language model} → \texttt{gene delivery} → \dots\par\vspace{2pt}
 与 2022--2026 年科研态势吻合,RAG 与大语言模型领跑。
 \end{plainbox}
@@ -56,22 +56,22 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 \end{plainbox}
 
 \subsection{用例六:科研智能体自主多步编排(真实轨迹)}
-下面是终端智能体 \texttt{make tui} 处理一个复合问题的\textbf{真实执行轨迹}(本地 Qwen2.5-7B),展示"规划 → 自主选工具 → 多步链式 → 据证作答":
+下面是终端智能体处理一个复合问题的\textbf{真实执行轨迹}(本地 Qwen2.5-7B),展示"规划 → 自主取证 → 多步链式 → 据证作答":
 \begin{plainbox}
 \textbf{提问}:推荐几篇关于知识图谱的代表论文并说明趋势\par\vspace{3pt}
-\statusbadge{1. plan} 自动生成计划:\texttt{search\_literature(知识图谱)} → \texttt{recommend\_papers} → \texttt{get\_trends}\par\vspace{2pt}
-\statusbadge{2. 执行} 智能体依计划链式调用:
+\statusbadge{1. 规划} 自动生成计划:先检索代表论文 → 再基于真实论文做推荐 → 最后查询"knowledge graph"趋势\par\vspace{2pt}
+\statusbadge{2. 执行} 智能体依计划链式取证:
 \begin{enumerate}[itemsep=1pt]
-\item \texttt{search\_literature\{query:"知识图谱"\}} —— 跨语言命中英文文献,取得真实 \texttt{paper\_id}
-\item \texttt{recommend\_papers\{paper\_id:"W2789524213"\}} —— \textbf{把上一步得到的 id 喂入}推荐(多步链式,非固定管线)
-\item \texttt{get\_trends\{keyword:"knowledge graph"\}} —— 中文关键词\textbf{自动转英文}查趋势
+\item 跨语言检索"知识图谱",命中英文文献并取得真实论文编号;
+\item 以检索得到的真实论文为种子做推荐,\textbf{不是预设固定结果};
+\item 将中文关键词映射到英文研究术语,查询年度趋势。
 \end{enumerate}
 \statusbadge{3. 据证作答} 综合三个工具的真实结果,给出代表论文清单 + 趋势判定,并标注出处。\par\vspace{2pt}
-\textbf{关键特性}:计划对用户可见;\texttt{recommend} 用的是\textbf{检索得到的真实 id 而非臆造};相同参数调用自动去重防空转;回答后还会\textbf{自评证据是否充分},不足则改写重试。
+\textbf{关键特性}:计划对用户可见;推荐使用的是\textbf{检索得到的真实论文编号而非臆造};相同参数调用自动去重防空转;回答后还会\textbf{自评证据是否充分},不足则改写重试。
 \end{plainbox}
 
-\subsection{用例七:论断核查与跨语言接地(\texttt{verify\_claim})}
-下面展示第 9 个智能体工具 \texttt{verify\_claim} 的真实输出轨迹:用户给出中文论断,系统检索英文文献并用同一跨语言 e5 向量空间计算“论断--证据”接地度,返回支持等级而不是让大模型直接判断。
+\subsection{用例七:论断核查与跨语言接地}
+下面展示论断核查能力的真实输出轨迹:用户给出中文论断,系统检索英文文献并用同一跨语言 e5 向量空间计算“论断--证据”接地度,返回支持等级而不是让大模型直接判断。
 \begin{plainbox}
 \textbf{待核查论断}:检索增强生成能够降低大语言模型回答中的幻觉风险\par\vspace{2pt}
 \textbf{工具输出}:支持等级=\textbf{强支持},最高接地相似度=\textbf{0.846}\par\vspace{2pt}
@@ -86,7 +86,7 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 \end{plainbox}
 
 \subsection{用例八:TUI 产品化工作流与黄金会话导出}
-终端客户端将底层 LangGraph 节点翻译为用户可读的科研工作流阶段。用户看到的是研究过程,而不是内部工具日志:\texttt{/timeline} 按阶段回看证据链,最终回答固定为"研究结论 + 证据工具 + 过程入口"。
+终端客户端将底层智能体节点翻译为用户可读的科研工作流阶段。用户看到的是研究过程,而不是内部工具日志;时间线可按阶段回看证据链,最终回答固定为"研究结论 + 证据工具 + 过程入口"。
 \begin{plainbox}
 \textbf{黄金会话样例}:\texttt{docs/examples/golden\_verify\_claim\_session.md}\par\vspace{2pt}
 \textbf{用户问题}:RAG 能否降低科研问答系统中的幻觉风险?请给出证据和判断边界。\par\vspace{2pt}
@@ -96,11 +96,11 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 阶段 & 样例中的可见动作 \\
 \midrule
 制定研究计划 & 将中文论断改写为英文检索表达,规划证据核查路径 \\
-证据检索 & 调用 \texttt{verify\_claim} 与文献检索,返回支持等级和证据卡 \\
+证据检索 & 调用论断核查与文献检索能力,返回支持等级和证据卡 \\
 自检修正 & 将结论限定为"降低风险",不夸大为"完全消除幻觉" \\
 综合回答 & 输出研究结论、依据、判断边界和可复现入口 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
-\textbf{输出边界}:结论表述为"降低幻觉风险并提升可核验性";证据工具与 \texttt{/timeline} 入口保留给评委复核。
+\textbf{输出边界}:结论表述为"降低幻觉风险并提升可核验性";证据工具与时间线入口保留给评委复核。
 \end{plainbox}
