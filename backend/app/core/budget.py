@@ -27,4 +27,10 @@ def enforce_agent_budget(
             "history_too_long",
             f"history exceeds {max_history_turns} turns",
         )
+    for turn in request.history:
+        if len(turn.content) > max_question_chars:
+            return BudgetViolation(
+                "history_content_too_long",
+                f"history turn length exceeds {max_question_chars} characters",
+            )
     return None
