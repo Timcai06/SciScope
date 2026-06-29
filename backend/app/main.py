@@ -31,6 +31,15 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name)
 
+    from backend.app.core.request_context import bind_request_context
+
+    @app.middleware("http")
+    async def request_context_middleware(request, call_next):
+        request_id = bind_request_context(request)
+        response = await call_next(request)
+        response.headers["x-request-id"] = request_id
+        return response
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

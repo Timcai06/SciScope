@@ -55,6 +55,16 @@ def test_healthz_does_not_require_database(monkeypatch):
     assert response.json() == {"status": "ok", "service": "SciScope"}
 
 
+def test_request_id_header_is_returned(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_ENV", "production")
+    client = _client()
+
+    response = client.get("/healthz", headers={"x-request-id": "req-test-1"})
+
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == "req-test-1"
+
+
 def test_readyz_reports_missing_database(monkeypatch):
     monkeypatch.setenv("SCISCOPE_ENV", "production")
     monkeypatch.delenv("SCISCOPE_DB_DSN", raising=False)
