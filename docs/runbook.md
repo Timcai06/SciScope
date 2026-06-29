@@ -199,6 +199,9 @@ Before cutting v0.2.1, record the concrete hosted API base URL, hosting provider
 managed PostgreSQL/pgvector provider, and anonymous quota values. Use
 `configs/hosted-backend.env.example` as the environment contract.
 
+Earlier localhost/Makefile steps in this runbook are repo-local developer workflows;
+packaged Homebrew/Scoop releases must use the hosted backend by default.
+
 The packaged TUI must default to the hosted HTTPS API. Local development remains:
 
 ```bash
