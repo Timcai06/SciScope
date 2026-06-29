@@ -566,6 +566,82 @@ func TestRecoveryActionClassifiesBackendError(t *testing.T) {
 	}
 }
 
+func TestHostedBackendRecoveryDoesNotTellUserToRunMakeBackend(t *testing.T) {
+	action := recoveryActionForBackend("https://api.example.test", "connection refused")
+
+	if strings.Contains(action.Message, "make backend") || strings.Contains(action.Command, "make backend") {
+		t.Fatalf("hosted recovery should not tell normal users to run make backend: %#v", action)
+	}
+	if !strings.Contains(action.Message, "/demo") {
+		t.Fatalf("hosted recovery should offer demo fallback: %#v", action)
+	}
+}
+
+func TestLocalBackendRecoveryStillMentionsMakeBackend(t *testing.T) {
+	action := recoveryActionForBackend("http://127.0.0.1:8000", "connection refused")
+
+	if action.Command != "make backend" {
+		t.Fatalf("local recovery should keep developer command, got %#v", action)
+	}
+}
+
+func TestRecoveryActionUsesHostedBackendURL(t *testing.T) {
+	t.Setenv("SCISCOPE_BACKEND", "")
+	t.Setenv("SCISCOPE_HOSTED_BACKEND", "https://api.example.test")
+
+	action := recoveryAction("无法连接后端 https://api.example.test: connection refused")
+
+	if action.Command != "/demo" {
+		t.Fatalf("hosted recovery should use demo command, got %#v", action)
+	}
+	if !strings.Contains(action.Message, "/demo") || !strings.Contains(action.Message, "/retry") {
+		t.Fatalf("hosted recovery should mention demo and retry: %#v", action)
+	}
+	if strings.Contains(action.Message, "make backend") || strings.Contains(action.Command, "make backend") {
+		t.Fatalf("hosted recovery should not mention make backend: %#v", action)
+	}
+}
+
+func TestRecoveryActionUsesDefaultHostedBackendURL(t *testing.T) {
+	t.Setenv("SCISCOPE_BACKEND", "")
+	t.Setenv("SCISCOPE_HOSTED_BACKEND", "")
+	old := defaultHostedBackendURL
+	t.Cleanup(func() {
+		defaultHostedBackendURL = old
+	})
+	defaultHostedBackendURL = "https://release.example.test"
+
+	action := recoveryAction("无法连接后端 https://release.example.test: connection refused")
+
+	if action.Command != "/demo" {
+		t.Fatalf("ldflag hosted recovery should use demo command, got %#v", action)
+	}
+	if !strings.Contains(action.Message, "/demo") || !strings.Contains(action.Message, "/retry") {
+		t.Fatalf("ldflag hosted recovery should mention demo and retry: %#v", action)
+	}
+	if strings.Contains(action.Message, "make backend") || strings.Contains(action.Command, "make backend") {
+		t.Fatalf("ldflag hosted recovery should not mention make backend: %#v", action)
+	}
+}
+
+func TestBackendDoctorWarning(t *testing.T) {
+	hosted := backendDoctorWarning("https://api.example.test")
+	if hosted.Name != "Backend" || hosted.Status != "warn" {
+		t.Fatalf("hosted doctor warning should describe backend warning, got %#v", hosted)
+	}
+	if !strings.Contains(hosted.Detail, "/demo") || strings.Contains(hosted.Detail, "make backend") {
+		t.Fatalf("hosted doctor warning should offer demo without make backend: %#v", hosted)
+	}
+
+	local := backendDoctorWarning("http://127.0.0.1:8000")
+	if local.Name != "Backend" || local.Status != "warn" {
+		t.Fatalf("local doctor warning should describe backend warning, got %#v", local)
+	}
+	if !strings.Contains(local.Detail, "make backend") {
+		t.Fatalf("local doctor warning should keep developer command: %#v", local)
+	}
+}
+
 func TestRetrySlashReplaysLastQuestion(t *testing.T) {
 	m := initialModel()
 	m.ready = true
@@ -1474,12 +1550,85 @@ func TestDoctorReportRendersProductChecks(t *testing.T) {
 	}
 }
 
-func TestDoctorUsesIngestStatusAsBackendHealthCheck(t *testing.T) {
+func TestBackendURLDefaultsToHostedEndpoint(t *testing.T) {
+	t.Setenv("SCISCOPE_BACKEND", "")
+	t.Setenv("SCISCOPE_HOSTED_BACKEND", " https://api.example.test/ ")
+
+	got := backendURL()
+
+	if got != "https://api.example.test" {
+		t.Fatalf("backendURL() = %q, want hosted endpoint", got)
+	}
+}
+
+func TestBackendURLLocalOverrideWins(t *testing.T) {
+	t.Setenv("SCISCOPE_BACKEND", "http://127.0.0.1:8000/")
+	t.Setenv("SCISCOPE_HOSTED_BACKEND", "https://api.example.test")
+
+	got := backendURL()
+
+	if got != "http://127.0.0.1:8000/" {
+		t.Fatalf("backendURL() = %q, want explicit local override", got)
+	}
+}
+
+func TestBackendURLDefaultHostedLdflagFallback(t *testing.T) {
+	t.Setenv("SCISCOPE_BACKEND", "")
+	t.Setenv("SCISCOPE_HOSTED_BACKEND", "")
+	old := defaultHostedBackendURL
+	t.Cleanup(func() {
+		defaultHostedBackendURL = old
+	})
+	defaultHostedBackendURL = " https://release.example.test/ "
+
+	got := backendURL()
+
+	if got != "https://release.example.test" {
+		t.Fatalf("backendURL() = %q, want trimmed ldflag hosted endpoint", got)
+	}
+}
+
+func TestBackendModeLabelsHostedAndLocal(t *testing.T) {
+	if got := backendMode("https://api.example.test"); got != "hosted" {
+		t.Fatalf("backendMode(hosted) = %q", got)
+	}
+	if got := backendMode("http://127.0.0.1:8000"); got != "local" {
+		t.Fatalf("backendMode(local) = %q", got)
+	}
+	if got := backendMode("http://[::1]:8000"); got != "local" {
+		t.Fatalf("backendMode(ipv6 local) = %q", got)
+	}
+	if got := backendMode("https://api.example.test/proxy/localhost"); got != "hosted" {
+		t.Fatalf("backendMode(path mentions localhost) = %q", got)
+	}
+	if got := backendMode("https://127.0.0.1.example.com"); got != "hosted" {
+		t.Fatalf("backendMode(hostname contains local IP) = %q", got)
+	}
+	if got := backendMode("not localhost"); got != "hosted" {
+		t.Fatalf("backendMode(malformed hosted) = %q", got)
+	}
+	if got := backendMode("localhost"); got != "local" {
+		t.Fatalf("backendMode(raw localhost) = %q", got)
+	}
+}
+
+func TestHelpStringDocumentsHostedBackendDefault(t *testing.T) {
+	help := helpString()
+
+	if strings.Contains(help, "default http://127.0.0.1:8000") {
+		t.Fatalf("help should not document localhost as default:\n%s", help)
+	}
+	if !strings.Contains(help, "SCISCOPE_HOSTED_BACKEND") && !strings.Contains(strings.ToLower(help), "hosted") {
+		t.Fatalf("help should document hosted backend default:\n%s", help)
+	}
+}
+
+func TestDoctorUsesReadinessAsBackendHealthCheck(t *testing.T) {
 	t.Setenv("SCISCOPE_BACKEND", "http://127.0.0.1:8000/")
 
 	got := healthURL()
 
-	if got != "http://127.0.0.1:8000/api/ingest/status" {
+	if got != "http://127.0.0.1:8000/readyz" {
 		t.Fatalf("unexpected health URL: %s", got)
 	}
 }

@@ -4,8 +4,9 @@
   "homepage": "https://github.com/Timcai06/SciScope",
   "license": "Proprietary",
   "notes": [
-    "This package installs only the Go TUI client.",
-    "Set SCISCOPE_BACKEND to connect to a hosted backend, or run the SciScope backend locally from the source repository."
+    "Run sciscope-tui to connect to the hosted SciScope backend.",
+    "Run sciscope-tui --demo for the offline golden demo.",
+    "Developers can set SCISCOPE_BACKEND to use a local backend."
   ],
   "architecture": {
     "64bit": {

@@ -27,6 +27,7 @@ from backend.app.agent.planning import make_plan, needs_plan
 from backend.app.agent.reflection import reflect_reason, self_critique
 from backend.app.agent.tool_runner import repair_missing_tool_results, run_tools
 from backend.app.agent.tools import TOOL_SCHEMAS
+from backend.app.core.config import get_settings
 
 MAX_STEPS = 6
 MAX_RETRIES = 1
@@ -49,6 +50,14 @@ def _skill_tool_budget(question: str) -> int | None:
     if "你正在执行 SciScope 技能" not in question:
         return None
     return 2
+
+
+def _tool_call_budget(question: str) -> int:
+    skill_budget = _skill_tool_budget(question)
+    configured_budget = get_settings().agent_max_tool_calls
+    if skill_budget is None:
+        return configured_budget
+    return min(configured_budget, skill_budget)
 
 
 def _skill_input(question: str, label: str) -> str:
@@ -267,8 +276,8 @@ def _llm_step(state: AgentState) -> AgentState:
         forced_call = _forced_skill_tool_call(state["question"])
         if forced_call:
             tool_calls = [forced_call]
-    budget = _skill_tool_budget(state["question"])
-    if budget is not None and tool_calls:
+    budget = _tool_call_budget(state["question"])
+    if tool_calls:
         remaining = max(budget - int(state.get("tools_total") or 0), 0)
         tool_calls = tool_calls[:remaining]
     next_state: AgentState = {
@@ -321,9 +330,9 @@ def _execute_tools(state: AgentState) -> AgentState:
         messages.append({"role": "tool", "tool_call_id": tool_call.get("id", name), "content": result})
     emit: list[AgentEvent] = [*call_events, *progress_events, *result_events]
 
-    budget = _skill_tool_budget(state["question"])
+    budget = _tool_call_budget(state["question"])
     tools_total = int(state.get("tools_total") or 0)
-    if budget is not None and tools_total >= budget:
+    if tools_total >= budget:
         route: GraphRoute = "force_synthesis"
         stop_reason = "tool_budget"
     else:

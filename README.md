@@ -80,19 +80,25 @@ make backend
 - `make smoke`：基础 API 健康检查。
 - `make agent-smoke`：live agent 黑盒验收，检查真实库表规模、skills 工具链路与工具预算。
 - `make vllm-smoke`：检查本地 OpenAI-compatible 模型端点。
-- `make tui-build TUI_VERSION=0.2.0`：产出 Go 客户端二进制。
+- `make tui-build TUI_VERSION=0.2.1`：产出 Go 客户端二进制。
 
 ## Terminal Agent Client（Go TUI）
 
 终端客户端是“协议消费者”：它不承载模型与检索决策逻辑，只消费
 `POST /api/agent/stream` 的 SSE 事件并渲染为可读面板。
 
-启动方式（推荐）：
+启动方式（发布版推荐）：
+
+```bash
+sciscope-tui
+```
+
+源码开发时连接本地后端：
 
 ```bash
 make backend  # 先启动后端 127.0.0.1:8000
 make llm      # 可选：本地 LLM 兼容网关（用于真实联网问答）
-make tui      # 运行终端客户端
+SCISCOPE_BACKEND=http://127.0.0.1:8000 make tui
 make tui-demo # 离线演示流程（无后端）
 make tui-doctor # 检查后端/LLM/会话目录/图谱资产
 ```

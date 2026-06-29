@@ -1,0 +1,13 @@
+.git
+.cache
+.pytest_cache
+__pycache__
+*.pyc
+tui/sciscope-tui
+data/**
+!data/sample
+!data/sample/**
+models/
+output
+tmp
+node_modules

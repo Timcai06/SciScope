@@ -6,12 +6,14 @@ runtime configuration (CORS/app metadata) from environment-driven settings.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 
+from backend.app.api.routes_health import router as health_router
 from backend.app.api.routes_agent import router as agent_router
 from backend.app.api.routes_chat import router as chat_router
 from backend.app.api.routes_dashboard import router as dashboard_router
-from backend.app.api.routes_ingest import router as ingest_router
 from backend.app.api.routes_graph import router as graph_router
+from backend.app.api.routes_ingest import router as ingest_router
 from backend.app.api.routes_recommend import router as recommend_router
 from backend.app.api.routes_search import router as search_router
 from backend.app.api.routes_trends import router as trends_router
@@ -29,6 +31,26 @@ def create_app() -> FastAPI:
     """
     settings = get_settings()
     app = FastAPI(title=settings.app_name)
+    production = settings.env.strip().lower() == "production"
+
+    from backend.app.core.request_context import bind_request_context, clear_request_context
+
+    @app.middleware("http")
+    async def request_context_middleware(request, call_next):
+        request_id = bind_request_context(request)
+        try:
+            try:
+                response = await call_next(request)
+            except Exception:  # noqa: BLE001
+                if not production:
+                    raise
+                response = PlainTextResponse("Internal Server Error", status_code=500)
+            if production and response.status_code == 500:
+                response = PlainTextResponse("Internal Server Error", status_code=500)
+            response.headers["x-request-id"] = request_id
+            return response
+        finally:
+            clear_request_context()
 
     app.add_middleware(
         CORSMiddleware,
@@ -36,8 +58,10 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["x-request-id"],
     )
 
+    app.include_router(health_router)
     app.include_router(dashboard_router)
     app.include_router(chat_router)
     app.include_router(ingest_router)

@@ -29,14 +29,15 @@ TUI 是终端客户端，真实问答需连接后端（见 2.1）；无后端时
 ### 2.1 正常联调
 
 ```bash
-make tui         # 启动前需先启动后端
+sciscope-tui     # 发布版默认连接托管后端
 make backend     # 后端：127.0.0.1:8000
+SCISCOPE_BACKEND=http://127.0.0.1:8000 make tui
 make llm         # 本地兼容 LLM：127.0.0.1:8001
 ```
 
 可选环境变量：
 
-- `SCISCOPE_BACKEND`：自定义后端地址（默认 `http://127.0.0.1:8000`）
+- `SCISCOPE_BACKEND`：开发者本地/自定义后端地址，会覆盖发布版托管后端
 - `SCISCOPE_TUI_ICONS=off`：无 Nerd Font 时仅保留文本标签
 - `SCISCOPE_TUI_THEME=paper`：启动时选择主题，可选 `dark`、`paper`、`light`、`contrast`
 
@@ -105,9 +106,9 @@ sciscope-tui export --last
 
 ## 7. 快速验收清单
 
-- `make tui-build TUI_VERSION=0.2.0` → `tui/sciscope-tui --version`
+- `make tui-build TUI_VERSION=0.2.1` → `tui/sciscope-tui --version`
 - `make tui-doctor`，确认发布前环境体检输出可读。
-- `make tui` 连接真实后端，执行一条测试问题，观察 plan/tool/result/final 流。
+- `make tui` 连接 hosted 或本地后端，执行一条测试问题，观察 plan/tool/result/final 流。
 - `make tui-demo`，确认完整离线演示可完整播完。
 - `make tui-export-last`，确认最近会话可从命令行导出。
 - `/sessions` 能列出最近会话，`/resume` 和 `/sessions` 可在 slash 启动器中进入二级会话菜单，`/tools` 可进入工具详情菜单，`/doctor` 可进入检查项菜单，`/clear` 与 `/quit` 会先进入确认菜单，`/export` 可用。

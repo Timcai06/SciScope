@@ -70,7 +70,7 @@ def stream_chat(messages: list[dict], model: str, tools: list | None) -> Iterato
     )
     full_text = ""
     acc: dict[int, dict[str, Any]] = {}
-    with urllib.request.urlopen(req, timeout=180) as resp:
+    with urllib.request.urlopen(req, timeout=get_settings().agent_timeout_seconds) as resp:
         for raw in resp:
             line = raw.decode("utf-8").strip()
             if not line.startswith("data:"):

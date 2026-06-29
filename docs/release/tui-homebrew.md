@@ -24,14 +24,16 @@ Homebrew artifact.
 ## Version injection policy
 
 - In Go binary build config:
-  - `ldflags: -s -w -X main.version={{ .Version }}`
+  - `ldflags: -s -w -X main.version={{ .Version }} -X main.defaultHostedBackendURL={{ .Env.SCISCOPE_HOSTED_BACKEND_URL }}`
   - `{{ .Version }}` is derived from the release tag (for CI) or
     `TUI_VERSION` in local wrappers.
+  - `SCISCOPE_HOSTED_BACKEND_URL` sets the release default backend URL; users can
+    still override it with `SCISCOPE_BACKEND`.
 - Local CI-equivalent verification:
 
 ```bash
-make tui-build TUI_VERSION=0.2.0
-./tui/sciscope-tui --version   # expect: sciscope-tui 0.2.0
+make tui-build TUI_VERSION=0.2.1
+./tui/sciscope-tui --version   # expect: sciscope-tui 0.2.1
 ```
 
 ## One-time setup
@@ -45,6 +47,7 @@ make tui-build TUI_VERSION=0.2.0
 2. Add repository secret to `Timcai06/SciScope`:
 
    - `HOMEBREW_TAP_GITHUB_TOKEN` with write access to `Timcai06/homebrew-sciscope`.
+   - `SCISCOPE_HOSTED_BACKEND_URL` with the production HTTPS API base URL.
 
 3. Ensure tooling:
 
@@ -58,7 +61,7 @@ make tui-build TUI_VERSION=0.2.0
 From repo root:
 
 ```bash
-make tui-build TUI_VERSION=0.2.0
+make tui-build TUI_VERSION=0.2.1
 ./tui/sciscope-tui --help
 make tui-demo
 make tui-doctor
@@ -79,8 +82,8 @@ cd ..
 ## Release operations
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
 This triggers `.github/workflows/release.yml`.
@@ -92,23 +95,22 @@ trusted, so the flow is **tap → trust → install**:
 
 ```bash
 brew tap Timcai06/sciscope
-brew trust --cask timcai06/sciscope/sciscope-tui   # required on newer Homebrew for third-party tap casks
+brew trust --cask timcai06/sciscope/sciscope-tui
 brew install --cask sciscope-tui
-sciscope-tui --help
-sciscope-tui --demo
-sciscope-tui doctor
+sciscope-tui
 ```
 
 Verified on macOS arm64 with Homebrew: installs `sciscope-tui` to
 `/opt/homebrew/bin`, `--version` prints the release tag, and the install hook
 strips the macOS quarantine xattr so the unsigned binary runs.
 
-Production attach:
+## Developer local backend override
+
+For local backend development, start a compatible backend separately from source
+and point the TUI at it:
 
 ```bash
-make backend
-make llm    # optional local compatible LLM
-sciscope-tui
+SCISCOPE_BACKEND=http://127.0.0.1:8000 sciscope-tui
 ```
 
 ## Failure triage

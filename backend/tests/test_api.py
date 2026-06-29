@@ -67,6 +67,22 @@ def test_ingest_status_prefers_database_count(monkeypatch, client):
     assert response.json() == {"status": "ready", "papers": 159187}
 
 
+def test_ingest_status_does_not_fallback_to_sample_in_production(monkeypatch, client):
+    class FakePsycopg:
+        @staticmethod
+        def connect(dsn):
+            raise RuntimeError("db down")
+
+    monkeypatch.setenv("SCISCOPE_ENV", "production")
+    monkeypatch.setenv("SCISCOPE_DB_DSN", "postgresql://example/sciscope")
+    monkeypatch.setitem(__import__("sys").modules, "psycopg", FakePsycopg)
+
+    response = client.get("/api/ingest/status")
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "corpus_unavailable"
+
+
 def test_dashboard_overview_returns_sample_corpus_summary(client):
     response = client.get("/api/dashboard/overview")
 

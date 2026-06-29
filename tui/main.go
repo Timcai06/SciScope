@@ -3,7 +3,8 @@
 // is purely a presentation client, styled after Claude Code's visual grammar
 // (⏺ action bullets, ⎿ tool-result connectors, an animated verb spinner).
 //
-// Run:  make tui        (requires `make backend` on :8000 and `make llm` on :8001)
+// Run:  sciscope-tui    (release binary connects to the hosted backend by default)
+// Dev:  SCISCOPE_BACKEND=http://127.0.0.1:8000 make tui
 package main
 
 import (
@@ -14,6 +15,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,6 +32,7 @@ import (
 )
 
 var version = "dev"
+var defaultHostedBackendURL string
 
 type cliOptions struct {
 	Command    string
@@ -206,7 +209,39 @@ func backendURL() string {
 	if v := os.Getenv("SCISCOPE_BACKEND"); v != "" {
 		return v
 	}
+	return hostedBackendURL()
+}
+
+func hostedBackendURL() string {
+	if v := strings.TrimSpace(os.Getenv("SCISCOPE_HOSTED_BACKEND")); v != "" {
+		return strings.TrimRight(v, "/")
+	}
+	if v := strings.TrimSpace(defaultHostedBackendURL); v != "" {
+		return strings.TrimRight(v, "/")
+	}
 	return "http://127.0.0.1:8000"
+}
+
+func backendMode(rawURL string) string {
+	normalized := strings.ToLower(strings.TrimSpace(rawURL))
+	if u, err := url.Parse(normalized); err == nil {
+		switch u.Hostname() {
+		case "localhost", "127.0.0.1", "::1":
+			return "local"
+		case "":
+		default:
+			return "hosted"
+		}
+	}
+	switch {
+	case normalized == "localhost", strings.HasPrefix(normalized, "localhost:"):
+		return "local"
+	case normalized == "127.0.0.1", strings.HasPrefix(normalized, "127.0.0.1:"):
+		return "local"
+	case normalized == "::1", strings.HasPrefix(normalized, "[::1]:"):
+		return "local"
+	}
+	return "hosted"
 }
 
 func demoMode() bool {
@@ -273,7 +308,8 @@ func helpString() string {
 		"  sciscope-tui --version",
 		"",
 		"Environment:",
-		"  SCISCOPE_BACKEND              backend URL, default http://127.0.0.1:8000",
+		"  SCISCOPE_HOSTED_BACKEND       hosted backend URL for release defaults",
+		"  SCISCOPE_BACKEND              developer override for local/custom backend",
 		"  SCISCOPE_TUI_DEMO_DELAY_MS    demo playback delay",
 	}, "\n")
 }
