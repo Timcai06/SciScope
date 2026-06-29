@@ -30,6 +30,28 @@ def test_parse_cors_origins_splits_and_strips_values():
     ]
 
 
+def test_production_budget_settings(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_ENV", "production")
+    monkeypatch.setenv("SCISCOPE_ANON_REQUESTS_PER_MINUTE", "9")
+    monkeypatch.setenv("SCISCOPE_AGENT_MAX_HISTORY_TURNS", "5")
+    monkeypatch.setenv("SCISCOPE_AGENT_MAX_TOOL_CALLS", "4")
+    monkeypatch.setenv("SCISCOPE_AGENT_TIMEOUT_SECONDS", "45")
+    monkeypatch.setenv("SCISCOPE_AGENT_MAX_QUESTION_CHARS", "700")
+    monkeypatch.setenv("SCISCOPE_LOG_PROMPTS", "false")
+
+    from backend.app.core.config import get_settings
+
+    settings = get_settings()
+
+    assert settings.env == "production"
+    assert settings.anon_requests_per_minute == 9
+    assert settings.agent_max_history_turns == 5
+    assert settings.agent_max_tool_calls == 4
+    assert settings.agent_timeout_seconds == 45
+    assert settings.agent_max_question_chars == 700
+    assert settings.log_prompts is False
+
+
 def test_chat_request_strips_question_whitespace():
     request = ChatRequest(question="  knowledge graph  ")
 

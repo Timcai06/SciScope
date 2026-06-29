@@ -26,6 +26,12 @@ class Settings:
     use_mock_llm: bool
     db_dsn: str
     embedding_model: str
+    anon_requests_per_minute: int
+    agent_max_history_turns: int
+    agent_max_tool_calls: int
+    agent_timeout_seconds: int
+    agent_max_question_chars: int
+    log_prompts: bool
 
 
 def _parse_bool(value: str | None, default: bool) -> bool:
@@ -44,6 +50,15 @@ def _parse_bool(value: str | None, default: bool) -> bool:
         return False
 
     raise ValueError(f"Invalid SCISCOPE_USE_MOCK_LLM value: {value!r}")
+
+
+def _parse_int(value: str | None, default: int) -> int:
+    if value is None or value.strip() == "":
+        return default
+    parsed = int(value)
+    if parsed <= 0:
+        raise ValueError(f"Expected positive integer, got {value!r}")
+    return parsed
 
 
 def _parse_cors_origins(value: str | None) -> list[str]:
@@ -86,4 +101,10 @@ def get_settings() -> Settings:
         use_mock_llm=_parse_bool(os.getenv("SCISCOPE_USE_MOCK_LLM"), default=True),
         db_dsn=os.getenv("SCISCOPE_DB_DSN", os.getenv("SCISCOPE_DATABASE_URL", "")),
         embedding_model=os.getenv("SCISCOPE_EMBEDDING_MODEL", "intfloat/multilingual-e5-base"),
+        anon_requests_per_minute=_parse_int(os.getenv("SCISCOPE_ANON_REQUESTS_PER_MINUTE"), 12),
+        agent_max_history_turns=_parse_int(os.getenv("SCISCOPE_AGENT_MAX_HISTORY_TURNS"), 12),
+        agent_max_tool_calls=_parse_int(os.getenv("SCISCOPE_AGENT_MAX_TOOL_CALLS"), 8),
+        agent_timeout_seconds=_parse_int(os.getenv("SCISCOPE_AGENT_TIMEOUT_SECONDS"), 75),
+        agent_max_question_chars=_parse_int(os.getenv("SCISCOPE_AGENT_MAX_QUESTION_CHARS"), 2000),
+        log_prompts=_parse_bool(os.getenv("SCISCOPE_LOG_PROMPTS"), default=False),
     )
