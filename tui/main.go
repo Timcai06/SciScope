@@ -14,6 +14,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -214,15 +215,29 @@ func hostedBackendURL() string {
 	if v := strings.TrimSpace(os.Getenv("SCISCOPE_HOSTED_BACKEND")); v != "" {
 		return strings.TrimRight(v, "/")
 	}
-	if strings.TrimSpace(defaultHostedBackendURL) != "" {
-		return strings.TrimRight(defaultHostedBackendURL, "/")
+	if v := strings.TrimSpace(defaultHostedBackendURL); v != "" {
+		return strings.TrimRight(v, "/")
 	}
 	return "http://127.0.0.1:8000"
 }
 
-func backendMode(url string) string {
-	normalized := strings.ToLower(strings.TrimSpace(url))
-	if strings.Contains(normalized, "127.0.0.1") || strings.Contains(normalized, "localhost") {
+func backendMode(rawURL string) string {
+	normalized := strings.ToLower(strings.TrimSpace(rawURL))
+	if u, err := url.Parse(normalized); err == nil {
+		switch u.Hostname() {
+		case "localhost", "127.0.0.1", "::1":
+			return "local"
+		case "":
+		default:
+			return "hosted"
+		}
+	}
+	switch {
+	case normalized == "localhost", strings.HasPrefix(normalized, "localhost:"):
+		return "local"
+	case normalized == "127.0.0.1", strings.HasPrefix(normalized, "127.0.0.1:"):
+		return "local"
+	case normalized == "::1", strings.HasPrefix(normalized, "[::1]:"):
 		return "local"
 	}
 	return "hosted"
@@ -292,7 +307,8 @@ func helpString() string {
 		"  sciscope-tui --version",
 		"",
 		"Environment:",
-		"  SCISCOPE_BACKEND              backend URL, default http://127.0.0.1:8000",
+		"  SCISCOPE_HOSTED_BACKEND       hosted backend URL for release defaults",
+		"  SCISCOPE_BACKEND              developer override for local/custom backend",
 		"  SCISCOPE_TUI_DEMO_DELAY_MS    demo playback delay",
 	}, "\n")
 }

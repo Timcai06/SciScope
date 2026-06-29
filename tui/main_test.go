@@ -1476,7 +1476,7 @@ func TestDoctorReportRendersProductChecks(t *testing.T) {
 
 func TestBackendURLDefaultsToHostedEndpoint(t *testing.T) {
 	t.Setenv("SCISCOPE_BACKEND", "")
-	t.Setenv("SCISCOPE_HOSTED_BACKEND", "https://api.example.test")
+	t.Setenv("SCISCOPE_HOSTED_BACKEND", "https://api.example.test/")
 
 	got := backendURL()
 
@@ -1496,12 +1496,54 @@ func TestBackendURLLocalOverrideWins(t *testing.T) {
 	}
 }
 
+func TestBackendURLDefaultHostedLdflagFallback(t *testing.T) {
+	t.Setenv("SCISCOPE_BACKEND", "")
+	t.Setenv("SCISCOPE_HOSTED_BACKEND", "")
+	old := defaultHostedBackendURL
+	t.Cleanup(func() {
+		defaultHostedBackendURL = old
+	})
+	defaultHostedBackendURL = " https://release.example.test/ "
+
+	got := backendURL()
+
+	if got != "https://release.example.test" {
+		t.Fatalf("backendURL() = %q, want trimmed ldflag hosted endpoint", got)
+	}
+}
+
 func TestBackendModeLabelsHostedAndLocal(t *testing.T) {
 	if got := backendMode("https://api.example.test"); got != "hosted" {
 		t.Fatalf("backendMode(hosted) = %q", got)
 	}
 	if got := backendMode("http://127.0.0.1:8000"); got != "local" {
 		t.Fatalf("backendMode(local) = %q", got)
+	}
+	if got := backendMode("http://[::1]:8000"); got != "local" {
+		t.Fatalf("backendMode(ipv6 local) = %q", got)
+	}
+	if got := backendMode("https://api.example.test/proxy/localhost"); got != "hosted" {
+		t.Fatalf("backendMode(path mentions localhost) = %q", got)
+	}
+	if got := backendMode("https://127.0.0.1.example.com"); got != "hosted" {
+		t.Fatalf("backendMode(hostname contains local IP) = %q", got)
+	}
+	if got := backendMode("not localhost"); got != "hosted" {
+		t.Fatalf("backendMode(malformed hosted) = %q", got)
+	}
+	if got := backendMode("localhost"); got != "local" {
+		t.Fatalf("backendMode(raw localhost) = %q", got)
+	}
+}
+
+func TestHelpStringDocumentsHostedBackendDefault(t *testing.T) {
+	help := helpString()
+
+	if strings.Contains(help, "default http://127.0.0.1:8000") {
+		t.Fatalf("help should not document localhost as default:\n%s", help)
+	}
+	if !strings.Contains(help, "SCISCOPE_HOSTED_BACKEND") && !strings.Contains(strings.ToLower(help), "hosted") {
+		t.Fatalf("help should document hosted backend default:\n%s", help)
 	}
 }
 
