@@ -101,6 +101,7 @@ make tui-doctor # 检查后端/LLM/会话目录/图谱资产
 
 - `tui/README.md`
 - `docs/release/tui-homebrew.md`
+- `docs/release/tui-windows.md`
 
 ## 交接时一页速查
 

@@ -61,3 +61,10 @@ sciscope-tui --demo
 $env:SCISCOPE_BACKEND="https://api.sciscope.example"
 sciscope-tui
 ```
+
+## Current role
+
+`winget` is the official Windows ecosystem path, but first-time package approval
+depends on Microsoft moderator review. For fast Windows iteration, use the
+Scoop channel documented in `packaging/scoop/README.md` and
+`docs/release/tui-windows.md`.
