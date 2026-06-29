@@ -1,5 +1,5 @@
 {
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "SciScope research-agent terminal client.",
   "homepage": "https://github.com/Timcai06/SciScope",
   "license": "Proprietary",
@@ -9,12 +9,12 @@
   ],
   "architecture": {
     "64bit": {
-      "url": "https://github.com/Timcai06/SciScope/releases/download/v0.1.2/sciscope-tui_windows_amd64.zip",
-      "hash": "877b79b8dac5f5214b3e6157ccde8c9d97a69c681a76ade92f8593ee0b5e9d67"
+      "url": "https://github.com/Timcai06/SciScope/releases/download/v0.2.0/sciscope-tui_windows_amd64.zip",
+      "hash": "6044441c8c1ffb448e17e6d46e7be1d95808a563b1a823a3e692024adbf3752e"
     },
     "arm64": {
-      "url": "https://github.com/Timcai06/SciScope/releases/download/v0.1.2/sciscope-tui_windows_arm64.zip",
-      "hash": "208f77a1fb3c60c1ae57d1292cafc714b4a794102f3948055d2ba0f435e88347"
+      "url": "https://github.com/Timcai06/SciScope/releases/download/v0.2.0/sciscope-tui_windows_arm64.zip",
+      "hash": "a0996eee73a4c37998c81804a92d54603e45e97fafdd17cedb909421fc5a9608"
     }
   },
   "bin": "sciscope-tui.exe",
