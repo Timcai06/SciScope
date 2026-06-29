@@ -20,11 +20,20 @@ SciScope TUI 是 Go 语言的终端交互客户端，负责把后端科研代理
 brew tap Timcai06/sciscope
 brew trust --cask timcai06/sciscope/sciscope-tui   # 新版 Homebrew 对第三方 tap cask 必需
 brew install --cask sciscope-tui
-sciscope-tui --demo     # 零配置离线体验
+sciscope-tui            # 默认连接托管 SciScope 后端
 ```
 
 二进制装到 `/opt/homebrew/bin/sciscope-tui`，安装钩子会自动去除 macOS quarantine 属性。
-TUI 是终端客户端，真实问答需连接后端（见 2.1）；无后端时用 `--demo` 体验固定证据流。
+TUI 是终端客户端，发布版内置 hosted backend URL；无网络或演示固定流程时用
+`sciscope-tui --demo` 体验固定证据流。
+
+Windows Scoop:
+
+```powershell
+scoop bucket add sciscope https://github.com/Timcai06/scoop-sciscope
+scoop install sciscope-tui
+sciscope-tui
+```
 
 ### 2.1 正常联调
 
@@ -38,6 +47,7 @@ make llm         # 本地兼容 LLM：127.0.0.1:8001
 可选环境变量：
 
 - `SCISCOPE_BACKEND`：开发者本地/自定义后端地址，会覆盖发布版托管后端
+- `SCISCOPE_HOSTED_BACKEND`：调试发布默认值时使用；普通用户不需要设置
 - `SCISCOPE_TUI_ICONS=off`：无 Nerd Font 时仅保留文本标签
 - `SCISCOPE_TUI_THEME=paper`：启动时选择主题，可选 `dark`、`paper`、`light`、`contrast`
 

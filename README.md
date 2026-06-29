@@ -1,6 +1,9 @@
 # SciScope
 
-SciScope is a local-first scientific literature intelligence stack.
+SciScope is a scientific literature intelligence product: a hosted/backend
+research agent plus a cross-platform terminal client. It can run as a public
+demo service for users, and as a heavier local development stack for full-corpus
+data, retrieval, evaluation, and report generation.
 
 ![SciScope TUI product snapshot](docs/assets/tui-product-snapshot.svg)
 
@@ -10,7 +13,52 @@ SciScope is a local-first scientific literature intelligence stack.
 - Go TUI (`tui/`) 是终端客户端，不承载推理，只消费后端的 SSE 事件。
 - Web 前端已从当前项目路径移除；主交互端为 Go TUI 与 FastAPI API。
 
-仓库启动面向 Makefile，以下信息优先于旧文档口径。
+仓库启动面向 Makefile，以下信息优先于旧文档口径。历史设计记录保留在
+`docs/superpowers/` 和 `plan/` 中；日常操作以本 README、`tui/README.md`、
+`docs/deploy-hosted-backend.md` 和 `docs/runbook.md` 为准。
+
+## 用户安装
+
+macOS:
+
+```bash
+brew tap Timcai06/sciscope
+brew trust --cask timcai06/sciscope/sciscope-tui
+brew install --cask sciscope-tui
+sciscope-tui
+```
+
+Windows:
+
+```powershell
+scoop bucket add sciscope https://github.com/Timcai06/scoop-sciscope
+scoop install sciscope-tui
+sciscope-tui
+```
+
+发布版 TUI 默认连接托管后端 `https://sciscope-backend.onrender.com`。无需用户
+本机启动 Python 后端、PostgreSQL 或模型服务。离线演示可运行：
+
+```bash
+sciscope-tui demo
+```
+
+开发者可覆盖后端地址：
+
+```bash
+SCISCOPE_BACKEND=http://127.0.0.1:8000 sciscope-tui
+```
+
+## 当前环境口径
+
+| 场景 | 后端 | 数据库 | 检索 | 用途 |
+| --- | --- | --- | --- | --- |
+| 生产/demo | Render Web Service | Supabase Postgres + pgvector | PostgreSQL FTS + DeepSeek evidence chat；禁用运行时本地 embedding | 用户试用、演示视频、Brew/Scoop 默认入口 |
+| 本地开发 | 本机 FastAPI | 本地 PostgreSQL | full hybrid lexical + semantic retrieval | 全量数据、模型实验、报告生成、agent 调试 |
+
+生产/demo 为小样本 hosted corpus，当前约 `220 papers / 467 chunks`。本地开发环境
+保留全量语料、全量向量与更重的语义检索能力。不要把 hosted free demo 描述成全量
+semantic production；它是稳定公开入口，架构上可升级到更大实例后开启运行时语义检索。
 
 ## 一句话理解项目
 
@@ -30,7 +78,7 @@ SciScope is a local-first scientific literature intelligence stack.
 - PostgreSQL（RAG/检索链条和 `/api/search` 需要）
 - Go（如运行 `make tui`）
 
-### 标准启动（推荐）
+### 本地开发标准启动
 
 ```bash
 make install
@@ -41,10 +89,10 @@ make backend
 
 - 后端文档：`http://127.0.0.1:8000/docs`
 
-### 常见运行路径
+### 常见开发运行路径
 
 - 后端：`make backend` 或 `make dev`。
-- 仅 TUI：`make backend`（先起后端）→ `make tui`。
+- 仅 TUI：发布版直接 `sciscope-tui`；源码开发用 `make backend`（先起后端）→ `make tui`。
 - 本地模型端到端：先保证可用 OpenAI-compatible 服务，再用 `make dev-vllm`。
 - 离线演示：`make tui-demo`。
 - TUI 体检：`make tui-doctor`。
@@ -64,6 +112,8 @@ make backend
 - `make data-layer-refresh`：分析资产 + 语料 + 报表重建的轻量入口。
 
 `data/` 不是 PostgreSQL 的重复备份：它是数据库、RAG、模型、报告的可重建资产层。数据库负责在线查询服务；`data/raw_canonical`、`data/analysis`、`data/processed/papers_corpus.json`、`data/processed/paper_chunks.jsonl` 负责复现、审计与报告。
+
+报告叙事、截图和 hosted/local 口径见 [`docs/report-optimization.md`](docs/report-optimization.md)。
 
 ### 模型层与工具链
 
@@ -87,7 +137,7 @@ make backend
 终端客户端是“协议消费者”：它不承载模型与检索决策逻辑，只消费
 `POST /api/agent/stream` 的 SSE 事件并渲染为可读面板。
 
-启动方式（发布版推荐）：
+启动方式（发布版推荐，默认连接 hosted backend）：
 
 ```bash
 sciscope-tui
@@ -117,6 +167,8 @@ make tui-doctor # 检查后端/LLM/会话目录/图谱资产
 - `SCISCOPE_DB_DSN=postgresql://tim@localhost:5432/sciscope`
 - `SCISCOPE_USE_MOCK_LLM=true`
 - `SCISCOPE_LLM_PROVIDER=deepseek`
+- `SCISCOPE_BACKEND` 仅用于 TUI 覆盖后端地址；发布二进制已内置 hosted URL。
+- `SCISCOPE_ENABLE_RUNTIME_EMBEDDINGS=false` 用于小规格 hosted 服务，避免 Web 容器加载本地 embedding 模型。
 - Agent 运行时：单一 LangGraph StateGraph（`backend/app/agent/langgraph_runtime.py`），无运行时开关。
 
 关键 API：
@@ -140,4 +192,4 @@ make tui-doctor # 检查后端/LLM/会话目录/图谱资产
 - 该分支的主运行路径是：Python agent/data layer 为核心，Go TUI 为终端消费端。
 - Web 前端源码已移除；若未来重启 Web 界面，应作为新范围重新设计和接入。
 - `data_pipeline/` 保留为 legacy sample pipeline 与旧测试兼容层；核心数据治理以 `src/harvest`、`src/analysis`、`src/infra` 为准。
-- DeepSeek 路径当前以配置占位为主；确定性本地验证以 mock 模式为主，LLM 本地通路以 `make dev-vllm` / `make llm` 为主。
+- DeepSeek 是 hosted/demo 的默认云端模型；确定性本地验证仍可使用 mock 模式，本地 LLM 通路以 `make dev-vllm` / `make llm` 为主。

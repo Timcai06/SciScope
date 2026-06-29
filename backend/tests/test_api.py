@@ -118,6 +118,29 @@ def test_chat_endpoint_rejects_whitespace_question(client):
 
     assert response.status_code == 422
 
+
+def test_chat_endpoint_rejects_oversized_question(monkeypatch, client):
+    monkeypatch.setenv("SCISCOPE_AGENT_MAX_QUESTION_CHARS", "5")
+
+    response = client.post("/api/chat", json={"question": "too long"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "question_too_long"
+
+
+def test_chat_endpoint_enforces_anonymous_rate_limit(monkeypatch, client):
+    from backend.app.core import budget
+
+    budget._RATE_LIMIT_BUCKETS.clear()
+    monkeypatch.setenv("SCISCOPE_ANON_REQUESTS_PER_MINUTE", "1")
+
+    first = client.post("/api/chat", json={"question": "What does RAG improve?"})
+    second = client.post("/api/chat", json={"question": "What does RAG improve?"})
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert second.json()["detail"]["code"] == "rate_limited"
+
 def test_cors_allows_configured_origin(monkeypatch):
     monkeypatch.setenv("SCISCOPE_CORS_ORIGINS", "https://example.com")
     with TestClient(create_app()) as client:

@@ -1,3 +1,8 @@
+# Paid Render Blueprint reference.
+#
+# Current public demo uses a manually created Render Web Service plus Supabase
+# Postgres. This blueprint intentionally provisions Render Postgres, so do not
+# apply it for the free/demo Supabase deployment unless you want a separate DB.
 services:
   - type: web
     name: sciscope-backend

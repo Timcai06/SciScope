@@ -5,16 +5,20 @@ the binary connects to the hosted FastAPI backend compiled into the release.
 
 ## Platform
 
-The checked-in `render.yaml` is the first hosted target:
+Current public demo deployment:
 
-- Render web service from `Dockerfile.backend`
-- Render Postgres for `SCISCOPE_DB_DSN`
-- PostgreSQL `pgvector` extension enabled by `infra/postgres/pgvector.sql`
-- DeepSeek API key kept server-side
+- Render Web Service from `Dockerfile.backend`
+- Supabase Postgres + pgvector for `SCISCOPE_DB_DSN`
+- DeepSeek API key kept server-side in Render environment variables
+- `SCISCOPE_ENABLE_RUNTIME_EMBEDDINGS=false` on small/free web instances
 
-Use a paid web service/database for a stable backend. Render free services can
-spin down, and free Postgres expires; that is not acceptable for a package
-default.
+The checked-in `render.yaml` is a paid Render Blueprint reference that provisions
+Render Postgres. Do not use it for the current Supabase free/demo deployment
+unless you intentionally want a separate Render-managed database.
+
+Render free services can spin down. The package default is acceptable for a
+public demo, but a long-lived production service should move to a paid always-on
+web instance and either paid Supabase/Render Postgres capacity.
 
 ## Required Secrets
 
@@ -22,6 +26,7 @@ Render prompts for:
 
 ```text
 DEEPSEEK_API_KEY
+SCISCOPE_DB_DSN
 ```
 
 For free/small web instances, set:
@@ -44,8 +49,8 @@ SCISCOPE_HOSTED_BACKEND_URL=https://<render-service>.onrender.com
 
 ## Database Bootstrap
 
-After Render creates the Postgres database, copy its external connection string
-and run the data bootstrap locally:
+For the current Supabase deployment, copy the Supabase Shared Pooler connection
+string and run the data bootstrap locally:
 
 ```bash
 export HOSTED_DB_DSN="postgresql://..."
@@ -54,6 +59,10 @@ make hosted-db-refresh
 
 This applies the schema, enables pgvector, loads papers/chunks, builds chunk
 embeddings, and materializes `paper_embeddings` for recommendations.
+
+For the free hosted demo, use a small corpus subset. Full local assets are too
+large for the free database tier and should remain in the local development
+environment until production capacity is upgraded.
 
 Then verify the hosted API:
 

@@ -213,6 +213,10 @@ func backendURL() string {
 }
 
 func hostedBackendURL() string {
+	// Runtime override for installed clients. Release CI uses
+	// SCISCOPE_HOSTED_BACKEND_URL only to inject defaultHostedBackendURL at build
+	// time; the running binary reads SCISCOPE_HOSTED_BACKEND when a user needs to
+	// test a different hosted service without rebuilding.
 	if v := strings.TrimSpace(os.Getenv("SCISCOPE_HOSTED_BACKEND")); v != "" {
 		return strings.TrimRight(v, "/")
 	}

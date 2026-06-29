@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
-from backend.app.models.schemas import AgentRequest
+from backend.app.models.schemas import AgentRequest, ChatRequest
 
 
 @dataclass(frozen=True)
@@ -56,6 +56,37 @@ def enforce_agent_budget(
     max_question_chars: int,
     max_history_turns: int,
 ) -> BudgetViolation | None:
+    if len(request.question) > max_question_chars:
+        return BudgetViolation(
+            "question_too_long",
+            f"question length exceeds {max_question_chars} characters",
+        )
+    if request.history and len(request.history) > max_history_turns:
+        return BudgetViolation(
+            "history_too_long",
+            f"history exceeds {max_history_turns} turns",
+        )
+    for turn in request.history:
+        if len(turn.content) > max_question_chars:
+            return BudgetViolation(
+                "history_content_too_long",
+                f"history turn length exceeds {max_question_chars} characters",
+            )
+    return None
+
+
+def enforce_chat_budget(
+    request: ChatRequest,
+    *,
+    max_question_chars: int,
+    max_history_turns: int,
+) -> BudgetViolation | None:
+    """Apply the same hosted cost guard to evidence chat requests.
+
+    ``/api/chat`` can call the configured LLM directly, so it needs the same
+    public-edge budget contract as the agent route even though it does not run
+    the full tool loop.
+    """
     if len(request.question) > max_question_chars:
         return BudgetViolation(
             "question_too_long",
