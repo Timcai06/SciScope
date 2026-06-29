@@ -72,6 +72,65 @@ def test_agent_stream_returns_budget_error(monkeypatch):
     assert calls == []
 
 
+def test_agent_stream_sanitizes_production_runtime_errors(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_ENV", "production")
+
+    from fastapi.testclient import TestClient
+
+    from backend.app.api import routes_agent
+    from backend.app.main import create_app
+
+    def leaking_stream_agent(*args, **kwargs):
+        raise RuntimeError("secret provider token leaked")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(routes_agent, "_stream_agent", leaking_stream_agent)
+
+    with TestClient(create_app(), raise_server_exceptions=False) as client:
+        response = client.post(
+            "/api/agent/stream",
+            json={"question": "hello"},
+            headers={"x-request-id": "req-stream-1"},
+        )
+
+    assert response.status_code == 200
+    assert "secret provider token" not in response.text
+    assert "internal_error" in response.text
+    assert "req-stream-1" in response.text
+    assert "data: [DONE]" in response.text
+
+
+def test_agent_stream_enforces_anonymous_rate_limit(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_ANON_REQUESTS_PER_MINUTE", "1")
+
+    from fastapi.testclient import TestClient
+
+    from backend.app.api import routes_agent
+    from backend.app.main import create_app
+
+    def ok_stream_agent(*args, **kwargs):
+        yield ("final", "ok")
+
+    monkeypatch.setattr(routes_agent, "_stream_agent", ok_stream_agent)
+
+    with TestClient(create_app(), raise_server_exceptions=False) as client:
+        first = client.post(
+            "/api/agent/stream",
+            json={"question": "hello"},
+            headers={"x-forwarded-for": "203.0.113.10"},
+        )
+        second = client.post(
+            "/api/agent/stream",
+            json={"question": "hello again"},
+            headers={"x-forwarded-for": "203.0.113.10"},
+        )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert "rate_limited" in second.text
+    assert "data: [DONE]" in second.text
+
+
 def test_agent_returns_budget_http_error(monkeypatch):
     monkeypatch.setenv("SCISCOPE_AGENT_MAX_QUESTION_CHARS", "5")
 

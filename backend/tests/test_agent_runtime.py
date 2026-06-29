@@ -176,6 +176,42 @@ def test_skill_prompt_caps_tool_loop_and_forces_synthesis(monkeypatch):
     assert result["answer"] == "final from capped skill evidence"
 
 
+def test_agent_max_tool_calls_caps_runtime_tools(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_AGENT_MAX_TOOL_CALLS", "1")
+    monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
+    monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: False)
+    monkeypatch.setattr(langgraph_runtime, "run_tools", lambda tool_calls, executed, on_progress=None: ["evidence"] * len(tool_calls))
+
+    def fake_stream_chat(messages, model, tools):
+        if False:
+            yield ("text", "")
+        if tools is None:
+            return "final after capped runtime tools", []
+        return (
+            "",
+            [
+                {
+                    "id": "call-1",
+                    "type": "function",
+                    "function": {"name": "search_literature", "arguments": '{"query": "rag"}'},
+                },
+                {
+                    "id": "call-2",
+                    "type": "function",
+                    "function": {"name": "get_trends", "arguments": '{"keyword": "rag"}'},
+                },
+            ],
+        )
+
+    monkeypatch.setattr(langgraph_runtime, "stream_chat", fake_stream_chat)
+
+    result = runtime.run_agent("rag", session_id="global-tool-budget")
+
+    assert result["tools_used"] == [{"name": "search_literature", "args": {"query": "rag"}}]
+    assert result["stop_reason"] == "tool_budget"
+    assert result["answer"] == "final after capped runtime tools"
+
+
 def test_skill_prompt_forces_required_first_tool_when_model_skips(monkeypatch):
     monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
     monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: False)
@@ -233,6 +269,33 @@ def test_llm_routes_to_deepseek_when_keyed(monkeypatch):
     assert model == "deepseek-chat"
     # Cloud provider: detect_model trusts config, no network probe.
     assert llm.detect_model() == "deepseek-chat"
+
+
+def test_stream_chat_uses_configured_agent_timeout(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_AGENT_TIMEOUT_SECONDS", "7")
+    monkeypatch.setenv("SCISCOPE_LLM_PROVIDER", "deepseek")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test")
+
+    from backend.app.agent import llm
+
+    seen = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return iter([b"data: [DONE]\n"])
+
+        def __exit__(self, *args):
+            return False
+
+    def fake_urlopen(request, timeout):
+        seen["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(llm.urllib.request, "urlopen", fake_urlopen)
+
+    llm.drain(llm.stream_chat([], "deepseek-chat", None), lambda kind, payload: None)
+
+    assert seen["timeout"] == 7
 
 
 def test_llm_falls_back_to_local_without_key(monkeypatch):

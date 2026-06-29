@@ -12,7 +12,7 @@ import (
 )
 
 func healthURL() string {
-	return strings.TrimRight(backendURL(), "/") + "/api/ingest/status"
+	return strings.TrimRight(backendURL(), "/") + "/readyz"
 }
 
 func llmURL() string {

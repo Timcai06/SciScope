@@ -5,7 +5,7 @@ product/dev runs a configured PostgreSQL corpus is authoritative; hermetic tests
 and no-DB demos fall back to the in-memory sample corpus.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from backend.app.core.config import get_settings
 from backend.app.models.schemas import IngestStatusResponse
@@ -33,6 +33,14 @@ def ingest_status() -> IngestStatusResponse:
                 count = int(cur.fetchone()[0])
             return IngestStatusResponse(status="ready", papers=count)
         except Exception:
+            if settings.env.strip().lower() == "production":
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "corpus_unavailable",
+                        "message": "configured corpus database is unavailable",
+                    },
+                )
             # Keep the endpoint usable for local demos even when a configured DB
             # is temporarily unavailable; corpus-backed tool endpoints still
             # surface their own DB errors.

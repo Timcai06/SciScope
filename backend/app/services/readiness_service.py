@@ -37,6 +37,36 @@ def check_database_config(settings: Settings) -> ReadinessCheck:
     return ReadinessCheck("configured", "database readiness probe succeeded")
 
 
+def check_retrieval_config(settings: Settings) -> ReadinessCheck:
+    if not settings.db_dsn.strip():
+        if _is_production(settings):
+            return ReadinessCheck("missing", "SCISCOPE_DB_DSN is required for hosted retrieval readiness")
+        return ReadinessCheck("sample", "sample corpus mode; retrieval tables are not required")
+
+    try:
+        import psycopg
+
+        with psycopg.connect(settings.db_dsn, connect_timeout=3) as connection:
+            with connection.cursor() as cursor:
+                required_queries = (
+                    "SELECT 1 FROM pg_extension WHERE extname = 'vector'",
+                    "SELECT 1 FROM paper_chunks LIMIT 1",
+                    "SELECT 1 FROM chunk_embeddings LIMIT 1",
+                    "SELECT 1 FROM paper_embeddings LIMIT 1",
+                )
+                for query in required_queries:
+                    cursor.execute(query)
+                    if cursor.fetchone() is None:
+                        return ReadinessCheck(
+                            "unavailable",
+                            "retrieval readiness probe returned no required rows",
+                        )
+    except Exception:  # noqa: BLE001
+        return ReadinessCheck("unavailable", "retrieval readiness probe failed")
+
+    return ReadinessCheck("configured", "retrieval and pgvector readiness probe succeeded")
+
+
 def check_model_config(settings: Settings) -> ReadinessCheck:
     if settings.use_mock_llm:
         if _is_production(settings):
@@ -56,6 +86,7 @@ def _status_is_ready(status: str, production: bool) -> bool:
 def readiness_report(settings: Settings) -> tuple[int, dict[str, Any]]:
     checks = {
         "db": check_database_config(settings),
+        "retrieval": check_retrieval_config(settings),
         "model": check_model_config(settings),
     }
     production = _is_production(settings)

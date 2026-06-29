@@ -29,14 +29,15 @@ TUI 是终端客户端，真实问答需连接后端（见 2.1）；无后端时
 ### 2.1 正常联调
 
 ```bash
-make tui         # 启动前需先启动后端
+sciscope-tui     # 发布版默认连接托管后端
 make backend     # 后端：127.0.0.1:8000
+SCISCOPE_BACKEND=http://127.0.0.1:8000 make tui
 make llm         # 本地兼容 LLM：127.0.0.1:8001
 ```
 
 可选环境变量：
 
-- `SCISCOPE_BACKEND`：自定义后端地址（默认 `http://127.0.0.1:8000`）
+- `SCISCOPE_BACKEND`：开发者本地/自定义后端地址，会覆盖发布版托管后端
 - `SCISCOPE_TUI_ICONS=off`：无 Nerd Font 时仅保留文本标签
 - `SCISCOPE_TUI_THEME=paper`：启动时选择主题，可选 `dark`、`paper`、`light`、`contrast`
 

@@ -1623,12 +1623,12 @@ func TestHelpStringDocumentsHostedBackendDefault(t *testing.T) {
 	}
 }
 
-func TestDoctorUsesIngestStatusAsBackendHealthCheck(t *testing.T) {
+func TestDoctorUsesReadinessAsBackendHealthCheck(t *testing.T) {
 	t.Setenv("SCISCOPE_BACKEND", "http://127.0.0.1:8000/")
 
 	got := healthURL()
 
-	if got != "http://127.0.0.1:8000/api/ingest/status" {
+	if got != "http://127.0.0.1:8000/readyz" {
 		t.Fatalf("unexpected health URL: %s", got)
 	}
 }

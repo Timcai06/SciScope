@@ -28,6 +28,9 @@ def _request(headers: dict[str, str]) -> Request:
 
 
 class _FakeCursor:
+    def __init__(self):
+        self.query = ""
+
     def __enter__(self):
         return self
 
@@ -35,7 +38,7 @@ class _FakeCursor:
         return False
 
     def execute(self, query: str) -> None:
-        return None
+        self.query = query
 
     def fetchone(self) -> tuple[int]:
         return (1,)
@@ -227,6 +230,37 @@ def test_readyz_reports_unavailable_database(monkeypatch):
     assert body["checks"]["db"]["status"] == "unavailable"
     assert body["checks"]["db"]["message"] == "database readiness probe failed"
     assert "db down" not in body["checks"]["db"]["message"]
+
+
+def test_readyz_requires_retrieval_tables_in_production(monkeypatch):
+    class MissingRetrievalCursor(_FakeCursor):
+        def execute(self, query: str) -> None:
+            if "paper_chunks" in query:
+                raise RuntimeError("relation paper_chunks does not exist")
+            super().execute(query)
+
+    class MissingRetrievalConnection(_FakeConnection):
+        def cursor(self):
+            return MissingRetrievalCursor()
+
+    def fake_connect(*args, **kwargs):
+        return MissingRetrievalConnection()
+
+    monkeypatch.setenv("SCISCOPE_ENV", "production")
+    monkeypatch.setenv("SCISCOPE_DB_DSN", "postgresql://example.invalid/sciscope")
+    monkeypatch.setenv("SCISCOPE_LLM_PROVIDER", "deepseek")
+    monkeypatch.setenv("SCISCOPE_USE_MOCK_LLM", "false")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.setitem(sys.modules, "psycopg", SimpleNamespace(connect=fake_connect))
+    client = _client()
+
+    response = client.get("/readyz")
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "not_ready"
+    assert body["checks"]["retrieval"]["status"] == "unavailable"
+    assert "paper_chunks" not in body["checks"]["retrieval"]["message"]
 
 
 def test_readyz_rejects_mock_llm_in_production(monkeypatch):
