@@ -2,7 +2,8 @@ import re
 import sys
 from types import SimpleNamespace
 
-from fastapi import Request
+import pytest
+from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
 
 
@@ -126,6 +127,42 @@ def test_request_id_header_is_returned_on_unhandled_error(monkeypatch):
     assert response.status_code == 500
     assert response.text == "Internal Server Error"
     assert response.headers["x-request-id"] == "req-error-1"
+
+
+def test_production_http_exception_500_is_generic(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_ENV", "production")
+    from backend.app.main import create_app
+
+    app = create_app()
+
+    @app.get("/raise-http-500")
+    def raise_http_500():
+        raise HTTPException(status_code=500, detail="secret detail")
+
+    client = TestClient(app, raise_server_exceptions=False)
+
+    response = client.get("/raise-http-500", headers={"x-request-id": "req-http-500"})
+
+    assert response.status_code == 500
+    assert response.text == "Internal Server Error"
+    assert response.headers["x-request-id"] == "req-http-500"
+    assert "secret detail" not in response.text
+
+
+def test_local_unhandled_error_raises_for_debugging(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_ENV", "local")
+    from backend.app.main import create_app
+
+    app = create_app()
+
+    @app.get("/raise-local-error")
+    def raise_local_error():
+        raise RuntimeError("local debug error")
+
+    client = TestClient(app)
+
+    with pytest.raises(RuntimeError, match="local debug error"):
+        client.get("/raise-local-error")
 
 
 def test_cors_exposes_request_id_header(monkeypatch):

@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
     """
     settings = get_settings()
     app = FastAPI(title=settings.app_name)
+    production = settings.env.strip().lower() == "production"
 
     from backend.app.core.request_context import bind_request_context, clear_request_context
 
@@ -38,13 +39,18 @@ def create_app() -> FastAPI:
     async def request_context_middleware(request, call_next):
         request_id = bind_request_context(request)
         try:
-            response = await call_next(request)
-        except Exception:  # noqa: BLE001
-            response = PlainTextResponse("Internal Server Error", status_code=500)
+            try:
+                response = await call_next(request)
+            except Exception:  # noqa: BLE001
+                if not production:
+                    raise
+                response = PlainTextResponse("Internal Server Error", status_code=500)
+            if production and response.status_code == 500:
+                response = PlainTextResponse("Internal Server Error", status_code=500)
+            response.headers["x-request-id"] = request_id
+            return response
         finally:
             clear_request_context()
-        response.headers["x-request-id"] = request_id
-        return response
 
     app.add_middleware(
         CORSMiddleware,
