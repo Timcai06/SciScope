@@ -29,8 +29,8 @@ def check_database_config(settings: Settings) -> ReadinessCheck:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1 FROM papers LIMIT 1")
                 row = cursor.fetchone()
-    except Exception as exc:  # noqa: BLE001
-        return ReadinessCheck("unavailable", f"database readiness probe failed: {exc}")
+    except Exception:  # noqa: BLE001
+        return ReadinessCheck("unavailable", "database readiness probe failed")
 
     if row is None:
         return ReadinessCheck("unavailable", "database readiness probe returned no paper rows")
