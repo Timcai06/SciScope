@@ -1,0 +1,37 @@
+{
+  "version": "0.1.2",
+  "description": "SciScope research-agent terminal client.",
+  "homepage": "https://github.com/Timcai06/SciScope",
+  "license": "Proprietary",
+  "notes": [
+    "This package installs only the Go TUI client.",
+    "Set SCISCOPE_BACKEND to connect to a hosted backend, or run the SciScope backend locally from the source repository."
+  ],
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/Timcai06/SciScope/releases/download/v0.1.2/sciscope-tui_windows_amd64.zip",
+      "hash": "877b79b8dac5f5214b3e6157ccde8c9d97a69c681a76ade92f8593ee0b5e9d67"
+    },
+    "arm64": {
+      "url": "https://github.com/Timcai06/SciScope/releases/download/v0.1.2/sciscope-tui_windows_arm64.zip",
+      "hash": "208f77a1fb3c60c1ae57d1292cafc714b4a794102f3948055d2ba0f435e88347"
+    }
+  },
+  "bin": "sciscope-tui.exe",
+  "checkver": {
+    "github": "https://github.com/Timcai06/SciScope"
+  },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/Timcai06/SciScope/releases/download/v$version/sciscope-tui_windows_amd64.zip"
+      },
+      "arm64": {
+        "url": "https://github.com/Timcai06/SciScope/releases/download/v$version/sciscope-tui_windows_arm64.zip"
+      }
+    },
+    "hash": {
+      "url": "$baseurl/checksums.txt"
+    }
+  }
+}

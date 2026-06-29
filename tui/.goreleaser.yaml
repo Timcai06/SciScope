@@ -1,5 +1,5 @@
 # GoReleaser config for the SciScope terminal client.
-# Release flow:  git tag v0.1.0 && git push origin v0.1.0
+# Release flow:  git tag v0.2.0 && git push origin v0.2.0
 # CI (.github/workflows/release.yml) runs goreleaser from this dir and publishes
 # multi-platform binaries, Windows zip archives, and a Homebrew cask to the tap repo below.
 #

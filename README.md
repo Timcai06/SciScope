@@ -80,7 +80,7 @@ make backend
 - `make smoke`：基础 API 健康检查。
 - `make agent-smoke`：live agent 黑盒验收，检查真实库表规模、skills 工具链路与工具预算。
 - `make vllm-smoke`：检查本地 OpenAI-compatible 模型端点。
-- `make tui-build TUI_VERSION=0.1.0`：产出 Go 客户端二进制。
+- `make tui-build TUI_VERSION=0.2.0`：产出 Go 客户端二进制。
 
 ## Terminal Agent Client（Go TUI）
 
@@ -101,6 +101,7 @@ make tui-doctor # 检查后端/LLM/会话目录/图谱资产
 
 - `tui/README.md`
 - `docs/release/tui-homebrew.md`
+- `docs/release/tui-windows.md`
 
 ## 交接时一页速查
 
