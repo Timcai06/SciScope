@@ -50,8 +50,8 @@ archives and agent execution traces should not be reconstructed for submission
 unless they are deliberately refreshed into current docs.
 
 - [ ] Judge index and run instructions:
-  `交付说明.md`, `README.md`, `docs/runbook.md`,
-  `docs/final_submission_checklist.md`, `docs/submission_manifest.md`.
+  `交付说明.md`, `README.md`, `docs/operations/runbook.md`,
+  `docs/reports/final_submission_checklist.md`, `docs/reports/submission_manifest.md`.
 - [ ] Competition source files:
   `docs/competition/赛题.docx`, `docs/competition/数据集.docx`.
 - [ ] Python code and runtime schema:
@@ -76,7 +76,7 @@ unless they are deliberately refreshed into current docs.
 - [ ] Build the whitelist package with `make submission-package`; inspect
   `output/submission/SciScope_submission_manifest.csv` before upload.
 - [ ] Exclude from the formal submission package unless deliberately refreshed:
-  `docs/2026-06-16-sciscope-product-architecture.md` and
+  `docs/architecture/2026-06-16-sciscope-product-architecture.md` and
   `output/pdf/sciscope_design/`. The old `plan/archive/` and
   `docs/superpowers/` areas have already been removed from the active repo.
 

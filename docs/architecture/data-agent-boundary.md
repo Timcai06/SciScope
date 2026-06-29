@@ -58,7 +58,7 @@
 - 原生工具(契约化 `Tool` 注册表):
   `search_literature`, `get_trends`, `recommend_papers`, `get_paper`, `summarize_field`, `compare_papers`, `export_bibliography`, `query_knowledge_graph`, `verify_claim`, `delegate`。
 - `delegate` 把子任务下派给专员子智能体(reviewer/trend/critic,见 `specialists.py`);专员工具集不含 `delegate`,结构上杜绝递归。
-- 工具可扩展:外部 MCP 服务端的工具经 `mcp_client.py` 按 `mcp__server__tool` 动态并入注册表(`register_tools`);SciScope 自身也经 `mcp_server.py` 把工具暴露给外部 MCP 客户端。详见 `docs/mcp.md`。
+- 工具可扩展:外部 MCP 服务端的工具经 `mcp_client.py` 按 `mcp__server__tool` 动态并入注册表(`register_tools`);SciScope 自身也经 `mcp_server.py` 把工具暴露给外部 MCP 客户端。详见 `docs/developer/mcp.md`。
 - 每个工具是带契约的对象:声明只读性、执行前 `validate`(如 `paper_id` 真实性校验,**在访问 DB 前拦截编造的 ID**)、结果上限。原生工具均为 **读模型边界**(无数据写入);输入异常或服务不可用时返回“可展示错误字符串”,交给循环再决策重试。
 - `langgraph_runtime.py` 的 `execute_tools` 节点通过 `TOOL_SCHEMAS` + `tool_runner.run_tools` 并发执行(仅当全部只读)、去重签名,限制同参重复调用。
 
@@ -79,6 +79,6 @@
 
 ## 八、相关文档入口
 
-- `docs/project_structure.md`：目录结构、责任边界与生成产物约定。
-- `docs/runbook.md`：运行命令、环境变量、验收命令与故障处理。
+- `docs/architecture/project_structure.md`：目录结构、责任边界与生成产物约定。
+- `docs/operations/runbook.md`：运行命令、环境变量、验收命令与故障处理。
 - `交付说明.md`：面向评审/交付的成果索引与指标口径。

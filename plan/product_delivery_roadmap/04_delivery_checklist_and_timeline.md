@@ -40,7 +40,7 @@
 - `tui/main.go`
 - `backend/app/api/routes_agent.py`
 - `backend/app/agent/*`
-- `docs/runbook.md`
+- `docs/operations/runbook.md`
 
 ### 负责人角色建议
 - 产品/PM：定义演示脚本（“三分钟体验路径”）
@@ -212,7 +212,7 @@
 
 ### 关键文件/产物
 - `README.md`
-- `docs/runbook.md`
+- `docs/operations/runbook.md`
 - `tui/README.md`
 - `docs/examples/golden_verify_claim_session.md`
 - `output/pdf/**`
@@ -262,7 +262,7 @@
 
 ### 关键文件/产物
 - 全链路命令与产物路径同上
-- `docs/runbook.md`（最终交付前统一核对）
+- `docs/operations/runbook.md`（最终交付前统一核对）
 - `交付说明.md`（提交口径统一）
 - `backend/tests/*`、`tui` Go tests/build
 

@@ -17,8 +17,8 @@
   - 交付对照、主指标与评测入口说明、关键实现映射（用于赛题口径对齐）
 - `docs/competition/赛题.docx`、`docs/competition/数据集.docx`
 - `README.md`
-- `docs/runbook.md`
-- `docs/project_structure.md`
+- `docs/operations/runbook.md`
+- `docs/architecture/project_structure.md`
 - `output/pdf/sciscope_data_report/sciscope_data_report.pdf`
 - `output/pdf/sciscope_project_report/sciscope_project_report.pdf`
 - `output/pdf/sciscope_data_report/sections/`、`output/pdf/sciscope_project_report/sections/`
@@ -64,7 +64,7 @@
 
 ### 3.1 预备约定
 
-- 默认参数见 `Makefile` 与 `docs/runbook.md`。
+- 默认参数见 `Makefile` 与 `docs/operations/runbook.md`。
 - 后端运行环境变量默认：
   - `SCISCOPE_APP_NAME=SciScope`
   - `SCISCOPE_ENV=local`

@@ -10,8 +10,8 @@ guess which notes are still authoritative.
   Makefile commands.
 - [TUI README](../tui/README.md): terminal client usage, hosted backend defaults,
   local development, and troubleshooting.
-- [Runbook](runbook.md): daily development, validation, and failure recovery.
-- [Project structure](project_structure.md): module ownership and architecture
+- [Runbook](operations/runbook.md): daily development, validation, and failure recovery.
+- [Project structure](architecture/project_structure.md): module ownership and architecture
   boundaries.
 
 ## User And Demo Guides
@@ -23,22 +23,22 @@ guess which notes are still authoritative.
 
 ## Development And Architecture
 
-- [Data and agent boundary](data-agent-boundary.md): data-governance and tool
+- [Data and agent boundary](architecture/data-agent-boundary.md): data-governance and tool
   execution rules.
-- [MCP integration](mcp.md): MCP server/client entry points.
-- [Product architecture note](2026-06-16-sciscope-product-architecture.md):
+- [MCP integration](developer/mcp.md): MCP server/client entry points.
+- [Product architecture note](architecture/2026-06-16-sciscope-product-architecture.md):
   background architecture record; prefer the current README, runbook, and
   project structure when they differ.
-- [Hosted backend deployment](deploy-hosted-backend.md): Render + Supabase demo
+- [Hosted backend deployment](operations/deploy-hosted-backend.md): Render + Supabase demo
   deployment and release checks.
 
 ## Reports And Submission
 
-- [Report optimization guide](report-optimization.md): screenshot, narrative,
+- [Report optimization guide](reports/report-optimization.md): screenshot, narrative,
   and report-polish backlog.
-- [Final submission checklist](final_submission_checklist.md): final package and
+- [Final submission checklist](reports/final_submission_checklist.md): final package and
   judge-facing consistency gates.
-- [Submission manifest](submission_manifest.md): whitelist package scope.
+- [Submission manifest](reports/submission_manifest.md): whitelist package scope.
 
 ## Source Materials And Research Notes
 

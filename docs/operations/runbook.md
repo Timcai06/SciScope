@@ -6,7 +6,7 @@ It is aligned to `Makefile` targets and current code behavior.
 ## Scope and Priority
 
 - Use Makefile targets as the source of truth for runnable workflows.
-- `docs/project_structure.md` defines directory ownership and boundaries.
+- `docs/architecture/project_structure.md` defines directory ownership and boundaries.
 - When behavior conflicts with text in older notes, runtime code + Makefile wins.
 - Current default path is backend + data/RAG/agent + TUI. Web frontend code is not part of the current scope.
 
@@ -199,7 +199,7 @@ Before cutting v0.2.1, record the concrete hosted API base URL, hosting provider
 managed PostgreSQL/pgvector provider, and anonymous quota values. Use
 `configs/hosted-backend.env.example` as the environment contract.
 
-The concrete deployment path lives in `docs/deploy-hosted-backend.md`. The
+The concrete deployment path lives in `docs/operations/deploy-hosted-backend.md`. The
 current public demo uses Render Web Service + Supabase Postgres/pgvector. The
 checked-in Render Blueprint (`render.yaml`) is a paid Render-managed Postgres
 reference, not the default free/demo path. The release tag must wait until

@@ -55,7 +55,15 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 │   ├── analysis/
 │   └── sample/
 ├── data_pipeline/            legacy sample pipeline / 兼容层
-├── docs/                     文档总入口、交接、竞赛资料、runbook、发布说明
+├── docs/                     文档总入口与分类资料
+│   ├── architecture/         架构、边界、项目结构
+│   ├── operations/           runbook、部署与生产运维
+│   ├── reports/              报告优化、提交清单、manifest
+│   ├── developer/            MCP/开发者集成说明
+│   ├── release/              Brew/Scoop 发布说明
+│   ├── competition/          赛题与数据集原始说明
+│   ├── examples/             agent 会话与演示样例
+│   └── research/             外部研究笔记
 ├── evaluation/               检索/推荐/趋势评估
 ├── infra/                    PostgreSQL SQL 与部署相关配置
 ├── models/                   模型文件（常见 Git 忽略）
@@ -84,7 +92,7 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 - `data` / `src/harvest`：采集、治理与分析资产源。数据库可由它们重建，不能替代它们的审计角色。
 - `data/analysis` + `src/models`：输出数据视图与模型训练/重排输入。
 - `backend/app/services`：构建检索/证据/趋势/推荐功能与 `/api` 套件。
-- `backend/app/agent`：单一 LangGraph StateGraph 编排 prepare / plan / llm_step / execute_tools / reflect / force_synthesis；`session_id` 映射 LangGraph `thread_id`，支持同会话 `/retry` 错误恢复；统一经 SSE（`/api/agent/stream`）对外输出。`runtime.py` 为稳定入口，`langgraph_runtime.py` 为编排实现，`planning/reflection/tool_runner/llm/events` 为共享原语。工具层走契约化 `Tool` 注册表(`tools.py`)；`mcp_server.py` 把工具经 MCP 暴露给外部客户端,`mcp_client.py` 消费外部 MCP 服务,`specialists.py` 提供 `delegate` 派生的专员子智能体(reviewer/trend/critic)。详见 `docs/mcp.md`。
+- `backend/app/agent`：单一 LangGraph StateGraph 编排 prepare / plan / llm_step / execute_tools / reflect / force_synthesis；`session_id` 映射 LangGraph `thread_id`，支持同会话 `/retry` 错误恢复；统一经 SSE（`/api/agent/stream`）对外输出。`runtime.py` 为稳定入口，`langgraph_runtime.py` 为编排实现，`planning/reflection/tool_runner/llm/events` 为共享原语。工具层走契约化 `Tool` 注册表(`tools.py`)；`mcp_server.py` 把工具经 MCP 暴露给外部客户端,`mcp_client.py` 消费外部 MCP 服务,`specialists.py` 提供 `delegate` 派生的专员子智能体(reviewer/trend/critic)。详见 `docs/developer/mcp.md`。
 - `tui`：当前主交互端。
 - Web 前端不在当前范围；相关源目录已删除。
 
@@ -105,8 +113,8 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 - `/api/chat`：基于证据的固定式问答（非规划式 Agent）。
 - `make tui-build`：产出 `tui/sciscope-tui`（仅客户端二进制）。
 - Homebrew 只覆盖 Go 客户端，不包含 Python 后端、数据库和大模型制品。
-- 数据治理与 Agent 工具边界见 `docs/data-agent-boundary.md`。
-- 当前可执行口径以 `README.md`、`docs/README.md`、本文件、`docs/runbook.md`、`docs/data-agent-boundary.md` 与 `Makefile` 为准。
+- 数据治理与 Agent 工具边界见 `docs/architecture/data-agent-boundary.md`。
+- 当前可执行口径以 `README.md`、`docs/README.md`、本文件、`docs/operations/runbook.md`、`docs/architecture/data-agent-boundary.md` 与 `Makefile` 为准。
 
 ## 生成产物与 Git 约定
 
@@ -121,7 +129,7 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 
 ## 常见入口文件
 
-- `docs/project_structure.md`：结构与责任边界
+- `docs/architecture/project_structure.md`：结构与责任边界
 - `docs/README.md`：文档分类入口
-- `docs/runbook.md`：启动、验证、故障处理
+- `docs/operations/runbook.md`：启动、验证、故障处理
 - `README.md`：项目入口与常用命令
