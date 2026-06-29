@@ -25,7 +25,7 @@ from backend.app.agent.llm import build_system_prompt, compact, complete, detect
 from backend.app.agent import session_memory
 from backend.app.agent.planning import make_plan, needs_plan
 from backend.app.agent.reflection import reflect_reason, self_critique
-from backend.app.agent.tool_runner import run_tools
+from backend.app.agent.tool_runner import repair_missing_tool_results, run_tools
 from backend.app.agent.tools import TOOL_SCHEMAS
 
 MAX_STEPS = 6
@@ -256,6 +256,7 @@ def _llm_step(state: AgentState) -> AgentState:
     messages = list(state.get("messages") or [])
     compact(messages)  # cheap microcompact first
     compaction_meta = _maybe_autocompact(messages, state.get("model"))  # LLM summary if still over budget
+    repair_missing_tool_results(messages)  # never send an unanswered tool_call to the API
     tokens_in = int(state.get("tokens_in") or 0) + _messages_tokens(messages)
     text_events: list[AgentEvent] = []
     full_text, tool_calls = drain(
@@ -375,6 +376,7 @@ def _reflect(state: AgentState) -> AgentState:
 def _force_synthesis(state: AgentState) -> AgentState:
     started_at = time.perf_counter()
     messages = list(state.get("messages") or [])
+    repair_missing_tool_results(messages)  # repair before adding the synthesis turn
     messages.append({"role": "user", "content": "请基于以上工具结果,用中文给出最终回答。"})
     call_in = _messages_tokens(messages)
     text_events: list[AgentEvent] = []

@@ -47,3 +47,45 @@ def run_tools(
         return [one(tool_call) for tool_call in tool_calls]
     with ThreadPoolExecutor(max_workers=min(4, len(tool_calls))) as pool:
         return list(pool.map(one, tool_calls))
+
+
+MISSING_RESULT_NOTE = "(工具结果缺失:上一步被中断或出错,请据现有信息继续作答。)"
+
+
+def _tool_call_id(tool_call: dict) -> str:
+    return tool_call.get("id") or tool_call["function"]["name"]
+
+
+def repair_missing_tool_results(messages: list[dict]) -> int:
+    """Ensure every ``tool_call`` in an assistant message is immediately followed by a
+    matching tool result, synthesizing a placeholder for any that is missing.
+
+    Mirrors Claude Code's ``yieldMissingToolResultBlocks``: an interrupted or failed
+    tool step can leave an assistant ``tool_calls`` block without its ``tool`` reply,
+    which violates the chat API contract (every tool call needs a result) and makes
+    the next request fail. This repairs the message list in place before the call.
+    Returns the number of placeholders inserted.
+    """
+    repaired = 0
+    out: list[dict] = []
+    i = 0
+    while i < len(messages):
+        message = messages[i]
+        out.append(message)
+        i += 1
+        if message.get("role") != "assistant" or not message.get("tool_calls"):
+            continue
+        # Consume the tool results that immediately follow this assistant message.
+        answered: set[str] = set()
+        while i < len(messages) and messages[i].get("role") == "tool":
+            out.append(messages[i])
+            answered.add(messages[i].get("tool_call_id"))
+            i += 1
+        # Fill any tool call that did not get a result, preserving order/adjacency.
+        for tool_call in message["tool_calls"]:
+            tcid = _tool_call_id(tool_call)
+            if tcid not in answered:
+                out.append({"role": "tool", "tool_call_id": tcid, "content": MISSING_RESULT_NOTE})
+                repaired += 1
+    messages[:] = out
+    return repaired
