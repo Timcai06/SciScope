@@ -68,6 +68,10 @@ function download(url, destination, redirects = 0) {
   });
 }
 
+function powershellQuote(value) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -103,9 +107,9 @@ function extract(archivePath, destination, ext) {
           "-ExecutionPolicy",
           "Bypass",
           "-Command",
-          "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
-          archivePath,
-          destination,
+          `Expand-Archive -LiteralPath ${powershellQuote(
+            archivePath
+          )} -DestinationPath ${powershellQuote(destination)} -Force`,
         ],
         { stdio: "inherit" }
       );
@@ -154,7 +158,7 @@ async function main() {
   }
 
   const target = platformTarget();
-  const version = process.env.SCISCOPE_TUI_VERSION || pkg.version;
+  const version = process.env.SCISCOPE_TUI_VERSION || pkg.sciscopeTui?.binaryVersion || pkg.version;
   const tag = version.startsWith("v") ? version : `v${version}`;
   const asset = `sciscope-tui_${target.os}_${target.arch}.${target.ext}`;
   const base =
