@@ -61,6 +61,7 @@ func runThemeCommand(m model, args []string) (model, tea.Cmd) {
 		return m, nil
 	}
 	m.syncThemeStyles()
+	m.invalidateRenderCache()
 	m.appendBlock(stAccent.Render("  已切换主题: "+currentTheme) + stFaint.Render(" · "+themes[currentTheme].Title))
 	return m, nil
 }
@@ -305,6 +306,9 @@ func (m model) View() string {
 
 	// thinking spinner (Claude Code-style verb + esc hint) while a turn runs
 	if m.answering {
+		if preview := renderLiveAnswerPreview(m.answer, m.vp.Width); preview != "" {
+			parts = append(parts, preview)
+		}
 		parts = append(parts, renderWorkflowStatus(m.lastMeta, m.nodeSeen, m.lastStreamKind, time.Since(m.start), m.vp.Width))
 		// plan/reflect now stream inline in the transcript, so no separate shelf.
 		elapsed := int(time.Since(m.start).Seconds())

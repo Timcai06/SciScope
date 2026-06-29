@@ -155,7 +155,7 @@ func (m model) renderCommandPalette(width int) string {
 	}
 	pad := func(s string, w int) string { return lipgloss.NewStyle().Width(w).Render(s) }
 	rows := []string{
-		stAccent.Render("命令启动器") + stFaint.Render("  · ↑/↓ 选择 · Enter 填入/执行 · Tab 补全 · Esc 关闭"),
+		stAccent.Render("命令启动器") + stFaint.Render("  · Enter 执行 · Esc 关闭 · / 命令"),
 	}
 	lastCat := ""
 	for i, c := range matches {
@@ -789,13 +789,9 @@ func renderRecoveryPanel(s string) string {
 }
 
 func (m *model) startQuestion(v string, retry bool) tea.Cmd {
-	prefix := "❯ "
-	if retry {
-		prefix = "↻ "
-	}
 	hist := append([]turn(nil), m.history...)
 	m.ti.SetValue("")
-	m.appendBlock(stUser.Render(prefix) + stInk.Render(v))
+	m.appendUserMessage(v, retry)
 	m.record("user", "", v)
 	m.history = append(m.history, turn{"user", v})
 	m.lastQuestion = v

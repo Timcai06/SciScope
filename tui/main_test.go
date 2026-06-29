@@ -84,8 +84,21 @@ func TestAgentRequestBodySanitizesHistoryForBackendSchema(t *testing.T) {
 func TestTranscriptViewportUsesFasterWheelDelta(t *testing.T) {
 	vp := newTranscriptViewport(100, 20)
 
-	if vp.MouseWheelDelta != 6 {
-		t.Fatalf("MouseWheelDelta = %d, want 6", vp.MouseWheelDelta)
+	if vp.MouseWheelDelta != 8 {
+		t.Fatalf("MouseWheelDelta = %d, want 8", vp.MouseWheelDelta)
+	}
+}
+
+func TestAnimationCadenceIsScrollFriendly(t *testing.T) {
+	if streamRefreshInterval < 80*time.Millisecond {
+		t.Fatalf("stream refresh interval %s is too aggressive for smooth terminal scrolling", streamRefreshInterval)
+	}
+	m := initialModel()
+	if m.spin.Spinner.FPS < 250*time.Millisecond {
+		t.Fatalf("spinner FPS interval %s is too aggressive for smooth terminal scrolling", m.spin.Spinner.FPS)
+	}
+	if terminalRenderFPS > 30 {
+		t.Fatalf("terminal render FPS %d should be capped for smoother scrolling", terminalRenderFPS)
 	}
 }
 
@@ -246,6 +259,27 @@ func TestRenderTranscriptContentReusesWholeTranscriptCache(t *testing.T) {
 	}
 	if m.transcriptCacheVersion == cacheVersion {
 		t.Fatalf("append should rebuild transcript cache")
+	}
+}
+
+func TestStreamingTextKeepsViewportStableUntilFinal(t *testing.T) {
+	m := initialModel()
+	m.ready = true
+	m.answering = true
+	m.vp = newTranscriptViewport(100, 20)
+	m.appendBlock("历史 transcript")
+	m.refresh()
+	beforeViewport := m.vp.View()
+	m.lastRefresh = time.Now().Add(-streamRefreshInterval)
+
+	next, _ := m.Update(textMsg("流式增量"))
+	got := next.(model)
+
+	if got.vp.View() != beforeViewport {
+		t.Fatalf("streaming text should not rewrite viewport content before final:\nbefore:\n%s\nafter:\n%s", beforeViewport, got.vp.View())
+	}
+	if !strings.Contains(got.View(), "流式增量") {
+		t.Fatalf("streaming preview should still show the live answer:\n%s", got.View())
 	}
 }
 
@@ -832,12 +866,15 @@ func TestComposerRendersPolishedInputBox(t *testing.T) {
 
 	for _, want := range []string{
 		"核查 RAG",
+		"Enter",
+		"Esc",
+		"/",
 	} {
 		if !strings.Contains(composer, want) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)
 		}
 	}
-	for _, removed := range []string{"session tui-test-session", "langgraph", "/retry"} {
+	for _, removed := range []string{"session tui-test-session", "langgraph", "/retry", "Tab", "Ctrl"} {
 		if strings.Contains(composer, removed) {
 			t.Fatalf("composer should not expose noisy status %q:\n%s", removed, composer)
 		}
@@ -853,9 +890,9 @@ func TestSlashCommandPaletteUsesFullWidth(t *testing.T) {
 
 	for _, want := range []string{
 		"命令启动器",
-		"↑/↓ 选择",
-		"Enter 填入/执行",
+		"Enter 执行",
 		"Esc 关闭",
+		"/ 命令",
 		"▶",
 		"/demo",
 		"/timeline",
@@ -864,6 +901,11 @@ func TestSlashCommandPaletteUsesFullWidth(t *testing.T) {
 	} {
 		if !strings.Contains(palette, want) {
 			t.Fatalf("palette missing %q:\n%s", want, palette)
+		}
+	}
+	for _, removed := range []string{"↑/↓", "Tab"} {
+		if strings.Contains(palette, removed) {
+			t.Fatalf("palette should keep shortcut hints minimal, found %q:\n%s", removed, palette)
 		}
 	}
 	if lipgloss.Width(palette) < 96 {
@@ -1121,6 +1163,36 @@ func TestThemeCommandListsAndSwitchesThemes(t *testing.T) {
 	}
 }
 
+func TestThemeCommandRerendersQuestionAndAnswerBlocks(t *testing.T) {
+	applyTheme("dark")
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(100, 20)
+	m.appendUserMessage("核查 RAG", false)
+	m.appendAnswerMessage("结论: RAG 能降低无依据回答风险。", []string{"verify_claim"})
+	beforeUserVersion := m.blockItems[0].RenderVersion
+	beforeAnswerVersion := m.blockItems[1].RenderVersion
+
+	next, _ := m.runSlash("/theme paper")
+	got := next.(model)
+
+	if currentTheme != "paper" {
+		t.Fatalf("expected current theme paper, got %q", currentTheme)
+	}
+	if got.blockItems[0].RenderVersion <= beforeUserVersion {
+		t.Fatalf("theme switch should rerender existing user block, version %d -> %d", beforeUserVersion, got.blockItems[0].RenderVersion)
+	}
+	if got.blockItems[1].RenderVersion <= beforeAnswerVersion {
+		t.Fatalf("theme switch should rerender existing answer block, version %d -> %d", beforeAnswerVersion, got.blockItems[1].RenderVersion)
+	}
+	plain := plainANSI(got.vp.View())
+	for _, want := range []string{"用户问题", "研究结论", "核查 RAG", "RAG 能降低"} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("rerendered themed view missing %q:\n%s", want, got.vp.View())
+		}
+	}
+}
+
 func TestApplyThemeRejectsUnknownTheme(t *testing.T) {
 	applyTheme("dark")
 	if applyTheme("not-a-theme") {
@@ -1282,6 +1354,29 @@ func TestRenderAnswerUsesChatMessageStyle(t *testing.T) {
 	}
 }
 
+func TestUserAndAssistantMessagesHaveDistinctLabels(t *testing.T) {
+	applyTheme("dark")
+	user := renderUserMessage("核查 RAG 是否降低幻觉", false)
+	assistant := renderAnswerMessage("结论: 可以降低无依据回答风险。", []string{"verify_claim"}, 100)
+	userPlain := plainANSI(user)
+	assistantPlain := plainANSI(assistant)
+
+	if !strings.Contains(userPlain, "用户问题") || !strings.Contains(userPlain, "核查 RAG") {
+		t.Fatalf("user message should be clearly labelled:\n%s", user)
+	}
+	if strings.Contains(userPlain, "研究结论") {
+		t.Fatalf("user message should not look like assistant answer:\n%s", user)
+	}
+	for _, want := range []string{"研究结论", "可以降低", "证据工具", "论断核查"} {
+		if !strings.Contains(assistantPlain, want) {
+			t.Fatalf("assistant message missing %q:\n%s", want, assistant)
+		}
+	}
+	if strings.Contains(assistantPlain, "用户问题") {
+		t.Fatalf("assistant message should not look like user prompt:\n%s", assistant)
+	}
+}
+
 func TestStyleAnswerBodyHighlightsSemanticLines(t *testing.T) {
 	applyTheme("paper")
 	body := styleAnswerBody("结论: RAG 有帮助\n证据: [1] 2025 年论文\n风险: 但取决于检索质量\n推荐相似度 0.8918")
@@ -1437,12 +1532,15 @@ func TestComposerShowsMultilineAndRecoveryHints(t *testing.T) {
 	for _, want := range []string{
 		"第一行",
 		"第二行",
+		"Enter",
+		"Esc",
+		"/",
 	} {
 		if !strings.Contains(composer, want) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)
 		}
 	}
-	for _, removed := range []string{"agent", "langgraph", "/retry"} {
+	for _, removed := range []string{"agent", "langgraph", "/retry", "Tab", "Ctrl"} {
 		if strings.Contains(composer, removed) {
 			t.Fatalf("composer should stay minimal, found %q:\n%s", removed, composer)
 		}

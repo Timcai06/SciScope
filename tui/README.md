@@ -105,7 +105,7 @@ sciscope-tui export --last
 
 ## 7. 快速验收清单
 
-- `make tui-build TUI_VERSION=0.1.0` → `tui/sciscope-tui --version`
+- `make tui-build TUI_VERSION=0.2.0` → `tui/sciscope-tui --version`
 - `make tui-doctor`，确认发布前环境体检输出可读。
 - `make tui` 连接真实后端，执行一条测试问题，观察 plan/tool/result/final 流。
 - `make tui-demo`，确认完整离线演示可完整播完。

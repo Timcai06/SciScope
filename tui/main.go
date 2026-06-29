@@ -149,7 +149,11 @@ var verbs = []string{
 	"推演中", "酝酿中", "梳理中", "求证中", "琢磨中", "盘点中", "沉思中",
 }
 
-const streamRefreshInterval = 45 * time.Millisecond
+const (
+	streamRefreshInterval = 90 * time.Millisecond
+	spinnerFrameInterval  = 250 * time.Millisecond
+	terminalRenderFPS     = 30
+)
 
 var (
 	paperIDPattern  = regexp.MustCompile(`\b(?:W\d{6,}|[a-zA-Z]+:\S+|\d{4}\.\d{4,5})\b`)
@@ -285,6 +289,8 @@ type model struct {
 	transcriptCacheWidth        int
 	transcriptCacheBlockVersion int
 	transcriptCacheVersion      int
+	viewportContent             string
+	viewportContentVersion      int
 	answer                      string // current streaming answer
 	answering                   bool
 	verb                        string
@@ -318,6 +324,8 @@ type model struct {
 type conversationBlock struct {
 	Kind          string
 	Raw           string
+	Tools         []string
+	Retry         bool
 	Rendered      string
 	RenderWidth   int
 	RenderVersion int
@@ -333,7 +341,7 @@ func initialModel() model {
 	sp := spinner.New()
 	sp.Spinner = spinner.Spinner{
 		Frames: []string{"✻", "✢", "✳", "∗", "✦", "✶"},
-		FPS:    time.Second / 8,
+		FPS:    spinnerFrameInterval,
 	}
 	sp.Style = stAccent
 	m := model{ti: ti, spin: sp, sub: make(chan tea.Msg, 64), demo: demoMode(), sessionID: newSessionID()}
@@ -343,9 +351,9 @@ func initialModel() model {
 
 func newTranscriptViewport(width, height int) viewport.Model {
 	vp := viewport.New(width, height)
-	// macOS trackpads emit many small wheel events; the default delta (3 lines)
-	// feels choppy in an alt-screen transcript, especially with styled ANSI text.
-	vp.MouseWheelDelta = 6
+	// macOS trackpads emit many small wheel events; a larger delta keeps the
+	// transcript responsive while streamed ANSI content is being redrawn.
+	vp.MouseWheelDelta = 8
 	return vp
 }
 
@@ -377,6 +385,21 @@ func (m *model) appendBlock(s string) {
 	m.refresh()
 }
 
+func (m *model) appendUserMessage(text string, retry bool) {
+	m.blocks = append(m.blocks, text)
+	m.blockItems = append(m.blockItems, conversationBlock{Kind: "user", Raw: text, Retry: retry})
+	m.blocksVersion++
+	m.refresh()
+}
+
+func (m *model) appendAnswerMessage(text string, tools []string) {
+	copiedTools := append([]string(nil), tools...)
+	m.blocks = append(m.blocks, text)
+	m.blockItems = append(m.blockItems, conversationBlock{Kind: "assistant", Raw: text, Tools: copiedTools})
+	m.blocksVersion++
+	m.refresh()
+}
+
 func (m *model) syncBlockItems() {
 	if len(m.blockItems) == len(m.blocks) {
 		matched := true
@@ -397,6 +420,17 @@ func (m *model) syncBlockItems() {
 	m.blocksVersion++
 }
 
+func (m *model) invalidateRenderCache() {
+	for i := range m.blockItems {
+		m.blockItems[i].Rendered = ""
+		m.blockItems[i].RenderWidth = 0
+	}
+	m.transcriptCache = ""
+	m.transcriptCacheWidth = 0
+	m.transcriptCacheBlockVersion = -1
+	m.blocksVersion++
+}
+
 func (m *model) renderBlocksContent(width int) string {
 	m.syncBlockItems()
 	if len(m.blockItems) == 0 {
@@ -406,7 +440,7 @@ func (m *model) renderBlocksContent(width int) string {
 	for i := range m.blockItems {
 		block := &m.blockItems[i]
 		if block.Rendered == "" || block.RenderWidth != width {
-			block.Rendered = block.Raw
+			block.Rendered = renderConversationBlock(*block, width)
 			block.RenderWidth = width
 			block.RenderVersion++
 		}
@@ -663,9 +697,32 @@ func formatHTTPError(resp *http.Response) string {
 	return fmt.Sprintf("后端返回 %s: %s", resp.Status, detail)
 }
 
+func (m *model) setViewportContent(content string, followBottom bool) {
+	if content == m.viewportContent {
+		if followBottom || m.vp.PastBottom() {
+			m.vp.GotoBottom()
+		}
+		return
+	}
+	m.vp.SetContent(content)
+	m.viewportContent = content
+	m.viewportContentVersion++
+	if followBottom {
+		m.vp.GotoBottom()
+	}
+}
+
 func (m *model) refresh() {
+	m.refreshTranscript(false)
+}
+
+func (m *model) refreshWithLiveAnswer() {
+	m.refreshTranscript(true)
+}
+
+func (m *model) refreshTranscript(includeLiveAnswer bool) {
 	content := m.renderTranscriptContent(m.vp.Width)
-	if m.answering && m.answer != "" {
+	if includeLiveAnswer && m.answering && m.answer != "" {
 		// Live answer with a streaming cursor block, for a "being written" feel.
 		content += "\n" + stBullet.Render("⏺ ") + stInk.Render(m.answer) + stAccent.Render("▌")
 	}
@@ -676,10 +733,7 @@ func (m *model) refresh() {
 	// Follow new content only when already pinned to the bottom; if the user has
 	// scrolled up to read, keep their position instead of yanking them down.
 	atBottom := m.vp.AtBottom()
-	m.vp.SetContent(content)
-	if atBottom {
-		m.vp.GotoBottom()
-	}
+	m.setViewportContent(content, atBottom)
 	m.lastRefresh = time.Now()
 	m.refreshPending = false
 }
@@ -818,12 +872,46 @@ func (m model) renderComposer(width int) string {
 	// composer box (rendering Value() as static text left the hardware cursor
 	// stranded at the bottom of the screen).
 	inputLine := m.ti.View()
+	hints := stFaint.Render("Enter 发送 · Esc 中断/关闭 · / 命令")
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), true, false, true, false).
 		BorderForeground(cAccent).
 		Padding(0, 1).
 		Width(width - 2).
-		Render(inputLine)
+		Render(inputLine + "\n" + hints)
+}
+
+func renderLiveAnswerPreview(answer string, width int) string {
+	answer = strings.Trim(answer, "\n")
+	if answer == "" {
+		return ""
+	}
+	if width < 48 {
+		width = 48
+	}
+	inner := width - 4
+	if inner < 24 {
+		inner = 24
+	}
+	lines := strings.Split(answer, "\n")
+	start := len(lines) - 4
+	if start < 0 {
+		start = 0
+	}
+	body := []string{stBullet.Render("⏺ ") + stAccent.Render("正在回答") + stAccent.Render(" ▌")}
+	for _, line := range lines[start:] {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		body = append(body, stInk.Render("  "+clipWidth(line, inner-2)))
+	}
+	return lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true, false, true, false).
+		BorderForeground(cFaint).
+		Padding(0, 1).
+		Width(width - 2).
+		Render(strings.Join(body, "\n"))
 }
 
 func (m model) argsStr(args map[string]any) string {
@@ -917,13 +1005,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.ready {
 			m.vp = newTranscriptViewport(msg.Width, vh)
 			m.loadRecentSessions()
-			m.vp.SetContent(renderSplash(msg.Width, m.recentSessions))
+			m.setViewportContent(renderSplash(msg.Width, m.recentSessions), true)
 			m.ready = true
 		} else {
 			m.vp.Width, m.vp.Height = msg.Width, vh
 			if len(m.blocks) == 0 && m.answer == "" {
 				m.loadRecentSessions()
-				m.vp.SetContent(renderSplash(msg.Width, m.recentSessions))
+				m.setViewportContent(renderSplash(msg.Width, m.recentSessions), true)
 			}
 		}
 		m.ti.Width = msg.Width - 4
@@ -931,7 +1019,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case demoStartMsg:
 		v := string(msg)
 		m.ti.SetValue("")
-		m.appendBlock(stUser.Render("◈ ") + stInk.Render(v))
+		m.appendUserMessage(v, false)
 		m.record("user", "", v)
 		m.history = append(m.history, turn{"user", v})
 		m.lastQuestion = v
@@ -1148,7 +1236,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.answer = string(msg)
 		}
 		m.refreshPending = false
-		m.refresh()
+		m.refreshWithLiveAnswer()
 		return m, listen(m.sub)
 
 	case errMsg:
@@ -1168,7 +1256,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.record("timeline", "", body)
 			}
 			m.record("assistant", "", ans)
-			m.appendBlock(m.renderAnswer())
+			m.appendAnswerMessage(ans, m.used)
 			m.history = append(m.history, turn{"assistant", ans})
 			if len(m.history) > 12 {
 				m.history = m.history[len(m.history)-12:]
@@ -1193,28 +1281,61 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// renderAnswer renders the finished answer as a chat message. Tool traces are
-// kept in /timeline so the main conversation stays readable.
-func (m model) renderAnswer() string {
-	w := m.vp.Width - 4
+func renderConversationBlock(block conversationBlock, width int) string {
+	switch block.Kind {
+	case "user":
+		return renderUserMessage(block.Raw, block.Retry)
+	case "assistant":
+		return renderAnswerMessage(block.Raw, block.Tools, width)
+	default:
+		return block.Raw
+	}
+}
+
+func renderUserMessage(text string, retry bool) string {
+	text = strings.TrimSpace(text)
+	prefix := "❯"
+	title := "用户问题"
+	if retry {
+		prefix = "↻"
+		title = "重试问题"
+	}
+	lines := []string{
+		stUser.Render(prefix + " " + title),
+		stInk.Render("  " + text),
+	}
+	return strings.Join(lines, "\n")
+}
+
+func glamourStyleName() string {
+	switch currentTheme {
+	case "paper", "light":
+		return "light"
+	default:
+		return "dark"
+	}
+}
+
+func renderAnswerMessage(answer string, tools []string, width int) string {
+	w := width - 4
 	if w < 20 {
 		w = 20
 	}
-	body := strings.Trim(m.answer, "\n")
-	// Fixed dark style — NOT WithAutoStyle(), which queries the terminal background
+	body := strings.Trim(answer, "\n")
+	// Use a fixed named style — NOT WithAutoStyle(), which queries the terminal background
 	// (OSC 11) on every render and leaks the response (]11;rgb:…) into the UI.
-	if r, err := glamour.NewTermRenderer(glamour.WithStandardStyle("dark"), glamour.WithWordWrap(w)); err == nil {
-		if out, e := r.Render(m.answer); e == nil {
+	if r, err := glamour.NewTermRenderer(glamour.WithStandardStyle(glamourStyleName()), glamour.WithWordWrap(w)); err == nil {
+		if out, e := r.Render(answer); e == nil {
 			body = strings.Trim(out, "\n")
 		}
 	}
 	body = styleAnswerBody(body)
 	header := stBullet.Render("⏺ ") + stAccent.Render("研究结论")
 	out := header + "\n" + body
-	if len(m.used) > 0 {
+	if len(tools) > 0 {
 		seen := map[string]bool{}
 		labels := []string{}
-		for _, n := range m.used {
+		for _, n := range tools {
 			if !seen[n] {
 				seen[n] = true
 				labels = append(labels, toolLabel(n))
@@ -1223,6 +1344,12 @@ func (m model) renderAnswer() string {
 		out += "\n" + stFaint.Render("  证据工具: "+strings.Join(labels, "  ")+" · /timeline 查看过程")
 	}
 	return out
+}
+
+// renderAnswer renders the finished answer as a chat message. Tool traces are
+// kept in /timeline so the main conversation stays readable.
+func (m model) renderAnswer() string {
+	return renderAnswerMessage(m.answer, m.used, m.vp.Width)
 }
 
 func styleAnswerBody(body string) string {
@@ -1535,7 +1662,7 @@ func (m model) renderSubmenuPalette(width int) string {
 		descW = 16
 	}
 	title := submenuTitle(m.submenu)
-	rows := []string{stAccent.Render(title) + stFaint.Render("  · ↑/↓ 选择 · Enter 执行 · Esc 返回")}
+	rows := []string{stAccent.Render(title) + stFaint.Render("  · Enter 执行 · Esc 返回 · / 命令")}
 	for i, item := range items {
 		marker := "  "
 		if i == idx {
@@ -1591,7 +1718,7 @@ func renderSlashHelpBlock() string {
 		groups[cmd.category] = append(groups[cmd.category], cmd)
 	}
 	order := []string{"常用", "会话", "证据", "系统"}
-	body := []string{"使用 / 打开命令启动器; ↑/↓ 选择, Enter 执行, Tab 补全。"}
+	body := []string{"使用 / 打开命令启动器; Enter 执行, Esc 返回。"}
 	for _, group := range order {
 		cmds := groups[group]
 		if len(cmds) == 0 {
@@ -1682,7 +1809,7 @@ func main() {
 	if opts.Demo {
 		m.demo = true
 	}
-	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithFPS(terminalRenderFPS))
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
