@@ -585,6 +585,63 @@ func TestLocalBackendRecoveryStillMentionsMakeBackend(t *testing.T) {
 	}
 }
 
+func TestRecoveryActionUsesHostedBackendURL(t *testing.T) {
+	t.Setenv("SCISCOPE_BACKEND", "")
+	t.Setenv("SCISCOPE_HOSTED_BACKEND", "https://api.example.test")
+
+	action := recoveryAction("无法连接后端 https://api.example.test: connection refused")
+
+	if action.Command != "/demo" {
+		t.Fatalf("hosted recovery should use demo command, got %#v", action)
+	}
+	if !strings.Contains(action.Message, "/demo") || !strings.Contains(action.Message, "/retry") {
+		t.Fatalf("hosted recovery should mention demo and retry: %#v", action)
+	}
+	if strings.Contains(action.Message, "make backend") || strings.Contains(action.Command, "make backend") {
+		t.Fatalf("hosted recovery should not mention make backend: %#v", action)
+	}
+}
+
+func TestRecoveryActionUsesDefaultHostedBackendURL(t *testing.T) {
+	t.Setenv("SCISCOPE_BACKEND", "")
+	t.Setenv("SCISCOPE_HOSTED_BACKEND", "")
+	old := defaultHostedBackendURL
+	t.Cleanup(func() {
+		defaultHostedBackendURL = old
+	})
+	defaultHostedBackendURL = "https://release.example.test"
+
+	action := recoveryAction("无法连接后端 https://release.example.test: connection refused")
+
+	if action.Command != "/demo" {
+		t.Fatalf("ldflag hosted recovery should use demo command, got %#v", action)
+	}
+	if !strings.Contains(action.Message, "/demo") || !strings.Contains(action.Message, "/retry") {
+		t.Fatalf("ldflag hosted recovery should mention demo and retry: %#v", action)
+	}
+	if strings.Contains(action.Message, "make backend") || strings.Contains(action.Command, "make backend") {
+		t.Fatalf("ldflag hosted recovery should not mention make backend: %#v", action)
+	}
+}
+
+func TestBackendDoctorWarning(t *testing.T) {
+	hosted := backendDoctorWarning("https://api.example.test")
+	if hosted.Name != "Backend" || hosted.Status != "warn" {
+		t.Fatalf("hosted doctor warning should describe backend warning, got %#v", hosted)
+	}
+	if !strings.Contains(hosted.Detail, "/demo") || strings.Contains(hosted.Detail, "make backend") {
+		t.Fatalf("hosted doctor warning should offer demo without make backend: %#v", hosted)
+	}
+
+	local := backendDoctorWarning("http://127.0.0.1:8000")
+	if local.Name != "Backend" || local.Status != "warn" {
+		t.Fatalf("local doctor warning should describe backend warning, got %#v", local)
+	}
+	if !strings.Contains(local.Detail, "make backend") {
+		t.Fatalf("local doctor warning should keep developer command: %#v", local)
+	}
+}
+
 func TestRetrySlashReplaysLastQuestion(t *testing.T) {
 	m := initialModel()
 	m.ready = true
