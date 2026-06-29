@@ -1,10 +1,10 @@
 # SciScope TUI npm package
 
-This package installs the SciScope Go terminal client through npm. It is a thin
-cross-platform wrapper: the npm package downloads the matching GitHub Release
-archive during install, then exposes the `sciscope-tui` command.
+This package installs the SciScope Go terminal client through npm. It downloads
+the matching GitHub Release archive during install, then exposes the
+`sciscope-tui` command.
 
-## Install
+## Install And Run
 
 ```bash
 npm install -g sciscope-tui

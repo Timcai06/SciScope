@@ -1,14 +1,37 @@
-# SciScope TUI npm Release Guide
+# SciScope TUI npm Install And Release Guide
 
-The npm package is the cross-platform developer install path:
+The npm package is live as `sciscope-tui` and is the simplest cross-platform
+install path when Node.js is already available:
 
 ```bash
 npm install -g sciscope-tui
 sciscope-tui
 ```
 
-It does not reimplement the client in Node.js. The package is a thin installer
+The package does not reimplement the client in Node.js. It is a thin installer
 and command proxy for the Go binary published by GitHub Releases.
+
+## User Commands
+
+```bash
+sciscope-tui
+sciscope-tui demo
+sciscope-tui doctor
+sciscope-tui --version
+```
+
+Local backend override:
+
+```bash
+SCISCOPE_BACKEND=http://127.0.0.1:8000 sciscope-tui
+```
+
+PowerShell:
+
+```powershell
+$env:SCISCOPE_BACKEND="http://127.0.0.1:8000"
+sciscope-tui
+```
 
 ## Scope
 
@@ -55,13 +78,12 @@ node scripts/install.js
 node bin/sciscope-tui.js --version
 ```
 
-## Publish
+## Maintainer Publish Notes
 
-One-time setup:
+One-time setup if automatic publishing is not configured:
 
-1. Claim the `sciscope-tui` package name on npm.
-2. Create an npm automation token.
-3. Add `NPM_TOKEN` to the `Timcai06/SciScope` GitHub repository secrets.
+1. Create an npm automation token.
+2. Add `NPM_TOKEN` to the `Timcai06/SciScope` GitHub repository secrets.
 
 Tag-driven release:
 

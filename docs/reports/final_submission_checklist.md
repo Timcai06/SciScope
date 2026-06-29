@@ -51,7 +51,8 @@ unless they are deliberately refreshed into current docs.
 
 - [ ] Judge index and run instructions:
   `交付说明.md`, `README.md`, `docs/operations/runbook.md`,
-  `docs/reports/final_submission_checklist.md`, `docs/reports/submission_manifest.md`.
+  `docs/release/README.md`, `docs/reports/final_submission_checklist.md`,
+  `docs/reports/submission_manifest.md`.
 - [ ] Competition source files:
   `docs/competition/赛题.docx`, `docs/competition/数据集.docx`.
 - [ ] Python code and runtime schema:

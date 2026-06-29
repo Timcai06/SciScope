@@ -9,7 +9,7 @@
 | 数据分析报告 | PDF、图表、图表 manifest | `output/pdf/sciscope_data_report/sciscope_data_report.pdf`; `output/assets/sciscope_data_report/` |
 | 科研智能体模型 | Python 代码、skill 工作流、模型/索引资产、知识图谱、评测结果 | `src/`; `backend/`; `.sciscope/skills/`; `data_pipeline/`; `models/trends/`; `models/recommend/`; `output/graphs/`; `output/eval/` |
 | 项目报告书 | PDF | `output/pdf/sciscope_project_report/sciscope_project_report.pdf` |
-| 系统运行说明 | 评委索引、README、runbook、提交清单 | `交付说明.md`; `README.md`; `docs/operations/runbook.md`; `docs/reports/final_submission_checklist.md`; `docs/reports/submission_manifest.md` |
+| 系统运行说明 | 评委索引、README、runbook、下载索引、提交清单 | `交付说明.md`; `README.md`; `docs/operations/runbook.md`; `docs/release/README.md`; `docs/reports/final_submission_checklist.md`; `docs/reports/submission_manifest.md` |
 | 演示样例 | 智能体黄金会话 | `docs/examples/golden_verify_claim_session.md` |
 
 ## 代码与运行入口

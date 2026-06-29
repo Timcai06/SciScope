@@ -12,7 +12,16 @@ SciScope TUI 是 Go 语言的终端交互客户端，负责把后端科研代理
 
 ## 2. 安装与启动
 
-### 2.0 用户安装（Homebrew）
+### 2.0 用户安装
+
+跨平台 npm（推荐给已有 Node.js 的用户）：
+
+```bash
+npm install -g sciscope-tui
+sciscope-tui
+```
+
+macOS Homebrew：
 
 新版 Homebrew 默认拒绝加载第三方 tap 的 cask，需先 trust，因此流程是 **tap → trust → install**：
 
@@ -34,6 +43,8 @@ scoop bucket add sciscope https://github.com/Timcai06/scoop-sciscope
 scoop install sciscope-tui
 sciscope-tui
 ```
+
+完整下载索引见 `docs/release/README.md`。
 
 ### 2.1 正常联调
 

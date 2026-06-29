@@ -68,6 +68,30 @@ function download(url, destination, redirects = 0) {
   });
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function downloadWithRetry(url, destination, attempts = 4) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      fs.rmSync(destination, { force: true });
+      await download(url, destination);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) break;
+      const delayMs = attempt * 1500;
+      console.warn(
+        `sciscope-tui install: download failed (${error.message}); retrying in ${delayMs}ms`
+      );
+      await wait(delayMs);
+    }
+  }
+  throw lastError;
+}
+
 function extract(archivePath, destination, ext) {
   fs.mkdirSync(destination, { recursive: true });
   if (ext === "zip") {
@@ -144,7 +168,7 @@ async function main() {
 
   try {
     console.log(`sciscope-tui install: downloading ${url}`);
-    await download(url, archivePath);
+    await downloadWithRetry(url, archivePath);
     extract(archivePath, extractDir, target.ext);
     const extractedBinary = findBinary(extractDir);
     if (!extractedBinary) {

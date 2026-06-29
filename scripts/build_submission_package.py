@@ -33,6 +33,7 @@ INCLUDES = [
     Include("docs/developer/mcp.md"),
     Include("docs/architecture/data-agent-boundary.md"),
     Include("docs/architecture/project_structure.md"),
+    Include("docs/release"),
     Include("docs/competition"),
     Include("docs/examples"),
     Include(".sciscope/skills"),

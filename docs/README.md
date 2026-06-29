@@ -16,6 +16,8 @@ guess which notes are still authoritative.
 
 ## User And Demo Guides
 
+- [Download and release index](release/README.md): npm, Homebrew, Scoop, and
+  GitHub Release paths in one place.
 - [Golden verify-claim session](examples/golden_verify_claim_session.md):
   judge-facing agent transcript example.
 - [Homebrew install notes](release/tui-homebrew.md): macOS package path.
