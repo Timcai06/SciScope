@@ -20,6 +20,7 @@ Fallback strategy:
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
@@ -28,6 +29,18 @@ from backend.app.core.config import get_settings
 
 RRF_K = 60
 CHUNK_POOL = 40  # candidate snippets pulled from each retrieval arm before fusion
+
+
+def runtime_embeddings_enabled() -> bool:
+    """Whether API requests may load a local embedder for query-time vectors.
+
+    Hosted free instances often have enough CPU for FastAPI/Postgres/DeepSeek, but
+    not enough memory to load sentence-transformers on demand. Disabling this
+    keeps lexical retrieval and evidence chat usable while preserving the
+    precomputed pgvector tables for larger deployments.
+    """
+    value = os.getenv("SCISCOPE_ENABLE_RUNTIME_EMBEDDINGS", "true")
+    return value.strip().lower() not in {"0", "false", "no", "n", "off"}
 
 
 @dataclass
@@ -148,7 +161,7 @@ def _lexical_candidates(conn, query: str, field: str | None, year: int | None) -
 
 
 def _semantic_candidates(conn, query: str, field: str | None, year: int | None) -> list[tuple[str, str]]:
-    if not _has_embeddings():
+    if not runtime_embeddings_enabled() or not _has_embeddings():
         return []
     from pgvector.psycopg import register_vector
 

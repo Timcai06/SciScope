@@ -24,6 +24,16 @@ Render prompts for:
 DEEPSEEK_API_KEY
 ```
 
+For free/small web instances, set:
+
+```text
+SCISCOPE_ENABLE_RUNTIME_EMBEDDINGS=false
+```
+
+This keeps hosted search/chat on PostgreSQL full-text retrieval instead of
+loading the local sentence-transformers model inside the web container. Keep the
+pgvector tables populated; larger instances can switch this back to `true`.
+
 GitHub Actions needs this repository secret before tagging `v0.2.1`:
 
 ```text

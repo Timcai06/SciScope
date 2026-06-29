@@ -28,6 +28,8 @@ services:
           property: connectionString
       - key: SCISCOPE_EMBEDDING_MODEL
         value: intfloat/multilingual-e5-base
+      - key: SCISCOPE_ENABLE_RUNTIME_EMBEDDINGS
+        value: "false"
       - key: SCISCOPE_ANON_REQUESTS_PER_MINUTE
         value: "60"
       - key: SCISCOPE_AGENT_MAX_HISTORY_TURNS

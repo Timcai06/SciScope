@@ -69,6 +69,28 @@ def test_rag_query_prioritizes_retrieval_augmented_generation_paper():
     assert response.evidence[0].title == "Retrieval Augmented Generation for Scientific Question Answering"
 
 
+def test_runtime_embedding_disable_uses_lexical_confidence(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_ENABLE_RUNTIME_EMBEDDINGS", "false")
+
+    from backend.app.models.schemas import EvidenceItem
+    from backend.app.services.evidence_chat import _verify_answer
+
+    evidence = [
+        EvidenceItem(
+            paper_id="paper-1",
+            title="Biomedical natural language processing",
+            year=2026,
+            reason="test",
+            authors=[],
+            snippet="Natural language processing supports biomedical literature search.",
+        )
+    ]
+
+    confidence = _verify_answer("Natural language processing supports biomedical literature search. [1]", evidence)
+
+    assert confidence == "high"
+
+
 def test_deepseek_provider_requires_api_key_when_mock_disabled(monkeypatch):
     monkeypatch.setenv("SCISCOPE_USE_MOCK_LLM", "false")
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)

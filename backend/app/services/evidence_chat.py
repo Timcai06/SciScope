@@ -224,7 +224,12 @@ def _semantic_support(answer: str, evidence_text: str) -> float | None:
     Returns None when the embedder/service layer is unavailable so the caller
     can fall back to lexical scoring.
     """
-    if not answer.strip() or not evidence_text.strip() or not retrieval_service.is_available():
+    if (
+        not answer.strip()
+        or not evidence_text.strip()
+        or not retrieval_service.runtime_embeddings_enabled()
+        or not retrieval_service.is_available()
+    ):
         return None
     try:
         from src.models.embeddings import get_embedder
