@@ -32,7 +32,7 @@ class MockDeepSeekProvider:
 
 
 class DeepSeekProvider:
-    """Strict DeepSeek provider stub: selection gate + API call contract placeholder."""
+    """DeepSeek cloud provider using its OpenAI-compatible chat API."""
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -41,7 +41,41 @@ class DeepSeekProvider:
         if not self.settings.deepseek_api_key:
             raise RuntimeError("DEEPSEEK_API_KEY is required when SCISCOPE_USE_MOCK_LLM=false")
 
-        raise RuntimeError("Real DeepSeek HTTP call is implemented in the API integration task")
+        endpoint = self.settings.deepseek_base_url.rstrip("/") + "/chat/completions"
+        payload = {
+            "model": self.settings.deepseek_model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are SciScope, an evidence-grounded scientific literature "
+                        "analysis assistant. Answer concisely in Chinese when the user "
+                        "question is Chinese, otherwise use the user's language."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+            "max_tokens": 800,
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.settings.deepseek_api_key}",
+        }
+        request = urllib.request.Request(
+            endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"DeepSeek request failed: {exc}") from exc
+
+        return _extract_openai_message(data)
 
 
 class LocalOpenAIProvider:
