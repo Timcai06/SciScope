@@ -1612,6 +1612,15 @@ func TestBackendModeLabelsHostedAndLocal(t *testing.T) {
 	}
 }
 
+func TestBackendDoctorTimeoutKeepsLocalFastAndHostedPatient(t *testing.T) {
+	if got := backendDoctorTimeout("http://127.0.0.1:8000"); got != 700*time.Millisecond {
+		t.Fatalf("local backend timeout = %s", got)
+	}
+	if got := backendDoctorTimeout("https://api.example.test"); got < 5*time.Second {
+		t.Fatalf("hosted backend timeout too short: %s", got)
+	}
+}
+
 func TestHelpStringDocumentsHostedBackendDefault(t *testing.T) {
 	help := helpString()
 

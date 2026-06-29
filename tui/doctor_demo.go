@@ -32,6 +32,13 @@ func httpReachable(url string, timeout time.Duration) bool {
 	return resp.StatusCode >= 200 && resp.StatusCode < 500
 }
 
+func backendDoctorTimeout(baseURL string) time.Duration {
+	if backendMode(baseURL) == "local" {
+		return 700 * time.Millisecond
+	}
+	return 8 * time.Second
+}
+
 func backendDoctorWarning(baseURL string) doctorCheck {
 	if backendMode(baseURL) == "local" {
 		return doctorCheck{"Backend", "warn", "not reachable; run make backend"}
@@ -41,10 +48,11 @@ func backendDoctorWarning(baseURL string) doctorCheck {
 
 func collectDoctorChecks() []doctorCheck {
 	checks := []doctorCheck{}
-	if httpReachable(healthURL(), 700*time.Millisecond) {
+	baseURL := backendURL()
+	if httpReachable(healthURL(), backendDoctorTimeout(baseURL)) {
 		checks = append(checks, doctorCheck{"Backend", "ok", healthURL()})
 	} else {
-		checks = append(checks, backendDoctorWarning(backendURL()))
+		checks = append(checks, backendDoctorWarning(baseURL))
 	}
 	if httpReachable(llmURL(), 700*time.Millisecond) {
 		checks = append(checks, doctorCheck{"LLM", "ok", llmURL()})
