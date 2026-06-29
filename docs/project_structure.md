@@ -55,7 +55,7 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 │   ├── analysis/
 │   └── sample/
 ├── data_pipeline/            legacy sample pipeline / 兼容层
-├── docs/                     交接、竞赛资料、runbook、发布说明
+├── docs/                     文档总入口、交接、竞赛资料、runbook、发布说明
 ├── evaluation/               检索/推荐/趋势评估
 ├── infra/                    PostgreSQL SQL 与部署相关配置
 ├── models/                   模型文件（常见 Git 忽略）
@@ -106,7 +106,7 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 - `make tui-build`：产出 `tui/sciscope-tui`（仅客户端二进制）。
 - Homebrew 只覆盖 Go 客户端，不包含 Python 后端、数据库和大模型制品。
 - 数据治理与 Agent 工具边界见 `docs/data-agent-boundary.md`。
-- `plan/archive/` 仅作历史决策记录；当前可执行口径以 `README.md`、本文件、`docs/runbook.md`、`docs/data-agent-boundary.md` 与 `Makefile` 为准。
+- 当前可执行口径以 `README.md`、`docs/README.md`、本文件、`docs/runbook.md`、`docs/data-agent-boundary.md` 与 `Makefile` 为准。
 
 ## 生成产物与 Git 约定
 
@@ -122,5 +122,6 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 ## 常见入口文件
 
 - `docs/project_structure.md`：结构与责任边界
+- `docs/README.md`：文档分类入口
 - `docs/runbook.md`：启动、验证、故障处理
 - `README.md`：项目入口与常用命令

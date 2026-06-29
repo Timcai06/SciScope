@@ -43,6 +43,7 @@ layer; corpus-specific intelligence lives in the local models and indices.
 
 ## History
 
-Earlier planning documents (foundation slice through the data-layer sprints)
-are preserved in [archive/](archive/). They are historical and superseded by
-the two documents above.
+Earlier planning archives were removed from the active repository to keep this
+folder focused on current execution state. Superseded implementation traces
+should not be used as delivery truth unless they are refreshed into the current
+documents above.

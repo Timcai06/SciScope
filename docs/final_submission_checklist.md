@@ -45,9 +45,9 @@ the work focused on presentation, consistency, and judging clarity.
 
 ## Package Contents Beyond The Two Reports
 
-Use a whitelist package, not a whole-repository archive. Historical planning
-docs can mention earlier frontend ideas and should not be treated as submission
-truth unless refreshed.
+Use a whitelist package, not a whole-repository dump. Removed historical plan
+archives and agent execution traces should not be reconstructed for submission
+unless they are deliberately refreshed into current docs.
 
 - [ ] Judge index and run instructions:
   `交付说明.md`, `README.md`, `docs/runbook.md`,
@@ -76,8 +76,9 @@ truth unless refreshed.
 - [ ] Build the whitelist package with `make submission-package`; inspect
   `output/submission/SciScope_submission_manifest.csv` before upload.
 - [ ] Exclude from the formal submission package unless deliberately refreshed:
-  `plan/archive/`, `docs/superpowers/`, `docs/2026-06-16-sciscope-product-architecture.md`,
-  and `output/pdf/sciscope_design/`.
+  `docs/2026-06-16-sciscope-product-architecture.md` and
+  `output/pdf/sciscope_design/`. The old `plan/archive/` and
+  `docs/superpowers/` areas have already been removed from the active repo.
 
 ## Report Polish Gates
 

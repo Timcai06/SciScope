@@ -26,6 +26,7 @@ INCLUDES = [
     Include("README.md"),
     Include("交付说明.md"),
     Include("Makefile"),
+    Include("docs/README.md"),
     Include("docs/runbook.md"),
     Include("docs/final_submission_checklist.md"),
     Include("docs/submission_manifest.md"),

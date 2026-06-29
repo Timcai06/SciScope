@@ -13,8 +13,8 @@ data, retrieval, evaluation, and report generation.
 - Go TUI (`tui/`) 是终端客户端，不承载推理，只消费后端的 SSE 事件。
 - Web 前端已从当前项目路径移除；主交互端为 Go TUI 与 FastAPI API。
 
-仓库启动面向 Makefile，以下信息优先于旧文档口径。历史设计记录保留在
-`docs/superpowers/` 和 `plan/` 中；日常操作以本 README、`tui/README.md`、
+仓库启动面向 Makefile，以下信息优先于旧文档口径。文档总入口见
+[`docs/README.md`](docs/README.md)；日常操作以本 README、`tui/README.md`、
 `docs/deploy-hosted-backend.md` 和 `docs/runbook.md` 为准。
 
 ## 用户安装
