@@ -9,16 +9,36 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from backend.app.agent.events import event_parts
-from backend.app.agent.runtime import run_agent, stream_agent
 from backend.app.core.budget import enforce_agent_budget
 from backend.app.core.config import get_settings
 from backend.app.models.schemas import AgentRequest
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
+
+
+def _stream_agent(*args, **kwargs):
+    from backend.app.agent.runtime import stream_agent
+
+    return stream_agent(*args, **kwargs)
+
+
+def _run_agent(*args, **kwargs):
+    from backend.app.agent.runtime import run_agent
+
+    return run_agent(*args, **kwargs)
+
+
+def _budget_violation(request: AgentRequest):
+    settings = get_settings()
+    return enforce_agent_budget(
+        request,
+        max_question_chars=settings.agent_max_question_chars,
+        max_history_turns=settings.agent_max_history_turns,
+    )
 
 
 @router.post("/stream")
@@ -36,12 +56,7 @@ def agent_stream(request: AgentRequest) -> StreamingResponse:
     Request contract:
     - Body is ``AgentRequest`` with required ``question`` and optional ``history``.
     """
-    settings = get_settings()
-    violation = enforce_agent_budget(
-        request,
-        max_question_chars=settings.agent_max_question_chars,
-        max_history_turns=settings.agent_max_history_turns,
-    )
+    violation = _budget_violation(request)
     if violation is not None:
         def budget_error():
             frame = {
@@ -62,7 +77,12 @@ def agent_stream(request: AgentRequest) -> StreamingResponse:
 
     def events():
         try:
-            for event in stream_agent(request.question, history=history, session_id=request.session_id, retry=request.retry):
+            for event in _stream_agent(
+                request.question,
+                history=history,
+                session_id=request.session_id,
+                retry=request.retry,
+            ):
                 kind, payload, meta = event_parts(event)
                 frame = {"type": kind, "payload": payload}
                 if meta:
@@ -86,5 +106,12 @@ def agent(request: AgentRequest) -> dict:
     This shares the same request schema as ``/api/agent/stream`` but returns one
     aggregate payload rather than incremental SSE frames.
     """
+    violation = _budget_violation(request)
+    if violation is not None:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": violation.code, "message": violation.message},
+        )
+
     history = [{"role": t.role, "content": t.content} for t in request.history]
-    return run_agent(request.question, history=history, session_id=request.session_id, retry=request.retry)
+    return _run_agent(request.question, history=history, session_id=request.session_id, retry=request.retry)

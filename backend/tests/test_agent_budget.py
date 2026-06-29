@@ -59,7 +59,7 @@ def test_agent_stream_returns_budget_error(monkeypatch):
         calls.append((args, kwargs))
         raise AssertionError("agent runtime should not be called for budget errors")
 
-    monkeypatch.setattr(routes_agent, "stream_agent", fail_stream_agent)
+    monkeypatch.setattr(routes_agent, "_stream_agent", fail_stream_agent)
 
     with TestClient(create_app()) as client:
         response = client.post("/api/agent/stream", json={"question": "too long"})
@@ -69,4 +69,28 @@ def test_agent_stream_returns_budget_error(monkeypatch):
     assert '"type": "error"' in body
     assert "question_too_long" in body
     assert "data: [DONE]" in body
+    assert calls == []
+
+
+def test_agent_returns_budget_http_error(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_AGENT_MAX_QUESTION_CHARS", "5")
+
+    from fastapi.testclient import TestClient
+
+    from backend.app.api import routes_agent
+    from backend.app.main import create_app
+
+    calls = []
+
+    def fail_run_agent(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError("agent runtime should not be called for budget errors")
+
+    monkeypatch.setattr(routes_agent, "_run_agent", fail_run_agent)
+
+    with TestClient(create_app(), raise_server_exceptions=False) as client:
+        response = client.post("/api/agent", json={"question": "too long"})
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "question_too_long"
     assert calls == []
