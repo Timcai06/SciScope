@@ -402,11 +402,12 @@ backend-image:
 	docker build -f Dockerfile.backend -t $(HOSTED_BACKEND_IMAGE) .
 
 backend-container-smoke: backend-image
-	docker run --rm -p $(HOSTED_BACKEND_PORT):8000 --env-file configs/hosted-backend.env.example $(HOSTED_BACKEND_IMAGE) python -c "from backend.app.main import create_app; print(create_app().title)"
+	docker run --rm -e SCISCOPE_ENV=local -e SCISCOPE_USE_MOCK_LLM=true -e SCISCOPE_DB_DSN= $(HOSTED_BACKEND_IMAGE) python -c "from backend.app.main import create_app; print(create_app().title)"
 
 hosted-smoke:
-	curl -fsS $(SCISCOPE_HOSTED_BACKEND_URL)/healthz
-	curl -fsS $(SCISCOPE_HOSTED_BACKEND_URL)/readyz
+	test -n "$(SCISCOPE_HOSTED_BACKEND_URL)" || { echo "SCISCOPE_HOSTED_BACKEND_URL is required for hosted-smoke" >&2; exit 1; }
+	curl -fsS "$(SCISCOPE_HOSTED_BACKEND_URL)/healthz"
+	curl -fsS "$(SCISCOPE_HOSTED_BACKEND_URL)/readyz"
 
 mcp:
 	$(PYTHON) -m backend.app.mcp_server
