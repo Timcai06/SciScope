@@ -32,6 +32,7 @@ class Settings:
     agent_timeout_seconds: int
     agent_max_question_chars: int
     log_prompts: bool
+    trust_proxy_headers: bool
 
 
 def _parse_bool(value: str | None, default: bool, name: str = "SCISCOPE_USE_MOCK_LLM") -> bool:
@@ -133,5 +134,10 @@ def get_settings() -> Settings:
             os.getenv("SCISCOPE_LOG_PROMPTS"),
             default=False,
             name="SCISCOPE_LOG_PROMPTS",
+        ),
+        trust_proxy_headers=_parse_bool(
+            os.getenv("SCISCOPE_TRUST_PROXY_HEADERS"),
+            default=False,
+            name="SCISCOPE_TRUST_PROXY_HEADERS",
         ),
     )

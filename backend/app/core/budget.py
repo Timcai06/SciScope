@@ -13,6 +13,16 @@ class BudgetViolation:
 
 
 _RATE_LIMIT_BUCKETS: dict[str, tuple[int, int]] = {}
+_MAX_RATE_LIMIT_BUCKETS = 4096
+
+
+def _prune_rate_limit_buckets(current_window: int) -> None:
+    expired = [key for key, (window, _count) in _RATE_LIMIT_BUCKETS.items() if window != current_window]
+    for key in expired:
+        _RATE_LIMIT_BUCKETS.pop(key, None)
+    while len(_RATE_LIMIT_BUCKETS) > _MAX_RATE_LIMIT_BUCKETS:
+        oldest = next(iter(_RATE_LIMIT_BUCKETS))
+        _RATE_LIMIT_BUCKETS.pop(oldest, None)
 
 
 def enforce_anonymous_rate_limit(
@@ -24,12 +34,14 @@ def enforce_anonymous_rate_limit(
     """In-process anonymous budget guard for the hosted API edge."""
     current = time.time() if now is None else now
     window = int(current // 60)
+    _prune_rate_limit_buckets(window)
     bucket_key = key or "anonymous"
     bucket_window, count = _RATE_LIMIT_BUCKETS.get(bucket_key, (window, 0))
     if bucket_window != window:
         bucket_window, count = window, 0
     count += 1
     _RATE_LIMIT_BUCKETS[bucket_key] = (bucket_window, count)
+    _prune_rate_limit_buckets(window)
     if count > requests_per_minute:
         return BudgetViolation(
             "rate_limited",

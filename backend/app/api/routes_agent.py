@@ -45,8 +45,9 @@ def _budget_violation(request: AgentRequest):
 
 
 def _client_rate_key(request: Request) -> str:
+    settings = get_settings()
     forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
-    if forwarded:
+    if settings.trust_proxy_headers and forwarded:
         return forwarded
     if request.client and request.client.host:
         return request.client.host

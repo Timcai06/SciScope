@@ -131,6 +131,51 @@ def test_agent_stream_enforces_anonymous_rate_limit(monkeypatch):
     assert "data: [DONE]" in second.text
 
 
+def test_agent_stream_rate_limit_does_not_trust_forwarded_for_by_default(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_ANON_REQUESTS_PER_MINUTE", "1")
+    monkeypatch.delenv("SCISCOPE_TRUST_PROXY_HEADERS", raising=False)
+
+    from fastapi.testclient import TestClient
+
+    from backend.app.api import routes_agent
+    from backend.app.main import create_app
+
+    def ok_stream_agent(*args, **kwargs):
+        yield ("final", "ok")
+
+    monkeypatch.setattr(routes_agent, "_stream_agent", ok_stream_agent)
+
+    with TestClient(create_app(), raise_server_exceptions=False) as client:
+        first = client.post(
+            "/api/agent/stream",
+            json={"question": "hello"},
+            headers={"x-forwarded-for": "203.0.113.10"},
+        )
+        second = client.post(
+            "/api/agent/stream",
+            json={"question": "hello again"},
+            headers={"x-forwarded-for": "203.0.113.11"},
+        )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert "rate_limited" in second.text
+
+
+def test_rate_limiter_prunes_expired_buckets():
+    from backend.app.core import budget
+
+    budget._RATE_LIMIT_BUCKETS.clear()
+
+    assert budget.enforce_anonymous_rate_limit("old", requests_per_minute=10, now=0) is None
+    assert "old" in budget._RATE_LIMIT_BUCKETS
+
+    assert budget.enforce_anonymous_rate_limit("new", requests_per_minute=10, now=120) is None
+
+    assert "old" not in budget._RATE_LIMIT_BUCKETS
+    assert "new" in budget._RATE_LIMIT_BUCKETS
+
+
 def test_agent_returns_budget_http_error(monkeypatch):
     monkeypatch.setenv("SCISCOPE_AGENT_MAX_QUESTION_CHARS", "5")
 
