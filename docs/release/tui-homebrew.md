@@ -32,8 +32,8 @@ Homebrew artifact.
 - Local CI-equivalent verification:
 
 ```bash
-make tui-build TUI_VERSION=0.2.0
-./tui/sciscope-tui --version   # expect: sciscope-tui 0.2.0
+make tui-build TUI_VERSION=0.2.1
+./tui/sciscope-tui --version   # expect: sciscope-tui 0.2.1
 ```
 
 ## One-time setup
@@ -60,7 +60,7 @@ make tui-build TUI_VERSION=0.2.0
 From repo root:
 
 ```bash
-make tui-build TUI_VERSION=0.2.0
+make tui-build TUI_VERSION=0.2.1
 ./tui/sciscope-tui --help
 make tui-demo
 make tui-doctor
@@ -81,8 +81,8 @@ cd ..
 ## Release operations
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
 This triggers `.github/workflows/release.yml`.

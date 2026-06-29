@@ -3,7 +3,8 @@
 // is purely a presentation client, styled after Claude Code's visual grammar
 // (⏺ action bullets, ⎿ tool-result connectors, an animated verb spinner).
 //
-// Run:  make tui        (requires `make backend` on :8000 and `make llm` on :8001)
+// Run:  sciscope-tui    (release binary connects to the hosted backend by default)
+// Dev:  SCISCOPE_BACKEND=http://127.0.0.1:8000 make tui
 package main
 
 import (

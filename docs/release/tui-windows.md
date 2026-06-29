@@ -46,8 +46,8 @@ cd ..
 For a real release:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
 After the release workflow completes, verify the Windows assets and checksums:

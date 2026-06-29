@@ -46,7 +46,7 @@ Keep `packaging/scoop/bucket/sciscope-tui.json` in this repository aligned with
 
 ## Release update flow
 
-1. Tag and publish SciScope, for example `v0.2.0`.
+1. Tag and publish SciScope, for example `v0.2.1`.
 2. Confirm the GitHub Release contains:
    - `sciscope-tui_windows_amd64.zip`
    - `sciscope-tui_windows_arm64.zip`

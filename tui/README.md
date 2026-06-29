@@ -105,9 +105,9 @@ sciscope-tui export --last
 
 ## 7. 快速验收清单
 
-- `make tui-build TUI_VERSION=0.2.0` → `tui/sciscope-tui --version`
+- `make tui-build TUI_VERSION=0.2.1` → `tui/sciscope-tui --version`
 - `make tui-doctor`，确认发布前环境体检输出可读。
-- `make tui` 连接真实后端，执行一条测试问题，观察 plan/tool/result/final 流。
+- `make tui` 连接 hosted 或本地后端，执行一条测试问题，观察 plan/tool/result/final 流。
 - `make tui-demo`，确认完整离线演示可完整播完。
 - `make tui-export-last`，确认最近会话可从命令行导出。
 - `/sessions` 能列出最近会话，`/resume` 和 `/sessions` 可在 slash 启动器中进入二级会话菜单，`/tools` 可进入工具详情菜单，`/doctor` 可进入检查项菜单，`/clear` 与 `/quit` 会先进入确认菜单，`/export` 可用。

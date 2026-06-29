@@ -314,9 +314,8 @@ full-rebuild:
 	-$(MAKE) data-report-pdf
 	@echo "[full-rebuild] complete"
 
-# Terminal agent client (Go / Bubble Tea / Charm) — the LLM autonomously calls
-# search/trends/recommend/graph/verify tools, streamed over SSE.
-# Requires the backend (`make backend` on :8000) and `make llm` (:8001) running.
+# Terminal agent client (Go / Bubble Tea / Charm) — release binaries use the
+# hosted backend by default; developers can override with SCISCOPE_BACKEND.
 tui:
 	cd tui && GOCACHE=$(GO_BUILD_CACHE) go run .
 
@@ -334,7 +333,7 @@ tui-export-last:
 
 # Build the Go client to a single static binary (tui/sciscope-tui).
 tui-build:
-	cd tui && GOCACHE=$(GO_BUILD_CACHE) go build -ldflags "-X main.version=$(TUI_VERSION)" -o sciscope-tui .
+	cd tui && GOCACHE=$(GO_BUILD_CACHE) go build -ldflags "-X main.version=$(TUI_VERSION) -X main.defaultHostedBackendURL=$(SCISCOPE_HOSTED_BACKEND_URL)" -o sciscope-tui .
 
 # Rebuild only the topic-model assets at finer granularity (default 40 topics).
 topic-model:
