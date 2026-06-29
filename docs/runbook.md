@@ -192,3 +192,15 @@ make backend
 - 运行 `make smoke`
 - 跑一次 `curl` 提问并确认返回有 `answer` / `evidence`
 - 运行 `make tui` 验证 SSE 可达（按需）
+
+## Hosted v0.2.1 Deployment Decisions
+
+Before cutting v0.2.1, record the concrete hosted API base URL, hosting provider,
+managed PostgreSQL/pgvector provider, and anonymous quota values. Use
+`configs/hosted-backend.env.example` as the environment contract.
+
+The packaged TUI must default to the hosted HTTPS API. Local development remains:
+
+```bash
+SCISCOPE_BACKEND=http://127.0.0.1:8000 sciscope-tui
+```
