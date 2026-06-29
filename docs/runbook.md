@@ -199,6 +199,11 @@ Before cutting v0.2.1, record the concrete hosted API base URL, hosting provider
 managed PostgreSQL/pgvector provider, and anonymous quota values. Use
 `configs/hosted-backend.env.example` as the environment contract.
 
+The concrete deployment path lives in `docs/deploy-hosted-backend.md`. The
+checked-in Render Blueprint (`render.yaml`) provisions the Docker web service and
+managed Postgres; the release tag must wait until `make hosted-release-preflight`
+passes against the real hosted URL.
+
 Earlier localhost/Makefile steps in this runbook are repo-local developer workflows;
 packaged Homebrew/Scoop releases must use the hosted backend by default.
 

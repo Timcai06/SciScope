@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: sciscope-backend
+    runtime: docker
+    plan: standard
+    dockerfilePath: ./Dockerfile.backend
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeployTrigger: off
+    envVars:
+      - key: SCISCOPE_APP_NAME
+        value: SciScope
+      - key: SCISCOPE_ENV
+        value: production
+      - key: SCISCOPE_USE_MOCK_LLM
+        value: "false"
+      - key: SCISCOPE_LLM_PROVIDER
+        value: deepseek
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_BASE_URL
+        value: https://api.deepseek.com
+      - key: DEEPSEEK_MODEL
+        value: deepseek-chat
+      - key: SCISCOPE_DB_DSN
+        fromDatabase:
+          name: sciscope-postgres
+          property: connectionString
+      - key: SCISCOPE_EMBEDDING_MODEL
+        value: intfloat/multilingual-e5-base
+      - key: SCISCOPE_ANON_REQUESTS_PER_MINUTE
+        value: "60"
+      - key: SCISCOPE_AGENT_MAX_HISTORY_TURNS
+        value: "12"
+      - key: SCISCOPE_AGENT_MAX_TOOL_CALLS
+        value: "8"
+      - key: SCISCOPE_AGENT_TIMEOUT_SECONDS
+        value: "75"
+      - key: SCISCOPE_AGENT_MAX_QUESTION_CHARS
+        value: "2000"
+      - key: SCISCOPE_LOG_PROMPTS
+        value: "false"
+      - key: SCISCOPE_TRUST_PROXY_HEADERS
+        value: "false"
+
+databases:
+  - name: sciscope-postgres
+    databaseName: sciscope
+    user: sciscope_app
+    plan: basic-1gb
+    postgresMajorVersion: "16"

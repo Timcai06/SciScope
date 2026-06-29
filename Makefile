@@ -8,6 +8,7 @@ BACKEND_HOST ?= 127.0.0.1
 BACKEND_PORT ?= 8000
 HOSTED_BACKEND_IMAGE ?= sciscope-backend:local
 HOSTED_BACKEND_PORT ?= 8000
+HOSTED_DB_DSN ?=
 DATA_PATH ?= data/sample/papers.sample.json
 HARVEST_SOURCE ?= openalex
 HARVEST_LIMIT ?= 500
@@ -103,7 +104,7 @@ unexport VLLM_PORT
 unexport VLLM_VENV
 
 .PHONY: help install install-backend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf submission-package report backend mcp dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend smoke agent-smoke clean
-.PHONY: backend-image backend-container-smoke hosted-smoke
+.PHONY: backend-image backend-container-smoke hosted-db-schema hosted-db-load hosted-db-embeddings hosted-db-refresh hosted-smoke hosted-release-preflight
 
 help:
 	@echo "SciScope local commands"
@@ -407,10 +408,31 @@ backend-container-smoke: backend-image
 	curl -fsS "http://127.0.0.1:$(HOSTED_BACKEND_PORT)/healthz"; \
 	curl -fsS "http://127.0.0.1:$(HOSTED_BACKEND_PORT)/readyz"
 
+hosted-db-schema:
+	test -n "$(HOSTED_DB_DSN)" || { echo "HOSTED_DB_DSN is required for hosted-db-schema" >&2; exit 1; }
+	psql "$(HOSTED_DB_DSN)" -f infra/postgres/schema.sql
+	psql "$(HOSTED_DB_DSN)" -f infra/postgres/pgvector.sql
+
+hosted-db-load: rag-chunks hosted-db-schema
+	test -n "$(HOSTED_DB_DSN)" || { echo "HOSTED_DB_DSN is required for hosted-db-load" >&2; exit 1; }
+	$(PYTHON) -m src.infra.cli load-postgres --dsn "$(HOSTED_DB_DSN)" --papers $(PROCESSED_CORPUS_PATH) --chunks $(RAG_CHUNKS_PATH)
+
+hosted-db-embeddings:
+	test -n "$(HOSTED_DB_DSN)" || { echo "HOSTED_DB_DSN is required for hosted-db-embeddings" >&2; exit 1; }
+	$(PYTHON) -m src.models.build_embeddings --dsn "$(HOSTED_DB_DSN)" --chunks $(RAG_CHUNKS_PATH) --batch-size $(EMBED_BATCH_SIZE)
+	$(PYTHON) -m src.models.recommend --dsn "$(HOSTED_DB_DSN)" --model "$(SCISCOPE_EMBEDDING_MODEL)"
+
+hosted-db-refresh: hosted-db-load hosted-db-embeddings
+
 hosted-smoke:
 	test -n "$(SCISCOPE_HOSTED_BACKEND_URL)" || { echo "SCISCOPE_HOSTED_BACKEND_URL is required for hosted-smoke" >&2; exit 1; }
 	curl -fsS "$(SCISCOPE_HOSTED_BACKEND_URL)/healthz"
 	curl -fsS "$(SCISCOPE_HOSTED_BACKEND_URL)/readyz"
+
+hosted-release-preflight: hosted-smoke
+	curl -fsS "$(SCISCOPE_HOSTED_BACKEND_URL)/api/ingest/status"
+	SCISCOPE_HOSTED_BACKEND="$(SCISCOPE_HOSTED_BACKEND_URL)" $(MAKE) tui-doctor
+	cd tui && SCISCOPE_HOSTED_BACKEND_URL="$(SCISCOPE_HOSTED_BACKEND_URL)" goreleaser check
 
 mcp:
 	$(PYTHON) -m backend.app.mcp_server
