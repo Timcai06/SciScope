@@ -43,3 +43,30 @@ def test_agent_budget_accepts_normal_request():
     violation = enforce_agent_budget(request, max_question_chars=100, max_history_turns=4)
 
     assert violation is None
+
+
+def test_agent_stream_returns_budget_error(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_AGENT_MAX_QUESTION_CHARS", "5")
+
+    from fastapi.testclient import TestClient
+
+    from backend.app.api import routes_agent
+    from backend.app.main import create_app
+
+    calls = []
+
+    def fail_stream_agent(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError("agent runtime should not be called for budget errors")
+
+    monkeypatch.setattr(routes_agent, "stream_agent", fail_stream_agent)
+
+    with TestClient(create_app()) as client:
+        response = client.post("/api/agent/stream", json={"question": "too long"})
+
+    assert response.status_code == 200
+    body = response.text
+    assert '"type": "error"' in body
+    assert "question_too_long" in body
+    assert "data: [DONE]" in body
+    assert calls == []

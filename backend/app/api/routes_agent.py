@@ -14,6 +14,8 @@ from fastapi.responses import StreamingResponse
 
 from backend.app.agent.events import event_parts
 from backend.app.agent.runtime import run_agent, stream_agent
+from backend.app.core.budget import enforce_agent_budget
+from backend.app.core.config import get_settings
 from backend.app.models.schemas import AgentRequest
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
@@ -34,6 +36,28 @@ def agent_stream(request: AgentRequest) -> StreamingResponse:
     Request contract:
     - Body is ``AgentRequest`` with required ``question`` and optional ``history``.
     """
+    settings = get_settings()
+    violation = enforce_agent_budget(
+        request,
+        max_question_chars=settings.agent_max_question_chars,
+        max_history_turns=settings.agent_max_history_turns,
+    )
+    if violation is not None:
+        def budget_error():
+            frame = {
+                "type": "error",
+                "payload": violation.message,
+                "meta": {"code": violation.code},
+            }
+            yield f"data: {json.dumps(frame, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(
+            budget_error(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     history = [{"role": t.role, "content": t.content} for t in request.history]
 
     def events():
