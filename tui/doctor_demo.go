@@ -37,7 +37,11 @@ func collectDoctorChecks() []doctorCheck {
 	if httpReachable(healthURL(), 700*time.Millisecond) {
 		checks = append(checks, doctorCheck{"Backend", "ok", healthURL()})
 	} else {
-		checks = append(checks, doctorCheck{"Backend", "warn", "not reachable; run make backend"})
+		if backendMode(backendURL()) == "local" {
+			checks = append(checks, doctorCheck{"Backend", "warn", "not reachable; run make backend"})
+		} else {
+			checks = append(checks, doctorCheck{"Backend", "warn", "hosted service unavailable; try /demo or retry later"})
+		}
 	}
 	if httpReachable(llmURL(), 700*time.Millisecond) {
 		checks = append(checks, doctorCheck{"LLM", "ok", llmURL()})

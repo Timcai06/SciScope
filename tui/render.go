@@ -707,10 +707,8 @@ func writeSessionMarkdown(dir string, events []transcriptEvent, now time.Time) (
 	return path, nil
 }
 
-func recoveryAction(s string) recoveryHint {
-	low := strings.ToLower(s)
-	switch {
-	case strings.Contains(low, "connection refused") || strings.Contains(low, "无法连接后端"):
+func recoveryActionForBackend(baseURL, errText string) recoveryHint {
+	if backendMode(baseURL) == "local" {
 		return recoveryHint{
 			Title:     "后端未连接",
 			Command:   "make backend",
@@ -719,6 +717,22 @@ func recoveryAction(s string) recoveryHint {
 			Inspect:   "/doctor",
 			Retryable: true,
 		}
+	}
+	return recoveryHint{
+		Title:     "托管服务暂不可用",
+		Command:   "/demo",
+		Message:   "托管后端暂时不可达。可先输入 /demo 查看完整演示流, 或稍后 /retry。",
+		Severity:  "blocked",
+		Inspect:   "/doctor",
+		Retryable: true,
+	}
+}
+
+func recoveryAction(s string) recoveryHint {
+	low := strings.ToLower(s)
+	switch {
+	case strings.Contains(low, "connection refused") || strings.Contains(low, "无法连接后端"):
+		return recoveryActionForBackend(backendURL(), s)
 	case strings.Contains(low, "llm") || strings.Contains(low, "vllm") || strings.Contains(low, "8001"):
 		return recoveryHint{
 			Title:     "LLM 服务不可用",

@@ -566,6 +566,25 @@ func TestRecoveryActionClassifiesBackendError(t *testing.T) {
 	}
 }
 
+func TestHostedBackendRecoveryDoesNotTellUserToRunMakeBackend(t *testing.T) {
+	action := recoveryActionForBackend("https://api.example.test", "connection refused")
+
+	if strings.Contains(action.Message, "make backend") || strings.Contains(action.Command, "make backend") {
+		t.Fatalf("hosted recovery should not tell normal users to run make backend: %#v", action)
+	}
+	if !strings.Contains(action.Message, "/demo") {
+		t.Fatalf("hosted recovery should offer demo fallback: %#v", action)
+	}
+}
+
+func TestLocalBackendRecoveryStillMentionsMakeBackend(t *testing.T) {
+	action := recoveryActionForBackend("http://127.0.0.1:8000", "connection refused")
+
+	if action.Command != "make backend" {
+		t.Fatalf("local recovery should keep developer command, got %#v", action)
+	}
+}
+
 func TestRetrySlashReplaysLastQuestion(t *testing.T) {
 	m := initialModel()
 	m.ready = true
