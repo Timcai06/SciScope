@@ -190,3 +190,9 @@ make tui-doctor # 检查后端/LLM/会话目录/图谱资产
 - Web 前端源码已移除；若未来重启 Web 界面，应作为新范围重新设计和接入。
 - `data_pipeline/` 保留为 legacy sample pipeline 与旧测试兼容层；核心数据治理以 `src/harvest`、`src/analysis`、`src/infra` 为准。
 - DeepSeek 是 hosted/demo 的默认云端模型；确定性本地验证仍可使用 mock 模式，本地 LLM 通路以 `make dev-vllm` / `make llm` 为主。
+
+## 许可证与贡献
+
+SciScope 以 Apache License 2.0 开源。欢迎围绕后端、数据/RAG 管线、Go TUI、
+打包发布、文档和测试提交 issue 或 pull request；贡献入口见
+[`CONTRIBUTING.md`](CONTRIBUTING.md)。

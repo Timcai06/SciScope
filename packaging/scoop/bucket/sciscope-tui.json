@@ -2,7 +2,7 @@
   "version": "0.2.1",
   "description": "SciScope research-agent terminal client.",
   "homepage": "https://github.com/Timcai06/SciScope",
-  "license": "Proprietary",
+  "license": "Apache-2.0",
   "notes": [
     "Run sciscope-tui to connect to the hosted SciScope backend.",
     "Run sciscope-tui --demo for the offline golden demo.",

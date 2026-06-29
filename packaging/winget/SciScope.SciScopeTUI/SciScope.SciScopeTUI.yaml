@@ -8,7 +8,7 @@ PublisherSupportUrl: https://github.com/Timcai06/SciScope/issues
 Author: SciScope contributors
 PackageName: SciScope TUI
 PackageUrl: https://github.com/Timcai06/SciScope
-License: Proprietary
+License: Apache-2.0
 ShortDescription: Terminal client for the SciScope research agent.
 Description: SciScope TUI is a terminal client for a grounded research agent. It can run an offline demo or connect to a SciScope backend through SCISCOPE_BACKEND.
 Moniker: sciscope-tui

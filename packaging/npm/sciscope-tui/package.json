@@ -11,7 +11,7 @@
   "bugs": {
     "url": "https://github.com/Timcai06/SciScope/issues"
   },
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "bin": {
     "sciscope-tui": "bin/sciscope-tui.js"
   },
