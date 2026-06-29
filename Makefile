@@ -6,6 +6,8 @@ PYTHON ?= $(PROJECT_PYTHON)
 TEST_PYTHON ?= $(PROJECT_TEST_PYTHON)
 BACKEND_HOST ?= 127.0.0.1
 BACKEND_PORT ?= 8000
+HOSTED_BACKEND_IMAGE ?= sciscope-backend:local
+HOSTED_BACKEND_PORT ?= 8000
 DATA_PATH ?= data/sample/papers.sample.json
 HARVEST_SOURCE ?= openalex
 HARVEST_LIMIT ?= 500
@@ -101,6 +103,7 @@ unexport VLLM_PORT
 unexport VLLM_VENV
 
 .PHONY: help install install-backend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf submission-package report backend mcp dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend smoke agent-smoke clean
+.PHONY: backend-image backend-container-smoke hosted-smoke
 
 help:
 	@echo "SciScope local commands"
@@ -394,6 +397,16 @@ report: analysis-assets processed-corpus report-figures data-report-pdf
 
 backend:
 	$(PYTHON) -m uvicorn backend.app.main:app --reload --host $(BACKEND_HOST) --port $(BACKEND_PORT)
+
+backend-image:
+	docker build -f Dockerfile.backend -t $(HOSTED_BACKEND_IMAGE) .
+
+backend-container-smoke: backend-image
+	docker run --rm -p $(HOSTED_BACKEND_PORT):8000 --env-file configs/hosted-backend.env.example $(HOSTED_BACKEND_IMAGE) python -c "from backend.app.main import create_app; print(create_app().title)"
+
+hosted-smoke:
+	curl -fsS $(SCISCOPE_HOSTED_BACKEND_URL)/healthz
+	curl -fsS $(SCISCOPE_HOSTED_BACKEND_URL)/readyz
 
 mcp:
 	$(PYTHON) -m backend.app.mcp_server
