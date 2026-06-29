@@ -13,7 +13,7 @@ Use Scoop when the user wants a terminal package-manager workflow:
 ```powershell
 scoop bucket add sciscope https://github.com/Timcai06/scoop-sciscope
 scoop install sciscope-tui
-sciscope-tui --demo
+sciscope-tui
 ```
 
 Use GitHub Release when Scoop is not available:
@@ -23,7 +23,7 @@ Use GitHub Release when Scoop is not available:
 # https://github.com/Timcai06/SciScope/releases
 #
 # Then unzip and run:
-.\sciscope-tui.exe --demo
+.\sciscope-tui.exe
 ```
 
 Use winget only after the Microsoft PR has been merged:
@@ -75,7 +75,16 @@ packaging/scoop/bucket/sciscope-tui.json
 The Windows package installs only `sciscope-tui.exe`. The backend and data layer
 are intentionally separate:
 
-- local development: run the SciScope backend from source
-- product deployment: point the TUI at a hosted backend with `SCISCOPE_BACKEND`
+- product deployment: run `sciscope-tui` to use the hosted backend compiled into
+  the release
+- local development: run the SciScope backend from source, then set
+  `SCISCOPE_BACKEND` to that local backend URL
 - reproducibility: use the project reports and source pipeline, not the TUI
   package, to rebuild the research artifacts
+
+Developer local backend override:
+
+```powershell
+$env:SCISCOPE_BACKEND="http://127.0.0.1:8000"
+sciscope-tui
+```

@@ -9,13 +9,19 @@ repository, so releases can move at the same pace as GitHub tags.
 ```powershell
 scoop bucket add sciscope https://github.com/Timcai06/scoop-sciscope
 scoop install sciscope-tui
-sciscope-tui --demo
+sciscope-tui
 ```
 
 Production attach:
 
 ```powershell
-$env:SCISCOPE_BACKEND="https://api.sciscope.example"
+sciscope-tui
+```
+
+## Developer local backend override
+
+```powershell
+$env:SCISCOPE_BACKEND="http://127.0.0.1:8000"
 sciscope-tui
 ```
 
@@ -72,7 +78,7 @@ On a Windows machine with Scoop:
 scoop bucket add sciscope https://github.com/Timcai06/scoop-sciscope
 scoop install sciscope-tui
 sciscope-tui --version
-sciscope-tui --demo
+sciscope-tui
 ```
 
 ## Packaging boundary

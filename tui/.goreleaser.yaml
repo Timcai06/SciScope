@@ -17,7 +17,7 @@ builds:
     goos: [darwin, linux, windows]
     goarch: [amd64, arm64]
     ldflags:
-      - -s -w -X main.version={{ .Version }}
+      - -s -w -X main.version={{ .Version }} -X main.defaultHostedBackendURL={{ .Env.SCISCOPE_HOSTED_BACKEND_URL }}
 
 archives:
   - id: default
@@ -47,11 +47,11 @@ homebrew_casks:
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/sciscope-tui"]
           end
     caveats: |
-      运行离线演示:
-        sciscope-tui --demo
-
-      连接真实后端:
-        make backend && make llm
+      直接连接托管科研智能体:
         sciscope-tui
 
-      或用 SCISCOPE_BACKEND=https://你的后端 指向远程服务。
+      离线演示:
+        sciscope-tui --demo
+
+      开发者本地后端:
+        SCISCOPE_BACKEND=http://127.0.0.1:8000 sciscope-tui
