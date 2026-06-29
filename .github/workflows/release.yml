@@ -20,6 +20,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.26"
+      - name: Verify hosted backend URL
+        run: test -n "$SCISCOPE_HOSTED_BACKEND_URL"
+        env:
+          SCISCOPE_HOSTED_BACKEND_URL: ${{ secrets.SCISCOPE_HOSTED_BACKEND_URL }}
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
@@ -29,3 +33,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # token with write access to the tap repo (set in repo secrets)
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          SCISCOPE_HOSTED_BACKEND_URL: ${{ secrets.SCISCOPE_HOSTED_BACKEND_URL }}

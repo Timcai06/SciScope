@@ -47,6 +47,7 @@ make tui-build TUI_VERSION=0.2.1
 2. Add repository secret to `Timcai06/SciScope`:
 
    - `HOMEBREW_TAP_GITHUB_TOKEN` with write access to `Timcai06/homebrew-sciscope`.
+   - `SCISCOPE_HOSTED_BACKEND_URL` with the production HTTPS API base URL.
 
 3. Ensure tooling:
 
