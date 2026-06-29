@@ -76,6 +76,7 @@ VLLM_EXTRA_ARGS ?=
 LLM_LOCAL_DIR ?= models/llm_local/Qwen2.5-7B-Instruct-4bit
 TUI_VERSION ?= dev
 GO_BUILD_CACHE ?= $(CURDIR)/.cache/go-build
+NPM_PACKAGE_DIR ?= packaging/npm/sciscope-tui
 
 # Local secrets, gitignored. Put your key in .env.local as:  DEEPSEEK_API_KEY = sk-...
 # Then `make backend` / `make dev` / `make tui` use DeepSeek by default.
@@ -103,7 +104,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf submission-package report backend mcp dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend smoke agent-smoke clean
+.PHONY: help install install-backend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build npm-package-smoke npm-package-pack npm-package-publish topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf submission-package report backend mcp dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend smoke agent-smoke clean
 .PHONY: backend-image backend-container-smoke hosted-db-schema hosted-db-load hosted-db-embeddings hosted-db-refresh hosted-smoke hosted-release-preflight
 
 help:
@@ -148,6 +149,8 @@ help:
 	@echo "  make tui-demo         Play the offline SciScope TUI golden demo flow"
 	@echo "  make tui-doctor       Check TUI backend/LLM/session readiness"
 	@echo "  make tui-export-last  Print the latest saved TUI Markdown session"
+	@echo "  make npm-package-smoke Validate the npm wrapper without downloading release assets"
+	@echo "  make npm-package-pack Dry-run the npm package tarball"
 	@echo "  make vllm-serve       Start local vLLM-Metal server on $(VLLM_BASE_URL)"
 	@echo "  make llm             Start local LLM (3B, offline) on $(VLLM_BASE_URL)"
 	@echo "  make llm-stop        Stop the local LLM"
@@ -335,6 +338,17 @@ tui-export-last:
 # Build the Go client to a single static binary (tui/sciscope-tui).
 tui-build:
 	cd tui && GOCACHE=$(GO_BUILD_CACHE) go build -ldflags "-X main.version=$(TUI_VERSION) -X main.defaultHostedBackendURL=$(SCISCOPE_HOSTED_BACKEND_URL)" -o sciscope-tui .
+
+# Validate the npm wrapper without downloading GitHub Release assets.
+npm-package-smoke:
+	cd $(NPM_PACKAGE_DIR) && npm run smoke
+
+# Dry-run the npm package tarball. A real publish still requires npm auth.
+npm-package-pack:
+	cd $(NPM_PACKAGE_DIR) && npm pack --dry-run
+
+npm-package-publish:
+	cd $(NPM_PACKAGE_DIR) && npm publish
 
 # Rebuild only the topic-model assets at finer granularity (default 40 topics).
 topic-model:

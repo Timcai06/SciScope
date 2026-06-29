@@ -36,6 +36,13 @@ scoop install sciscope-tui
 sciscope-tui
 ```
 
+Cross-platform npm:
+
+```bash
+npm install -g sciscope-tui
+sciscope-tui
+```
+
 发布版 TUI 默认连接托管后端 `https://sciscope-backend.onrender.com`。无需用户
 本机启动 Python 后端、PostgreSQL 或模型服务。离线演示可运行：
 
@@ -158,6 +165,7 @@ make tui-doctor # 检查后端/LLM/会话目录/图谱资产
 - `tui/README.md`
 - `docs/release/tui-homebrew.md`
 - `docs/release/tui-windows.md`
+- `docs/release/tui-npm.md`
 
 ## 交接时一页速查
 

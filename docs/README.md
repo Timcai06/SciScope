@@ -20,6 +20,7 @@ guess which notes are still authoritative.
   judge-facing agent transcript example.
 - [Homebrew install notes](release/tui-homebrew.md): macOS package path.
 - [Windows Scoop install notes](release/tui-windows.md): Windows package path.
+- [npm install notes](release/tui-npm.md): cross-platform developer package path.
 
 ## Development And Architecture
 

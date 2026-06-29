@@ -1,0 +1,31 @@
+{
+  "name": "sciscope-tui",
+  "version": "0.2.1",
+  "description": "Cross-platform npm installer for the SciScope research-agent terminal client.",
+  "homepage": "https://github.com/Timcai06/SciScope",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Timcai06/SciScope.git",
+    "directory": "packaging/npm/sciscope-tui"
+  },
+  "bugs": {
+    "url": "https://github.com/Timcai06/SciScope/issues"
+  },
+  "license": "UNLICENSED",
+  "bin": {
+    "sciscope-tui": "bin/sciscope-tui.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install.js",
+    "smoke": "node scripts/smoke.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "README.md",
+    "vendor/.gitkeep"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

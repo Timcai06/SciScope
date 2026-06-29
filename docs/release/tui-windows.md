@@ -5,6 +5,7 @@ Windows distribution has three channels:
 1. GitHub Release zip: immediate fallback and source of truth.
 2. Scoop bucket: preferred Windows package-manager path for fast iteration.
 3. winget: official ecosystem path, subject to Microsoft moderator review.
+4. npm: cross-platform developer path when Node.js is already available.
 
 ## Recommended user path
 
@@ -30,6 +31,13 @@ Use winget only after the Microsoft PR has been merged:
 
 ```powershell
 winget install SciScope.SciScopeTUI
+```
+
+Use npm when Node.js is already installed:
+
+```powershell
+npm install -g sciscope-tui
+sciscope-tui
 ```
 
 ## Maintainer release checklist

@@ -48,6 +48,7 @@ make tui-build TUI_VERSION=0.2.1
 
    - `HOMEBREW_TAP_GITHUB_TOKEN` with write access to `Timcai06/homebrew-sciscope`.
    - `SCISCOPE_HOSTED_BACKEND_URL` with the production HTTPS API base URL.
+   - Optional: `NPM_TOKEN` for automatic npm publishing of `sciscope-tui`.
 
 3. Ensure tooling:
 

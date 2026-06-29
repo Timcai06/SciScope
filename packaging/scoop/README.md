@@ -1,8 +1,9 @@
 # SciScope TUI Scoop Packaging
 
 Scoop is the preferred Windows package-manager path while the winget submission
-waits for Microsoft moderator review. It is controlled by our own bucket
-repository, so releases can move at the same pace as GitHub tags.
+waits for Microsoft moderator review. npm is also available as a cross-platform
+developer path when Node.js is already installed. Scoop remains useful for
+Windows users who do not want Node.js as a prerequisite.
 
 ## User install flow
 

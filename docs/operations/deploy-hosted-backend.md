@@ -87,7 +87,9 @@ git push origin v0.2.1
 
 After GoReleaser publishes assets, update `packaging/scoop/bucket/sciscope-tui.json`
 with the v0.2.1 Windows URLs and hashes, copy it to `Timcai06/scoop-sciscope`,
-and verify Homebrew/Scoop.
+and verify Homebrew/Scoop/npm. The npm package publishes automatically when the
+repository secret `NPM_TOKEN` is configured; otherwise run
+`make npm-package-pack` and publish manually from `packaging/npm/sciscope-tui`.
 
 ## Proxy Header Policy
 
