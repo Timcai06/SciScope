@@ -30,6 +30,7 @@ import (
 )
 
 var version = "dev"
+var defaultHostedBackendURL string
 
 type cliOptions struct {
 	Command    string
@@ -206,7 +207,25 @@ func backendURL() string {
 	if v := os.Getenv("SCISCOPE_BACKEND"); v != "" {
 		return v
 	}
+	return hostedBackendURL()
+}
+
+func hostedBackendURL() string {
+	if v := strings.TrimSpace(os.Getenv("SCISCOPE_HOSTED_BACKEND")); v != "" {
+		return strings.TrimRight(v, "/")
+	}
+	if strings.TrimSpace(defaultHostedBackendURL) != "" {
+		return strings.TrimRight(defaultHostedBackendURL, "/")
+	}
 	return "http://127.0.0.1:8000"
+}
+
+func backendMode(url string) string {
+	normalized := strings.ToLower(strings.TrimSpace(url))
+	if strings.Contains(normalized, "127.0.0.1") || strings.Contains(normalized, "localhost") {
+		return "local"
+	}
+	return "hosted"
 }
 
 func demoMode() bool {

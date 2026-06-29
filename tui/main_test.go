@@ -1474,6 +1474,37 @@ func TestDoctorReportRendersProductChecks(t *testing.T) {
 	}
 }
 
+func TestBackendURLDefaultsToHostedEndpoint(t *testing.T) {
+	t.Setenv("SCISCOPE_BACKEND", "")
+	t.Setenv("SCISCOPE_HOSTED_BACKEND", "https://api.example.test")
+
+	got := backendURL()
+
+	if got != "https://api.example.test" {
+		t.Fatalf("backendURL() = %q, want hosted endpoint", got)
+	}
+}
+
+func TestBackendURLLocalOverrideWins(t *testing.T) {
+	t.Setenv("SCISCOPE_BACKEND", "http://127.0.0.1:8000/")
+	t.Setenv("SCISCOPE_HOSTED_BACKEND", "https://api.example.test")
+
+	got := backendURL()
+
+	if got != "http://127.0.0.1:8000/" {
+		t.Fatalf("backendURL() = %q, want explicit local override", got)
+	}
+}
+
+func TestBackendModeLabelsHostedAndLocal(t *testing.T) {
+	if got := backendMode("https://api.example.test"); got != "hosted" {
+		t.Fatalf("backendMode(hosted) = %q", got)
+	}
+	if got := backendMode("http://127.0.0.1:8000"); got != "local" {
+		t.Fatalf("backendMode(local) = %q", got)
+	}
+}
+
 func TestDoctorUsesIngestStatusAsBackendHealthCheck(t *testing.T) {
 	t.Setenv("SCISCOPE_BACKEND", "http://127.0.0.1:8000/")
 
