@@ -1476,7 +1476,7 @@ func TestDoctorReportRendersProductChecks(t *testing.T) {
 
 func TestBackendURLDefaultsToHostedEndpoint(t *testing.T) {
 	t.Setenv("SCISCOPE_BACKEND", "")
-	t.Setenv("SCISCOPE_HOSTED_BACKEND", "https://api.example.test/")
+	t.Setenv("SCISCOPE_HOSTED_BACKEND", " https://api.example.test/ ")
 
 	got := backendURL()
 
