@@ -13,7 +13,7 @@ def request_id() -> str:
     current = REQUEST_ID.get()
     if current:
         return current
-    generated = f"req-{uuid.uuid4().hex[:12]}"
+    generated = f"req-{uuid.uuid4().hex}"
     REQUEST_ID.set(generated)
     return generated
 
@@ -23,9 +23,13 @@ def session_id() -> str:
 
 
 def bind_request_context(request: Request) -> str:
-    rid = request.headers.get("x-request-id", "").strip() or f"req-{uuid.uuid4().hex[:12]}"
+    rid = request.headers.get("x-request-id", "").strip() or f"req-{uuid.uuid4().hex}"
     REQUEST_ID.set(rid)
     sid = request.headers.get("x-sciscope-session", "").strip()
-    if sid:
-        SESSION_ID.set(sid)
+    SESSION_ID.set(sid)
     return rid
+
+
+def clear_request_context() -> None:
+    REQUEST_ID.set("")
+    SESSION_ID.set("")

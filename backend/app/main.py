@@ -6,6 +6,7 @@ runtime configuration (CORS/app metadata) from environment-driven settings.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 
 from backend.app.api.routes_health import router as health_router
 from backend.app.api.routes_agent import router as agent_router
@@ -31,12 +32,17 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.app_name)
 
-    from backend.app.core.request_context import bind_request_context
+    from backend.app.core.request_context import bind_request_context, clear_request_context
 
     @app.middleware("http")
     async def request_context_middleware(request, call_next):
         request_id = bind_request_context(request)
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:  # noqa: BLE001
+            response = PlainTextResponse("Internal Server Error", status_code=500)
+        finally:
+            clear_request_context()
         response.headers["x-request-id"] = request_id
         return response
 
@@ -46,6 +52,7 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["x-request-id"],
     )
 
     app.include_router(health_router)

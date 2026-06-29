@@ -1,6 +1,8 @@
+import re
 import sys
 from types import SimpleNamespace
 
+from fastapi import Request
 from fastapi.testclient import TestClient
 
 
@@ -8,6 +10,20 @@ def _client() -> TestClient:
     from backend.app.main import create_app
 
     return TestClient(create_app())
+
+
+def _request(headers: dict[str, str]) -> Request:
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": [
+                (name.lower().encode("latin-1"), value.encode("latin-1"))
+                for name, value in headers.items()
+            ],
+        }
+    )
 
 
 class _FakeCursor:
@@ -63,6 +79,64 @@ def test_request_id_header_is_returned(monkeypatch):
 
     assert response.status_code == 200
     assert response.headers["x-request-id"] == "req-test-1"
+
+
+def test_generated_request_id_header_uses_full_uuid_hex(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_ENV", "production")
+    client = _client()
+
+    response = client.get("/healthz")
+
+    assert response.status_code == 200
+    assert re.fullmatch(r"req-[0-9a-f]{32}", response.headers["x-request-id"])
+
+
+def test_session_context_is_cleared_when_session_header_is_absent():
+    from backend.app.core.request_context import (
+        bind_request_context,
+        clear_request_context,
+        session_id,
+    )
+
+    bind_request_context(
+        _request({"x-request-id": "req-test-1", "x-sciscope-session": " session-1 "})
+    )
+    assert session_id() == "session-1"
+
+    bind_request_context(_request({"x-request-id": "req-test-2"}))
+
+    assert session_id() == ""
+    clear_request_context()
+
+
+def test_request_id_header_is_returned_on_unhandled_error(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_ENV", "production")
+    from backend.app.main import create_app
+
+    app = create_app()
+
+    @app.get("/raise-test-error")
+    def raise_test_error():
+        raise RuntimeError("do not leak")
+
+    client = TestClient(app, raise_server_exceptions=False)
+
+    response = client.get("/raise-test-error", headers={"x-request-id": "req-error-1"})
+
+    assert response.status_code == 500
+    assert response.text == "Internal Server Error"
+    assert response.headers["x-request-id"] == "req-error-1"
+
+
+def test_cors_exposes_request_id_header(monkeypatch):
+    monkeypatch.setenv("SCISCOPE_CORS_ORIGINS", "https://example.com")
+    client = _client()
+
+    response = client.get("/healthz", headers={"Origin": "https://example.com"})
+
+    assert response.status_code == 200
+    expose_headers = response.headers["access-control-expose-headers"]
+    assert "x-request-id" in {header.strip().lower() for header in expose_headers.split(",")}
 
 
 def test_readyz_reports_missing_database(monkeypatch):
