@@ -22,6 +22,9 @@ sciscope-tui
 
 npm 包名：`sciscope-tui`
 
+Windows npm 用户如果遇到 GitHub Release 下载或解压失败，可暂时使用 Scoop；
+npm 修复版 `0.2.2` 已在源码中准备好，等待 registry 发布。
+
 详细说明：[tui-npm.md](tui-npm.md)
 
 ## Homebrew

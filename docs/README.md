@@ -8,6 +8,10 @@ guess which notes are still authoritative.
 
 - [Project README](../README.md): product positioning, install paths, and common
   Makefile commands.
+- [Contributing](../CONTRIBUTING.md): contribution workflow and verification
+  expectations.
+- [Security policy](../SECURITY.md): private vulnerability reporting guidance.
+- [Code of conduct](../CODE_OF_CONDUCT.md): collaboration standards.
 - [TUI README](../tui/README.md): terminal client usage, hosted backend defaults,
   local development, and troubleshooting.
 - [Runbook](operations/runbook.md): daily development, validation, and failure recovery.
