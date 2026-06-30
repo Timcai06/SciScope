@@ -41,6 +41,21 @@ make vllm-serve\hfill\# 启动本地模型\\
 \end{codepanel}
 使用 \texttt{make tui} 进入终端科研智能体;后端接口文档见 \texttt{http://127.0.0.1:8000/docs}。
 
+\subsection{预编译客户端安装}
+若只体验终端客户端,可直接安装预编译的 Go TUI,再连接公开 demo 后端或自建后端:
+\begin{codepanel}\ttfamily\small
+\# 跨平台开发者路径(Node.js)\\
+npm install -g sciscope-tui\\[3pt]
+\# macOS(Homebrew)\\
+brew tap Timcai06/sciscope\\
+brew trust --cask timcai06/sciscope/sciscope-tui\\
+brew install --cask sciscope-tui\\[3pt]
+\# Windows(Scoop)\\
+scoop bucket add sciscope https://github.com/Timcai06/scoop-sciscope\\
+scoop install sciscope-tui
+\end{codepanel}
+上述安装只分发终端客户端本体;若要体现全量科研智能体能力,仍需连接后端服务。公开后端适合演示和轻量试用,全量语料与长期运行建议按本章前述步骤部署本地或自建后端。
+
 \subsection{质量与效果验证}
 \begin{codepanel}\ttfamily\small
 make test\hfill\# 后端自动化测试(以当前环境输出为准)\\
@@ -62,6 +77,7 @@ make data-layer-refresh \&\& make rag-chunks \&\& make postgres-refresh \&\& mak
 \item \textbf{演示样例}:\texttt{docs/examples/golden\_verify\_claim\_session.md} 给出一轮跨语言论断核查黄金会话,评委即使不启动环境也可查看工作流阶段、证据时间线与最终结论格式。
 \item \textbf{黑盒验收}:\texttt{make agent-smoke} 调用 live \texttt{/api/agent},检查数据库级语料规模、能力边界、论断核查、趋势分析与论文推荐工具链路。
 \item \textbf{基础大模型}:声明为可替换依赖(任意 OpenAI 兼容端点),不绑定特定模型。
+\item \textbf{提交附件边界}:为满足逐文件上传与单文件大小限制,正式附件提供源代码、运行说明、评测/图谱/小型模型结果和校验清单;大型数据目录、嵌入器权重与数据库运行表不随附件上传,由 \texttt{Makefile} 与运行说明重建。
 \end{itemize}
 
 \vspace{4mm}
