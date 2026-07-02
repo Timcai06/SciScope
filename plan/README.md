@@ -1,5 +1,9 @@
 # SciScope Plan Index
 
+> **Live product direction lives in [`docs/project/`](../docs/project/)**
+> (charter + roadmap). This tree is the competition execution plan and delivered
+> build history — kept for reproducibility, not the current forward roadmap.
+
 Execution plan for `面向科技文献智能分析的科研智能体构建`.
 
 The contest requires two outcomes:
