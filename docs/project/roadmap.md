@@ -38,6 +38,13 @@ judge 不可用时回退到相似度旧判定（`判定方式=similarity`）。
 - 结果：一句论断与它的反面得到不同结论（强支持 vs 证据反驳）；全套测试 229 passed
 - 效果：SciScope 成为会告诉你"文献里有人反对"的科研 agent
 
+### 插曲 — 产品力打磨(2026-07,进行中)
+
+第 2 步暂缓,先全维度提升现有产品的对话质量(对照 Claude Code 源码的做法):
+系统提示补齐日期与语料时间边界、引用规范(关键论断标注论文标题+年份)、
+结论先行与如实报告约束;autocompact 摘要器升级为结构化备忘(保留 paper_id、
+用户纠正、未完成项)。落点:`backend/app/agent/prompts.py`、`langgraph_runtime.py`。
+
 ### 第 2 步 — 矛盾即资产
 
 把检测到的立场/矛盾落库（新增 `claim_evidence_stance` / `contradictions` 表），

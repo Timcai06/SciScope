@@ -41,10 +41,33 @@ def test_system_prompt_requires_synthesis_not_paper_by_paper():
     assert "不要把动量、burst、Mann-Kendall、Sen's 斜率等内部指标名直接列成用户答案" in SYSTEM_PROMPT
 
 
+def test_system_prompt_carries_date_and_corpus_time_boundary():
+    # The model must know today's date and the corpus snapshot boundary to
+    # calibrate "最新/近年" questions instead of guessing coverage.
+    from datetime import date
+
+    from src.analysis.data_readiness import RECENT_YEAR_END
+
+    prompt = build_system_prompt()
+    assert date.today().isoformat() in prompt
+    assert f"收录至 {RECENT_YEAR_END} 年" in prompt
+
+
+def test_system_prompt_enforces_citations_and_conclusion_first():
+    # Evidence grounding is the product moat: key claims must carry a traceable
+    # source, answers must lead with the conclusion, and reporting must be honest
+    # both ways (no forced verdicts, no needless hedging).
+    assert "标注出处" in SYSTEM_PROMPT
+    assert "结论先行" in SYSTEM_PROMPT
+    assert "不要硬撑出确定结论" in SYSTEM_PROMPT
+    assert "不要堆砌多余的免责声明" in SYSTEM_PROMPT
+
+
 def test_system_prompt_is_sectioned_and_catalog_backed_by_registry():
     prompt = build_system_prompt()
     for section in (
         "# identity",
+        "# context",
         "# capability_boundary",
         "# tool_policy",
         "# evidence_policy",

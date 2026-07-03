@@ -235,9 +235,22 @@ AUTOCOMPACT_BUDGET = 6000  # tokens; above this, summarize older turns (Claude C
 
 
 def _summarize_transcript(transcript: str, model: str) -> str:
-    """LLM summarizer injected into autocompact — condenses older turns."""
+    """LLM summarizer injected into autocompact — condenses older turns.
+
+    Structured like Claude Code's compact prompt (scaled down): the summary must
+    preserve exactly what later turns need to keep working — the user's goal and
+    corrections, retrieved evidence with paper_ids (still valid tool arguments
+    after compaction), settled conclusions, and unfinished work.
+    """
     messages = [
-        {"role": "system", "content": "你是对话摘要器。用 3-5 句中文概括以下科研对话的关键信息(用户问题、已检索到的证据、结论方向),供后续轮次参考,不要展开。"},
+        {"role": "system", "content": (
+            "你是对话压缩器,只输出摘要文本,不要评论或展开。"
+            "把这段科研对话压缩成供后续轮次继续工作的备忘,按以下四项输出,每项一行,没有则写「无」:\n"
+            "1. 用户目标: 用户想解决什么,以及中途给过的指示或纠正;\n"
+            "2. 已检索证据: 关键论文的标题、年份、paper_id 与要点(paper_id 必须原样保留,后续轮次要用它调用工具);\n"
+            "3. 已得结论: 已经明确回答过的内容;\n"
+            "4. 未完成: 还没做完的检索或还没答复的问题。"
+        )},
         {"role": "user", "content": transcript},
     ]
     return complete(messages, model)
@@ -386,7 +399,13 @@ def _force_synthesis(state: AgentState) -> AgentState:
     started_at = time.perf_counter()
     messages = list(state.get("messages") or [])
     repair_missing_tool_results(messages)  # repair before adding the synthesis turn
-    messages.append({"role": "user", "content": "请基于以上工具结果,用中文给出最终回答。"})
+    messages.append({
+        "role": "user",
+        "content": (
+            "请基于以上工具结果,用中文给出最终回答:结论先行,"
+            "关键论断标注出处(论文标题+年份);证据不足处如实说明,不要硬撑。"
+        ),
+    })
     call_in = _messages_tokens(messages)
     text_events: list[AgentEvent] = []
     full_text, _ = drain(

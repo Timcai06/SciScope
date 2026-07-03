@@ -26,6 +26,24 @@ def test_maybe_autocompact_summarizes_over_budget(monkeypatch):
     assert meta["compaction"]["tokens_freed"] > 0
 
 
+def test_summarize_transcript_prompt_demands_working_memory(monkeypatch):
+    # The autocompact summary is the agent's working memory after older turns are
+    # dropped: it must ask for paper_ids (still-valid tool arguments), user
+    # corrections, and unfinished work — not a free-form recap.
+    captured: dict = {}
+
+    def fake_complete(messages, model):
+        captured["messages"] = messages
+        return "备忘"
+
+    monkeypatch.setattr(R, "complete", fake_complete)
+    assert R._summarize_transcript("user: 咖啡与心脏病?", "test-model") == "备忘"
+    system = captured["messages"][0]["content"]
+    assert "paper_id" in system
+    assert "未完成" in system
+    assert "纠正" in system
+
+
 def test_estimate_tokens_cjk_vs_latin():
     assert C.estimate_tokens("") == 0
     # Same char count: CJK (~1.5 chars/token) is denser than latin (~4 chars/token).
