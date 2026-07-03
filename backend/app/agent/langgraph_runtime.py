@@ -217,7 +217,11 @@ def _plan(state: AgentState) -> AgentState:
     if not model or not needs_plan(question):
         return _finish_node("plan", started_at, state, {"messages": messages, "route": "llm_step", "emit": []})
 
-    plan = make_plan(question, model)
+    # Feed the planner the previous answer so follow-up references (「第 2 篇论文」)
+    # resolve to real titles instead of a fabricated paper_id.
+    history = state.get("history") or []
+    last_answer = next((m.get("content") for m in reversed(history) if m.get("role") == "assistant"), "")
+    plan = make_plan(question, model, context=str(last_answer or "")[:600])
     if not plan:
         return _finish_node("plan", started_at, state, {"messages": messages, "route": "llm_step", "emit": []})
 

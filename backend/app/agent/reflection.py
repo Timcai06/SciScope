@@ -52,7 +52,8 @@ def self_critique(question: str, answer: str, model: str) -> str | None:
         {"role": "system", "content": "你是严格的审稿人,只输出 OK 或 RETRY。"},
         {"role": "user", "content": (
             f"问题:{question}\n\n回答:{answer}\n\n"
-            "判断这个回答是否充分回答了问题、且关键论断都有文献证据支撑。"
+            "判断这个回答是否正面回答了问题、且关键论断标注了出处(论文标题+年份即可;"
+            "本系统以文献库内 paper_id 标识论文,不要求 DOI、期刊卷期或外部链接,缺这些不算缺陷)。"
             "若充分且有据,只回复 OK;否则回复「RETRY:」加一句话指出缺什么、该补检索什么。"
         )},
     ]

@@ -36,7 +36,15 @@ def parse_plan(text: str) -> list[str]:
     return steps[:4]
 
 
-def make_plan(question: str, model: str) -> list[str]:
+def make_plan(question: str, model: str, context: str = "") -> list[str]:
+    """Plan tool steps for a question; ``context`` (the previous answer) lets the
+    planner resolve follow-up references like 「第 2 篇论文」to real titles instead
+    of fabricating a paper_id."""
+    context_block = (
+        f"上一轮回答(供理解「第 N 篇/刚才提到的」等指代,引用其中论文时在步骤里写论文标题,不要编造 paper_id):\n{context}\n\n"
+        if context
+        else ""
+    )
     prompt = [
         {"role": "system", "content": "你是科研智能体的规划器,只输出执行步骤。"},
         {"role": "user", "content": (
@@ -49,7 +57,7 @@ def make_plan(question: str, model: str) -> list[str]:
             "注意:recommend_papers/get_paper/compare_papers 依赖 paper_id,必须先安排一步 "
             "search_literature 才能拿到 id,不能直接对主题词调用它们。"
             "每行一步,只输出步骤本身,不要解释、不要编号前缀。\n\n"
-            f"问题:{question}\n\n步骤:"
+            f"{context_block}问题:{question}\n\n步骤:"
         )},
     ]
     try:

@@ -63,6 +63,49 @@ def test_system_prompt_enforces_citations_and_conclusion_first():
     assert "不要堆砌多余的免责声明" in SYSTEM_PROMPT
 
 
+def test_system_prompt_bans_narration_and_demands_faithful_directions():
+    # Pinned from the 2026-07 experience run: transition narration leaked into
+    # final answers, a vague question triggered blind searching, and a falling
+    # trend was reported as growth.
+    assert "过渡旁白" in SYSTEM_PROMPT
+    assert "反问澄清" in SYSTEM_PROMPT
+    assert "不得说反" in SYSTEM_PROMPT
+
+
+def test_make_plan_receives_previous_answer_for_reference_resolution(monkeypatch):
+    # 「你刚才提到的第 2 篇论文」can only be planned correctly if the planner sees
+    # the previous answer; without it the plan fabricated get_paper(paper_id="2").
+    from backend.app.agent import planning
+
+    captured: dict = {}
+
+    def fake_complete(messages, model):
+        captured["prompt"] = messages[-1]["content"]
+        return "用 search_literature 按标题检索 HopRAG"
+
+    monkeypatch.setattr(planning, "complete", fake_complete)
+    steps = planning.make_plan("第 2 篇论文讲了什么?", "test-model", context="2. HopRAG (2025)")
+    assert steps
+    assert "HopRAG (2025)" in captured["prompt"]
+    assert "不要编造 paper_id" in captured["prompt"]
+
+
+def test_self_critique_criteria_match_product_citation_format(monkeypatch):
+    # The critic once demanded DOIs/journal issues the product never emits,
+    # forcing pointless retries; the rubric must accept 标题+年份(+paper_id).
+    from backend.app.agent import reflection
+
+    captured: dict = {}
+
+    def fake_complete(messages, model):
+        captured["prompt"] = messages[-1]["content"]
+        return "OK"
+
+    monkeypatch.setattr(reflection, "complete", fake_complete)
+    assert reflection.self_critique("问题", "回答", "test-model") is None
+    assert "不要求 DOI" in captured["prompt"]
+
+
 def test_system_prompt_is_sectioned_and_catalog_backed_by_registry():
     prompt = build_system_prompt()
     for section in (
@@ -97,7 +140,7 @@ def test_skill_catalog_is_backed_by_real_tools():
 def test_langgraph_runtime_streams_plan_tool_and_grounded_answer(monkeypatch):
     monkeypatch.setattr(langgraph_runtime, "detect_model", lambda: "test-model")
     monkeypatch.setattr(langgraph_runtime, "needs_plan", lambda question: True)
-    monkeypatch.setattr(langgraph_runtime, "make_plan", lambda question, model: ["search evidence"])
+    monkeypatch.setattr(langgraph_runtime, "make_plan", lambda question, model, context="": ["search evidence"])
     monkeypatch.setattr(langgraph_runtime, "self_critique", lambda *args: None)
     monkeypatch.setattr(langgraph_runtime, "run_tools", lambda tool_calls, executed, on_progress=None: ["ok"])
 

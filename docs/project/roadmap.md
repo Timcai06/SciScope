@@ -41,9 +41,17 @@ judge 不可用时回退到相似度旧判定（`判定方式=similarity`）。
 ### 插曲 — 产品力打磨(2026-07,进行中)
 
 第 2 步暂缓,先全维度提升现有产品的对话质量(对照 Claude Code 源码的做法):
-系统提示补齐日期与语料时间边界、引用规范(关键论断标注论文标题+年份)、
-结论先行与如实报告约束;autocompact 摘要器升级为结构化备忘(保留 paper_id、
-用户纠正、未完成项)。落点:`backend/app/agent/prompts.py`、`langgraph_runtime.py`。
+
+**第一批(提示层)**:系统提示补齐日期与语料时间边界、引用规范(关键论断标注论文
+标题+年份)、结论先行与如实报告约束;autocompact 摘要器升级为结构化备忘(保留
+paper_id、用户纠正、未完成项)。落点:`backend/app/agent/prompts.py`、`langgraph_runtime.py`。
+
+**第二批(体验驱动)**:用真实 provider 亲测 5 会话 11 轮对话,按暴露的问题修复:
+规划器带上一轮回答做指代消解(「第 2 篇论文」不再编 paper_id);get_trends 归一化
+匹配(连字符不再脱靶)+ 未命中时给相近已收录关键词 + 方向中文化(falling(下降))+
+Mann-Kendall 显著性直出(p 不显著时提示不要下强结论);自检审稿标准对齐产品引用
+格式(不再索要 DOI/卷期);系统提示禁过渡旁白、模糊问题先反问。复测 4 场景验证通过。
+落点:`planning.py`、`reflection.py`、`tools/get_trends.py`、`prompts.py`。
 
 ### 第 2 步 — 矛盾即资产
 
