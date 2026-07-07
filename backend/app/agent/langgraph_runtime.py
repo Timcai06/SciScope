@@ -407,7 +407,8 @@ def _force_synthesis(state: AgentState) -> AgentState:
         "role": "user",
         "content": (
             "请基于以上工具结果,用中文给出最终回答:结论先行,"
-            "关键论断标注出处(论文标题+年份);证据不足处如实说明,不要硬撑。"
+            "关键论断标注出处(论文标题+年份);证据不足处如实说明,不要硬撑;"
+            "控制在 500 字内,结尾不要加总结段。"
         ),
     })
     call_in = _messages_tokens(messages)

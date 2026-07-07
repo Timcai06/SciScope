@@ -28,6 +28,11 @@ CAPABILITY_INTENT = (
     "what can you", "what else can you", "capability", "abilities", "limits",
 )
 
+# verify_claim verdict vocabulary: an answer stating one of these while citing
+# papers is an honest, grounded conclusion — not a weak answer to retry. Retrying
+# it pressures the model into confirming the user's claim (confirmation bias).
+HONEST_VERDICTS = ("证据不足", "证据反驳", "存在争议", "尚未被证实", "未被证实", "未有定论")
+
 
 def reflect_reason(answer: str, tools_used: int, question: str) -> str | None:
     """Return a retry instruction for ungrounded or weak answers.
@@ -42,6 +47,8 @@ def reflect_reason(answer: str, tools_used: int, question: str) -> str | None:
     needs_literature = any(marker in question_lower for marker in LITERATURE_INTENT)
     if tools_used == 0 and not is_meta and not is_capability and needs_literature:
         return "你没有调用任何工具就回答了。请先用 search_literature 等工具检索证据,再据实回答。"
+    if any(verdict in (answer or "") for verdict in HONEST_VERDICTS) and "《" in (answer or ""):
+        return None  # grounded honest verdict — do not push for a "stronger" answer
     if any(marker in answer_lower for marker in WEAK_ANSWER):
         return "上次检索证据不足。请换用不同的关键词(或英文术语)重新检索,再回答。"
     return None
@@ -54,6 +61,9 @@ def self_critique(question: str, answer: str, model: str) -> str | None:
             f"问题:{question}\n\n回答:{answer}\n\n"
             "判断这个回答是否正面回答了问题、且关键论断标注了出处(论文标题+年份即可;"
             "本系统以文献库内 paper_id 标识论文,不要求 DOI、期刊卷期或外部链接,缺这些不算缺陷)。"
+            "注意:对求证/核查类问题,如实回答「证据不足」「证据反驳」「存在争议」本身就是正面回答"
+            "——你的职责是检查回答是否忠于证据,不是要求回答支持原论断;"
+            "严禁因为回答没有证实用户的说法而要求重试。"
             "若充分且有据,只回复 OK;否则回复「RETRY:」加一句话指出缺什么、该补检索什么。"
         )},
     ]

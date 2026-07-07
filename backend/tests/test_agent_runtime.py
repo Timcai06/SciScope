@@ -63,6 +63,13 @@ def test_system_prompt_enforces_citations_and_conclusion_first():
     assert "不要堆砌多余的免责声明" in SYSTEM_PROMPT
 
 
+def test_system_prompt_caps_length_and_bans_closing_recap():
+    # Pinned from the experience run: complex answers ran 800-2100 chars, padded
+    # by a closing 小结 section restating the whole answer.
+    assert "小标题至多 3 个" in SYSTEM_PROMPT
+    assert "不要再加「小结/总结」段" in SYSTEM_PROMPT
+
+
 def test_system_prompt_bans_narration_and_demands_faithful_directions():
     # Pinned from the 2026-07 experience run: transition narration leaked into
     # final answers, a vague question triggered blind searching, and a falling
@@ -88,6 +95,33 @@ def test_make_plan_receives_previous_answer_for_reference_resolution(monkeypatch
     assert steps
     assert "HopRAG (2025)" in captured["prompt"]
     assert "不要编造 paper_id" in captured["prompt"]
+
+
+def test_reflect_lets_grounded_honest_verdict_stand():
+    # A cited answer concluding 证据不足 must NOT be retried into confirming the
+    # claim (confirmation bias observed live on 2026-07-07: the critic pushed
+    # 证据不足 into 明确支持, overriding verify_claim's stance verdict).
+    answer = "现有文献对该论断证据不足:《LLM Risks》(2023) 仅描述风险,缺乏实证研究量化因果。"
+    assert reflect_reason(answer, 2, "求证:大语言模型会加剧学术不端?") is None
+
+
+def test_reflect_still_retries_uncited_weak_answer():
+    # Without citations the weak-answer retry still applies.
+    assert reflect_reason("抱歉,没有找到相关信息。", 1, "RAG 领域最新研究趋势如何?") is not None
+
+
+def test_self_critique_must_not_demand_claim_confirmation(monkeypatch):
+    from backend.app.agent import reflection
+
+    captured: dict = {}
+
+    def fake_complete(messages, model):
+        captured["prompt"] = messages[-1]["content"]
+        return "OK"
+
+    monkeypatch.setattr(reflection, "complete", fake_complete)
+    reflection.self_critique("求证: X 导致 Y", "证据不足", "test-model")
+    assert "严禁因为回答没有证实用户的说法而要求重试" in captured["prompt"]
 
 
 def test_self_critique_criteria_match_product_citation_format(monkeypatch):

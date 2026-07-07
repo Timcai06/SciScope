@@ -14,6 +14,59 @@ REPEAT_NOTE = "(已用相同参数调用过该工具,结果同上。请改用不
 # (tool_name, progress_message) — emitted while a streaming tool runs.
 ProgressFn = Callable[[str, str], None]
 
+# Result-list tools whose entries carry a paper_id — candidates for cross-query
+# paper dedup (different keywords often return the same top papers).
+_SEARCH_TOOLS = {"search_literature", "recommend_papers"}
+
+
+def _known_paper_ids(executed: dict[str, str]) -> set[str]:
+    """paper_ids already shown to the model this turn, from prior tool results."""
+    seen: set[str] = set()
+    for result in executed.values():
+        try:
+            data = json.loads(result)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        items = data if isinstance(data, list) else [data]
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            if item.get("paper_id"):
+                seen.add(str(item["paper_id"]))
+            # One nested level: verify_claim wraps its papers in a 证据 list.
+            for value in item.values():
+                if isinstance(value, list):
+                    for sub in value:
+                        if isinstance(sub, dict) and sub.get("paper_id"):
+                            seen.add(str(sub["paper_id"]))
+    return seen
+
+
+def _dedupe_papers(result: str, seen: set[str]) -> str:
+    """Compact papers the model has already seen this turn into a one-line note.
+
+    A repeated paper burns context and reads as fresh evidence; replacing it with
+    an explicit "already shown" note both saves tokens and tells the model that
+    rewording the query is not surfacing new papers.
+    """
+    try:
+        data = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return result
+    if not isinstance(data, list) or not data:
+        return result
+    fresh = [d for d in data if not (isinstance(d, dict) and str(d.get("paper_id")) in seen)]
+    dup_count = len(data) - len(fresh)
+    if dup_count == 0:
+        return result
+    if not fresh:
+        return (
+            f"本次检索的 {dup_count} 篇论文全部与本轮此前结果重复,没有新证据。"
+            "请换一个明显不同的检索角度,或直接基于已有证据作答。"
+        )
+    payload: list = [*fresh, {"提示": f"另有 {dup_count} 篇论文与本轮此前结果重复,已省略。"}]
+    return json.dumps(payload, ensure_ascii=False)
+
 
 def run_tools(
     tool_calls: list[dict],
@@ -36,7 +89,12 @@ def run_tools(
         except json.JSONDecodeError:
             args = {}
         progress = (lambda message: on_progress(name, message)) if on_progress else None
+        # Snapshot known papers before executing so a tool's own result isn't
+        # deduped against itself.
+        seen = _known_paper_ids(executed) if name in _SEARCH_TOOLS else set()
         result = execute_tool(name, args, on_progress=progress)
+        if name in _SEARCH_TOOLS:
+            result = _dedupe_papers(result, seen)
         executed[sig] = result
         return result
 

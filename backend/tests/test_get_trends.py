@@ -53,6 +53,35 @@ def test_suggest_dedupes_rows_across_tables():
     assert T._suggest(rows, "federated learning privacy") == ["federated learning"]
 
 
+def test_variant_key_folds_singular_plural():
+    assert T._variant_key("graph neural networks gnn") == T._variant_key("graph neural network gnn")
+    assert T._variant_key("federated learning") != T._variant_key("transfer learning")
+
+
+def test_fold_variants_groups_conflicting_directions():
+    # The real GNN case: two spellings, independently computed, opposite trends.
+    matches = [
+        {"keyword": "graph neural networks gnn", "doc_count": "50", "mk_trend": "falling"},
+        {"keyword": "graph neural network gnn", "doc_count": "39", "mk_trend": "rising"},
+    ]
+    folded = T._fold_variants(matches)
+    assert len(folded) == 1
+    rep, variants, conflicting = folded[0]
+    assert rep["keyword"] == "graph neural networks gnn"  # best-ranked kept
+    assert variants == ["graph neural network gnn"]
+    assert conflicting is True
+
+
+def test_fold_variants_keeps_distinct_keywords_separate():
+    matches = [
+        {"keyword": "federated learning", "doc_count": "300", "mk_trend": "rising"},
+        {"keyword": "split federated learning", "doc_count": "20", "mk_trend": "rising"},
+    ]
+    folded = T._fold_variants(matches)
+    assert len(folded) == 2
+    assert all(not conflicting for _, _, conflicting in folded)
+
+
 def test_significance_verbalizes_p_value():
     assert T._significance("0.001").startswith("显著")
     assert "不显著" in T._significance("0.31")
