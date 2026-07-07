@@ -1,0 +1,189 @@
+{
+  "generated_at": "2026-07-07T13:03:12.782328+00:00",
+  "cases_total": 7,
+  "cases_passed": 7,
+  "results": [
+    {
+      "case_id": "reference-resolution",
+      "pinned_from": "规划器看不到历史,生成了 get_paper(paper_id='2')",
+      "passed": true,
+      "checks": [
+        {
+          "name": "不编造序号 paper_id",
+          "passed": true
+        },
+        {
+          "name": "回答落在 HopRAG 上",
+          "passed": true
+        }
+      ],
+      "seconds": 25.6,
+      "answer_chars": 464,
+      "tool_calls": [
+        "search_literature",
+        "get_paper"
+      ],
+      "reflects": 0,
+      "answer": "## HopRAG 做了什么\n\nHopRAG（2025）提出了一种**将逻辑推理融入检索过程**的多跳 RAG 框架，核心思路是让检索器不再只依赖词法或语义相似度，而是能\"理解\"段落之间的逻辑关联。\n\n具体做法分两步：\n\n1. **索引阶段——构建段落逻辑图**：将文档切分成文本块作为图的节点，然后让 LLM 为每个文本块生成若干\"伪查询\"（pseudo-queries），如果两个文本块能回答同一个伪查询，就在它们之间建立一条逻辑边，从而形成一张段落级别的逻辑关系图。\n\n2. **检索阶段——检索-推理-剪枝机制**：先用传统语义检索找到一批候选段落，然后沿着逻辑图的边向多跳邻居扩展，每走一步都让 LLM 判断该邻居是否与原始问题逻辑相关，只保留真正相关的段落，剪掉无关分支。这样检索到的文档不是\"看起来像\"的碎片，而是**逻辑上能串联起来支撑多跳推理**的段落。\n\n在多个多跳问答基准上的实验表明，HopRAG 相比传统 RAG 方法显著提升了检索准确率和最终回答质量，尤其适用于需要跨段落组合信息才能回答的复杂问题。"
+    },
+    {
+      "case_id": "claim-honesty",
+      "pinned_from": "反思层把「证据不足」逼成「明确支持」(确认偏误)",
+      "passed": true,
+      "checks": [
+        {
+          "name": "调用了 verify_claim",
+          "passed": true
+        },
+        {
+          "name": "诚实判定未被强制重试",
+          "passed": true
+        },
+        {
+          "name": "回答带引用",
+          "passed": true
+        },
+        {
+          "name": "verdict 与回答方向一致",
+          "passed": true
+        }
+      ],
+      "seconds": 36.8,
+      "answer_chars": 1052,
+      "tool_calls": [
+        "search_literature",
+        "search_literature",
+        "verify_claim",
+        "search_literature",
+        "get_paper",
+        "get_paper",
+        "get_paper"
+      ],
+      "reflects": 0,
+      "answer": "**结论：现有文献普遍认为大语言模型对学术诚信构成严重威胁，但\"加剧学术不端\"这一因果论断目前处于\"部分支持\"状态——文献确认了风险与滥用现象，但尚未建立严格的因果证据链。**\n\n具体来看，文献库中的证据可分为三个层面：\n\n**1. 风险与威胁已被广泛确认**\n\n多篇论文明确指出 LLM 对学术诚信的威胁。《How Large Language Models are Transforming Machine-Paraphrased Plagiarism》（Wahle 等，2022）指出，大语言模型生成的改写文本与原创作品难以区分，对学术诚信构成\"严重威胁\"（severe threat）。《Survey on AI-Generated Plagiarism Detection: The Impact of Large Language Models on Academic Integrity》（Pudasaini 等，2024）进一步指出，LLM 的兴起已导致学术不端行为激增（\"a surge in academic misconduct\"），并引用 2023 年一项覆盖 3,017 名学生的调查——近三分之一的学生承认使用 ChatGPT 完成作业。\n\n**2. 检测困难加剧了问题的严重性**\n\n《Academic Integrity considerations of AI Large Language Models in the post-pandemic era》（Perkins，2023）指出，LLM 能生成\"可规避现有技术检测手段和教师人工检测\"的原创连贯文本，构成重大学术诚信隐患。Wahle 等（2022）的实验也表明，人类参与者难以区分 LLM 生成的改写文本与原创文本。\n\n**3. 因果关系的直接证据仍有限**\n\n尽管上述文献一致描述了 LLM 被滥用于学术不端的现象和风险，但严格来说，它们更多是\"相关性/风险描述\"而非\"因果证明\"。目前文献库中缺乏将 LLM 使用与学术不端率上升之间建立严格因果推断（如控制混杂变量、纵向追踪）的研究。因此，verify_claim 工具给出的判定为\"证据不足\"——这并非否定风险存在，而是指现有文献尚未提供足以确立因果关系的证据。\n\n**综合来看**：文献证据强烈支持\"大语言模型为学术不端提供了新的便利手段，且现有检测手段难以应对\"这一判断；但\"加剧\"一词所隐含的因果递增关系，目前更多是合理推论而非已被严格证明的结论。"
+    },
+    {
+      "case_id": "trend-faithful",
+      "pinned_from": "get_trends 返回 falling,回答却写成增长阶段",
+      "passed": true,
+      "checks": [
+        {
+          "name": "调用了 get_trends",
+          "passed": true
+        },
+        {
+          "name": "不显著趋势不说成显著上升",
+          "passed": true
+        },
+        {
+          "name": "无过渡旁白",
+          "passed": true
+        }
+      ],
+      "seconds": 20.9,
+      "answer_chars": 1275,
+      "tool_calls": [
+        "search_literature",
+        "get_trends",
+        "summarize_field"
+      ],
+      "reflects": 0,
+      "answer": "好的，三个工具的结果都已返回。下面我综合这些信息来回答。\n\n---\n\n图神经网络（GNN）的研究整体已进入**成熟期**，应用面持续拓宽，但文献库内近年发文量的增长趋势已趋于平稳。\n\n**研究热度与阶段**\n\n从文献库收录的论文统计来看，GNN 相关研究已度过高速增长阶段，目前处于 **maturity（成熟期）**。累计论文数约 50 篇（语料库规模为 16 万篇），近期活跃度仍较高，但年增长斜率已趋近于零，表明该领域不再是爆发式增长，而是进入了深耕细作、向各垂直领域渗透的阶段。\n\n**主要研究方向**\n\n从文献内容看，当前 GNN 的研究热点集中在以下几个方向：\n\n- **推荐系统**：如《Survey of Graph Neural Network in Recommendation System》(2022) 和《RWESA-GNNR》(2024) 所示，GNN 被广泛用于建模用户-物品关系图，实现深度特征挖掘。\n- **分子与化学**：如《Graph neural networks for the prediction of infinite dilution activity coefficients》(2022)，GNN 在分子性质预测方面持续发挥作用。\n- **知识图谱嵌入**：《Advances in Knowledge Graph Embedding Based on Graph Neural Networks》(2023) 反映了 GNN 与知识图谱结合的研究热度。\n- **图数据增强与防御**：《Enhancing Graph Neural Networks by Structure-wise Graph Data Augmentation》(2025) 和《Graph Neural Network Defense Combined with Contrastive Learning》(2023) 表明，提升 GNN 的鲁棒性和泛化能力是近年关注点。\n- **大规模训练与效率**：《Efficient Training of Graph Neural Networks on Large Graphs》(2024) 关注 GNN 在大规模图上的训练效率问题。\n- **跨领域应用**：从配电网拓扑优化（2024）到 fMRI 脑功能分析（2022），GNN 的应用场景不断扩展。\n\n**趋势判断说明**\n\n需要指出的是，文献库中 GNN 相关论文的统计样本量有限，趋势方向（falling）的统计显著性不高（p=1.00），因此不宜据此断言发文量已绝对下降。更准确的描述是：GNN 已从早期的概念提出阶段（如《The Graph Neural Network Model》(2008)），经过 2019–2022 年的快速发展期，进入了应用深化和问题聚焦的成熟阶段。未来预测词频仍保持一定水平，说明该主题在文献库中仍会持续出现，但增长动力更多来自具体应用场景的拓展，而非基础模型架构的颠覆性创新。"
+    },
+    {
+      "case_id": "boundary-2027",
+      "pinned_from": "语料时间边界(收录至 2026)",
+      "passed": true,
+      "checks": [
+        {
+          "name": "说明收录边界 2026",
+          "passed": true
+        },
+        {
+          "name": "简短(<300 字)",
+          "passed": true
+        }
+      ],
+      "seconds": 16.7,
+      "answer_chars": 246,
+      "tool_calls": [
+        "search_literature",
+        "search_literature",
+        "search_literature"
+      ],
+      "reflects": 0,
+      "answer": "本知识库收录的文献截至 **2026 年**，因此库中不包含 2027 年发表的论文。检索结果中仅有的\"2027\"出现在部分论文的展望描述中（如 PLATO 望远镜计划于 2027 年初发射、Simons Observatory 计划在 2027 年扩展），而非论文本身的发表年份。\n\n如需了解 2027 年的新论文，建议届时通过 arXiv、PubMed、Google Scholar 等实时更新的学术数据库查询。当前我可以帮您检索本库中 **2026 年** 的最新文献，您有兴趣了解吗？"
+    },
+    {
+      "case_id": "vague-question",
+      "pinned_from": "模糊问题曾盲搜 8 次工具调用烧光预算",
+      "passed": true,
+      "checks": [
+        {
+          "name": "不盲搜(0 次工具调用)",
+          "passed": true
+        },
+        {
+          "name": "反问澄清",
+          "passed": true
+        }
+      ],
+      "seconds": 3.6,
+      "answer_chars": 377,
+      "tool_calls": [],
+      "reflects": 0,
+      "answer": "你好！我是 SciScope 科研文献智能体，可以帮你做以下几类事情：\n\n**文献检索与调研**\n- 搜索特定主题的论文\n- 了解某个领域的研究现状和进展\n- 分析研究趋势（热度变化、发展阶段、未来走向）\n\n**论文分析**\n- 推荐与某篇论文相似的文献\n- 对比两篇论文的方法或结论\n- 获取论文的详细信息（标题、作者、摘要等）\n- 导出 BibTeX 引用格式\n\n**论断核查**\n- 验证某个科研说法是否有文献证据支持\n- 判断证据是支持、反驳还是存在争议\n\n**知识图谱**\n- 查看研究社区、作者合作网络、关键词关联\n\n---\n\n不过你只说了「帮我看看」，能具体告诉我你想看什么吗？比如：\n\n- 某个研究主题的文献综述？\n- 某个说法有没有论文支持？\n- 某篇论文的详细信息？\n- 某个领域的发展趋势？\n\n告诉我你的目标，我来帮你查 (・_・)"
+    },
+    {
+      "case_id": "common-sense",
+      "pinned_from": "常识问题不必检索",
+      "passed": true,
+      "checks": [
+        {
+          "name": "零工具调用",
+          "passed": true
+        },
+        {
+          "name": "直接作答(非空)",
+          "passed": true
+        }
+      ],
+      "seconds": 5.7,
+      "answer_chars": 709,
+      "tool_calls": [],
+      "reflects": 0,
+      "answer": "注意力机制（Attention Mechanism）是深度学习中的一种技术，它让模型在处理输入数据时能够动态地\"关注\"不同部分的重要程度，而不是对所有信息一视同仁。简单来说，它通过计算权重来告诉模型\"哪里更重要\"，从而提升对关键信息的提取能力。\n\n其核心思想最早源于机器翻译任务——传统的编码器-解码器架构在处理长句子时，会把整个源句压缩成一个固定长度的向量，导致信息丢失。注意力机制则允许解码器在生成每个词时，回看源句的所有位置，并给每个位置分配一个注意力权重，权重越高表示该位置对当前输出越重要。\n\n从数学上看，注意力机制通常计算一个查询（Query）与一组键（Key）之间的相似度，得到权重后对值（Value）进行加权求和。最经典的公式是 **Scaled Dot-Product Attention**：\n\n\\[\n\\text{Attention}(Q, K, V) = \\text{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V\n\\]\n\n其中 \\(d_k\\) 是键的维度，除以 \\(\\sqrt{d_k}\\) 是为了防止内积过大导致梯度消失。\n\n注意力机制最著名的应用是 Transformer 架构（Vaswani et al., 2017），它完全基于自注意力（Self-Attention）构建，取代了循环和卷积结构，成为后续 BERT、GPT 等大语言模型的基础。此外，注意力机制也广泛用于计算机视觉（如图像 captioning）、多模态学习、图神经网络等领域。\n\n如果你希望了解注意力机制在具体研究中的发展脉络或最新进展，我可以帮你检索文献库中的相关论文。"
+    },
+    {
+      "case_id": "survey-discipline",
+      "pinned_from": "综述回答 1700+ 字、旁白开头、结尾总结段",
+      "passed": true,
+      "checks": [
+        {
+          "name": "带引用",
+          "passed": true
+        },
+        {
+          "name": "无过渡旁白",
+          "passed": true
+        },
+        {
+          "name": "长度受控(<1800 字)",
+          "passed": true
+        }
+      ],
+      "seconds": 21.0,
+      "answer_chars": 1142,
+      "tool_calls": [
+        "search_literature",
+        "get_trends",
+        "summarize_field",
+        "get_paper",
+        "get_paper",
+        "get_paper"
+      ],
+      "reflects": 0,
+      "answer": "RAG（检索增强生成）领域在 2024–2025 年间进入了高速增长阶段，研究从早期的\"能否工作\"转向了\"如何更可靠、更高效地工作\"。以下是几个主要进展方向：\n\n**1. 架构系统化与工程化成熟**\n\n2025 年的综述性工作对 RAG 架构进行了系统梳理。Polan 等人在《Retrieval-Augmented Generation: Architecture, Techniques, and Evaluations》(2025) 中详细探讨了检索模块、嵌入表示、向量数据库、上下文增强策略和记忆机制等核心组件。Wampler 等人则在《Engineering the RAG Stack》(2025) 中基于 2018–2025 年的文献，将 RAG 技术归纳为统一分类体系，涵盖融合机制、检索策略和编排方法，并提供了定量评估框架。这表明 RAG 正从零散的方法实验走向工程化、标准化。\n\n**2. 可信度与安全性成为核心议题**\n\n随着 RAG 被广泛部署，其引入的新风险也受到关注。Ni 等人在《Towards Trustworthy Retrieval Augmented Generation for Large Language Models: A Survey》(2025) 中指出，RAG 虽然能减少幻觉，但也带来了鲁棒性问题、隐私泄露、对抗攻击和问责缺失等新挑战。该综述系统梳理了提升 RAG 可信度的方法，标志着领域关注点从\"效果\"向\"安全可信\"的转移。\n\n**3. 垂直领域应用加速落地**\n\nRAG 在专业领域的适配研究显著增多。例如，Weinert 和 Rauschecker 在《Enhancing Large Language Models with Retrieval-Augmented Generation: A Radiology-Specific Approach》(2025) 中提出了放射学领域的 RAG 方案，通过注入领域知识提升 LLM 在诊断场景中的表现。这类工作表明 RAG 正从通用 NLP 任务向医疗、法律、金融等知识密集型行业渗透。\n\n**4. 研究热度持续攀升**\n\n趋势分析显示，\"Retrieval Augmented Generation\" 主题的累计论文数已达约 5,588 篇，增长方向显著上升（p=0.089），生命周期处于 **growth（成长期）**，短期活跃度仍在加速。预测到 2026 年该领域的发文热度将继续走高，说明 RAG 仍是 NLP 领域最活跃的研究方向之一。\n\n总体而言，RAG 近年的研究进展可概括为：**架构走向系统化、可信度成为新焦点、垂直应用加速落地、整体热度持续上升**。"
+    }
+  ]
+}
