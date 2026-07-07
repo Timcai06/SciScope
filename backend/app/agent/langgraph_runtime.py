@@ -32,6 +32,20 @@ from backend.app.core.config import get_settings
 MAX_STEPS = 6
 MAX_RETRIES = 1
 
+# Transition narration the model keeps prepending to final answers despite the
+# prompt ban ("好的，数据已全部返回。下面综合作答。---"). Stripped deterministically:
+# a short leading line containing one of these phrases, plus a following --- rule.
+_NARRATION_MARKERS = ("综合作答", "数据已全部返回", "证据已足够", "证据充分了", "现在综合")
+_HR_RE = re.compile(r"^\s*-{3,}\s*\n+")
+
+
+def _strip_narration(text: str) -> str:
+    out = (text or "").lstrip()
+    first, sep, rest = out.partition("\n")
+    if sep and len(first) <= 60 and any(marker in first for marker in _NARRATION_MARKERS):
+        out = _HR_RE.sub("", rest.lstrip("\n"))
+    return out
+
 
 GraphRoute = Literal["plan", "llm_step", "execute_tools", "reflect", "force_synthesis", "end"]
 
@@ -376,7 +390,7 @@ def _reflect(state: AgentState) -> AgentState:
     if not reason:
         return _finish_node(
             "reflect", started_at, state,
-            {"route": "end", "emit": [("final", answer)]},
+            {"route": "end", "emit": [("final", _strip_narration(answer))]},
             extra=_final_extra(state, "completed"),
         )
 
@@ -419,7 +433,7 @@ def _force_synthesis(state: AgentState) -> AgentState:
     )
     return _finish_node(
         "force_synthesis", started_at, state,
-        {"messages": messages, "last_answer": full_text, "route": "end", "emit": [*text_events, ("final", full_text)]},
+        {"messages": messages, "last_answer": full_text, "route": "end", "emit": [*text_events, ("final", _strip_narration(full_text))]},
         extra=_final_extra(state, state.get("stop_reason") or "max_steps", call_in, _estimate_tokens(full_text)),
     )
 

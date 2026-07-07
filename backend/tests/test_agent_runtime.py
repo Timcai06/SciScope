@@ -70,6 +70,19 @@ def test_system_prompt_caps_length_and_bans_closing_recap():
     assert "不要再加「小结/总结」段" in SYSTEM_PROMPT
 
 
+def test_strip_narration_removes_leading_transition_line():
+    # First eval-baseline run: the prompt ban alone did not stop DeepSeek from
+    # prepending "好的，数据已全部返回。下面综合作答。---"; strip it deterministically.
+    strip = langgraph_runtime._strip_narration
+    assert strip("好的，数据已全部返回。下面综合作答。\n\n---\n\n图神经网络……") == "图神经网络……"
+    assert strip("证据已足够，现在综合作答。\n正文开始") == "正文开始"
+    # Honest first lines survive, as does narration vocabulary deep in the body.
+    assert strip("图神经网络处于成熟期。\n细节……") == "图神经网络处于成熟期。\n细节……"
+    body = "正文很长" * 20 + "\n现在综合来看……"
+    assert strip(body) == body
+    assert strip("") == ""
+
+
 def test_system_prompt_bans_narration_and_demands_faithful_directions():
     # Pinned from the 2026-07 experience run: transition narration leaked into
     # final answers, a vague question triggered blind searching, and a falling

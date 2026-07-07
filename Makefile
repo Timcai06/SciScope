@@ -370,6 +370,10 @@ eval-retrieval:
 eval-all:
 	SCISCOPE_DB_DSN=$(POSTGRES_DSN) SCISCOPE_EMBEDDER_PATH=$(EMBEDDER_PATH) SCISCOPE_EMBED_FP16=1 $(PYTHON) -m evaluation.eval_all
 
+# Dialogue-quality regression eval (ONLINE: needs DEEPSEEK_API_KEY; replays real failure scenarios).
+eval-dialogue:
+	SCISCOPE_DB_DSN=$(POSTGRES_DSN) SCISCOPE_EMBEDDER_PATH=$(EMBEDDER_PATH) SCISCOPE_USE_MOCK_LLM=false SCISCOPE_LLM_PROVIDER=deepseek $(PYTHON) -m evaluation.eval_dialogue
+
 report-figures:
 	@mkdir -p .cache/matplotlib
 	XDG_CACHE_HOME=$(CURDIR)/.cache MPLCONFIGDIR=$(CURDIR)/.cache/matplotlib $(PYTHON) -m src.analysis.cli figures --analysis-dir $(ANALYSIS_OUTPUT_DIR) --output-dir $(REPORT_ASSETS_DIR)
