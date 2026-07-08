@@ -3,6 +3,8 @@
 This checklist is the handoff surface for the final report-polish pass. It keeps
 the work focused on presentation, consistency, and judging clarity.
 
+Last reviewed: 2026-07-08.
+
 ## Scope Lock
 
 - [x] Do not add data sources, agent tools, frontend scope, release packaging, or
