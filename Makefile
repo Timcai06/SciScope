@@ -274,6 +274,7 @@ rag-chunks:
 
 postgres-schema:
 	$(PYTHON) -m src.infra.cli schema --dsn $(POSTGRES_DSN) --file infra/postgres/schema.sql
+	$(PYTHON) -m src.infra.cli schema --dsn $(POSTGRES_DSN) --file infra/postgres/stance.sql
 
 postgres-load: rag-chunks
 	$(PYTHON) -m src.infra.cli load-postgres --dsn $(POSTGRES_DSN) --papers $(PROCESSED_CORPUS_PATH) --chunks $(RAG_CHUNKS_PATH)

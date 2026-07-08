@@ -68,13 +68,19 @@ def _fake_judge(claim: str, evidence_texts: list[str]) -> list[str]:
 
 
 @pytest.fixture
-def _patched(monkeypatch: pytest.MonkeyPatch) -> None:
-    from backend.app.services import retrieval_service
+def _patched(monkeypatch: pytest.MonkeyPatch) -> list[tuple]:
+    from backend.app.services import retrieval_service, stance_store
     from src.models import embeddings
 
     monkeypatch.setattr(retrieval_service, "search", _fake_search)
     monkeypatch.setattr(embeddings, "get_embedder", lambda *_a, **_k: _FakeEmbedder(_TOP_SIM))
     monkeypatch.setattr(verify_claim, "_judge_stances", _fake_judge)
+    # Capture persistence instead of hitting a real DB (and prove it fires).
+    recorded: list[tuple] = []
+    monkeypatch.setattr(
+        stance_store, "record_stances", lambda claim, verdict, evidence: recorded.append((claim, verdict, evidence)) or len(evidence)
+    )
+    return recorded
 
 
 def _result(claim: str) -> dict:
@@ -105,7 +111,7 @@ def test_negation_gets_different_verdict_from_claim(_patched: None) -> None:
 
 
 def test_falls_back_to_similarity_when_judge_unavailable(
-    _patched: None, monkeypatch: pytest.MonkeyPatch
+    _patched: list[tuple], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Fail-safe: with no usable LLM judge (offline / mock mode), the tool must not
     # crash — it falls back to the legacy similarity-only verdict.
@@ -113,3 +119,17 @@ def test_falls_back_to_similarity_when_judge_unavailable(
     result = _result(CLAIM)
     assert result["判定方式"] == "similarity"
     assert result["支持等级"] == "强支持"
+    assert _patched == []  # no stance labels -> nothing to persist
+
+
+def test_stance_run_persists_all_judged_evidence(_patched: list[tuple]) -> None:
+    # 矛盾即资产: a stance-judged run records every judged evidence row (not just
+    # the displayed top 4), with the claim and final verdict attached.
+    _result(CLAIM)
+    assert len(_patched) == 1
+    claim, verdict, evidence = _patched[0]
+    assert claim == CLAIM
+    assert verdict == "强支持"
+    assert [e["paper_id"] for e in evidence] == ["W1"]
+    assert evidence[0]["立场"] == "SUPPORT"
+    assert evidence[0]["接地相似度"] == 0.9

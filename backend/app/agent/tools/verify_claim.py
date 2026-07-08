@@ -164,6 +164,19 @@ def run(args: dict[str, Any]) -> Iterator[str]:
     }
     if stances is not None:
         payload["证据立场统计"] = {"支持": support, "反驳": contradict, "中立": len(stances) - support - contradict}
+        # 矛盾即资产 (roadmap Step 2): accumulate judged stances so contradictions
+        # build the 争议地图 over time. Persist every judged evidence (not just the
+        # displayed top 4). Fail-open inside — never blocks the answer.
+        from backend.app.services.stance_store import record_stances
+
+        record_stances(
+            claim,
+            verdict,
+            [
+                {**meta, "接地相似度": round(sim, 3), "立场": stances[i]}
+                for i, (sim, meta, _text) in enumerate(ranked)
+            ],
+        )
     return json.dumps(payload, ensure_ascii=False)
 
 
