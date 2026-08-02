@@ -36,7 +36,11 @@
 % for elegant supporting text, Bodoni 72 (high-contrast Didone) for Latin &
 % numerals. Body text keeps the portable fandol set so the rest still compiles
 % on any TeX Live.
-\newCJKfontfamily\coverTitle{Weibei SC}
+% Keep the expressive original title face when available, while allowing the
+% report to compile on machines that do not expose the optional macOS font.
+\IfFontExistsTF{Weibei SC}
+  {\newCJKfontfamily\coverTitle{Weibei SC}}
+  {\newCJKfontfamily\coverTitle{Songti SC}}
 \newCJKfontfamily\coverCJK{Songti SC}
 \newfontfamily\coverNum{Bodoni 72}
 \newfontfamily\coverSans{Bodoni 72}
