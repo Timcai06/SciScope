@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.singleton.1.10.0.schema.json
 PackageIdentifier: SciScope.SciScopeTUI
-PackageVersion: 0.1.2
+PackageVersion: 0.2.1
 PackageLocale: en-US
 Publisher: SciScope
 PublisherUrl: https://github.com/Timcai06
@@ -20,7 +20,7 @@ Tags:
   - literature
 Commands:
   - sciscope-tui
-ReleaseNotesUrl: https://github.com/Timcai06/SciScope/releases/tag/v0.1.2
+ReleaseNotesUrl: https://github.com/Timcai06/SciScope/releases/tag/v0.2.1
 Installers:
   - Architecture: x64
     InstallerType: zip
@@ -28,15 +28,15 @@ Installers:
     NestedInstallerFiles:
       - RelativeFilePath: sciscope-tui.exe
         PortableCommandAlias: sciscope-tui
-    InstallerUrl: https://github.com/Timcai06/SciScope/releases/download/v0.1.2/sciscope-tui_windows_amd64.zip
-    InstallerSha256: 877B79B8DAC5F5214B3E6157CCDE8C9D97A69C681A76ADE92F8593EE0B5E9D67
+    InstallerUrl: https://github.com/Timcai06/SciScope/releases/download/v0.2.1/sciscope-tui_windows_amd64.zip
+    InstallerSha256: 2D55BA70E18124EFFB19AF7FEFF0AD3FFF7273783E449F996C254D427A369E85
   - Architecture: arm64
     InstallerType: zip
     NestedInstallerType: portable
     NestedInstallerFiles:
       - RelativeFilePath: sciscope-tui.exe
         PortableCommandAlias: sciscope-tui
-    InstallerUrl: https://github.com/Timcai06/SciScope/releases/download/v0.1.2/sciscope-tui_windows_arm64.zip
-    InstallerSha256: 208F77A1FB3C60C1AE57D1292CAFC714B4A794102F3948055D2BA0F435E88347
+    InstallerUrl: https://github.com/Timcai06/SciScope/releases/download/v0.2.1/sciscope-tui_windows_arm64.zip
+    InstallerSha256: 44276D9F89CCFAF607A08BCB893806AF7531F193730A9490BF3FCE1998FF4C10
 ManifestType: singleton
 ManifestVersion: 1.10.0
