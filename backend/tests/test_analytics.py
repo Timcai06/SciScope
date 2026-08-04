@@ -1,12 +1,12 @@
 from backend.app.services.analytics_service import build_dashboard_overview
-from data_pipeline.analytics import (
+from src.data_contracts.analytics import (
     author_collaboration_edges,
     field_distribution,
     keyword_counts,
     publication_trend,
 )
-from data_pipeline.loaders import load_papers
-from data_pipeline.sample_data import sample_papers_path
+from src.data_contracts.loaders import load_papers
+from src.data_contracts.sample_data import sample_papers_path
 
 
 def _sample_papers():

@@ -1,9 +1,9 @@
 import csv
 import json
 
-from data_pipeline.loaders import load_papers
-from data_pipeline.normalize import normalize_keyword, normalize_paper
-from data_pipeline.sample_data import sample_papers_path
+from src.data_contracts.loaders import load_papers
+from src.data_contracts.normalize import normalize_keyword, normalize_paper
+from src.data_contracts.sample_data import sample_papers_path
 
 
 def test_sample_data_exists():

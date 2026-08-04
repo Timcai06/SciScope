@@ -4,6 +4,6 @@ Routes and services in backend import ``Paper`` through this module to avoid a
 hard dependency on pipeline package paths and to keep model ownership centralized.
 """
 
-from data_pipeline.models import Paper
+from src.data_contracts.models import Paper
 
 __all__ = ["Paper"]

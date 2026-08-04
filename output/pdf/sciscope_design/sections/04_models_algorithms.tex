@@ -9,14 +9,14 @@
 \begin{center}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{29mm}X X}
 \toprule
-模块 & 推荐技术 & 输出资产 \\
+模块 & 实现 & 输出资产 \\
 \midrule
-文本检索 & SQLite FTS5 或 BM25, 向量检索, RRF 融合 & 候选片段、分数、召回诊断 \\
-向量表示 & bge 或 sentence-transformer 本地 embedding, 可替换为云端 embedding & 向量索引、文本 chunk embedding \\
-GraphRAG & 作者合作图、关键词共现图、论文主题边与检索证据融合 & 图谱上下文、关系解释、路径证据 \\
-主题建模 & BERTopic 或 embedding 聚类, 结合关键词抽取与人工可读标签 & 主题编号、主题词、代表论文 \\
-趋势预测 & 关键词频次时序、增长率、突增检测、滑动窗口预测 & 热点榜、趋势曲线、预测说明 \\
-论文推荐 & 向量相似、主题相似、时间加权、作者关系重排 & 推荐列表、解释因子、排序分 \\
+文本检索 & PostgreSQL FTS + multilingual-e5 向量 + RRF(k=60) + 可选 bge-reranker & 候选片段、融合分、重排结果 \\
+向量表示 & multilingual-e5-base 768 维（query:/passage: 前缀） & chunk\_embeddings / paper\_embeddings \\
+GraphRAG & 关键词图扩展 + 检索证据融合 & 图谱上下文、关系解释 \\
+\multicolumn{1}{l}{\textbf{Stance 判定}} & \multicolumn{1}{l}{LLM 单条证据立场判定 + 聚合 verdict + 校准拒答 + 限定条件} & \multicolumn{1}{l}{stance 标签、verdict、claim\_evidence\_stance 表}\\
+趋势预测 & 关键词频次时序、增长率、突增、显著性 & 热点榜、趋势曲线、预测说明 \\
+论文推荐 & 向量相似、主题、时间、作者关系重排 & 推荐列表、解释因子、排序分 \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -62,20 +62,21 @@ GraphRAG & 作者合作图、关键词共现图、论文主题边与检索证据
 \end{tabularx}
 \end{center}
 
-\subsection{模型文件组织建议}
+\subsection{模型文件组织}
 
 \begin{center}
-\begin{tabularx}{\textwidth}{p{42mm}X}
+\begin{tabularx}{\textwidth}{p{44mm}X}
 \toprule
 路径 & 内容 \\
 \midrule
 \texttt{data/processed/} & 清洗后的论文表、chunk 表、关键词时序表 \\
-\texttt{indices/fts/} & 全文或摘要关键词检索索引 \\
-\texttt{indices/vector/} & LanceDB 或 FAISS 向量索引 \\
-\texttt{models/topics/} & 主题模型、主题标签、代表论文映射 \\
+\texttt{src/models/} & 代码包: 嵌入/趋势/推荐/图谱/双语/重排脚本（与资产目录 \texttt{models/} 同名不同物） \\
+\texttt{models/embedder\_local/} & multilingual-e5-base（768 维） \\
+\texttt{models/reranker\_local/} & bge-reranker-v2-m3（可选重排） \\
 \texttt{models/trends/} & 热点检测结果、趋势预测结果、解释元数据 \\
-\texttt{graphs/} & 作者合作图、关键词共现图、主题关系图 \\
-\begin{tabular}[t]{@{}l@{}}\texttt{configs/}\\\texttt{providers.yaml}\end{tabular} & DeepSeek、本地 vLLM、Mock provider 配置 \\
+\texttt{models/recommend/} & 推荐模型资产 \\
+\texttt{output/graphs/} & 作者合作图、关键词共现图、主题关系图 \\
+\texttt{infra/postgres/} & schema.sql + pgvector.sql + stance.sql（争议表与视图） \\
 \bottomrule
 \end{tabularx}
 \end{center}

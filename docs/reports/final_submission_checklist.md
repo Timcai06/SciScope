@@ -58,7 +58,7 @@ unless they are deliberately refreshed into current docs.
 - [ ] Competition source files:
   `docs/competition/赛题.docx`, `docs/competition/数据集.docx`.
 - [ ] Python code and runtime schema:
-  `src/`, `backend/`, `data_pipeline/`, `infra/`, `configs/`, `Makefile`.
+  `src/`, `backend/`, `src/data_contracts/`, `infra/`, `configs/`, `Makefile`.
 - [ ] Agent skill workflows and live smoke:
   `.sciscope/skills/`, `scripts/agent_smoke.py`.
 - [ ] Terminal client:

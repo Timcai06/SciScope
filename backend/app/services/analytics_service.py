@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from data_pipeline.analytics import (
+from src.data_contracts.analytics import (
     author_collaboration_edges,
     field_distribution,
     keyword_counts,

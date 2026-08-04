@@ -6,7 +6,7 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 - `backend` 与 `src` 是核心运行逻辑层，`tui` 只消费 SSE。
 - Web 前端源码已移除；当前客户端边界是 Go TUI 与 FastAPI API。
 
-## 六层职责（从底到上）
+## 分层职责（从底到上）
 
 1. 数据层
    - `data/`：可重建资产层，不是 PostgreSQL 的重复备份。
@@ -14,25 +14,31 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
    - `data/raw_canonical/`：source/year 分区的原始底账，支持审计与重建。
    - `data/analysis/`：报告、趋势、关键词/作者网络的分析资产。
    - `data/processed/`：`papers_corpus.json` 与 `paper_chunks.jsonl`，是 PostgreSQL/RAG 的导入边界。
-   - `data_pipeline/`：legacy sample pipeline，服务旧 sample tests 和兼容层；核心生产链路以 `src/` 为准。
 
-2. 模型与索引输入层
+2. 共享数据契约层
+   - `src/data_contracts/`：跨世界的共享契约（`Paper` 模型、loaders、normalize、analytics 适配器），
+     backend 运行时与 `src.harvest` 共用，避免两套口径漂移。
+
+3. 模型与索引输入层
    - `src/harvest/`：源采集与文本补全
    - `src/analysis/`：报告与分析资产计算
-   - `src/models/`：模型/索引相关脚本（embedding/recommend/trend 等）
+   - `src/models/`：模型/索引相关脚本（embedding/recommend/trend 等）。注意与资产目录 `models/` 同名：`src/models/` 是 Python 代码包，`models/` 是 gitignore 的模型文件资产。
 
-3. 服务层
+4. 服务层
    - `backend/app/services/`：检索、GraphRAG、证据问答、趋势与推荐服务
+   - `backend/app/services/stance/`：证据立场层（L3 核心）：stance 落库、争议地图读取，
+     后续证据句定位/校准/限定条件都落在此包。
    - `src/infra/` + `infra/postgres/`：PostgreSQL schema 与装载 CLI/SQL
 
-4. Agent 层
+5. Agent 层
    - `backend/app/agent/`：stream_agent 工具循环与可执行工具集合
 
-5. 接口层
+6. 接口层
    - `backend/app/api/`：REST 和 SSE 接口（含 `routes_agent.py` 的 `/api/agent/stream`）
    - `backend/app/main.py`：FastAPI 入口
+   - `backend/app/mcp_server.py`：MCP server（tools + resources），对外证据后端正门
 
-6. 客户端层
+7. 客户端层
    - `tui/`：Go/TUI 协议客户端（SSE 消费）
 
 ## 目录总览
@@ -54,9 +60,25 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 │   ├── processed/
 │   ├── analysis/
 │   └── sample/
-├── data_pipeline/            legacy sample pipeline / 兼容层
+├── src/                      核心数据工程与模型脚本
+│   ├── harvest/              源采集与治理
+│   ├── analysis/             分析资产与报告计算
+│   ├── data_contracts/       共享数据契约（Paper 模型/loaders/normalize/analytics）
+│   ├── infra/                PostgreSQL 装载 CLI
+│   └── models/               嵌入/趋势/推荐/图谱/双语/重排脚本
+├── backend/                  FastAPI（服务/接口/模型）
+│   ├── app/
+│   │   ├── api/
+│   │   ├── agent/
+│   │   ├── core/
+│   │   ├── models/
+│   │   ├── services/         检索/GraphRAG/证据问答/趋势/推荐/图谱
+│   │   │   └── stance/       L3 证据立场层（落库/争议地图/句级证据/校准）
+│   │   └── mcp_server.py     MCP 正门（tools + resources）
+│   └── tests/
 ├── docs/                     文档总入口与分类资料
-│   ├── architecture/         架构、边界、项目结构
+│   ├── architecture/         架构、边界、项目结构、agent 模型层
+│   ├── project/              charter、roadmap、国赛目标说明书、交付计划、状态快照
 │   ├── operations/           runbook、部署与生产运维
 │   ├── reports/              报告优化、提交清单、manifest
 │   ├── developer/            MCP/开发者集成说明
@@ -64,24 +86,24 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 │   ├── competition/          赛题与数据集原始说明
 │   ├── examples/             agent 会话与演示样例
 │   └── research/             外部研究笔记
-├── evaluation/               检索/推荐/趋势评估
+├── evaluation/               检索/推荐/趋势/对话评估（含后续 stance 金标准与 eval_stance）
 ├── infra/                    PostgreSQL SQL 与部署相关配置
-├── models/                   模型文件（常见 Git 忽略）
+├── models/                   模型文件资产（常见 Git 忽略；`src/models/` 是代码包，二者同名不同物）
+│   ├── embedder_local/       本地 embedding 模型
+│   ├── reranker_local/       本地重排模型
+│   ├── trends/               趋势模型资产
+│   └── recommend/            推荐模型资产
 ├── output/                   报告图表、PDF、评估结果
 │   ├── assets/
 │   ├── eval/
 │   ├── graphs/
 │   ├── logs/
 │   └── pdf/
-├── plan/                     任务与路线文档
 ├── scripts/                  辅助脚本
-├── src/                      核心数据工程与模型脚本
-│   ├── harvest/
-│   ├── analysis/
-│   ├── infra/
-│   └── models/
 ├── tui/                      Go 终端客户端
 ├── configs/                  配置文件与示例
+├── deploy/                   Docker 部署（compose/Dockerfile）
+├── packaging/                npm/Scoop/Winget 打包
 ├── .github/                  流水线与发布工作流
 ├── Makefile                  全部可执行交接口
 └── README.md
@@ -124,6 +146,10 @@ SciScope 以 **Python 数据智能底座 + Go TUI 终端客户端** 为主要交
 - `models/`
 - `output/graphs/`
 - `tui/sciscope-tui`, `tui/dist/`
+
+`tmp/` 只放临时构建中间产物（例如 LaTeX 分段构建），可随时清空。
+规划类文档统一在 `docs/project/`：`charter.md`、`roadmap.md`、`国赛目标说明书.md`、
+`status-and-roadmap.md`（状态快照）与 `delivery/`（交付计划与检查清单）。
 
 其中 `data/raw_canonical/`、`data/analysis/`、`data/processed/papers_corpus.json`、`data/processed/paper_chunks.jsonl` 是可复现交付资产，不能因为 PostgreSQL 已加载而删除；如需节省空间，应先归档而不是直接删除。
 

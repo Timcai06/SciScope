@@ -73,11 +73,13 @@ product roadmap.
   交互式 Web 工作台) that are NOT the current delivery. Prefer the living zone
   above, the README, runbook, and project structure when they differ.
 
-### Planning archive
+### Planning
 
-- [`../plan/`](../plan/): execution planning tree. The forward-looking roadmap now
-  lives in [project/roadmap.md](project/roadmap.md); `plan/` is kept as the
-  build/delivery history and current-state snapshot.
+- [`project/`](project/): the single planning home — charter (方针),
+  [roadmap.md](project/roadmap.md) (北极星与路线), [国赛目标说明书.md](project/国赛目标说明书.md)
+  (frozen national-competition goals), `status-and-roadmap.md` (delivered-state
+  snapshot), and `delivery/` (delivery plans & checklists). The old top-level
+  `plan/` tree has been merged here and removed.
 
 ---
 

@@ -2,14 +2,14 @@
 \thispagestyle{empty}
 \centering
 \vspace*{12mm}
-{\Huge\bfseries SciScope 科技文献智能分析报告\\与科研智能体系统设计\par}
+{\Huge\bfseries SciScope 科技文献数据要素服务\\与科研智能体系统设计\par}
 \vspace{6mm}
-{\Large 内部架构与设计思路文档\par}
+{\Large 国赛版架构与完整设计文档（内部）\par}
 \vspace{8mm}
-{\large \tagpill{数据分析报告} \quad
-\tagpill{科研智能体模型} \quad
-\tagpill{RAG 与知识图谱} \quad
-\tagpill{AI Infra 支撑}\par}
+{\large \tagpill{数据要素服务} \quad
+\tagpill{证据立场 L3} \quad
+\tagpill{MCP 证据后端} \quad
+\tagpill{本机全量演示}\par}
 \vspace{16mm}
 
 \begin{tikzpicture}[
@@ -18,21 +18,25 @@
   box/.style={draw=black, fill=white, rounded corners=3pt, minimum height=14mm, align=center},
   arrow/.style={-{Latex[length=2.2mm]}, thick, color=black}
 ]
-  \node[box, minimum width=34mm] (data) {论文数据\\元数据 / 摘要 / 作者 / 年份 / 关键词};
-  \node[box, minimum width=37mm, right=10mm of data, very thick] (analysis) {数据分析报告\\分布 / 演化 / 合作网络 / 热点};
-  \node[box, minimum width=37mm, right=10mm of analysis, very thick] (agent) {科研智能体\\问答 / 推荐 / 预测 / 图谱查询};
-  \node[box, minimum width=48mm, below=15mm of analysis, double] (infra) {AI Infra 支撑层\\DeepSeek / 本地 vLLM / Makefile / 可降级运行};
+  \node[box, minimum width=34mm] (data) {公开科技文献\\六源采集 / 数据要素治理};
+  \node[box, minimum width=37mm, right=10mm of data, very thick] (analysis) {可计算数据要素\\分析资产 / RAG 语料 / 图谱};
+  \node[box, minimum width=37mm, right=10mm of analysis, very thick] (agent) {证据层智能体\\检索 / 问答 / 趋势 / 推荐\\stance 判定 / 争议地图};
+  \node[box, minimum width=48mm, below=15mm of agent, double] (mcp) {协议出口\\API / SSE / MCP（tools + resources）\\被其他科研 agent 调用};
+  \node[box, minimum width=34mm, left=10mm of mcp] (tui) {展示端\\Go TUI 消费 SSE};
   \draw[arrow] (data) -- (analysis);
   \draw[arrow] (analysis) -- (agent);
-  \draw[arrow] (infra) -- (analysis);
-  \draw[arrow] (infra) -- (agent);
+  \draw[arrow] (agent) -- (mcp);
+  \draw[arrow] (agent) -- (tui);
 \end{tikzpicture}
 
 \vfill
 \begin{designbox}{文档定位}
-这不是交付给评委的最终分析报告, 而是团队内部用于统一架构、模型、数据、工程路线和产品边界的设计文档。最终对外交付仍然必须落在两条主线上: 可复现的数据分析报告, 以及可运行的科研智能体系统。AI Infra 很重要, 但它只服务于主线能力。
+本文档是团队内部用于统一国赛架构、证据层（stance L3）、协议边界、数据与演示路线的
+设计文档，是 `docs/project/国赛目标说明书.md`（冻结目标）在设计层的展开。
+对外交付仍落在两条主线上：可复现的数据分析报告（要素服务化表述），以及可被调用、
+可演示的科研智能体系统。核心判断：**证据可追溯是魂，协议可调用是门，界面可替换是皮**。
 \end{designbox}
 \vspace{6mm}
-{\small 版本: 多文件 LaTeX 重构稿 \quad 日期: 2026-06-19}
+{\small 版本: 国赛版（2026-08-04） \quad 上一版: 2026-06-19}
 \end{titlepage}
 \clearpage

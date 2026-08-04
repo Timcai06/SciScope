@@ -3,14 +3,16 @@ import json
 from pathlib import Path
 from typing import Any
 
-from data_pipeline.models import Paper
-from data_pipeline.normalize import normalize_paper
+from src.data_contracts.models import Paper
+from src.data_contracts.normalize import normalize_paper
 
 
-"""Load sample paper records from JSON/CSV and normalize+validate them.
+"""Load paper records from JSON/CSV and normalize+validate them.
 
-This legacy helper supports deterministic sample-mode services and tests. The
-production data layer is built by `src.harvest`, `src.analysis`, and `src.infra`.
+This shared contract helper supports sample-mode services, backend in-memory
+workflows and tests. The production data layer is built by `src.harvest`,
+`src.analysis`, and `src.infra`; this module keeps the payload contract
+(`Paper` -> normalized dict) consistent across both worlds.
 """
 
 

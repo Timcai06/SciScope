@@ -1,32 +1,36 @@
-\section{主线边界: 数据洞察与科研智能体优先}
+\section{主线边界: 证据可追溯的科研智能体与数据要素服务}
 
 \begin{designbox}{核心判断}
-SciScope 的主线不是炫耀 AI Infra, 而是让科研人员从海量科技文献中快速得到可验证洞察。AI Infra 的价值在于保证问答、趋势预测、论文推荐和知识图谱查询稳定运行, 并支撑 DeepSeek 与本地模型之间的可切换能力。
+SciScope 的主线不是炫耀 AI Infra, 也不只是"又一个文献问答助手", 而是把公开科技文献
+治理成\textbf{可计算、可调用的数据要素}, 并建成\textbf{可被其他科研 agent 调用的证据后端}。
+大模型只是生成层; 可复现的数据资产、检索/证据索引、stance 判定与协议出口才是护城河。
 \end{designbox}
 
 \subsection{任务主线}
 
 \begin{center}
-\begin{tabularx}{\textwidth}{>{\bfseries}p{28mm}X X}
+\begin{tabularx}{\textwidth}{>{\bfseries}p{30mm}X X}
 \toprule
 主线模块 & 必须回答的问题 & 应形成的资产 \\
 \midrule
-数据分析报告 & 这些论文在年份、领域、关键词、作者合作上呈现什么结构与变化 & 图表、统计表、网络图、趋势解释、结论摘要 \\
-科研智能体系统 & 用户能否用自然语言查文献、问趋势、找论文、查图谱 & 前端工作台、FastAPI 服务、RAG 链路、模型与索引文件 \\
-模型算法资产 & 系统是否有可复现的分析与预测能力 & 向量索引、主题模型、推荐排序、趋势矩阵、作者图谱 \\
-AI Infra 支撑 & 系统是否稳定、可降级、可本地运行、可接入 DeepSeek & Makefile、模型 provider、vLLM 配置、运行文档 \\
-\bottomrule
+数据要素治理 & 六源文献如何被规范化、去重、分区分层成可审计资产 & raw\_canonical / analysis / processed 分层 + 口径表 \\
+数据分析报告 & 分布、演化、作者网络、覆盖偏差揭示了什么 & 图表、统计表、网络图、要素服务化收束 \\
+证据立场 L3 & 一句话与文献是支持 / 反驳 / 中立, 证据落在哪个句子 & 金标准评测、校准/拒答、争议地图表与视图 \\
+混合检索与问答 & 用户能否用自然语言得到带 `[n]` 证据的答案 & 混合检索、GraphRAG 证据问答 \\
+MCP 协议出口 & 其他 agent 能否调用核查工具、读取争议资源 & MCP tools + resources、OpenCode 真调产物 \\
 \end{tabularx}
 \end{center}
 
-\subsection{叙事比例}
+\subsection{叙事比例（国赛答辩）}
 
 \begin{plainbox}
 \begin{itemize}
-  \item \textbf{第一优先级}: 文献分析结果与洞察, 包括分布、演化、合作网络和热点变化。
-  \item \textbf{第二优先级}: 科研智能体功能闭环, 包括问答、推荐、趋势预测、图谱查询和证据溯源。
-  \item \textbf{第三优先级}: 算法创新, 包括 GraphRAG、混合检索、动态主题建模、突增检测和推荐排序。
-  \item \textbf{第四优先级}: AI Infra, 包括 DeepSeek、本地 vLLM、M5 单机优先和 i5 可选协同。
+  \item \textbf{第一优先级（技术魂 A）}: 论断级 stance——不是"相关即支持", 而是
+    证据句级支持/反驳/中立 + 校准拒答 + 限定条件 + 争议沉淀。
+  \item \textbf{第二优先级（价值壳 C）}: 公开文献治理成数据要素, 以 API/MCP 对外服务,
+    贴出题单位语境: 智能体作为文献要素服务的调用方。
+  \item \textbf{第三优先级（展示皮 B）}: Go TUI 消费 SSE 的完整科研工作流, 本机全量可演示。
+  \item \textbf{第四优先级}: 检索/趋势/推荐等赛题基线能力——必须能展示, 但不作为技术主叙事。
 \end{itemize}
 \end{plainbox}
 
@@ -38,15 +42,15 @@ AI Infra 支撑 & 系统是否稳定、可降级、可本地运行、可接入 D
   layer/.style={draw=black, fill=white, rounded corners=2pt, minimum height=11mm, align=center, text width=0.88\textwidth},
   arrow/.style={-{Latex[length=2mm]}, thick, color=black}
 ]
-  \node[layer, very thick] (value) {科研工作流层: 文献调研, 研究选题, 技术路线梳理, 趋势判断};
-  \node[layer, below=of value] (product) {产品能力层: 问答, 证据卡, 趋势看板, 作者合作图, 论文推荐};
-  \node[layer, below=of product] (model) {模型算法层: RAG, GraphRAG, 主题建模, 推荐排序, 时序预测};
-  \node[layer, below=of model] (data) {数据资产层: 论文元数据, 摘要切块, 向量索引, 关键词时序矩阵, 作者图谱};
-  \node[layer, below=of data, densely dashed] (infra) {AI Infra 支撑层: DeepSeek, 本地 vLLM, Makefile, 可降级运行, i5 可选控制面};
-  \draw[arrow] (infra) -- (data);
-  \draw[arrow] (data) -- (model);
-  \draw[arrow] (model) -- (product);
-  \draw[arrow] (product) -- (value);
+  \node[layer, very thick] (mcp) {协议与出口层: API / SSE / MCP server（tools + resources）——被其他科研 agent 调用};
+  \node[layer, below=of mcp] (evidence) {证据层（核心）: 混合检索, GraphRAG, 证据句定位, stance 判定, 校准/拒答, 争议地图};
+  \node[layer, below=of evidence] (cap) {能力层: /api/search, /api/chat, /api/trends, /api/recommend, /api/graph, /api/agent/stream};
+  \node[layer, below=of cap] (engine) {数据工程与模型层: src/harvest, src/analysis, src/models, src/infra, src/data\_contracts};
+  \node[layer, below=of engine, densely dashed] (base) {可重建资产层: data/raw\_canonical, data/analysis, data/processed, models/, PostgreSQL/ pgvector};
+  \draw[arrow] (base) -- (engine);
+  \draw[arrow] (engine) -- (cap);
+  \draw[arrow] (cap) -- (evidence);
+  \draw[arrow] (evidence) -- (mcp);
 \end{tikzpicture}
 
 \clearpage

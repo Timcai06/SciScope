@@ -69,7 +69,8 @@ def _fake_judge(claim: str, evidence_texts: list[str]) -> list[str]:
 
 @pytest.fixture
 def _patched(monkeypatch: pytest.MonkeyPatch) -> list[tuple]:
-    from backend.app.services import retrieval_service, stance_store
+    from backend.app.services import retrieval_service
+    from backend.app.services.stance import store as stance_store
     from src.models import embeddings
 
     monkeypatch.setattr(retrieval_service, "search", _fake_search)

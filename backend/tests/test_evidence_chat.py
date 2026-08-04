@@ -3,8 +3,8 @@ import pytest
 from backend.app.core.config import get_settings
 from backend.app.services.deepseek_provider import DeepSeekProvider, LocalOpenAIProvider, get_llm_provider
 from backend.app.services.evidence_chat import answer_question
-from data_pipeline.loaders import load_papers
-from data_pipeline.sample_data import sample_papers_path
+from src.data_contracts.loaders import load_papers
+from src.data_contracts.sample_data import sample_papers_path
 
 
 @pytest.fixture(autouse=True)

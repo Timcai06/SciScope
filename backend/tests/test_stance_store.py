@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.app.services import stance_store
+from backend.app.services.stance import store as stance_store
 
 
 class _FakeCursor:

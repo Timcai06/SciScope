@@ -27,7 +27,7 @@ Current load: ~160k papers, ~341k chunks, ~3.5M coauthor edges.
 
 - `src/models/embeddings.py` — local sentence-transformers embedder
   (`intfloat/multilingual-e5-base`, 768-dim to match the schema; e5 `query:` /
-  `passage:` prefixes). Cached under `models/embedder/`. Configurable via
+  `passage:` prefixes). Cached under `models/embedder_local/`. Configurable via
   `SCISCOPE_EMBEDDING_MODEL`.
 - `src/models/build_embeddings.py` (`make embeddings`) — streams
   `paper_chunks.jsonl`, encodes in batches, upserts `chunk_embeddings`, with
@@ -92,9 +92,19 @@ removed; any future Web client should consume the same `/api/search`,
 `/api/trends`, `/api/recommend`, `/api/graph`, and `/api/agent/stream`
 contracts as a new scope.
 
-## Not yet done / future
+## Landed after this document was written
 
-- GraphRAG (graph-augmented retrieval), cross-encoder reranking.
-- Remote generation (DeepSeek / iFlytek Spark) — provider slot exists.
-- Re-run on the final corpus once crawling completes:
-  `make data-layer-refresh && make rag-chunks && make agent-build`.
+- GraphRAG keyword-graph query expansion (`graphrag.py`) and local
+  cross-encoder reranking (`bge-reranker-v2-m3`, optional) are now wired into
+  retrieval (`retrieval_service.py`).
+- Remote generation is live: DeepSeek is the hosted provider, local vLLM/LM
+  Studio is the fallback (`backend/app/services/deepseek_provider.py`).
+- Stance layer landed (roadmap steps 0–2): `verify_claim` judges per-evidence
+  SUPPORT / CONTRADICT / NEUTRAL, persists to `claim_evidence_stance` and
+  derives disputes via the `contradictions` view — the seed of the 科学争议地图.
+  Current L3 plan (sentence-level evidence, calibration/rejection,
+  qualification) is tracked in `docs/project/roadmap.md` and the frozen
+  `docs/project/国赛目标说明书.md`.
+- Data contracts moved from the former `data_pipeline/` package to
+  `src/data_contracts/` (shared by backend runtime and `src.harvest`).
+- Full rebuild: `make data-layer-refresh && make rag-chunks && make agent-build`.

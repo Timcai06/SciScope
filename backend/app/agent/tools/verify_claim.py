@@ -167,7 +167,7 @@ def run(args: dict[str, Any]) -> Iterator[str]:
         # 矛盾即资产 (roadmap Step 2): accumulate judged stances so contradictions
         # build the 争议地图 over time. Persist every judged evidence (not just the
         # displayed top 4). Fail-open inside — never blocks the answer.
-        from backend.app.services.stance_store import record_stances
+        from backend.app.services.stance.store import record_stances
 
         record_stances(
             claim,

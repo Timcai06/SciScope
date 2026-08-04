@@ -23,11 +23,10 @@ RUN python -m pip install --upgrade pip \
  && python -m pip install -r backend/requirements.txt
 
 # Application code (the Python brain: API + agent + services + models loaders).
-# backend imports first-party packages `src` (reranker/embeddings) and
-# `data_pipeline` (corpus loaders) — all three must be on the image.
+# backend imports first-party package `src` (reranker/embeddings, shared
+# data contracts) — it must be on the image.
 COPY backend backend
 COPY src src
-COPY data_pipeline data_pipeline
 
 EXPOSE 8000
 

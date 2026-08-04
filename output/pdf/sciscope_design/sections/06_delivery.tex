@@ -1,7 +1,9 @@
-\section{工程交付设计}
+\section{工程交付设计（国赛双轨）}
 
 \begin{designbox}{交付原则}
-最终交付不是一个孤立 PDF, 也不是一个只能在开发机上运行的 demo。它应是一套可复现工程包: 数据处理代码生成分析资产, 后端服务消费这些资产, 前端工作台展示与交互, 模型 provider 提供可切换生成能力。
+最终交付不是孤立 PDF, 也不是只在开发机上的 demo。它是可复现工程包：
+数据处理代码生成分析资产, 服务层消费资产, 证据层提供 stance/争议能力,
+MCP 把能力暴露给外部 agent, Go TUI 演示完整工作流。提交配套"评委视频 + 硬件清单"双轨。
 \end{designbox}
 
 \subsection{交付物清单}
@@ -11,11 +13,13 @@
 \toprule
 交付物 & 内容 \\
 \midrule
-数据分析报告 & 文献分布、关键词演化、作者合作网络、主题结构、趋势预测和洞察结论 \\
-科研智能体系统 & Next.js 工作台, FastAPI 后端, RAG 问答, 推荐、趋势、图谱查询接口 \\
-Python 模型代码 & 数据清洗、索引构建、主题建模、趋势检测、推荐排序、图谱构建 \\
-模型与索引文件 & 向量索引、FTS 索引、主题模型、趋势结果、作者图谱、关键词矩阵 \\
-运行与验收文档 & Makefile 命令、DeepSeek 配置、本地 vLLM 配置、故障排查、演示脚本 \\
+数据分析报告 & 文献分布、关键词演化、作者合作网络、覆盖偏差、要素服务化收束 \\
+项目报告书 & 概述/方案/价值三章, L3 证据层为主干, 双报告口径一致 \\
+科研智能体系统 & FastAPI + PostgreSQL + LangGraph Agent + Go TUI \\
+Stance L3 评测 & 双语金标准、SciFact 锚点、similarity 对照、校准/拒答 \\
+争议地图 & claim\_evidence\_stance + contradictions + API/Agent tool/MCP resource \\
+MCP 证据后端 & tools（verify\_claim 等）+ resources（争议前线）+ OpenCode 真调产物 \\
+评委视频与清单 & 本机全量黄金脚本录屏 + 硬件/环境清单 + 逐步复现文档 \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -23,43 +27,54 @@ Python 模型代码 & 数据清洗、索引构建、主题建模、趋势检测�
 \subsection{Makefile 命令分层}
 
 \begin{center}
-\begin{tabularx}{\textwidth}{p{36mm}X}
+\begin{tabularx}{\textwidth}{p{38mm}X}
 \toprule
 命令 & 作用 \\
 \midrule
-\texttt{make install} & 安装前后端依赖和 Python 环境依赖 \\
-\texttt{make ingest} & 读取样本数据, 生成标准化中间表 \\
-\texttt{make index} & 构建 FTS、向量索引、主题模型和图谱资产 \\
-\texttt{make report} & 生成数据分析报告所需图表和统计结果 \\
-\texttt{make dev} & 启动默认开发链路, 可使用 Mock 或 DeepSeek \\
-\texttt{make vllm-serve} & 启动本地 vLLM-Metal OpenAI-compatible 服务 \\
-\texttt{make dev-vllm} & 使用本地 vLLM provider 启动后端 \\
-\texttt{make smoke} & 检查 ingest、dashboard、chat、recommend、trend、graph \\
-\texttt{make status} & 检查端口、索引文件、模型 provider 和数据版本 \\
+\texttt{make install} & 安装 Python 依赖 \\
+\texttt{make postgres-refresh} & 数据资产刷新 + schema + 全量入库 \\
+\texttt{make agent-build} & embeddings + recommend + trend + graph \\
+\texttt{make backend} & 启动 FastAPI（:8000） \\
+\texttt{make tui} & 启动 Go TUI（消费 SSE） \\
+\texttt{make test-backend} & 后端自动化测试（当前 269 passed） \\
+\texttt{make eval-all} / \texttt{make eval-stance} & 检索/趋势/推荐评测; stance L3 金标准评测 \\
+\texttt{make submission-package} & 白名单提交包 + manifest \\
+\texttt{make tui-doctor} & 终端客户端环境自检 \\
 \bottomrule
 \end{tabularx}
 \end{center}
 
-\subsection{产品工作台页面}
+\subsection{演示与复现双轨}
 
 \begin{plainbox}
 \begin{itemize}
-  \item \textbf{Overview}: 数据集规模、领域分布、年份趋势、热点关键词。
-  \item \textbf{Ask}: 文献问答、证据卡、引用论文、检索诊断。
-  \item \textbf{Trends}: 关键词演化、主题热度、突增检测、预测说明。
-  \item \textbf{Graph}: 作者合作网络、关键词共现、主题关系路径。
-  \item \textbf{Recommend}: 论文推荐、相似度解释、时间与主题过滤。
-  \item \textbf{Workbench}: 一个研究问题贯穿问答、趋势、图谱、推荐的联动视图。
+  \item \textbf{评委视频}: 本机全量 + OpenCode 调用的黄金脚本（约 6--8 分钟）, 综合评委 10 分钟内建立信任。
+  \item \textbf{硬件清单}: CPU/RAM/磁盘、PostgreSQL/pgvector、模型路径、耗时量级、关键命令,
+        说明全量可复现的门槛。
+  \item \textbf{文档复现}: runbook 逐步: 安装 $\rightarrow$ 起库 $\rightarrow$ 加载 $\rightarrow$ 启动 $\rightarrow$ 黄金脚本。
+  \item \textbf{不承诺}: 不把 hosted 小库当国赛主演示; 现场环境不允许全量时以视频为能力举证。
 \end{itemize}
 \end{plainbox}
+
+\subsection{黄金演示脚本（约 6--8 分钟）}
+
+\begin{enumerate}
+  \item C 开场: 文献要素治理 $\rightarrow$ 证据服务。
+  \item 规模一屏: 运行库论文/chunk 与报告口径一致。
+  \item B 基线: 真实问题 $\rightarrow$ `[n]` 证据问答 $\rightarrow$ 证据卡。
+  \item A L3: 正论断 / 反论断 / 限定冲突 / 证据不足。
+  \item 争议地图: 列表读到刚写入的矛盾 claim。
+  \item OpenCode 调用: MCP verify\_claim + disputes resource。
+  \item 收束: 三创新点 + 一句诚实边界。
+\end{enumerate}
 
 \subsection{验收口径}
 
 \begin{enumerate}
-  \item 能从原始样本数据生成标准化资产和分析图表。
-  \item 能启动前端、后端和至少一种模型 provider。
-  \item \texttt{/api/chat} 能返回答案和证据, 且证据来自本地索引。
-  \item 趋势、推荐、图谱接口能返回结构化结果。
+  \item 本机全量库可起, 运行库数字与报告口径一致。
+  \item stance 正反论断不同判; 低置信给"证据不足"; 回退不出现"强支持"。
+  \item 争议地图 API / Agent tool / MCP resource 三条读路径同一 claim 可读。
+  \item OpenCode 真实调用过一次, 有日志/录屏产物。
   \item 所有对外结论都能追溯到数据资产或检索证据。
 \end{enumerate}
 

@@ -62,8 +62,28 @@
   \item 文献分布: 年份趋势、领域结构、关键词总体排行。
   \item 主题演化: 动态主题、突增关键词、领域间主题迁移。
   \item 作者合作: 合作网络、核心作者、社区结构、跨领域合作。
-  \item 热点预测: 高增长主题、潜在研究机会、风险与不确定性。
-  \item 系统映射: 报告中的每类洞察如何被智能体调用和解释。
+  \item 热点观察: 高增长主题、潜在研究机会、风险与不确定性。
+  \item 要素服务化收束: 每类洞察如何支撑检索、核查、争议地图与 MCP 服务。
 \end{enumerate}
+
+\subsection{全国赛口径: 数据要素分层表}
+
+\begin{center}
+\begin{tabularx}{\textwidth}{p{30mm}X X}
+\toprule
+层 & 资产 & 用途 \\
+\midrule
+原始采集 & 169{,}324 条（六源） & 审计与重建底账, raw\_canonical 分区 \\
+分析论文 & 168{,}447 条 & 分析与图件输入, analysis 资产 \\
+处理语料 & 159{,}164 条 & PostgreSQL/RAG 导入边界 \\
+运行库 & 论文 / chunk / 向量实测 & PostgreSQL + pgvector 服务层 \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+\begin{plainbox}
+四层数字\textbf{必须分开表述}，不可混用；运行库一层以 PostgreSQL 实测为准。覆盖上注意：全文仅约
+10.5\% 且高度依赖 PMC，计算机/材料领域主要靠标题摘要——这在报告与答辩中要诚实前置。
+\end{plainbox}
 
 \clearpage

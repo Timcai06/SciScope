@@ -43,7 +43,7 @@ INCLUDES = [
     Include("infra"),
     Include("src"),
     Include("backend"),
-    Include("data_pipeline"),
+    Include("src/data_contracts"),
     Include("tui"),
     Include("models/trends"),
     Include("models/recommend"),

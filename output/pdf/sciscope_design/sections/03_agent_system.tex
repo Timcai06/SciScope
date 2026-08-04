@@ -1,7 +1,10 @@
-\section{科研智能体系统设计}
+\section{科研智能体系统设计（证据层为核心）}
 
 \begin{designbox}{产品定位}
-科研智能体不是一个普通聊天框, 而是一个围绕科技文献构建的研究工作台。它要把数据分析报告中的静态洞察转化为可交互能力: 用户能继续追问、筛选证据、跳转图谱、获得推荐, 并理解答案来自哪些文献。
+科研智能体不是一个普通聊天框, 也不只是一套 RAG 检索器。它的差异化在于\textbf{证据立场判定}:
+对一句论断, 系统能说出文献是"支持/反驳/中立", 指出证据落在哪个句子, 低置信时如实说
+"证据不足", 并把检测到的矛盾沉淀为可读取的\textbf{科学争议地图}。这个原语同时是核查能力、
+争议检测器和可被其他 agent 调用的服务。
 \end{designbox}
 
 \subsection{核心能力矩阵}
@@ -11,16 +14,17 @@
 \toprule
 能力 & 用户体验 & 后端能力 \\
 \midrule
-文献问答 & 用户用自然语言询问某个方向的研究现状, 系统返回答案与证据卡 & 混合检索、RAG 合成、引用校验 \\
-趋势预测 & 用户询问未来哪些方向值得关注, 系统返回趋势解释与依据 & 关键词时序、主题增长率、突增检测 \\
-论文推荐 & 用户输入兴趣主题或一篇论文, 系统推荐相关论文并解释原因 & 向量相似、主题相似、作者关系、时间加权排序 \\
-知识图谱查询 & 用户查询作者、机构、关键词、主题之间的关系 & 图谱索引、NetworkX 预计算、前端图谱渲染 \\
-综述辅助 & 用户要求生成某方向的初步综述框架 & 证据聚合、主题分组、引用约束生成 \\
+证据问答 & 自然语言问方向, 系统返回答案与证据卡 & 混合检索、GraphRAG、引用约束生成 \\
+\multicolumn{1}{l}{\textbf{论断核查}} & \multicolumn{1}{l}{一句话得到支持/反驳/中立, 证据句可展开, 边界诚实} & \multicolumn{1}{l}{stance L3: 句级证据, 类别概率, 校准拒答}\\
+争议地图 & 看到"文献里有人反对"的论断与双方证据 & claim\_evidence\_stance + contradictions 视图 + API/Agent tool/MCP resource \\
+趋势预测 & 询问未来方向, 返回解释与不确定性 & 关键词时序、增长率、显著性核实 \\
+论文推荐 & 输入兴趣, 得到推荐与解释原因 & 向量/主题/作者/时间加权, 可解释因子 \\
+图谱查询 & 查询作者/关键词/主题关系 & 图谱索引与 NetworkX 预计算 \\
 \bottomrule
 \end{tabularx}
 \end{center}
 
-\subsection{Agentic Workflow}
+\subsection{Stance L3 管线（技术主叙事）}
 
 \begin{tikzpicture}[
   node distance=6mm,
@@ -28,36 +32,49 @@
   box/.style={draw=black, fill=white, rounded corners=2pt, align=center, minimum width=30mm, minimum height=10mm},
   arrow/.style={-{Latex[length=2mm]}, thick, color=black}
 ]
-  \node[box, very thick] (q) {用户问题};
-  \node[box, right=6mm of q] (planner) {Planner\\意图识别};
-  \node[box, right=6mm of planner] (retriever) {Retriever\\混合检索};
-  \node[box, below=7mm of retriever] (kg) {Graph Agent\\图谱查询};
-  \node[box, double, left=6mm of kg] (trend) {Trend Agent\\趋势分析};
-  \node[box, below=7mm of planner] (synth) {Synthesis Agent\\证据合成};
-  \node[box, densely dashed, left=6mm of synth] (critic) {Critic\\引用校验};
-  \node[box, very thick, left=6mm of critic] (answer) {答案\\证据卡};
-  \draw[arrow] (q) -- (planner);
-  \draw[arrow] (planner) -- (retriever);
-  \draw[arrow] (retriever) -- (kg);
-  \draw[arrow] (retriever) -- (synth);
-  \draw[arrow] (kg) -- (synth);
-  \draw[arrow,double] (trend) -- (synth);
-  \draw[arrow,densely dashed] (synth) -- (critic);
-  \draw[arrow] (critic) -- (answer);
+  \node[box, very thick] (q) {论断 Claim};
+  \node[box, right=6mm of q] (ret) {检索相关文献\\6 篇候选};
+  \node[box, right=6mm of ret] (sent) {证据句定位\\句级跨度};
+  \node[box, below=7mm of sent] (judge) {单条立场判定\\SUPPORT / CONTRADICT / NEUTRAL};
+  \node[box, left=6mm of judge] (agg) {聚合 verdict\\强支持/部分/争议/反驳/不足};
+  \node[box, left=6mm of agg] (store) {落库\\claim\_evidence\_stance};
+  \node[box, below=7mm of store] (map) {争议地图\\contradictions 视图};
+  \node[box, densely dashed, above=7mm of judge] (rule) {回退纪律\\LLM 不可用 $\rightarrow$ similarity 仅判证据不足};
+  \draw[arrow] (q) -- (ret);
+  \draw[arrow] (ret) -- (sent);
+  \draw[arrow] (sent) -- (judge);
+  \draw[arrow] (judge) -- (agg);
+  \draw[arrow] (agg) -- (store);
+  \draw[arrow] (store) -- (map);
+  \draw[arrow,densely dashed] (rule) -- (judge);
 \end{tikzpicture}
 
-\subsection{API 与模块边界}
+\begin{plainbox}
+\begin{itemize}
+  \item \textbf{句级证据}: 采用的证据能落到句级（或等价最小跨度）, 不拿整段摘要充当证据。
+  \item \textbf{校准与拒答}: 低置信倾向"证据不足"; 给出类别概率或分数, 呈校准/拒答表现。
+  \item \textbf{限定条件}: 人群/剂量/时间/物种等明显冲突时降级为 NEUTRAL 或证据不足并写理由。
+  \item \textbf{对称性}: 论断 C 与反论断 $\neg$C 不得无理由同判为支持（这是早期"相似即支持"的裂缝）。
+  \item \textbf{回退纪律}: LLM 不可用时仅按相似度给"证据不足", \textbf{禁止}回退序列输出"强支持"式措辞。
+  \item \textbf{金标准}: 双语主集 + SciFact 协议锚点, 与纯相似度 baseline 同集对照, 结果进项目报告。
+\end{itemize}
+\end{plainbox}
+
+\subsection{协议与模块边界}
 
 \begin{center}
 \begin{tabularx}{\textwidth}{p{34mm}X X}
 \toprule
 接口或模块 & 输入 & 输出 \\
 \midrule
-\texttt{/api/chat} & 问题、筛选条件、会话上下文 & 答案、证据、引用论文、检索诊断 \\
-\texttt{/api/trends} & 关键词、主题、时间范围、领域 & 趋势曲线、突增词、预测说明 \\
-\texttt{/api/recommend} & 论文 id、主题描述、用户偏好 & 推荐列表、推荐理由、相似度分解 \\
-\texttt{/api/graph} & 作者、关键词、主题、机构查询 & 节点、边、社区、中心性指标 \\
-\texttt{/api/dashboard} & 数据集版本、过滤条件 & 报告指标、图表数据、质量诊断 \\
+\texttt{/api/agent/stream} & 问题、历史、session\_id、retry & SSE 事件流（plan/tool/reflect/final）+ meta \\
+\texttt{/api/chat} & 问题、证据问答 & 答案、证据、引用、置信说明 \\
+\texttt{/api/search} & 查询词 & 混合检索结果（FTS+向量+RRF） \\
+\texttt{/api/trends} & 关键词、时间范围 & 趋势曲线、显著性、解释 \\
+\texttt{/api/recommend} & 论文 id / 主题 & 推荐列表、解释因子 \\
+\texttt{/api/graph} & 作者/关键词/主题 & 节点、边、社区、中心性 \\
+\texttt{verify\_claim (tool)} & 论断 & verdict、证据句、立场统计 \\
+\texttt{disputes (MCP resource)} & — & 当前争议前线论断 \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -65,10 +82,10 @@
 \subsection{可信答案原则}
 
 \begin{itemize}
-  \item 答案必须绑定证据卡, 证据卡必须能追溯到论文标题、年份、作者和片段。
-  \item 趋势判断必须同时给出数据依据和不确定性, 避免把短期波动说成确定结论。
-  \item 推荐结果必须解释“为什么推荐”, 至少包含主题相似、关键词重叠、作者关系或时间新鲜度之一。
-  \item 图谱查询必须区分真实合作边、关键词共现边和模型推断关系。
+  \item 答案必须绑定证据卡, 证据卡必须能追溯到论文标题、年份、来源与片段。
+  \item 核查类结论区分"相关"与"支持"; 拒不出现"证据不足却强说支持"。
+  \item 系统敢说"证据不足 / 文献里有人反对", 也接受人类反驳并认错。
+  \item 趋势/推荐给明数据显示与不确定性, Web 不把代理指标当用户价值。
 \end{itemize}
 
 \clearpage

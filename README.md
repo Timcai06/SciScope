@@ -196,7 +196,8 @@ make tui-doctor # 检查后端/LLM/会话目录/图谱资产
 
 - 该分支的主运行路径是：Python agent/data layer 为核心，Go TUI 为终端消费端。
 - Web 前端源码已移除；若未来重启 Web 界面，应作为新范围重新设计和接入。
-- `data_pipeline/` 保留为 legacy sample pipeline 与旧测试兼容层；核心数据治理以 `src/harvest`、`src/analysis`、`src/infra` 为准。
+- `src/data_contracts/` 是共享数据契约层（`Paper` 模型/loaders/normalize），backend 运行时与 `src.harvest` 共用；核心数据治理以 `src/harvest`、`src/analysis`、`src/infra` 为准。
+- `src/models/` 是 Python 代码包（嵌入/趋势/推荐脚本）；`models/` 是 gitignore 的模型文件资产，二者同名不同物。
 - DeepSeek 是 hosted/demo 的默认云端模型；确定性本地验证仍可使用 mock 模式，本地 LLM 通路以 `make dev-vllm` / `make llm` 为主。
 
 ## 许可证与贡献

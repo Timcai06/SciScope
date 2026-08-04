@@ -1,9 +1,10 @@
 # Status and Roadmap
 
 > **Forward-looking roadmap has moved.** The live product direction and next
-> steps now live in [`docs/project/roadmap.md`](../docs/project/roadmap.md)
-> (north star: `verify_claim` relatedness → entailment). This file is kept as the
-> **delivered-state snapshot** and build history.
+> steps now live in [`docs/project/roadmap.md`](roadmap.md)
+> (north star: `verify_claim` relatedness → entailment) and
+> [`国赛目标说明书.md`](国赛目标说明书.md) (frozen national-competition goals).
+> This file is kept as the **delivered-state snapshot** and build history.
 
 ## Where the project is now (delivered & frozen)
 
@@ -48,4 +49,5 @@ make agent-build          # embeddings + recommend + trend + graph
 ## Next direction
 
 Product evolution is no longer "freeze for submission." It is the evidence-layer
-north star — see [`docs/project/roadmap.md`](../docs/project/roadmap.md).
+north star — see [`docs/project/roadmap.md`](../docs/project/roadmap.md) and the
+frozen [`国赛目标说明书.md`](国赛目标说明书.md).

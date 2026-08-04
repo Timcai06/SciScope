@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from data_pipeline.normalize import normalize_paper
+from src.data_contracts.normalize import normalize_paper
 
 
 def _restore_openalex_abstract(index: dict[str, list[int]] | None) -> str:
