@@ -38,6 +38,7 @@ from backend.app.agent.tools import (
     export_bibliography,
     get_paper,
     get_trends,
+    list_disputes,
     query_knowledge_graph,
     recommend_papers,
     search_literature,
@@ -56,6 +57,7 @@ NATIVE_TOOLS: list[Tool] = [
     export_bibliography.TOOL,
     query_knowledge_graph.TOOL,
     verify_claim.TOOL,
+    list_disputes.TOOL,
     delegate.TOOL,
 ]
 

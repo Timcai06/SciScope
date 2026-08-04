@@ -12,6 +12,7 @@ from backend.app.api.routes_health import router as health_router
 from backend.app.api.routes_agent import router as agent_router
 from backend.app.api.routes_chat import router as chat_router
 from backend.app.api.routes_dashboard import router as dashboard_router
+from backend.app.api.routes_disputes import router as disputes_router
 from backend.app.api.routes_graph import router as graph_router
 from backend.app.api.routes_ingest import router as ingest_router
 from backend.app.api.routes_recommend import router as recommend_router
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(dashboard_router)
+    app.include_router(disputes_router)
     app.include_router(chat_router)
     app.include_router(ingest_router)
     app.include_router(search_router)

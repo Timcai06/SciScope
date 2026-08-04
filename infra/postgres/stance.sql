@@ -15,9 +15,19 @@ CREATE TABLE IF NOT EXISTS claim_evidence_stance (
     stance TEXT NOT NULL CHECK (stance IN ('SUPPORT', 'CONTRADICT', 'NEUTRAL')),
     similarity REAL,
     verdict TEXT NOT NULL,
+    confidence REAL,
+    evidence_sentence TEXT NOT NULL DEFAULT '',
+    qualification TEXT,
+    judge_version TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (claim_norm, paper_id)
 );
+
+-- Migration for databases created before the L3 columns existed (idempotent).
+ALTER TABLE claim_evidence_stance ADD COLUMN IF NOT EXISTS confidence REAL;
+ALTER TABLE claim_evidence_stance ADD COLUMN IF NOT EXISTS evidence_sentence TEXT NOT NULL DEFAULT '';
+ALTER TABLE claim_evidence_stance ADD COLUMN IF NOT EXISTS qualification TEXT;
+ALTER TABLE claim_evidence_stance ADD COLUMN IF NOT EXISTS judge_version TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS claim_evidence_stance_claim_idx
     ON claim_evidence_stance (claim_norm);
@@ -35,6 +45,8 @@ SELECT
     count(DISTINCT paper_id) AS paper_count,
     max(created_at) AS last_seen
 FROM claim_evidence_stance
+WHERE confidence >= 0.5
+  AND qualification IS NULL
 GROUP BY claim_norm
 HAVING count(*) FILTER (WHERE stance = 'SUPPORT') > 0
    AND count(*) FILTER (WHERE stance = 'CONTRADICT') > 0;

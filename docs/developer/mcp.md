@@ -1,21 +1,27 @@
 # SciScope as an MCP server
 
 SciScope exposes its research tools over the **Model Context Protocol (MCP)**, so
-any MCP client — Claude Desktop, Cursor, Codex, etc. — can ground on the
-~160k-paper corpus, run trend/recommendation analysis, and fact-check claims,
-without going through the SciScope agent or TUI.
+any MCP client — Claude Desktop, Cursor, Codex, OpenCode, etc. — can ground on
+the ~160k-paper corpus, run trend/recommendation analysis, fact-check claims,
+and read the accepted-evidence dispute frontier without going through the
+SciScope agent or TUI.
 
 It is a thin adapter (`backend/app/mcp_server.py`): it reuses the agent's `Tool`
 registry (the same JSON schemas) and the shared `execute_tool` dispatch, so the
 exposed tools always match the agent's tools — no duplication, no drift.
 
-## Tools exposed
+## Tools and resource exposed
 
-All 9 SciScope tools: `search_literature`, `get_trends`, `recommend_papers`,
+The current native registry exposes 11 tools: `search_literature`, `get_trends`, `recommend_papers`,
 `get_paper`, `summarize_field`, `compare_papers`, `export_bibliography`,
-`query_knowledge_graph`, `verify_claim`. Each carries its JSON input schema; the
+`query_knowledge_graph`, `verify_claim`, `list_disputes`, `delegate`. Each carries its JSON input schema; the
 pre-execution validation gate (e.g. rejecting fabricated `paper_id`s) applies
 here too.
+
+It also exposes the read-only `sciscope://disputes/recent` resource. It contains
+only claims with accepted SUPPORT and CONTRADICT evidence: an empty resource is
+an honest initial state, not evidence that the scientific literature has no
+disagreement.
 
 ## Run
 
@@ -52,6 +58,24 @@ Restart Claude Desktop; the SciScope tools appear in the tool picker. Asking
 "verify: RAG reduces hallucination, search our corpus" will call `verify_claim`
 / `search_literature` against the local corpus.
 
+## Connect OpenCode
+
+The repository's [`opencode.json`](../../opencode.json) declares the same local
+stdio server and points it at the local Docker database on port 5433. From this
+repository, verify discovery with:
+
+```bash
+opencode mcp list
+```
+
+The expected entry is `sciscope connected`. With an authorized OpenCode model,
+ask it explicitly to call `list_disputes` or read `sciscope://disputes/recent`.
+Keep the first integration script read-only: this proves the evidence service
+boundary without modifying the corpus or stance asset.
+
+A redacted, replayable call record is kept at
+[`docs/project/evidence/opencode_mcp_call_20260804.json`](../project/evidence/opencode_mcp_call_20260804.json).
+
 ## Boundary
 
 This server is the **generation-agnostic** face of SciScope: it provides grounded
@@ -85,10 +109,10 @@ over stdio (async bridged to our sync tool layer per call) and wraps them via th
 `Tool` contract. External tools are marked non-read-only (run sequentially,
 conservative). This means new capabilities (web fetch, web search, etc.) are
 added by **plugging an MCP server**, not by writing native tool code — keeping the
-9 native tools focused on the curated corpus.
+native tools focused on the curated corpus.
 
 Verified by loopback: pointing the consumer at SciScope's own MCP server (①)
-discovers all 9 tools and calls them successfully.
+discovers its registered tools and calls them successfully.
 
 ---
 

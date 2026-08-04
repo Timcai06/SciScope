@@ -104,7 +104,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build npm-package-smoke npm-package-pack npm-package-publish topic-model eval-retrieval eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf submission-package report backend mcp dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend smoke agent-smoke clean
+.PHONY: help install install-backend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build npm-package-smoke npm-package-pack npm-package-publish topic-model eval-retrieval stance-packets stance-reconcile eval-stance-similarity eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf submission-package report backend mcp dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend smoke agent-smoke clean
 .PHONY: backend-image backend-container-smoke hosted-db-schema hosted-db-load hosted-db-embeddings hosted-db-refresh hosted-smoke hosted-release-preflight
 
 help:
@@ -366,6 +366,21 @@ dedupe-db:
 # Self-retrieval evaluation of hybrid search (recall@k, MRR, latency).
 eval-retrieval:
 	SCISCOPE_DB_DSN=$(POSTGRES_DSN) SCISCOPE_EMBEDDER_PATH=$(EMBEDDER_PATH) $(PYTHON) -m evaluation.eval_retrieval --dsn $(POSTGRES_DSN) --sample $(EVAL_SAMPLE)
+
+# Deterministic L3 control: demonstrates why topical similarity cannot label refutation.
+eval-stance-similarity:
+	$(PYTHON) -m evaluation.eval_stance --baseline similarity
+
+# Formal Gold v1 workflow. Provide CANDIDATES=<unlabelled JSONL> and OUT_DIR=<path>.
+stance-packets:
+	test -n "$(CANDIDATES)" || { echo "CANDIDATES is required" >&2; exit 1; }
+	$(PYTHON) -m evaluation.build_stance_packets --candidates "$(CANDIDATES)" --out-dir "$(or $(OUT_DIR),output/stance_annotation)"
+
+stance-reconcile:
+	test -n "$(CANDIDATES)" || { echo "CANDIDATES is required" >&2; exit 1; }
+	test -n "$(ANNOTATOR_A)" || { echo "ANNOTATOR_A is required" >&2; exit 1; }
+	test -n "$(ANNOTATOR_B)" || { echo "ANNOTATOR_B is required" >&2; exit 1; }
+	$(PYTHON) -m evaluation.reconcile_stance_annotations --candidates "$(CANDIDATES)" --annotator-a "$(ANNOTATOR_A)" --annotator-b "$(ANNOTATOR_B)" --out-dir "$(or $(OUT_DIR),output/stance_reconciliation)"
 
 # Full evaluation evidence pack -> output/eval/ (retrieval + trend backtest + recommend).
 eval-all:

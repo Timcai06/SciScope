@@ -1,0 +1,8 @@
+{
+  "name": "SciFact",
+  "purpose": "External English scientific claim-verification anchor; do not mix it with SciScope's bilingual held-out set.",
+  "upstream": "https://github.com/allenai/scifact",
+  "license_note": "Fetch and retain the upstream license, commit, and checksums before including any rows in a submission artifact.",
+  "required_files": ["claims_dev.jsonl", "corpus.jsonl"],
+  "status": "manifest_only_not_downloaded"
+}

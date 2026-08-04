@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "sciscope": {
+      "type": "local",
+      "command": [
+        "/opt/homebrew/Caskroom/miniconda/base/envs/ai/bin/python",
+        "-m",
+        "backend.app.mcp_server"
+      ],
+      "environment": {
+        "SCISCOPE_DB_DSN": "postgresql://tim@localhost:5433/sciscope",
+        "SCISCOPE_USE_MOCK_LLM": "true"
+      },
+      "enabled": true,
+      "timeout": 10000
+    }
+  }
+}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 from backend.app import mcp_server
 from backend.app.agent.tools import TOOLS
@@ -33,3 +34,11 @@ def test_call_tool_applies_validation_gate():
 def test_unknown_tool_is_reported_not_raised():
     out = asyncio.run(mcp_server._call_tool("nope", {}))
     assert out[0].text == "未知工具: nope"
+
+
+def test_lists_and_reads_dispute_frontier(monkeypatch):
+    monkeypatch.setattr(mcp_server, "disputed_claims", lambda limit: [{"claim": "A", "support_count": 1, "contradict_count": 1, "paper_count": 2, "last_seen": "2026-08-04"}])
+    resources = asyncio.run(mcp_server._list_resources())
+    assert [(str(resource.uri), resource.mimeType) for resource in resources] == [("sciscope://disputes/recent", "application/json")]
+    content = asyncio.run(mcp_server._read_resource("sciscope://disputes/recent"))
+    assert json.loads(content[0].text)["disputes"][0]["claim"] == "A"

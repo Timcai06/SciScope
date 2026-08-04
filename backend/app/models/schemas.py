@@ -146,6 +146,23 @@ class SearchResponse(BaseModel):
     results: list[SearchResultItem] = Field(description="List of retrieved items, up to request limit")
 
 
+class DisputeItem(BaseModel):
+    """One claim with accepted evidence on both sides."""
+
+    claim: str
+    support_count: int
+    contradict_count: int
+    paper_count: int
+    last_seen: str
+
+
+class DisputesResponse(BaseModel):
+    """Read-only scientific dispute-frontier data-product response."""
+
+    count: int
+    disputes: list[DisputeItem] = Field(default_factory=list)
+
+
 class TrendKeyword(BaseModel):
     """Single trend-row object for hot/emerging lists."""
 

@@ -1,0 +1,20 @@
+{
+  "kind": "opencode_mcp_tool_call_evidence",
+  "verified_at": "2026-08-04",
+  "client": "OpenCode 1.18.9",
+  "session_id": "ses_034d5595affeCJuyN81hD5B1gJ",
+  "model": "opencode/ling-3.0-flash-free",
+  "mcp_server": "sciscope",
+  "tool": "sciscope_list_disputes",
+  "input": {
+    "limit": 100
+  },
+  "output": {
+    "争议数量": 0,
+    "争议": [],
+    "边界": "仅计入有可核验证据句、置信度达阈值且无适用条件冲突的 SUPPORT/CONTRADICT 证据。"
+  },
+  "assistant_summary": "当前 SciScope 知识图谱中共有 0 条争议记录。",
+  "scope": "固定只读指令；未修改文件、语料或 stance 资产。",
+  "evidence_boundary": "0 表示当前本机 asset 中尚无同时具有可采信支持与反驳证据的论断，不表示科学文献不存在争议。"
+}

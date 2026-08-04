@@ -20,8 +20,9 @@ from typing import Any
 
 _UPSERT_SQL = """
 INSERT INTO claim_evidence_stance
-    (claim, claim_norm, paper_id, paper_title, paper_year, stance, similarity, verdict)
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+    (claim, claim_norm, paper_id, paper_title, paper_year, stance, similarity, verdict,
+     confidence, evidence_sentence, qualification, judge_version)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 ON CONFLICT (claim_norm, paper_id) DO UPDATE SET
     claim = EXCLUDED.claim,
     paper_title = EXCLUDED.paper_title,
@@ -29,6 +30,10 @@ ON CONFLICT (claim_norm, paper_id) DO UPDATE SET
     stance = EXCLUDED.stance,
     similarity = EXCLUDED.similarity,
     verdict = EXCLUDED.verdict,
+    confidence = EXCLUDED.confidence,
+    evidence_sentence = EXCLUDED.evidence_sentence,
+    qualification = EXCLUDED.qualification,
+    judge_version = EXCLUDED.judge_version,
     created_at = now()
 """
 
@@ -73,6 +78,10 @@ def record_stances(claim: str, verdict: str, evidence: list[dict[str, Any]]) -> 
             e.get("立场"),
             e.get("接地相似度"),
             verdict,
+            e.get("置信度"),
+            str(e.get("证据句") or ""),
+            e.get("限定条件"),
+            e.get("判定版本") or "",
         )
         for e in evidence
         if e.get("paper_id") and e.get("立场")

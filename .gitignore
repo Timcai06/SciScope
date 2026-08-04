@@ -68,3 +68,6 @@ configs/mcp_servers.json
 
 # Agent session memory (runtime, per-session)
 data/.agent_memory/
+
+# OpenCode local continuation state (session IDs and runtime-only progress).
+.omo/
