@@ -4,7 +4,16 @@
 > steps now live in [`docs/project/roadmap.md`](roadmap.md)
 > (north star: `verify_claim` relatedness → entailment) and
 > [`国赛目标说明书.md`](国赛目标说明书.md) (frozen national-competition goals).
+> **Current execution** (who owns what, next step, evidence ledger) lives in
+> [`docs/plan/active/`](../plan/active/) — the single task-dispatch index.
 > This file is kept as the **delivered-state snapshot** and build history.
+
+> **Snapshot boundary**: this file reflects the delivered state as of the
+> competition freeze — commit `c63ef49` (2026-08-04). All counts and
+> "tests green" claims below are **point-in-time**, not current runtime truth.
+> For the current runtime verification entry point, use the active-plan baseline
+> ledgers in [`docs/plan/active/`](../plan/active/)
+> and re-run `make test-backend` / `make eval-all` / `make agent-smoke`.
 
 ## Where the project is now (delivered & frozen)
 
@@ -19,15 +28,15 @@
 - Figures + PDF in `output/pdf/sciscope_data_report/`.
 
 ### Research-agent model (outcome ②) — delivered
-- PostgreSQL + pgvector serving layer (~159k papers / ~367k chunks).
+- PostgreSQL + pgvector serving layer (~159k papers / ~367k chunks; at snapshot).
 - Hybrid retrieval (FTS + vector + RRF) → `/api/search`, `/api/chat`.
 - Trend forecast → `/api/trends` (`models/trends/`).
 - Recommendation → `/api/recommend` (`paper_embeddings`).
 - Knowledge-graph exports → `/api/graph` (`output/graphs/`).
 - Agent: single LangGraph StateGraph over `/api/agent/stream`; Go TUI consumes SSE.
-- Backend tests green (`make test-backend`).
+- Backend tests were green at snapshot time (`make test-backend`).
 
-See [01-agent-model-layer.md](01-agent-model-layer.md) for model-layer architecture.
+See [agent-model-layer.md](../architecture/agent-model-layer.md) for model-layer architecture.
 
 ## Known gaps / follow-ups (build-quality, not direction)
 
@@ -49,5 +58,6 @@ make agent-build          # embeddings + recommend + trend + graph
 ## Next direction
 
 Product evolution is no longer "freeze for submission." It is the evidence-layer
-north star — see [`docs/project/roadmap.md`](../docs/project/roadmap.md) and the
-frozen [`国赛目标说明书.md`](国赛目标说明书.md).
+north star — see [`docs/project/roadmap.md`](roadmap.md), the frozen
+[`国赛目标说明书.md`](国赛目标说明书.md), and the current execution plan
+[`docs/plan/active/`](../plan/active/).

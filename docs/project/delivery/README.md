@@ -1,20 +1,21 @@
-# SciScope 产品化与完整交付路线图
+# SciScope 交付计划存档（Delivery — 历史/参考）
 
-> 本目录由原 `plan/product_delivery_roadmap/` 并入。**当下目标与决策以上游
-> [`docs/project/国赛目标说明书.md`](../国赛目标说明书.md) 与
-> [`docs/project/roadmap.md`](../roadmap.md) 为准**；本目录保留为交付执行参考
-> （阶段拆分、验收条款），若与冻结目标冲突，以冻结目标为准。
-
-本目录记录 SciScope 从比赛项目走向可交付产品的双线计划：一条面向赛题评委,一条面向最终用户。核心判断是 **TUI 是主产品入口,landing page 是品牌宣传、观览、下载与文档入口;赛题交付物必须做到无环境可核验、有环境可复现。**
+> **定位**：本目录是**历史交付计划与参考执行材料**（由原 `plan/product_delivery_roadmap/` 并入），
+> 冻结于 2026-07 竞赛交付期。它记录当时的阶段拆分与验收条款，供追溯与参考，
+> **不再是当前承诺**。当下目标与决策以上游
+> [`docs/project/国赛目标说明书.md`](../国赛目标说明书.md)（冻结目标）与
+> [`docs/project/roadmap.md`](../roadmap.md)（方向）为准；
+> **当前执行计划**以 [`docs/plan/active/`](../../plan/active/) 为唯一分配索引。
+> 若本目录内容与冻结目标或当前执行冲突，以冻结目标/当前执行为准。
 
 ## 文件索引
 
-| 文件 | 读者 | 解决的问题 |
-|---|---|---|
-| `01_competition_reproducibility.md` | 评委、出题方、交付负责人 | 没有依赖环境时如何验收;有环境时如何复现关键成果 |
-| `02_product_distribution.md` | 产品负责人、最终用户、文档负责人 | TUI 主线如何分发;landing page 承担什么宣传、下载与文档入口角色 |
-| `03_cross_platform_installation.md` | 发布负责人、平台工程、运维 | macOS/Linux/Windows 如何安装、打包、校验和降级 |
-| `04_delivery_checklist_and_timeline.md` | 项目负责人、执行团队 | 从产品体验到最终验收的阶段拆分、边界和验收标准 |
+| 文件 | 读者 | 解决的问题 | 定位 |
+|---|---|---|---|
+| `01_competition_reproducibility.md` | 评委、出题方、交付负责人 | 没有依赖环境时如何验收;有环境时如何复现关键成果 | 历史交付快照（复现路径仍可参考） |
+| `02_product_distribution.md` | 产品负责人、最终用户、文档负责人 | TUI 主线如何分发;landing page 承担什么宣传、下载与文档入口角色 | 历史交付快照（TUI 分发现状以 `docs/release/` 为准） |
+| `03_cross_platform_installation.md` | 发布负责人、平台工程、运维 | macOS/Linux/Windows 如何安装、打包、校验和降级 | 参考执行材料（含大量"待实现/待补齐"标记） |
+| `04_delivery_checklist_and_timeline.md` | 项目负责人、执行团队 | 从产品体验到最终验收的阶段拆分、边界和验收标准 | **历史时间线**（W1-W7 已过，不再作为当前承诺） |
 
 ## 总体目标
 

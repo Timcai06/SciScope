@@ -1,0 +1,134 @@
+# D-数据准入清单（D00 产物）
+
+> 状态：`DONE`（盘点完成，验收待项目负责人复核）
+> 盘点日期：2026-08（基线 `c63ef49`）
+> 只读范围：`data/`、`src/data_contracts/`、`src/harvest/`、`infra/postgres/`
+> 用途：D 线逐项记录「来源 / 许可 / 原始文件 / 运行时表 / 版本哈希 / 权限分级」，
+> 并定义讯飞数据到达时必须提供的最小元数据；D01 将据此固化受控摄取数据合同。
+
+本清单只记录盘点当日可核实的现状与缺口，不把未实现的机制写成已具备。
+
+---
+
+## 1. 来源与规模现状（canonical 层）
+
+`data/raw_canonical/` 共 **169,324** 条记录（`data/raw_canonical/summary.json`），按 `(source, year)` 分区，
+每条带 `_sciscope_raw_file`（来源文件路径）与 `_sciscope_canonicalized_at`（规范化时间戳）。
+
+| source | canonical 记录数 | 分区位置 | 获取通道（代码依据） |
+|---|---|---|---|
+| openalex | 41,477 | `data/raw_canonical/openalex/` | `src/harvest/openalex_client.py` |
+| arxiv | 29,760 | `data/raw_canonical/arxiv/` | `src/harvest/public_sources.py`（export.arxiv.org） |
+| pmc | 30,104 | `data/raw_canonical/pmc/` | `src/harvest/public_sources.py`（NCBI eutils） |
+| pubmed | 28,163 | `data/raw_canonical/pubmed/` | `src/harvest/public_sources.py`（NCBI eutils） |
+| crossref | 28,500 | `data/raw_canonical/crossref/` | `src/harvest/public_sources.py`（api.crossref.org） |
+| doaj | 11,320 | `data/raw_canonical/doaj/` | `src/harvest/public_sources.py`（doaj.org） |
+
+口径说明：
+
+- `src/harvest/public_sources.py` 的 `SUPPORTED_SOURCES` 声明 8 个源（含
+  `semantic_scholar`、`core`），但 canonical 实有 6 源 —— 声明多于数据，报告不得按 8 源口径写。
+- `src/harvest/fulltext_enrichment.py` 的 `SUPPORTED_SOURCES = (arxiv, crossref, doaj, openalex, pubmed)`，
+  即全文富化覆盖 5 源，**不含 pmc** —— 但这与「PMC 全文偏向」的报告口径需要核对（见 §7 风险）。
+- `data/raw_inventory.csv`（147 行，全部 `role=contributed`，无 `failed_empty`）记录每个输入文件
+  → canonical 的记录数、有效/无效、去重后新增数、年份分布、来源分布、字节数。
+- `data/analysis/collection_manifest.csv`（125 行）记录 canonical 每个分区文件的 records / 字节数 / 异常年份。
+
+## 2. 许可与使用范围现状（关键缺口）
+
+**盘点结论：代码与数据层均无 `license` / 使用范围字段。**
+
+- `src/data_contracts/models.py` 的 `Paper` 无 license 字段；
+- `src/data_contracts/normalize.py` 的 `normalize_paper` 无许可清洗逻辑；
+- `infra/postgres/schema.sql` 的 `papers` 表无 license/usage 列；
+- `data/raw_inventory.csv` 与 `data/raw_canonical/summary.json` 无许可信息；
+- 全仓 `rg "license|许可"`（排除 pyc）仅命中 `docs/plan/active/` 下的 D/E 计划文档本身。
+
+外部常识（**未在本仓固化，不得据此直接放宽权限**）：OpenAlex、Crossref 元数据对外声明 CC0，
+arXiv 正文版权归作者、PMC/DOAJ 全文受各刊各自许可。这些事实必须由 D01 以字段形式固化后才
+能进入准入判断；固化前一律按「未知许可」处理。
+
+## 3. 原始文件定位
+
+| 层 | 位置 | 现状 |
+|---|---|---|
+| 原始输入 | `data/raw/`（8.0K） | 仅剩 `.gitkeep` 与各源空目录；原始 JSONL 不随仓库保存 |
+| canonical 证据 | `data/raw_canonical/`（1.3G） | 169,324 条，唯一随仓的原始证据底稿；`raw_inventory.csv` 保留文件级映射 |
+| 处理语料 | `data/processed/`（1.3G） | `papers_corpus.json`、`paper_chunks.jsonl` 及 summary |
+| 分析资产 | `data/analysis/`（2.4G） | 趋势/主题/作者网络等 CSV + JSON，`collection_manifest.csv` 可追溯到 canonical 文件 |
+
+`src/harvest/raw_governance.py` 的 `build_raw_canonical` 每次运行会**整体重建** canonical
+（先 `rmtree` 再写），因此 canonical 文件集没有跨运行的稳定指纹（见 §4）。
+
+## 4. 版本与哈希现状
+
+| 对象 | 现状 |
+|---|---|
+| 发布包 | `checksums.txt` 覆盖 6 个 TUI 平台包（darwin/linux/windows × amd64/arm64） |
+| canonical 数据 | 每条记录仅 `_sciscope_canonicalized_at` 时间戳；**无内容哈希** |
+| 分区文件 | 无 per-file 校验和；重建无指纹可比对 |
+| 代码/文档 | git 基线（本盘点为 `c63ef49`） |
+
+**验收差距**：D00 验收要求「任一论文可从运行时记录回指来源和版本」。当前可回指
+`source + source_id`（papers 表唯一索引）与 `_sciscope_raw_file`；「版本」仅有时间戳，
+无内容哈希 → 需 D02（或 D01）引入 per-partition / per-record 校验和。
+
+## 5. 运行时表（`infra/postgres/`）
+
+| 表 / 视图 | 定义文件 | 关键列 | 备注 |
+|---|---|---|---|
+| `papers` | `schema.sql` | source, source_id, doi, title, abstract, year, field, full_text, metadata(JSONB), search_document | `UNIQUE(source, source_id)`；**无 license、无来源版本/哈希** |
+| `paper_chunks` | `schema.sql` | chunk_uid, paper_uid, chunk_index, chunk_type, source_field, text, token_estimate, metadata | `UNIQUE(paper_uid, chunk_index)` |
+| `authors` / `paper_authors` | `schema.sql` | 规范化作者与论文-作者边 | — |
+| `keywords` / `paper_keywords` | `schema.sql` | 规范化关键词与论文-关键词边 | — |
+| `coauthor_edges` | `schema.sql` | 合著边 + weight | — |
+| `chunk_embeddings` | `pgvector.sql` | embedding vector(768), embedding_model | 本机仅 7,680 行残留，全量向量化待 2080 Ti |
+| `claim_evidence_stance` / `contradictions` | `stance.sql` | claim, paper_id, stance, similarity, verdict, confidence, evidence_sentence, qualification | L3；`UNIQUE(claim_norm, paper_id)` |
+
+本机运行库实测（`docs/project/国赛目标说明书.md` §12，2026-08-04）：Docker `sciscope-db`
+（pgvector:pg16，端口 5433）**papers 159,164 / chunks 367,861**；与 canonical 169,324 的差值
+口径须在报告里写清（去重/入库过滤），不得混用。
+
+## 6. 权限分级（定义 + 现状）
+
+| 权限 | 定义 | 现状 |
+|---|---|---|
+| 可索引 indexable | 允许进入 FTS/向量检索，返回元数据与摘要 | 全部 6 源默认允许（现状无字段约束） |
+| 可展示片段 snippet | 允许返回有限片段（如句级证据、引用范围） | 无显式控制；D05 按来源字段约束 |
+| 可再分发 redistributable | 允许导出 / 再分发全文或大段内容 | **默认关闭**；全仓无许可字段，未知许可一律不得公开导出（D00 验收线） |
+
+现状缺口：权限分级没有任何代码/字段承载，靠 D01 数据合同 + D05 出口强制。
+
+## 7. 讯飞数据到达时必须提供的最小元数据（D01 将固化为合同）
+
+提交方：黑龙江讯飞讯智研院（`交付说明.md`）。数据尚未到达；到达时每批 / 每条必须提供：
+
+| # | 字段 | 必填 | 说明 |
+|---|---|---|---|
+| 1 | `paper_id`（或等价稳定 ID） | 是 | 跨版本稳定，重复到达可识别 |
+| 2 | `source` | 是 | 讯飞语料标识，不得混入 6 个公开源 |
+| 3 | `license` / `usage_scope` | 是 | 缺失即拒绝（见 D01 非法样例） |
+| 4 | `file_hash`（sha256） | 是 | 与 D01 哈希校验对齐 |
+| 5 | `language` | 是 | 中/英/其他，用于抽取与检索口径 |
+| 6 | `year`（或 publication_date） | 是 | 未知年份允许但须显式标记 |
+| 7 | `usage_rights` | 是 | 三权限分级（indexable / snippet / redistributable） |
+| 8 | `retracted` / `correction` 标记 | 否 | 删除/更正；有则必填 |
+
+到达前约束：讯飞数据只能保存在受控原始区（`data/raw/` 对应子目录或独立受控目录），
+未通过 D00→D01 准入流程前不得进入 canonical / 运行库，更不得进入公开导出。
+
+## 8. 验收断言与差距
+
+| D00 验收项 | 当前断言 | 差距 / 去向 |
+|---|---|---|
+| 任一论文可从运行时记录回指来源和版本 | 可回指 `source+source_id`（`papers` 唯一索引）；canonical 可回指 `_sciscope_raw_file` | 版本仅时间戳、无内容哈希 → D01/D02 补校验和 |
+| 未知许可一律不能进入公开导出 | 当前无公开导出通道；全仓无 license 字段 → 天然「全部未知许可」 | D01 固化 license 字段，D05 出口强制「未知许可禁导出」 |
+
+## 9. 风险与回退
+
+- **原始 JSONL 不入仓**：`data/raw/` 为空。回退：canonical 是唯一证据底稿，`raw_inventory.csv`
+  保留文件级映射；如需重放须重新 harvest（`make raw-governance` 链）。
+- **许可未知**：正式准入前，所有来源按「仅可索引」保守处理；公开导出保持关闭。
+- **canonical 重建无指纹**：`build_raw_canonical` 全量 rmtree 重建，来源更新会改变整个文件集；
+  D02 建议引入 per-partition 校验和清单。
+- **口径混用**：声明 8 源 vs 实有 6 源、canonical 169,324 vs 运行库 159,164，报告与演示必须分开表述。

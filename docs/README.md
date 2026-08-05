@@ -75,11 +75,18 @@ product roadmap.
 
 ### Planning
 
-- [`project/`](project/): the single planning home — charter (方针),
-  [roadmap.md](project/roadmap.md) (北极星与路线), [国赛目标说明书.md](project/国赛目标说明书.md)
-  (frozen national-competition goals), `status-and-roadmap.md` (delivered-state
-  snapshot), and `delivery/` (delivery plans & checklists). The old top-level
-  `plan/` tree has been merged here and removed.
+- [`plan/`](plan/): **current execution workspace** — the single task-dispatch
+  index. [`active/`](plan/active/) holds the active plan
+  ([active/](plan/active/) 中的 D/G/A/T/E 任务线); lifecycle
+  `draft → active → completed/cancelled`, `blocked → active`. Not a source of
+  long-term product/architecture truth.
+- [`project/`](project/): direction & goals — charter (方针),
+  [roadmap.md](project/roadmap.md) (north star + historical execution log),
+  [国赛目标说明书.md](project/国赛目标说明书.md) (frozen national-competition
+  goals — the single upstream), `status-and-roadmap.md` (delivered-state
+  snapshot), and `delivery/` (historical delivery plans, reference only). The
+  old top-level `plan/` tree was merged here and removed; the execution
+  workspace now lives at `docs/plan/`.
 
 ---
 
