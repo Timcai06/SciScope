@@ -347,6 +347,7 @@ type model struct {
 	sessionID                   string
 	lastMeta                    eventMeta
 	lastStreamKind              string
+	lastTurnErr                 string // error text of the current turn; persisted on failure
 	nodeSeen                    []string
 	livePlan                    []string
 	liveReflect                 string
@@ -1285,6 +1286,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		action := recoveryAction(string(msg))
 		m.addTimeline(timelineEvent{Kind: "error", Phase: "错误恢复", Label: action.Title, Detail: action.Message})
 		m.appendBlock(stError.Render("⏺ ✗ ") + renderRecoveryPanel(string(msg)))
+		m.lastTurnErr = errText
 		return m, listen(m.sub)
 
 	case doneMsg:
@@ -1301,9 +1303,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.history) > 12 {
 				m.history = m.history[len(m.history)-12:]
 			}
+		}
+		// Persist even a failed turn (error with no final answer) so the failure
+		// reason survives /export and /resume instead of being lost.
+		if m.answer != "" || m.lastTurnErr != "" {
 			if path, err := writeSessionMarkdown(sessionDir(), m.transcript, time.Now()); err == nil {
 				m.lastExport = path
-				m.appendBlock(stFaint.Render("  会话已保存: " + path))
+				if m.lastTurnErr != "" {
+					m.appendBlock(stFaint.Render("  会话已保存(含失败原因): " + path))
+				} else {
+					m.appendBlock(stFaint.Render("  会话已保存: " + path))
+				}
 			} else {
 				m.appendBlock(stWarn.Render("  会话保存失败: " + err.Error()))
 			}
@@ -1312,6 +1322,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.answering = false
 		m.livePlan = nil
 		m.liveReflect = ""
+		m.lastTurnErr = ""
 		m.cancel = nil
 		m.refresh()
 		return m, nil
@@ -1759,6 +1770,7 @@ func renderSlashHelpBlock() string {
 	}
 	order := []string{"常用", "会话", "证据", "系统"}
 	body := []string{"使用 / 打开命令启动器; Enter 执行, Esc 返回。"}
+	body = append(body, stFaint.Render("服务或数据不可用时, 按错误面板提示操作: /doctor 查看状态, /retry 重试, 失败原因会随会话保存。"))
 	for _, group := range order {
 		cmds := groups[group]
 		if len(cmds) == 0 {

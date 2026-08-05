@@ -101,5 +101,6 @@ type claimResult struct {
 	Claim         string          `json:"论断"`
 	Verdict       string          `json:"支持等级"`
 	TopSimilarity float64         `json:"最高接地相似度"`
+	Reason        string          `json:"理由"`
 	Evidence      []claimEvidence `json:"证据"`
 }

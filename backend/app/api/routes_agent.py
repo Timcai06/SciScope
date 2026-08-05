@@ -80,8 +80,11 @@ def agent_stream(request: AgentRequest, http_request: Request) -> StreamingRespo
     SSE contract:
     - Each event is encoded as a line frame:
       ``data: {"type": "...", "payload": ...}``
-    - ``type`` is one of: ``plan``, ``text``, ``tool_call``,
+    - ``type`` is one of: ``intent``, ``plan``, ``text``, ``tool_call``,
       ``tool_result``, ``reflect``, ``final``, ``error``.
+      ``intent`` carries ``{intent, label, reason}`` — the deterministic routing
+      result for the turn (capability label + classification basis, never the
+      internal steering prompt).
     - Errors in the loop are emitted as ``type=error`` and then terminated.
     - Stream termination is always signaled by a literal ``data: [DONE]`` frame.
 

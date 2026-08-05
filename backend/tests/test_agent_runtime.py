@@ -213,16 +213,18 @@ def test_langgraph_runtime_streams_plan_tool_and_grounded_answer(monkeypatch):
     result = runtime.run_agent("rag", session_id="s-1")
     parts = [event_parts(event) for event in events]
 
-    assert [(kind, payload) for kind, payload, _ in parts[:3]] == [
+    # The deterministic intent route fires first (A01); then plan -> tools.
+    assert (parts[0][0], parts[0][1]) == ("intent", {"intent": "vague_query", "label": "待澄清", "reason": "问题过短或缺少可检索主题"})
+    assert [(kind, payload) for kind, payload, _ in parts[1:4]] == [
         ("plan", ["search evidence"]),
         ("tool_call", {"name": "search_literature", "args": {"query": "rag"}}),
         ("tool_result", {"name": "search_literature", "result": "ok"}),
     ]
-    assert parts[1][2]["runtime"] == "langgraph"
-    assert parts[1][2]["node"] == "execute_tools"
-    assert parts[1][2]["phase"] == "证据检索"
-    assert parts[1][2]["session_id"] == "s-1"
-    assert isinstance(parts[1][2]["elapsed_ms"], int)
+    assert parts[2][2]["runtime"] == "langgraph"
+    assert parts[2][2]["node"] == "execute_tools"
+    assert parts[2][2]["phase"] == "证据检索"
+    assert parts[2][2]["session_id"] == "s-1"
+    assert isinstance(parts[2][2]["elapsed_ms"], int)
     assert (parts[-1][0], parts[-1][1]) == ("final", "grounded answer")
     assert result["answer"] == "grounded answer"
     assert result["steps"] == 1

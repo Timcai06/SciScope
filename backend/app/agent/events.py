@@ -11,7 +11,7 @@ from typing import Any, Literal, TypeAlias
 
 
 AgentEventType: TypeAlias = Literal[
-    "plan", "text", "tool_call", "tool_progress", "tool_result", "reflect", "final"
+    "intent", "plan", "text", "tool_call", "tool_progress", "tool_result", "reflect", "final"
 ]
 AgentEventMeta: TypeAlias = dict[str, Any]
 AgentEvent: TypeAlias = tuple[AgentEventType, Any] | tuple[AgentEventType, Any, AgentEventMeta]

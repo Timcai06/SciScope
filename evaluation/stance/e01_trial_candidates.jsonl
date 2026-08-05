@@ -1,0 +1,20 @@
+{"id":"e01-zh-sup-01","claim":"数据增强可以提高小样本文本分类的准确率。","evidence":"在仅有 200 条标注样本的实验中，使用回译数据增强后，F1 从 0.61 提升到 0.74。","language":"zh","source":"e01-trial"}
+{"id":"e01-zh-contra-01","claim":"大语言模型在任意语言上表现完全一致。","evidence":"实验表明，同一模型在低资源语言上的准确率显著低于英语，性能随语言资源量变化。","language":"zh","source":"e01-trial"}
+{"id":"e01-zh-neu-01","claim":"图神经网络优于所有传统方法。","evidence":"该综述比较了多种图学习方法在分子性质预测上的表现，报告了各方法的平均性能；部分任务上 GNN 优于传统基线，部分任务上传统方法更好。","language":"zh","source":"e01-trial"}
+{"id":"e01-zh-qual-01","claim":"二甲双胍可降低人类糖尿病并发症风险。","evidence":"在一项 2 型糖尿病患者队列研究中，服用二甲双胍的患者心血管事件发生率低于对照组；该队列以中老年人群为主。","language":"zh","source":"e01-trial"}
+{"id":"e01-zh-sup-02","claim":"间歇性禁食可以减轻体重。","evidence":"在一项为期 12 周的随机对照试验中，采用 16:8 间歇性禁食的参与者平均减重 3.2 公斤，对照组为 0.8 公斤。","language":"zh","source":"e01-trial"}
+{"id":"e01-zh-contra-02","claim":"补充维生素 C 可以治愈普通感冒。","evidence":"多项临床试验显示，常规剂量维生素 C 对感冒病程的影响微乎其微，不能治愈感冒。","language":"zh","source":"e01-trial"}
+{"id":"e01-zh-sup-03","claim":"掺杂可以提高钙钛矿太阳能电池的稳定性。","evidence":"在 85°C 与 85% 相对湿度条件下，掺杂 A 组分的器件在 1000 小时后仍保持初始效率的 92%，未掺杂器件降至 60%。","language":"zh","source":"e01-trial"}
+{"id":"e01-zh-neu-02","claim":"运动可以预防所有类型的心血管疾病。","evidence":"本综述汇总了多项关于运动与心血管健康的研究，指出运动对部分疾病有保护作用，但对某些先天性心脏病的预防证据不足。","language":"zh","source":"e01-trial"}
+{"id":"e01-zh-qual-02","claim":"知识图谱嵌入可用于药物重定位。","evidence":"在该研究中，知识图谱嵌入方法在药物-疾病关联预测任务上取得较好 AUC，预测结果未在临床前或临床试验中验证。","language":"zh","source":"e01-trial"}
+{"id":"e01-en-sup-01","claim":"Sentence-level evidence improves claim verification accuracy.","evidence":"In our experiments, verifying claims with sentence-level evidence improved accuracy from 0.71 to 0.83 on the held-out set.","language":"en","source":"e01-trial"}
+{"id":"e01-en-contra-01","claim":"Vaccination always prevents infection.","evidence":"Even among vaccinated participants, breakthrough infections occurred, though at a lower rate than in the unvaccinated group.","language":"en","source":"e01-trial"}
+{"id":"e01-en-neu-01","claim":"Graphene is the strongest material ever measured.","evidence":"This paper reviews mechanical tests of graphene and other 2D materials; the reported tensile strength values depend on the measurement method and sample quality.","language":"en","source":"e01-trial"}
+{"id":"e01-en-sup-02","claim":"Adding niobium improves the corrosion resistance of the alloy.","evidence":"Electrochemical testing showed the Nb-containing alloy had a lower corrosion current density than the base alloy.","language":"en","source":"e01-trial"}
+{"id":"e01-en-contra-02","claim":"All lithium batteries are prone to thermal runaway.","evidence":"While some chemistries show thermal instability, solid-state prototypes in this study remained stable under the same abuse tests.","language":"en","source":"e01-trial"}
+{"id":"e01-en-qual-01","claim":"The drug reduces blood pressure in adults.","evidence":"In a trial enrolling adults with mild hypertension, the drug lowered systolic blood pressure by 8 mmHg on average; the effect was not observed in participants under 30.","language":"en","source":"e01-trial"}
+{"id":"e01-en-neu-02","claim":"Larger models are always more accurate.","evidence":"Scaling experiments show accuracy improves with size up to a point, but some small models with better training data match larger ones on specific benchmarks.","language":"en","source":"e01-trial"}
+{"id":"e01-cross-sup-01","claim":"石墨烯可以显著提升复合材料的导电性。","evidence":"在环氧树脂中加入 1wt% 石墨烯后，复合材料的电导率提升了约三个数量级。","language":"cross","source":"e01-trial"}
+{"id":"e01-cross-contra-01","claim":"咖啡因会损害所有年龄段人群的睡眠。","evidence":"研究显示咖啡因会减少部分受试者的慢波睡眠，但在习惯性饮用者中影响较小，且对儿童的影响与成人不同。","language":"cross","source":"e01-trial"}
+{"id":"e01-cross-neu-01","claim":"Transformer 比 CNN 更擅长图像分类。","evidence":"该文评估了两种架构在 ImageNet 子集上的 top-1 准确率，结果相近；在不同规模数据下优劣不同。","language":"cross","source":"e01-trial"}
+{"id":"e01-cross-qual-01","claim":"该干预能改善患者的临床结局。","evidence":"在体外细胞实验中，该化合物显著降低了炎症因子的表达；尚缺乏人体临床数据。","language":"cross","source":"e01-trial"}

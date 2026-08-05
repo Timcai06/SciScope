@@ -1,8 +1,8 @@
 # E｜证据 L3 与国赛证明
 
-- 状态：`active`（E08 为外部阻塞，其余任务 `PENDING`）
+- 状态：`active`（E00 `PASS`；E08 为外部阻塞，其余任务 `PENDING`）
 - 负责人：项目负责人；分工：NLP/评测、后端/MCP、演示/报告、领域专家
-- 当前领取：E00；上游：[冻结目标说明书](../../project/国赛目标说明书.md)
+- 当前领取：E01 与 E05；上游：[冻结目标说明书](../../project/国赛目标说明书.md)
 - 交付边界：先把“相关”与“支持/反驳/证据不足”区分清楚，再证明 API/MCP、TUI 和报告的
   事实一致；不以开发自测充当专家金标准，不把历史评测当当前运行态。
 
@@ -29,7 +29,8 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 ### E00｜基线、主权与证据台账
 
-- 状态：`PENDING`；依赖：无。
+- 状态：`PASS`（2026-08-05；产物与链接已复核）；依赖：无。
+- 产物：[E00 基线与证据台账](E/E00-基线与证据台账.md)（基线 commit `67e275a`，2026-08-05）。
 - 文件所有权：`docs/plan/**`、证据索引和引用的 canonical 文档；不改模型、数据或报告源。
 - 做什么：冻结本轮 commit、运行环境、数据版本、历史/当前/计划中三层口径；将国赛指标映射到
   代码、测试、截图、外部材料，缺项显式标红。
@@ -38,7 +39,9 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 ### E01｜20 条标注卡试运行（两种证据等级）
 
-- 状态：`PENDING`；依赖：E00。
+- 状态：`DONE`（试运行完成，验收待项目负责人复核）；依赖：E00。
+- 产物：[E01-20260805-标注试运行.md](E/E01-20260805-标注试运行.md) 及
+  `output/stance_annotation/e01_trial/`、`output/stance_reconciliation/e01_trial/`。
 - 文件所有权：`evaluation/build_stance_packets.py`、`evaluation/reconcile_stance_annotations.py`、
   标注指南/样例；不把试运行结果写入正式主表。
 - 方案 A（默认、无独立标注者时唯一可用）：直接执行
@@ -67,7 +70,8 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 - 状态：`PENDING`；依赖：E02。
 - 文件所有权：`infra/postgres/stance.sql`、`backend/app/api/routes_disputes.py`、Agent/MCP 读取测试；
   不改变 papers/chunks。
-- 做什么：对**同一个 canonical claim 的一次 `verify_claim` 核查**，让其已采信检索证据同时含
+- 做什么：在受控环境设 `SCISCOPE_ALLOW_WRITE_TOOLS=1` 后，对**同一个 canonical claim 的一次
+  `verify_claim(persist=true)` 核查**，让其已采信检索证据同时含
   至少一条 `SUPPORT` 和一条 `CONTRADICT`，同次落库到同一 `claim_norm`，使 `contradictions`
   视图出现该 claim，并通过 API、Agent tool、MCP resource 三处读取同一资产。
 - 禁止：分别对相反句子调用后将结果称为争议闭环；它们会生成不同 `claim_norm`，不能满足此任务。
@@ -79,7 +83,7 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 - 状态：`PENDING`；依赖：E03。
 - 文件所有权：`opencode.json`、MCP 文档、调用日志/截图；不修改论文语料。
-- 做什么：先由 OpenCode 调用 `verify_claim` 核查真实论断，再读取
+- 做什么：先由 OpenCode 在写入授权环境调用 `verify_claim(persist=true)` 核查真实论断，再读取
   `sciscope://disputes/recent`；如实说明前者会 upsert 已采信证据至 stance 资产
   `claim_evidence_stance`，不触碰 `papers`/`chunks`。
 - 验收：日志能证明顺序、工具输入输出、resource 读取和同一 claim 的争议资产；旧“0 争议只读”
@@ -88,7 +92,10 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 ### E05｜报告口径准备
 
-- 状态：`PENDING`；依赖：E00。
+- 状态：`DONE`（口径表已建立，验收待项目负责人复核）；依赖：E00。
+- 产物：[报告口径.md](../../project/报告口径.md)。
+- 复核修订（2026-08-05）：补逐项采集日期/可复现命令、DB 数字附 SQL 记录；测试数更正为本次实测
+  `rtk make test-backend` = 336 passed（不再写"326 收集/2 errors"）。
 - 文件所有权：`docs/project/报告口径.md`；本任务**不修改任何报告 TeX 源**。
 - 做什么：建立四层数字来源（代码实现、已验证、已证明、计划/阻塞）、章节映射、拟改写范围和
   每条诚实边界的位置，消除 README、PPT、两份报告的口径漂移。
@@ -136,12 +143,12 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 | 任务 | 状态 | PASS 所需证据 |
 |---|---|---|
-| E00 | `PENDING` | 冻结基线与指标—证据矩阵 |
-| E01 | `PENDING` | 20 条试运行；非正式金标准 |
+| E00 | `PASS` | [E00 基线与证据台账](E/E00-基线与证据台账.md)：冻结基线与指标—证据矩阵 |
+| E01 | `DONE`（待复核） | [E01-20260805-标注试运行.md](E/E01-20260805-标注试运行.md)：20 条试运行；非正式金标准 |
 | E02 | `PENDING` | L3 主表、纪律测试和失败分析 |
 | E03 | `PENDING` | 同 claim 的数据库/API/tool/resource 三读证据 |
 | E04 | `PENDING` | OpenCode 先核查后 resource 的真实产物 |
-| E05 | `PENDING` | 报告口径表 |
+| E05 | `DONE`（待复核） | [报告口径.md](../../project/报告口径.md)：报告口径表 |
 | E06 | `PENDING` | 两份重建 PDF 与一致性记录 |
 | E07 | `PENDING` | 演练、硬件清单、离线回退 |
 | E08 | `BLOCKED` | 授权、准入与真实场景/反馈 |

@@ -365,6 +365,13 @@ func renderToolResult(name, result string, width int, elapsed time.Duration) str
 			if cr.Claim != "" {
 				body = append(body, clip(cr.Claim, 96))
 			}
+			if len(cr.Evidence) == 0 {
+				reason := strings.TrimSpace(cr.Reason)
+				if reason == "" {
+					reason = "未找到可核验的证据。"
+				}
+				body = append(body, stWarn.Render("证据不足: "+reason))
+			}
 			for i, ev := range cr.Evidence {
 				if i >= 4 {
 					body = append(body, fmt.Sprintf("+%d 条更多证据 · /timeline 查看", len(cr.Evidence)-i))
@@ -434,6 +441,13 @@ func summarizeToolResultMarkdown(name, result string) string {
 			head := fmt.Sprintf("论断: %s\n支持等级: %s", cr.Claim, cr.Verdict)
 			if cr.TopSimilarity > 0 {
 				head += fmt.Sprintf("\n最高接地相似度: %.3f", cr.TopSimilarity)
+			}
+			if len(cr.Evidence) == 0 {
+				reason := strings.TrimSpace(cr.Reason)
+				if reason == "" {
+					reason = "未找到可核验的证据。"
+				}
+				head += "\n证据不足: " + reason
 			}
 			lines := []string{head}
 			for i, ev := range cr.Evidence {
@@ -733,6 +747,31 @@ func recoveryAction(s string) recoveryHint {
 	switch {
 	case strings.Contains(low, "connection refused") || strings.Contains(low, "无法连接后端"):
 		return recoveryActionForBackend(backendURL(), s)
+	case strings.Contains(low, "forbidden") || strings.Contains(low, "permission denied") || strings.Contains(low, " 403 "):
+		return recoveryHint{
+			Title:     "权限限制",
+			Message:   "本次操作被服务端权限规则拒绝。请改用允许的只读方式（如 /demo），或联系管理员开通权限后重试。",
+			Severity:  "blocked",
+			Inspect:   "/doctor",
+			Retryable: false,
+		}
+	case strings.Contains(low, "llm") && (strings.Contains(low, "timeout") || strings.Contains(low, "timed out")):
+		return recoveryHint{
+			Title:     "LLM 超时",
+			Command:   "make llm",
+			Message:   "LLM 响应超时。建议: 检查 make llm 是否已启动且未过载, 稍后输入 /retry。",
+			Severity:  "recoverable",
+			Inspect:   "/doctor",
+			Retryable: true,
+		}
+	case strings.Contains(low, "timed out") || strings.Contains(low, "timeout") || strings.Contains(low, "gateway"):
+		return recoveryHint{
+			Title:     "请求超时",
+			Message:   "后端响应超时。建议: 稍等片刻后输入 /retry; 若反复超时, 用 /doctor 检查后端与 LLM 状态。",
+			Severity:  "recoverable",
+			Inspect:   "/doctor",
+			Retryable: true,
+		}
 	case strings.Contains(low, "llm") || strings.Contains(low, "vllm") || strings.Contains(low, "8001"):
 		return recoveryHint{
 			Title:     "LLM 服务不可用",
@@ -757,6 +796,16 @@ func recoveryAction(s string) recoveryHint {
 			Command:   "make postgres-refresh",
 			Message:   "建议: 检查 PostgreSQL, 必要时运行 make postgres-refresh, 然后输入 /retry。",
 			Severity:  "blocked",
+			Inspect:   "/doctor",
+			Retryable: true,
+		}
+	case strings.Contains(low, "paper_embeddings") || strings.Contains(low, "does not exist") ||
+		strings.Contains(low, "undefinedtable") || strings.Contains(low, "embedding"):
+		return recoveryHint{
+			Title:     "数据/向量资产不可用",
+			Command:   "make embeddings",
+			Message:   "推荐/向量检索所需资产未就绪。建议: 按 /doctor 提示补齐资产（make embeddings）后重试；资产缺失期间该能力如实降级，不伪造结果。",
+			Severity:  "recoverable",
 			Inspect:   "/doctor",
 			Retryable: true,
 		}

@@ -41,10 +41,20 @@ def test_paper_id_tools_have_validators():
 
 
 # --- B: side-effect classification + permission gate ------------------------
-def test_all_native_tools_are_read_only():
-    assert all(t.side_effect == "read" for t in tools.NATIVE_TOOLS)
-    assert all(t.is_read_only for t in tools.NATIVE_TOOLS)
-    assert all(tools.is_read_only(t.name) for t in tools.NATIVE_TOOLS)
+def test_verify_claim_is_the_only_write_capable_native_tool():
+    write_tools = {t.name for t in tools.NATIVE_TOOLS if t.side_effect == "write"}
+    assert write_tools == {"verify_claim"}
+    assert tools.is_read_only("verify_claim") is False
+    assert all(t.is_read_only for t in tools.NATIVE_TOOLS if t.name != "verify_claim")
+
+
+def test_verify_claim_only_allows_persistence_when_writes_are_enabled(monkeypatch):
+    tool = tools.get_tool("verify_claim")
+    assert tool is not None
+    assert base.check_permission(tool, {"claim": "RAG 降低幻觉"}) is None
+    assert base.check_permission(tool, {"claim": "RAG 降低幻觉", "persist": True}) is not None
+    monkeypatch.setattr(base, "ALLOW_WRITE_TOOLS", True)
+    assert base.check_permission(tool, {"claim": "RAG 降低幻觉", "persist": True}) is None
 
 
 def test_permission_gate_blocks_write_tool_by_default():

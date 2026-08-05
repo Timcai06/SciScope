@@ -24,6 +24,7 @@ import json
 import os
 from typing import Any, Iterator
 
+from backend.app.agent.tools import base
 from backend.app.agent.tools.base import Tool
 from backend.app.services.stance import judge as stance_judge
 
@@ -40,7 +41,14 @@ SCHEMA = {
         ),
         "parameters": {
             "type": "object",
-            "properties": {"claim": {"type": "string", "description": "需要核查的一句论断,中英文均可"}},
+            "properties": {
+                "claim": {"type": "string", "description": "需要核查的一句论断,中英文均可"},
+                "persist": {
+                    "type": "boolean",
+                    "description": "仅在受控环境中明确请求将已采信立场写入争议资产；默认 false。",
+                    "default": False,
+                },
+            },
             "required": ["claim"],
         },
     },
@@ -57,6 +65,13 @@ def _judge_stances(claim: str, evidence_texts: list[str]) -> stance_judge.JudgeR
     return stance_judge.judge_evidence(claim, evidence_texts)
 
 
+def _check_persist_permission(args: dict[str, Any]) -> str | None:
+    """Allow ordinary verification, but gate the optional stance-asset write."""
+    if args.get("persist") and not base.ALLOW_WRITE_TOOLS:
+        return "verify_claim 请求写入 stance 资产，但当前为只读模式，未授权执行。"
+    return None
+
+
 def run(args: dict[str, Any]) -> Iterator[str]:
     """Generator handler: streams retrieve→score→judge→calibrate, returns the verdict."""
     from backend.app.core.config import get_settings
@@ -64,6 +79,7 @@ def run(args: dict[str, Any]) -> Iterator[str]:
     from src.models.embeddings import get_embedder
 
     claim = str(args.get("claim") or "").strip()
+    persist = bool(args.get("persist"))
     if not claim:
         return "verify_claim: claim 为空"
 
@@ -193,7 +209,9 @@ def run(args: dict[str, Any]) -> Iterator[str]:
     if qualified_hints:
         payload["限定条件"] = qualified_hints
 
-    # 矛盾即资产 (roadmap Step 2): only persist *accepted* non-neutral evidence.
+    # 矛盾即资产 (roadmap Step 2): persistence is explicit because it mutates a
+    # derived asset. Ordinary verification remains a read-only research action.
+    # Only accepted non-neutral evidence may be persisted.
     # Low-confidence, qualifier-mismatched and sentence-unverifiable judgements
     # remain in the response for auditability, but must not pollute the dispute map.
     from backend.app.services.stance.store import record_stances
@@ -203,8 +221,11 @@ def run(args: dict[str, Any]) -> Iterator[str]:
         for item, judgement in zip(evidence, judgements)
         if countable(judgement) and judgement.stance in {"SUPPORT", "CONTRADICT"}
     ]
-    if accepted_evidence:
+    if accepted_evidence and persist:
         record_stances(claim, verdict, accepted_evidence)
+        payload["资产写入"] = {"状态": "已写入", "记录数": len(accepted_evidence)}
+    elif accepted_evidence:
+        payload["资产写入"] = {"状态": "未写入", "原因": "未请求 persist=true"}
     return json.dumps(payload, ensure_ascii=False)
 
 
@@ -212,5 +233,7 @@ TOOL = Tool(
     name="verify_claim",
     schema=SCHEMA,
     run=run,
+    side_effect="write",
+    check_permissions=_check_persist_permission,
     prompt_fragment="先检索再逐条判定证据立场(支持/反驳/中立)与置信度,置信不足或限定条件不匹配时如实报证据不足",
 )

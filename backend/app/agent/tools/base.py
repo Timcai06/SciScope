@@ -25,6 +25,7 @@ Three cross-cutting concerns live here, mirroring Claude Code:
 from __future__ import annotations
 
 import inspect
+import os
 from dataclasses import dataclass
 from typing import Any, Callable, Iterator, Literal
 
@@ -32,11 +33,9 @@ from backend.app.agent.tools.hooks import post_tool_use, pre_tool_use
 
 SideEffect = Literal["read", "write", "external"]
 
-# Policy switch for data-mutating tools. Off by default: SciScope's native tools
-# are all read-only evidence lookups, so nothing is gated today — but the gate is
-# in place so a write tool added later is denied until writes are deliberately
-# enabled, instead of the loop having to special-case it.
-ALLOW_WRITE_TOOLS = False
+# Policy switch for data-mutating tools. Off by default; a controlled runtime must
+# opt in before an evidence tool may persist a derived asset.
+ALLOW_WRITE_TOOLS = os.getenv("SCISCOPE_ALLOW_WRITE_TOOLS", "").strip().lower() in {"1", "true", "yes"}
 
 
 @dataclass(frozen=True)

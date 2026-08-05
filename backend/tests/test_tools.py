@@ -12,8 +12,9 @@ def test_registry_covers_every_schema():
     assert len(tools.TOOLS) == len(schema_names)
 
 
-def test_all_current_tools_are_read_only():
-    assert all(t.is_read_only for t in tools.TOOLS)
+def test_only_verify_claim_is_write_capable():
+    assert tools.is_read_only("verify_claim") is False
+    assert all(t.is_read_only for t in tools.TOOLS if t.name != "verify_claim")
     assert is_read_only("search_literature") is True
     assert is_read_only("nonexistent") is True  # safe default
 

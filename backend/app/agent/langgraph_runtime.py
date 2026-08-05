@@ -23,6 +23,7 @@ from backend.app.agent.compaction import messages_tokens as _messages_tokens
 from backend.app.agent.events import AgentEvent, summarize_events
 from backend.app.agent.llm import build_system_prompt, compact, complete, detect_model, drain, stream_chat
 from backend.app.agent import session_memory
+from backend.app.agent.intents import classify_intent, routing_guidance
 from backend.app.agent.planning import make_plan, needs_plan
 from backend.app.agent.reflection import reflect_reason, self_critique
 from backend.app.agent.tool_runner import repair_missing_tool_results, run_tools
@@ -81,6 +82,40 @@ def _skill_input(question: str, label: str) -> str:
     return match.group("input").strip()
 
 
+# --- Intent-driven tool forcing (A01) ----------------------------------------
+# When the model answers a claim-check question without calling verify_claim, the
+# loop forces the tool deterministically so 论断核查 never degrades into plain
+# retrieval. Skill prompts keep their existing forced path; this covers plain
+# questions like 「求证: X 对吗」that carry no skill marker.
+
+_CLAIM_PREFIX_RE = re.compile(r"^(求证|请求证|请帮我求证|帮我求证|请问|请核查|核查一下|查证)[:：、\s]*", re.I)
+_CLAIM_SHELL_RE = re.compile(r"(?:这个说法|这句话|这种说法|这个观点|这一说法|这个论断|这说法)\s*$")
+_CLAIM_TRAIL_RE = re.compile(r"(吗|么|呢|对不对|对吧|是不是)[?？。!！\s]*$")
+
+
+def _claim_from_question(question: str) -> str:
+    """Extract the bare claim from a natural-language check request."""
+    claim = _CLAIM_PREFIX_RE.sub("", (question or "").strip())
+    claim = _CLAIM_TRAIL_RE.sub("", claim)
+    claim = _CLAIM_SHELL_RE.sub("", claim).strip()
+    claim = claim.strip(" '「」\"“”『』")
+    return claim if len(claim) >= 4 else (question or "").strip()
+
+
+def _forced_intent_tool_call(state: AgentState) -> dict[str, Any] | None:
+    """Deterministically force the right first tool for a plain (non-skill) question."""
+    intent = state.get("intent")
+    if intent == "claim_verification":
+        claim = _claim_from_question(state["question"])
+        if claim:
+            return {
+                "id": "forced_intent_" + uuid4().hex,
+                "type": "function",
+                "function": {"name": "verify_claim", "arguments": json.dumps({"claim": claim}, ensure_ascii=False)},
+            }
+    return None
+
+
 def _forced_skill_tool_call(question: str) -> dict[str, Any] | None:
     """Deterministically recover when a skill prompt skips its required first tool."""
     if "SciScope 技能: 论断核查" in question:
@@ -133,6 +168,7 @@ class AgentState(TypedDict, total=False):
     last_answer: str
     runtime: str
     route: GraphRoute
+    intent: str
     emit: list[AgentEvent]
     node_meta: dict[str, Any]
     tokens_in: int
@@ -191,6 +227,13 @@ def _prepare(state: AgentState) -> AgentState:
             "emit": [("final", "本地大模型未运行(:8001)。请先 `make llm`,或设置 DEEPSEEK_API_KEY 使用云端模型。")],
         }, extra={"stop_reason": "no_model", "tokens_in": 0, "tokens_out": 0})
     messages = [{"role": "system", "content": build_system_prompt()}]
+    # Deterministic intent routing (A01): classify before the first LLM call,
+    # inject steering guidance, and surface the intent on SSE. The event carries
+    # only the capability label + classification basis, never the guidance text.
+    intent = classify_intent(state["question"])
+    guidance = routing_guidance(intent)
+    if guidance:
+        messages.append({"role": "system", "content": guidance})
     # Session memory (Claude Code SessionMemory): recall prior research focus, then
     # record this question for future turns. No-ops without a session id.
     session_id = state.get("session_id")
@@ -219,7 +262,8 @@ def _prepare(state: AgentState) -> AgentState:
         "tokens_out": 0,
         "runtime": "langgraph",
         "route": "plan",
-        "emit": [],
+        "intent": intent.name,
+        "emit": [("intent", {"intent": intent.name, "label": intent.label, "reason": intent.reason})],
     })
 
 
@@ -303,10 +347,23 @@ def _llm_step(state: AgentState) -> AgentState:
         stream_chat(messages, state["model"], TOOL_SCHEMAS),
         lambda kind, payload: text_events.append((kind, payload)),
     )
-    if not tool_calls and int(state.get("tools_total") or 0) == 0:
-        forced_call = _forced_skill_tool_call(state["question"])
-        if forced_call:
-            tool_calls = [forced_call]
+    # A01: claim-check turns must call verify_claim even when the model called
+    # *some* tool — otherwise 论断核查 degrades into plain retrieval. On the
+    # first round, if the model called anything but verify_claim (e.g. a mistaken
+    # search_literature), replace the calls deterministically.
+    intent = state.get("intent")
+    first_round = int(state.get("tools_total") or 0) == 0
+    if first_round:
+        names = {tc["function"]["name"] for tc in tool_calls}
+        needs_forced = False
+        if intent in {"claim_verification", "skill_claim_check"}:
+            needs_forced = "verify_claim" not in names
+        elif not tool_calls:
+            needs_forced = True  # skill question answered with no tools at all
+        if needs_forced:
+            forced_call = _forced_skill_tool_call(state["question"]) or _forced_intent_tool_call(state)
+            if forced_call:
+                tool_calls = [forced_call]
     budget = _tool_call_budget(state["question"])
     if tool_calls:
         remaining = max(budget - int(state.get("tools_total") or 0), 0)

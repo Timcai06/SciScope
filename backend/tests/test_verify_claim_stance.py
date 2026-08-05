@@ -95,9 +95,9 @@ def _patched(monkeypatch: pytest.MonkeyPatch) -> list[tuple]:
     return recorded
 
 
-def _result(claim: str) -> dict:
+def _result(claim: str, *, persist: bool = False) -> dict:
     """Drive the generator handler and return verify_claim's parsed payload."""
-    gen = verify_claim.run({"claim": claim})
+    gen = verify_claim.run({"claim": claim, "persist": persist})
     result = None
     try:
         while True:
@@ -114,6 +114,11 @@ def test_supported_claim_is_graded_strong(_patched: None) -> None:
     assert result["判定版本"] == stance_judge.JUDGE_VERSION
     assert result["证据"][0]["证据句"] == "A cohort study associating coffee intake with lower CVD risk."
     assert result["证据"][0]["置信度"] == 0.95
+
+
+def test_default_verification_does_not_persist_stance_asset(_patched: list[tuple]) -> None:
+    _result(CLAIM)
+    assert _patched == []
 
 
 def test_negation_gets_different_verdict_from_claim(_patched: None) -> None:
@@ -188,7 +193,7 @@ def test_similarity_fallback_only_concludes_insufficient(
 def test_stance_run_persists_all_judged_evidence(_patched: list[tuple]) -> None:
     # 矛盾即资产: a stance-judged run records every judged evidence row (not
     # just the displayed top 4), with claim, verdict and L3 fields attached.
-    _result(CLAIM)
+    _result(CLAIM, persist=True)
     assert len(_patched) == 1
     claim, verdict, evidence = _patched[0]
     assert claim == CLAIM

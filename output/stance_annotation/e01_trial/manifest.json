@@ -1,0 +1,17 @@
+{
+  "schema_version": "stance-gold-v1",
+  "candidate_count": 20,
+  "seed": 20260804,
+  "source": "evaluation/stance/e01_trial_candidates.jsonl",
+  "packets": {
+    "annotator_a": {
+      "path": "output/stance_annotation/e01_trial/annotator_a.jsonl",
+      "sha256": "53111c2f737b53403f409c5c147aeba0c8d612fbb33268df14494ca2b3bca309"
+    },
+    "annotator_b": {
+      "path": "output/stance_annotation/e01_trial/annotator_b.jsonl",
+      "sha256": "36a9f8de21d6da02d2a19dc2448f58bc8f0a1790254f42e600fd95ceec204353"
+    }
+  },
+  "status": "awaiting_independent_annotation"
+}

@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -1744,5 +1747,198 @@ func TestStripPlaceholderArgument(t *testing.T) {
 		if got := strings.Join(stripPlaceholder(c.in), "|"); got != c.want {
 			t.Fatalf("stripPlaceholder(%v) = %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+// ---- T03: 不可用依赖的诚实降级 ----
+
+func TestRecoveryActionClassifiesTimeout(t *testing.T) {
+	action := recoveryAction("后端响应超时: read: connection timed out")
+
+	if action.Title != "请求超时" {
+		t.Fatalf("expected 请求超时 classification, got %#v", action)
+	}
+	if !action.Retryable {
+		t.Fatalf("timeout should stay retryable")
+	}
+	if !strings.Contains(action.Message, "/retry") {
+		t.Fatalf("timeout recovery should hint /retry: %s", action.Message)
+	}
+}
+
+func TestRecoveryActionClassifiesLLMTimeout(t *testing.T) {
+	action := recoveryAction("LLM 请求超时: timed out after 30s")
+
+	if action.Title != "LLM 超时" {
+		t.Fatalf("expected LLM 超时 classification, got %#v", action)
+	}
+	if action.Command != "make llm" {
+		t.Fatalf("LLM timeout should suggest make llm, got %#v", action)
+	}
+	if !action.Retryable {
+		t.Fatalf("LLM timeout should be retryable")
+	}
+}
+
+func TestRecoveryActionClassifiesPermissionDenied(t *testing.T) {
+	action := recoveryAction("后端返回 403 Forbidden: no permission for export")
+
+	if action.Title != "权限限制" {
+		t.Fatalf("expected 权限限制 classification, got %#v", action)
+	}
+	if action.Retryable {
+		t.Fatalf("permission denial must not spin in retry loops")
+	}
+	if !strings.Contains(action.Message, "只读") {
+		t.Fatalf("permission recovery should suggest read-only fallback: %s", action.Message)
+	}
+}
+
+func TestRecoveryActionClassifiesVectorAssetMissing(t *testing.T) {
+	for _, msg := range []string{
+		`relation "paper_embeddings" does not exist`,
+		"UndefinedTable: relation paper_embeddings does not exist",
+		"embedding table missing for recommend_papers",
+	} {
+		action := recoveryAction(msg)
+		if action.Title != "数据/向量资产不可用" {
+			t.Fatalf("expected 数据/向量资产不可用 for %q, got %#v", msg, action)
+		}
+		if !strings.Contains(action.Message, "make embeddings") {
+			t.Fatalf("vector recovery should mention make embeddings: %s", action.Message)
+		}
+	}
+}
+
+func TestFailedTurnStillPersistsSession(t *testing.T) {
+	t.Setenv("SCISCOPE_SESSION_DIR", t.TempDir())
+	m := initialModel()
+	m.ready = true
+	m.vp = viewport.New(80, 20)
+
+	next, _ := m.Update(errMsg("无法连接后端 http://127.0.0.1:8000: connect: connection refused"))
+	afterErr := next.(model)
+	if afterErr.lastTurnErr == "" {
+		t.Fatalf("expected lastTurnErr to be set after errMsg")
+	}
+
+	next2, _ := afterErr.Update(doneMsg{})
+	afterDone := next2.(model)
+	if afterDone.lastExport == "" {
+		t.Fatalf("expected a failed turn to persist a session file")
+	}
+	b, err := os.ReadFile(afterDone.lastExport)
+	if err != nil {
+		t.Fatalf("failed-turn session file missing: %v", err)
+	}
+	content := string(b)
+	for _, want := range []string{"## 错误与恢复建议", "无法连接后端", "make backend"} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("failed session should keep failure reason %q:\n%s", want, content)
+		}
+	}
+	if afterDone.lastTurnErr != "" {
+		t.Fatalf("lastTurnErr should reset after persistence, got %q", afterDone.lastTurnErr)
+	}
+}
+
+func TestVerifyClaimNoEvidenceShowsReason(t *testing.T) {
+	result := `{
+		"论断":"某论断",
+		"支持等级":"证据不足",
+		"理由":"未检索到相关文献。",
+		"证据":[]
+	}`
+
+	rendered := plainANSI(renderToolResult("verify_claim", result, 120, 0))
+	for _, want := range []string{"论断核查", "证据不足", "未检索到相关文献"} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("no-evidence verify card missing %q:\n%s", want, rendered)
+		}
+	}
+	md := summarizeToolResultMarkdown("verify_claim", result)
+	if !strings.Contains(md, "证据不足: 未检索到相关文献") {
+		t.Fatalf("summary should carry no-evidence reason:\n%s", md)
+	}
+}
+
+func TestStreamEmitsBackendErrorFrame(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "data: {\"type\":\"error\",\"payload\":\"LLM 请求超时: timed out\"}\n\n")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer srv.Close()
+
+	sub := make(chan tea.Msg, 8)
+	go stream(context.Background(), srv.URL, "测试问题", nil, "", false, sub)
+
+	gotErr := ""
+	gotDone := false
+	for msg := range sub {
+		switch v := msg.(type) {
+		case errMsg:
+			gotErr = string(v)
+		case doneMsg:
+			gotDone = true
+		}
+		if gotDone && gotErr != "" {
+			break
+		}
+	}
+	if !strings.Contains(gotErr, "LLM 请求超时") {
+		t.Fatalf("expected LLM timeout error surfaced from SSE frame, got %q", gotErr)
+	}
+}
+
+func TestStreamSurfacesConnectionFailure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	url := srv.URL
+	srv.Close() // unreachable -> connection refused
+
+	sub := make(chan tea.Msg, 8)
+	go stream(context.Background(), url, "测试问题", nil, "", false, sub)
+
+	gotErr := ""
+	gotDone := false
+	for msg := range sub {
+		switch v := msg.(type) {
+		case errMsg:
+			gotErr = string(v)
+		case doneMsg:
+			gotDone = true
+		}
+		if gotDone && gotErr != "" {
+			break
+		}
+	}
+	if !strings.Contains(gotErr, "无法连接后端") {
+		t.Fatalf("expected connection failure error, got %q", gotErr)
+	}
+}
+
+func TestStreamCancelOnTimeoutDoesNotFabricateError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(5 * time.Second) // never respond within the test window
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	sub := make(chan tea.Msg, 8)
+	go stream(ctx, srv.URL, "测试问题", nil, "", false, sub)
+
+	gotErr := false
+	for msg := range sub {
+		if _, ok := msg.(errMsg); ok {
+			gotErr = true
+		}
+		if _, ok := msg.(doneMsg); ok {
+			break
+		}
+	}
+	if gotErr {
+		t.Fatal("user-interrupt/timeout must not fabricate an error message")
 	}
 }

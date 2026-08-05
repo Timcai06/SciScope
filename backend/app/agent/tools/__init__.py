@@ -5,9 +5,11 @@ co-locating its schema, handler, validation and "when to use me" prompt — over
 shared contract/registry engine (:mod:`base`). Adding a capability is dropping a
 module here and listing its ``TOOL`` below; the agent loop never changes.
 
-Boundary note: native tools are read-only and map to backend service/table state
-(papers/chunks/chunk_embeddings/recommendation assets/graphs). Returned payloads
-are evidence references, not raw authoritative facts.
+Boundary note: native tools query backend service/table state
+(papers/chunks/chunk_embeddings/recommendation assets/graphs). `verify_claim`
+is the exception: it may persist accepted evidence into the derived stance asset
+only when the caller explicitly requests `persist=true` in a write-enabled
+environment. Returned payloads are evidence references, not raw authoritative facts.
 """
 
 from __future__ import annotations
