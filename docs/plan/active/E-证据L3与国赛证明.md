@@ -56,7 +56,7 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 ### E02｜L3 句级证据、校准拒答与回退纪律
 
-- 状态：`DONE`（纪律实现验证完成；**正式双语主集与 SciFact 锚点 BLOCKED，待正式主集证明**）；依赖：E01。
+- 状态：`DONE`（纪律实现验证完成；**正式双语主集与 SciFact 真评分仍待完成**）；依赖：E01。
 - 产物：[E02-20260805-L3纪律与评测.md](E/E02-20260805-L3纪律与评测.md)；
   修复 judge 格式异常静默降 NEUTRAL 缺陷（fail-closed），新增 10 条纪律测试。
 - 复核修订（2026-08-05）：fail-closed 完整化——空数组/多余元素/缺失 stance/非对象元素
@@ -66,9 +66,9 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
   judge 层 `math.isfinite` 检查（非有限值→整次 `ok=False` 走证据不足回退）；
   verify_claim 聚合层同样用 `isfinite` 防御（`inf>=阈值` 为 True，原可导出"强支持"）；
   补 judge 层参数化测试与 verify_claim 层不驱动结论/不写资产测试。
-- 收口修订（2026-08，正式评测可执行性）：SciFact 锚点审计结论 `BLOCKED`
-  （`scifact_anchor.json` 为 manifest_only_not_downloaded，无 claims_dev/corpus，不输出伪跑分）；
-  固化 gold_v1 主集 schema（id/claim/evidence/language/source/domain）、train/dev/test 冻结规则、
+- 收口修订（2026-08，正式评测可执行性）：最初 SciFact 锚点因无官方 claims/corpus 而
+  `BLOCKED`；E02a 已完成官方数据准入、哈希/schema 校验和 dry-run 入口，但**尚未运行模型真评分**。
+  已固化 gold_v1 主集 schema（id/claim/evidence/language/source/domain）、train/dev/test 冻结规则、
   领域·语言分层字段与 E02 主表分开报告格式（检索/证据句定位/stance/校准拒答/similarity 对照/样本边界）；
   dev_fixture 管线可执行（16 条 baseline，仅纪律实现验证）；fail-closed 回归 31 passed 保持。
   详见 E02 报告 §8。**不解锁 E03。**
@@ -150,7 +150,7 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 ### E08｜讯飞数据准入与真实场景证明
 
-- 状态：`BLOCKED`；依赖：外部数据、许可说明、领域联系人；与 D00/D01 协作。
+- 状态：`BLOCKED`（交付压缩包已到达；仍缺许可说明、字段映射确认与领域联系人）；依赖：准入审计、许可说明、领域联系人；与 D00/D01 协作。
 - 文件所有权：准入记录、许可矩阵、试点协议/反馈、匿名化统计；未经授权不提交原文。
 - 做什么：收到数据后按 D 合同进行隔离、抽样质量/重复率/领域适配审查，选择可落地任务并记录
   用户前后对照；不把“拿到几千篇论文”自动解释为真实用户成效。
