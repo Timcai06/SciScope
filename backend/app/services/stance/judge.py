@@ -21,6 +21,7 @@ derive a confident verdict; the similarity-only path may only say 证据不足
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 
 _STANCE_LABELS = {"SUPPORT", "CONTRADICT", "NEUTRAL"}
@@ -43,36 +44,56 @@ class JudgeResult:
     note: str = ""
 
 
-def _coerce_judgements(raw: object, count: int) -> list[EvidenceJudgement]:
-    """Coerce parsed LLM output into count-aligned judgements.
+def _coerce_judgements(raw: object, count: int) -> tuple[list[EvidenceJudgement], str | None]:
+    """Coerce parsed LLM output into exactly-count, label-valid judgements.
 
-    Unknown stance labels become NEUTRAL; unparseable confidence becomes 0.5;
-    missing sentence/qualification become empty/None. Never raises.
+    Fail-closed (格式异常绝不静默降级): on ANY structural problem the whole
+    result is rejected and a human-readable ``reason`` is returned so the caller
+    fails with ``ok=False`` — never a default-filled NEUTRAL list:
+    - reply is not a list, or its length differs from the evidence count
+      (empty list and surplus elements included — no default filling);
+    - an element is not an object, or its ``stance`` key is missing/blank;
+    - a stance label is not one of SUPPORT/CONTRADICT/NEUTRAL.
+    A genuine NEUTRAL produced by the model is legal.  A missing or unparseable
+    ``confidence`` becomes 0.0 (never the aggregation threshold 0.5), so such
+    evidence can never accidentally drive 部分支持/证据反驳; it only shows up
+    as low-confidence rejection.  Missing sentence/qualification become
+    empty/None.
     """
+    if not isinstance(raw, list):
+        return [], "reply is not a list"
+    if len(raw) != count:
+        return [], f"reply length {len(raw)} != expected {count}"
     out: list[EvidenceJudgement] = []
-    if isinstance(raw, list):
-        for item in raw:
-            if not isinstance(item, dict):
-                item = {}
-            stance = str(item.get("stance") or "NEUTRAL").strip().upper()
-            if stance not in _STANCE_LABELS:
-                stance = "NEUTRAL"
-            try:
-                conf = float(item.get("confidence", 0.5))
-            except (TypeError, ValueError):
-                conf = 0.5
-            out.append(
-                EvidenceJudgement(
-                    stance=stance,
-                    confidence=max(0.0, min(1.0, conf)),
-                    sentence=str(item.get("sentence") or "").strip(),
-                    qualification=(str(item["qualification"]).strip() or None)
-                    if item.get("qualification")
-                    else None,
-                )
+    for item in raw:
+        if not isinstance(item, dict):
+            return [], "non-object element in reply"
+        raw_stance = item.get("stance")
+        if raw_stance is None or str(raw_stance).strip() == "":
+            return [], "missing stance field"
+        stance = str(raw_stance).strip().upper()
+        if stance not in _STANCE_LABELS:
+            return [], f"nonstandard stance label {stance!r}"
+        try:
+            conf = float(item.get("confidence"))
+            if not math.isfinite(conf):
+                # NaN/Infinity: json.loads 会接受这些非标准值; 钳制会把它们变成
+                # 1.0 从而导出「强支持」。非有限置信度一律按格式错误 fail-closed,
+                # 使整次 judge ok=False 并走「证据不足」回退。
+                return [], f"non-finite confidence {conf!r}"
+        except (TypeError, ValueError):
+            conf = 0.0
+        out.append(
+            EvidenceJudgement(
+                stance=stance,
+                confidence=max(0.0, min(1.0, conf)),
+                sentence=str(item.get("sentence") or "").strip(),
+                qualification=(str(item["qualification"]).strip() or None)
+                if item.get("qualification")
+                else None,
             )
-    out = (out + [EvidenceJudgement("NEUTRAL", 0.5, "", None)] * count)[:count]
-    return out
+        )
+    return out, None
 
 
 def _judge_prompt(claim: str, evidence_texts: list[str]) -> str:
@@ -114,10 +135,12 @@ def judge_evidence(claim: str, evidence_texts: list[str]) -> JudgeResult:
     except Exception:  # noqa: BLE001 — judge unavailability is a normal offline state
         return JudgeResult(ok=False, judgements=[], note="judge unavailable")
 
-    judgements = _coerce_judgements(parsed, len(evidence_texts))
-    fixed = sum(1 for j in judgements if j.stance == "NEUTRAL")
-    note = f"coerced {len(evidence_texts) - fixed} nonstandard labels" if fixed else ""
-    return JudgeResult(ok=True, judgements=judgements, note=note)
+    judgements, reason = _coerce_judgements(parsed, len(evidence_texts))
+    if reason is not None:
+        # 格式异常不静默降级: 数量不匹配/缺失字段/非标准标签都使整个判定
+        # 不可信, 调用方必须走 similarity 回退并只报「证据不足」。
+        return JudgeResult(ok=False, judgements=[], note=f"format error: {reason}")
+    return JudgeResult(ok=True, judgements=judgements, note="")
 
 
 def qualification_conflicts(judgements: list[EvidenceJudgement]) -> list[str]:

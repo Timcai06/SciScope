@@ -7,6 +7,8 @@ no way to recover, and the English direction value being misread as growth.
 
 from __future__ import annotations
 
+import json
+
 from backend.app.agent.tools import get_trends as T
 
 
@@ -94,3 +96,60 @@ def test_direction_is_spelled_out_in_chinese():
     assert T._direction_cn("increasing") == "increasing(上升)"
     assert T._direction_cn("no-trend") == "no-trend(无明显趋势)"
     assert T._direction_cn("unknown-value") == "unknown-value"  # pass through
+
+
+def _write_hot_trend_fixture(tmp_path, monkeypatch, backtest_payload=None):
+    hot = tmp_path / "models" / "trends"
+    hot.mkdir(parents=True)
+    (hot / "hot_keywords.csv").write_text(
+        "keyword,doc_count,mk_trend,mk_p,sen_slope,momentum_score,burst_score,"
+        "forecast_next_year,forecast_normalized_df,lifecycle_stage\n"
+        "cancer,100,rising,0.01,0.1,0.2,0.3,2026,0.42,growing\n",
+        encoding="utf-8",
+    )
+    if backtest_payload is not None:
+        path = tmp_path / "backtest.json"
+        path.write_text(json.dumps(backtest_payload), encoding="utf-8")
+        monkeypatch.setenv("SCISCOPE_TRENDS_BACKTEST_PATH", str(path))
+    else:
+        monkeypatch.setenv("SCISCOPE_TRENDS_BACKTEST_PATH", str(tmp_path / "missing-backtest.json"))
+    monkeypatch.chdir(tmp_path)
+
+
+def test_get_trends_hides_forecasts_when_backtest_is_descriptive(tmp_path, monkeypatch):
+    _write_hot_trend_fixture(
+        tmp_path,
+        monkeypatch,
+        {"schema_version": "trends-backtest/v1", "decision": {"descriptive_only": True, "reason": "mae_wins=0/2"}},
+    )
+    payload = json.loads(T.run({"keyword": "cancer"}))
+    item = payload["results"][0]
+
+    assert payload["trend_policy"]["descriptive_only"] is True
+    assert "预测目标年份(未验证外推)" not in item
+    assert "预测目标年份(受约束外推)" not in item
+    assert "forecast_next_year" not in json.dumps(item, ensure_ascii=False)
+    assert "forecast_normalized_df" not in json.dumps(item, ensure_ascii=False)
+
+
+def test_get_trends_fails_closed_when_backtest_missing(tmp_path, monkeypatch):
+    _write_hot_trend_fixture(tmp_path, monkeypatch)
+    payload = json.loads(T.run({"keyword": "cancer"}))
+
+    assert payload["trend_policy"]["descriptive_only"] is True
+    assert payload["trend_policy"]["reason"] == "trend_backtest_unavailable_fail_closed"
+    assert "预测目标年份(未验证外推)" not in json.dumps(payload, ensure_ascii=False)
+
+
+def test_get_trends_exposes_constrained_forecast_only_after_passing_backtest(tmp_path, monkeypatch):
+    _write_hot_trend_fixture(
+        tmp_path,
+        monkeypatch,
+        {"schema_version": "trends-backtest/v1", "decision": {"descriptive_only": False, "reason": "all_passed"}},
+    )
+    payload = json.loads(T.run({"keyword": "cancer"}))
+    item = payload["results"][0]
+
+    assert payload["trend_policy"]["descriptive_only"] is False
+    assert item["预测目标年份(受约束外推)"] == "2026"
+    assert item["该年外推归一化词频"] == "0.42"

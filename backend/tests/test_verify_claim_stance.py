@@ -219,3 +219,129 @@ def test_nonverbatim_evidence_sentence_is_rejected(_patched: list[tuple], monkey
     assert result["证据"][0]["立场"] == "NEUTRAL"
     assert "核验" in result["证据"][0]["限定条件"]
     assert _patched == []
+
+
+def test_no_retrieval_results_yields_insufficient_not_neutral_verdict(
+    _patched: list[tuple], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # 无检索结果: 明确的「未检索到相关文献」拒答, 与「低置信拒答」和
+    # 「解析失败回退」都是不同的输出路径, 不得混同。
+    from backend.app.services import retrieval_service
+
+    monkeypatch.setattr(retrieval_service, "search", lambda query, limit=6: [])
+    result = _result(CLAIM)
+    assert result["支持等级"] == "证据不足"
+    assert "未检索到相关文献" in result["理由"]
+    assert result["证据"] == []
+    assert _patched == []
+
+
+def test_empty_claim_is_rejected_upfront() -> None:
+    gen = verify_claim.run({"claim": "   "})
+    try:
+        next(gen)
+    except StopIteration as stop:
+        message = stop.value
+    assert "为空" in message
+
+
+def test_conflicting_evidence_yields_dispute(
+    _patched: list[tuple], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # 同一论断的两条证据一条支持一条反驳 → 存在争议, 不偏袒任一侧。
+    from backend.app.services import retrieval_service
+
+    monkeypatch.setattr(
+        retrieval_service,
+        "search",
+        lambda query, limit=6: [
+            SimpleNamespace(
+                paper_id="W1",
+                title="Coffee consumption and cardiovascular outcomes",
+                snippet="A cohort study associating coffee intake with lower CVD risk.",
+                year=2023,
+            ),
+            SimpleNamespace(
+                paper_id="W2",
+                title="Coffee consumption and cardiovascular outcomes",
+                snippet="A cohort study associating coffee intake with higher CVD risk.",
+                year=2022,
+            ),
+        ],
+    )
+    monkeypatch.setattr(
+        verify_claim,
+        "_judge_stances",
+        lambda claim, texts: stance_judge.JudgeResult(
+            ok=True,
+            judgements=[
+                _judgement("SUPPORT", 0.95, "A cohort study associating coffee intake with lower CVD risk."),
+                _judgement("CONTRADICT", 0.9, "A cohort study associating coffee intake with higher CVD risk."),
+            ],
+            note="",
+        ),
+    )
+    result = _result(CLAIM)
+    assert result["支持等级"] == "存在争议"
+    assert result["证据立场统计"]["支持"] == 1
+    assert result["证据立场统计"]["反驳"] == 1
+    assert "正反两面" in result["提示"]
+
+
+def test_nonstandard_label_fallback_reports_format_reason(
+    _patched: list[tuple], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # judge 输出非标准标签 → ok=False → 走 similarity 回退, 拒答原因须
+    # 说明是「输出格式异常」而非笼统的「不可用」。
+    monkeypatch.setattr(
+        verify_claim,
+        "_judge_stances",
+        lambda *_a, **_k: stance_judge.JudgeResult(ok=False, judgements=[], note="format error: nonstandard stance label 'AGREE'"),
+    )
+    result = _result(CLAIM)
+    assert result["判定方式"] == "similarity"
+    assert result["支持等级"] == "证据不足"
+    assert "格式异常" in result["拒答原因"]
+    assert "AGREE" in result["拒答原因"]
+    assert _patched == []
+
+
+def test_missing_confidence_cannot_drive_verdict(
+    _patched: list[tuple], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # confidence 缺失时 judge 以 0.0 记置信 (低于阈值 0.5), 绝不默认 0.5:
+    # 该证据只能进入低置信拒答, 不得意外导出 部分支持/证据反驳。
+    monkeypatch.setattr(
+        verify_claim,
+        "_judge_stances",
+        lambda claim, texts: stance_judge.JudgeResult(
+            ok=True,
+            judgements=[_judgement("SUPPORT", confidence=0.0, sentence="A cohort study associating coffee intake with lower CVD risk.")],
+            note="",
+        ),
+    )
+    result = _result(CLAIM)
+    assert result["支持等级"] == "证据不足"
+    assert "置信度" in (result.get("拒答原因") or "")
+    assert _patched == []
+
+
+@pytest.mark.parametrize("bad_conf", [float("nan"), float("inf"), float("-inf")])
+def test_non_finite_confidence_cannot_drive_verdict_or_persist(
+    _patched: list[tuple], monkeypatch: pytest.MonkeyPatch, bad_conf: float
+) -> None:
+    # 防御层: 即便 mock judge 漏检而返回 NaN/±Infinity 置信度, verify_claim 的
+    # 聚合 (confidence >= 阈值) 对非有限值恒为 False — 不得导出支持/反驳,
+    # 也不得写入争议资产。
+    monkeypatch.setattr(
+        verify_claim,
+        "_judge_stances",
+        lambda claim, texts: stance_judge.JudgeResult(
+            ok=True,
+            judgements=[_judgement("SUPPORT", confidence=bad_conf, sentence="A cohort study associating coffee intake with lower CVD risk.")],
+            note="",
+        ),
+    )
+    result = _result(CLAIM, persist=True)
+    assert result["支持等级"] == "证据不足"
+    assert _patched == []  # 非有限置信度不得写入 claim_evidence_stance

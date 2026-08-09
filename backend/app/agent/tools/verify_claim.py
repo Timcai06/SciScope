@@ -21,6 +21,7 @@ relatedness, not entailment, so it must never emit 强支持/部分支持.
 from __future__ import annotations
 
 import json
+import math
 import os
 from typing import Any, Iterator
 
@@ -115,6 +116,12 @@ def run(args: dict[str, Any]) -> Iterator[str]:
 
     if not result.ok:
         # Fallback discipline: similarity can only conclude 证据不足.
+        note = (result.note or "").strip()
+        reason_detail = (
+            f"LLM 立场判定输出格式异常({note}),按纪律不采用其中任何立场。"
+            if note
+            else "LLM 立场判定不可用,按回退纪律只报证据不足,不做支持/反驳断言。"
+        )
         return json.dumps(
             {
                 "论断": claim,
@@ -124,9 +131,9 @@ def run(args: dict[str, Any]) -> Iterator[str]:
                 "最高接地相似度": round(top_sim, 3),
                 "拒答原因": (
                     "当前仅能给出相关度(相似度=%.3f),无法确认文献立场;相似度衡量「相关」而非「支持」。"
-                    "LLM 立场判定不可用,按回退纪律只报证据不足,不做支持/反驳断言。"
+                    "%s"
                 )
-                % top_sim,
+                % (top_sim, reason_detail),
                 "证据": [
                     {
                         **meta,
@@ -157,8 +164,10 @@ def run(args: dict[str, Any]) -> Iterator[str]:
         )
 
     # Calibrated aggregation: confidence threshold + qualifier mismatch.
+    # Non-finite confidence (NaN/±Infinity) is never countable: it must not
+    # drive 强支持/部分支持/证据反驳 even if a judge layer ever leaked it.
     def countable(j: stance_judge.EvidenceJudgement) -> bool:
-        return j.confidence >= _MIN_CONFIDENCE and not j.qualification
+        return math.isfinite(j.confidence) and j.confidence >= _MIN_CONFIDENCE and not j.qualification
 
     support = [j for j in judgements if countable(j) and j.stance == "SUPPORT"]
     contradict = [j for j in judgements if countable(j) and j.stance == "CONTRADICT"]

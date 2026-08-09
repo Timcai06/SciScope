@@ -1,0 +1,180 @@
+{
+  "eval": "G04a_trend_rolling_backtest",
+  "schema_version": "trends-backtest/v1",
+  "params": {
+    "min_doc_count": 30,
+    "ma_window": 2,
+    "splits": [
+      {
+        "target_year": 2024,
+        "train_years": [
+          2022,
+          2023
+        ]
+      },
+      {
+        "target_year": 2025,
+        "train_years": [
+          2022,
+          2023,
+          2024
+        ]
+      }
+    ],
+    "data_file": "data/analysis/keyword_trends.csv"
+  },
+  "splits": [
+    {
+      "target_year": 2024,
+      "train_years": [
+        2022,
+        2023
+      ],
+      "window": "2022-2023 → 2024",
+      "n": 1998,
+      "models": {
+        "trend": {
+          "mae": 0.000524,
+          "smape": 0.597925,
+          "spearman_rho": 0.6926,
+          "spearman_p": 0.0,
+          "direction_balanced_acc": 0.4351,
+          "direction_overall_acc": 0.4535
+        },
+        "last": {
+          "mae": 0.000509,
+          "smape": 0.503432,
+          "spearman_rho": 0.7332,
+          "spearman_p": 0.0,
+          "direction_balanced_acc": 0.0,
+          "direction_overall_acc": 0.002
+        },
+        "ma": {
+          "mae": 0.000549,
+          "smape": 0.504339,
+          "spearman_rho": 0.7277,
+          "spearman_p": 0.0,
+          "direction_balanced_acc": 0.5604,
+          "direction_overall_acc": 0.5445
+        }
+      },
+      "best_mae_model": "last",
+      "best_smape_model": "last"
+    },
+    {
+      "target_year": 2025,
+      "train_years": [
+        2022,
+        2023,
+        2024
+      ],
+      "window": "2022-2024 → 2025",
+      "n": 1998,
+      "models": {
+        "trend": {
+          "mae": 0.000385,
+          "smape": 0.56123,
+          "spearman_rho": 0.7428,
+          "spearman_p": 0.0,
+          "direction_balanced_acc": 0.4166,
+          "direction_overall_acc": 0.4074
+        },
+        "last": {
+          "mae": 0.000349,
+          "smape": 0.421348,
+          "spearman_rho": 0.7915,
+          "spearman_p": 0.0,
+          "direction_balanced_acc": 0.0,
+          "direction_overall_acc": 0.0015
+        },
+        "ma": {
+          "mae": 0.000385,
+          "smape": 0.407677,
+          "spearman_rho": 0.7791,
+          "spearman_p": 0.0,
+          "direction_balanced_acc": 0.6011,
+          "direction_overall_acc": 0.6111
+        }
+      },
+      "best_mae_model": "last",
+      "best_smape_model": "ma"
+    }
+  ],
+  "failures": [
+    {
+      "target_year": 2024,
+      "failures": [
+        {
+          "keyword": "cond mat mtrl sci",
+          "abs_error": 0.037942,
+          "actual": 0.042968,
+          "pred": 0.005026
+        },
+        {
+          "keyword": "retrieval augmented generation",
+          "abs_error": 0.037781,
+          "actual": 0.055612,
+          "pred": 0.017831
+        },
+        {
+          "keyword": "cancer",
+          "abs_error": 0.034271,
+          "actual": 0.111191,
+          "pred": 0.07692
+        },
+        {
+          "keyword": "large language model",
+          "abs_error": 0.022572,
+          "actual": 0.146196,
+          "pred": 0.123623
+        },
+        {
+          "keyword": "task project management",
+          "abs_error": 0.012163,
+          "actual": 0.003705,
+          "pred": 0.015868
+        }
+      ]
+    },
+    {
+      "target_year": 2025,
+      "failures": [
+        {
+          "keyword": "cond mat mtrl sci",
+          "abs_error": 0.043185,
+          "actual": 0.009551,
+          "pred": 0.052735
+        },
+        {
+          "keyword": "cancer",
+          "abs_error": 0.036986,
+          "actual": 0.08305,
+          "pred": 0.120036
+        },
+        {
+          "keyword": "cond mat mes hall",
+          "abs_error": 0.010738,
+          "actual": 0.000728,
+          "pred": 0.011466
+        },
+        {
+          "keyword": "information retrieval",
+          "abs_error": 0.010586,
+          "actual": 0.028108,
+          "pred": 0.038694
+        },
+        {
+          "keyword": "natural language processing",
+          "abs_error": 0.00968,
+          "actual": 0.063736,
+          "pred": 0.073416
+        }
+      ]
+    }
+  ],
+  "decision": {
+    "descriptive_only": true,
+    "reason": "mae_wins=0/2,smape_wins=0/2,required_majority=2,spearman_significant=True",
+    "policy": "descriptive_only=True 时，趋势输出与文档只可称“描述性趋势”（统计描述历史方向/波动），不得称预测能力、不得给出研究方向预测结论；descriptive_only=False 才可保留受约束的短期方向辅助。"
+  }
+}

@@ -31,6 +31,7 @@ output/pdf/**/*.toc
 output/pdf/**/*.xdv
 data/raw/**/*.jsonl
 data/raw/**/*.tmp
+data/raw/**/*.tar.gz
 data/raw_canonical/**/*.jsonl
 data/raw_canonical/**/*.json
 data/raw_archive/**

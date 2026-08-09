@@ -1,4 +1,12 @@
-"""recommend_papers — similar-paper recommendations for a known paper_id."""
+"""recommend_papers — similar-paper recommendations for a known paper_id.
+
+G02 查询解释合同：
+- ``paper_embeddings`` 表不存在 → 结构化 ``unavailable``，reason 固定为
+  ``paper_embeddings_unavailable``，**绝不** fallback 成伪造的“语义推荐成功”；
+- 服务可用但无候选 → 结构化 ``empty``；
+- 成功 → 每条推荐带 paper_id / title / year / field / similarity /
+  shared_keywords，并附数据源说明。
+"""
 
 from __future__ import annotations
 
@@ -21,16 +29,48 @@ SCHEMA = {
     },
 }
 
+# 固定、可测试的不可用原因（G02 合同要求）。
+UNAVAILABLE_REASON = "paper_embeddings_unavailable"
+
 
 def run(args: dict[str, Any]) -> str:
     from backend.app.services import recommend_service
 
     paper_id = str(args.get("paper_id") or "").strip()
     if not paper_id:
-        return "recommend_papers: paper_id 为空"
+        return json.dumps(
+            {"status": "empty", "results": [], "unavailable_reason": None,
+             "note": "paper_id 为空", "data_source": None},
+            ensure_ascii=False,
+        )
+
+    if not recommend_service.is_available():
+        return json.dumps(
+            {
+                "status": "unavailable",
+                "query": {"kind": "recommend", "paper_id": paper_id},
+                "data_source": None,
+                "results": [],
+                "unavailable_reason": UNAVAILABLE_REASON,
+                "note": "paper_embeddings 缺失（2080 Ti 全量构建未完成，见 G03）；"
+                        "不提供伪造的语义推荐。",
+            },
+            ensure_ascii=False,
+        )
+
     recs = recommend_service.recommend(paper_id, limit=5)
     if not recs:
-        return f"未能为 {paper_id} 生成推荐(可能 paper_id 不存在)。"
+        return json.dumps(
+            {
+                "status": "empty",
+                "query": {"kind": "recommend", "paper_id": paper_id},
+                "data_source": "recommend_service",
+                "results": [],
+                "unavailable_reason": None,
+                "note": f"未为 {paper_id} 找到相似论文（paper 不存在或无候选）。",
+            },
+            ensure_ascii=False,
+        )
     items = [
         {
             "paper_id": r.paper_id,
@@ -39,10 +79,22 @@ def run(args: dict[str, Any]) -> str:
             "field": r.field,
             "similarity": r.semantic_similarity,
             "shared_keywords": r.shared_keywords[:5],
+            "factors": r.factors,
         }
         for r in recs
     ]
-    return json.dumps(items, ensure_ascii=False)
+    return json.dumps(
+        {
+            "status": "ok",
+            "query": {"kind": "recommend", "paper_id": paper_id},
+            "data_source": "recommend_service",
+            "results": items,
+            "unavailable_reason": None,
+            "note": "推荐基于 paper_embeddings 语义近邻 + 关键词/作者重叠 + MMR 重排；"
+                    "相关性为计算相似度，不代表科学结论支持。",
+        },
+        ensure_ascii=False,
+    )
 
 
 TOOL = Tool(

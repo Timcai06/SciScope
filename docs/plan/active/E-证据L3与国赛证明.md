@@ -56,7 +56,22 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 ### E02｜L3 句级证据、校准拒答与回退纪律
 
-- 状态：`PENDING`；依赖：E01。
+- 状态：`DONE`（纪律实现验证完成；**正式双语主集与 SciFact 锚点 BLOCKED，待正式主集证明**）；依赖：E01。
+- 产物：[E02-20260805-L3纪律与评测.md](E/E02-20260805-L3纪律与评测.md)；
+  修复 judge 格式异常静默降 NEUTRAL 缺陷（fail-closed），新增 10 条纪律测试。
+- 复核修订（2026-08-05）：fail-closed 完整化——空数组/多余元素/缺失 stance/非对象元素
+  一律拒答；confidence 缺失默认 0.0（不再 0.5，杜绝意外导出部分支持/证据反驳）；
+  明确无正式双语主集与 SciFact 锚点评测，**不得 PASS、不得解锁 E03**。
+- 复核修订 2（2026-08-05，REVISE）：NaN/Infinity/-Infinity 置信度 fail-closed——
+  judge 层 `math.isfinite` 检查（非有限值→整次 `ok=False` 走证据不足回退）；
+  verify_claim 聚合层同样用 `isfinite` 防御（`inf>=阈值` 为 True，原可导出"强支持"）；
+  补 judge 层参数化测试与 verify_claim 层不驱动结论/不写资产测试。
+- 收口修订（2026-08，正式评测可执行性）：SciFact 锚点审计结论 `BLOCKED`
+  （`scifact_anchor.json` 为 manifest_only_not_downloaded，无 claims_dev/corpus，不输出伪跑分）；
+  固化 gold_v1 主集 schema（id/claim/evidence/language/source/domain）、train/dev/test 冻结规则、
+  领域·语言分层字段与 E02 主表分开报告格式（检索/证据句定位/stance/校准拒答/similarity 对照/样本边界）；
+  dev_fixture 管线可执行（16 条 baseline，仅纪律实现验证）；fail-closed 回归 31 passed 保持。
+  详见 E02 报告 §8。**不解锁 E03。**
 - 文件所有权：`backend/app/agent/tools/verify_claim.py`、stance schema/测试、`evaluation/`；不改
   论文语料。
 - 做什么：验收并补齐证据句、限定条件、低置信拒答、解析失败不静默变 `NEUTRAL`、支持/反驳的
@@ -64,6 +79,19 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 - 验收：每项纪律都有正/反测试；主表分别报告检索、证据句、立场、校准/拒答，明确正式金标准
   未具备时只能 `REVISE`。
 - 验证：`rtk make test-backend`、`rtk make eval-stance-similarity` 及实现后的 stance 主表命令。
+
+### E02a｜SciFact 锚点数据准入与可执行评测入口
+
+- 状态：`DONE`（数据准入、完整性校验与 dry-run 评测入口完成，验收待项目负责人复核）；依赖：E02 纪律。
+- 产物：[E02a-20260808-SciFact锚点准入.md](E/E02a-20260808-SciFact锚点准入.md)；
+  `evaluation/stance/scifact_data.py`（loader/validator）、`evaluation/stance/scifact_eval.py`
+  （dry-run 评测入口）、`evaluation/stance/scifact_anchor.json`（已更新为 downloaded_and_validated）、
+  原始数据 `data/scifact/raw/`（官方 S3 下载，含 SHA256 manifest）。
+- 边界：只做数据准入与完整性校验，**不训练模型、不伪造分数、不宣称 L3 已通过**；
+  默认 dry-run，评分需 `--predictions` + `--allow-score` 同时满足；**不解锁 E03**。
+- 验收：缺文件/哈希不符/schema 不符 fail-closed；输出样本数、标签分布、缺失率、证据引用可解析率。
+- 验证：`rtk test python3 -m pytest backend/tests/test_scifact_admission.py -q`（9 passed）、
+  `rtk test make test-backend`（491 passed）、`rtk summary python3 -m evaluation.stance.scifact_eval --split dev`（dry-run data_ok）。
 
 ### E03｜同一 canonical claim 的争议三读路径
 
@@ -145,7 +173,8 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 |---|---|---|
 | E00 | `PASS` | [E00 基线与证据台账](E/E00-基线与证据台账.md)：冻结基线与指标—证据矩阵 |
 | E01 | `PASS` | [E01-20260805-标注试运行.md](E/E01-20260805-标注试运行.md)：20 条试运行；非正式金标准 |
-| E02 | `PENDING` | L3 主表、纪律测试和失败分析 |
+| E02 | `DONE`（待复核） | [E02-20260805-L3纪律与评测.md](E/E02-20260805-L3纪律与评测.md)：L3 主表、纪律测试和失败分析 |
+| E02a | `DONE`（待复核） | [E02a-20260808-SciFact锚点准入.md](E/E02a-20260808-SciFact锚点准入.md)：SciFact 数据准入、完整性校验与 dry-run 评测入口 |
 | E03 | `PENDING` | 同 claim 的数据库/API/tool/resource 三读证据 |
 | E04 | `PENDING` | OpenCode 先核查后 resource 的真实产物 |
 | E05 | `PASS` | [报告口径.md](../../project/报告口径.md)：报告口径表 |
