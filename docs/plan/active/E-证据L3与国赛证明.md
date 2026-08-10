@@ -1,6 +1,6 @@
 # E｜证据 L3 与国赛证明
 
-- 状态：`active`（E00、E01、E05 `PASS`；E02 技术门禁已关闭、质量主表 `REVISE`；E03 可开展受控工程集成；E08 外部阻塞）
+- 状态：`active`（E00、E01、E03、E05 技术 `PASS`；E02 质量主表 `REVISE`；E04 可启动；E08 外部阻塞）
 - 负责人：项目负责人；分工：NLP/评测、后端/MCP、演示/报告、领域专家
 - 当前领取：E02；上游：[冻结目标说明书](../../project/国赛目标说明书.md)
 - 交付边界：先把“相关”与“支持/反驳/证据不足”区分清楚，再证明 API/MCP、TUI 和报告的
@@ -11,8 +11,8 @@
 | 事实 | 代码/材料依据 | 尚未证明 |
 |---|---|---|
 | `verify_claim` 已有支持、反驳、中立及回退实现 | `backend/app/agent/tools/verify_claim.py` | 句级证据、校准拒答在人工金标准上的质量 |
-| claim—paper—stance 可写入资产，争议视图按同一 `claim_norm` 聚合 | `infra/postgres/stance.sql` | 当前库已有可展示的真实争议或三读闭环 |
-| API、Agent tool 和 MCP server 有争议读取入口 | `backend/app/api/routes_disputes.py`、`backend/app/mcp_server.py` | OpenCode 已完成“核查后读取 resource”的真实调用 |
+| claim—paper—stance 可写入资产，争议视图按同一 `claim_norm` 聚合并返回 `paper_ids` | `infra/postgres/stance.sql`、E03 fixture + 隔离 live PostgreSQL gate | 当前库已有由真实科学 judge 产生、可用于展示的争议案例 |
+| API、Agent tool 和 MCP server 有争议读取入口且 fixture 对账同一 claim/paper IDs | `backend/app/api/routes_disputes.py`、`backend/app/mcp_server.py`、[E03 工程集成](E/E03-20260810-同claim争议三读工程集成.md) | OpenCode 已完成“核查后读取 resource”的真实调用 |
 | 历史评测/黄金会话存在 | `output/eval/`、`output/dialogue/` | 它们是当前主表或外部证明 |
 
 ## 最简依赖图
@@ -102,7 +102,7 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 ### E03｜同一 canonical claim 的争议三读路径
 
-- 状态：`READY（仅工程集成）`；依赖：E02 技术门禁。正式质量验收仍依赖 E02 人工 Gold/L3 主表。
+- 状态：`工程 live PASS / 质量 REVISE`；依赖：E02 技术门禁。正式质量验收仍依赖 E02 人工 Gold/L3 主表。详见 [E03 工程集成](E/E03-20260810-同claim争议三读工程集成.md)。
 - 文件所有权：`infra/postgres/stance.sql`、`backend/app/api/routes_disputes.py`、Agent/MCP 读取测试；
   不改变 papers/chunks。
 - 做什么：在受控环境设 `SCISCOPE_ALLOW_WRITE_TOOLS=1` 后，对**同一个 canonical claim 的一次
@@ -186,7 +186,7 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 | E02 | `技术 PASS / 质量 REVISE` | [E02-20260805-L3纪律与评测.md](E/E02-20260805-L3纪律与评测.md)：纪律、英文官方基线与双语 silver；正式人工 Gold/L3 主表仍缺 |
 | E02a | `DONE`（待复核） | [E02a-20260808-SciFact锚点准入.md](E/E02a-20260808-SciFact锚点准入.md)：SciFact 数据准入、完整性校验与 dry-run 评测入口 |
 | E02b | `技术 PASS / 质量 REVISE` | [E02b-20260810-双语Silver替代收口.md](E/E02b-20260810-双语Silver替代收口.md)：冻结的双语 silver 仅作回归/模型一致性；不替代 Gold；可支持 E03 工程集成 |
-| E03 | `READY（工程集成）` | 同 claim 的数据库/API/tool/resource 三读证据；不得解释为 stance 质量证明 |
+| E03 | `工程 live PASS / 质量 REVISE` | 同 claim 的真实 PostgreSQL 写入与 DB/API/tool/resource 三读证据；不得解释为 stance 质量证明 |
 | E04 | `PENDING` | OpenCode 先核查后 resource 的真实产物 |
 | E05 | `PASS` | [报告口径.md](../../project/报告口径.md)：报告口径表 |
 | E06 | `PENDING` | 两份重建 PDF 与一致性记录 |

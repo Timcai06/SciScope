@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,12 @@ DEFAULT_ADMISSION_PATH = "data/admission/staged.jsonl"
 
 # 允许展示正文片段/证据句的许可分级。
 SNIPPET_OR_ABOVE = frozenset({"snippet", "redistributable"})
+
+# D02 的 chunk_uid 由 ``stable_uid`` 生成，是 40 位 SHA-1；未授权出口只接受
+# 这个不透明标识。locator 也只输出受控类型，不能把中间层的任意字符串当作审计元数据
+# 回显（否则被污染的 locator 本身可成为正文泄露通道）。
+_CHUNK_UID_RE = re.compile(r"^[0-9a-f]{40}$")
+_LOCATOR_BASES = frozenset({"field_text", "normalized_text", "normalized_page_text"})
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -65,14 +72,11 @@ def _audit_reference(field: dict[str, Any], evidence: dict[str, Any] | None) -> 
     - ``confidence``：置信度。
     """
     locator = (evidence or {}).get("locator") or {}
-    locator_type = (
-        locator.get("base")
-        or locator.get("field")
-        or (f"page:{locator.get('page')}" if locator.get("page") is not None else "")
-        or "unknown"
-    )
+    base = locator.get("base") if isinstance(locator, dict) else None
+    locator_type = base if base in _LOCATOR_BASES else "unknown"
+    chunk_uid = (evidence or {}).get("chunk_uid")
     return {
-        "chunk_uid": (evidence or {}).get("chunk_uid"),
+        "chunk_uid": chunk_uid if isinstance(chunk_uid, str) and _CHUNK_UID_RE.fullmatch(chunk_uid) else None,
         "locator_type": locator_type,
         "confidence": field.get("confidence"),
     }

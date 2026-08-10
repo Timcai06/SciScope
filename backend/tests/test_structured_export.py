@@ -26,7 +26,7 @@ def _structured_record(source="s1", paper_id="PX-001", *, with_fields=True):
             "value": "we studied 50 patients with cancer",
             "confidence": 0.8,
             "evidence": {
-                "chunk_uid": "c1",
+                "chunk_uid": "1" * 40,
                 "locator": {"base": "field_text"},
                 "sentence": "we studied 50 patients with cancer",
                 "span": {"start_char": 0, "end_char": 36},
@@ -38,7 +38,7 @@ def _structured_record(source="s1", paper_id="PX-001", *, with_fields=True):
             "value": "Results show 92% accuracy",
             "confidence": 0.6,
             "evidence": {
-                "chunk_uid": "c2",
+                "chunk_uid": "2" * 40,
                 "locator": {"base": "normalized_text"},
                 "sentence": "Results show 92% accuracy",
                 "span": {"start_char": 12, "end_char": 36},
@@ -115,7 +115,7 @@ def test_query_returns_fields_with_provenance_and_license(tmp_path):
     assert extracted["study_population"]["value"] == "we studied 50 patients with cancer"
     assert extracted["study_population"]["confidence"] == 0.8
     # 已授权（snippet）：完整 provenance 保留（证据句 + span）。
-    assert extracted["study_population"]["evidence"]["chunk_uid"] == "c1"
+    assert extracted["study_population"]["evidence"]["chunk_uid"] == "1" * 40
     assert extracted["study_population"]["evidence"]["sentence"] == "we studied 50 patients with cancer"
     assert extracted["study_population"]["evidence"]["span"]["start_char"] >= 0
 
@@ -179,7 +179,7 @@ def test_indexable_blocks_value_display(tmp_path):
     assert extracted["study_population"]["display"] == "not_authorized_display"
     # 最小审计引用（不泄露正文证据句 / span / 精确 offset）。
     assert "evidence" not in extracted["study_population"]
-    assert extracted["study_population"]["audit"]["chunk_uid"] == "c1"
+    assert extracted["study_population"]["audit"]["chunk_uid"] == "1" * 40
     assert extracted["study_population"]["audit"]["locator_type"] == "field_text"
     assert extracted["study_population"]["audit"]["confidence"] == 0.8
     # 正文证据句不得出现在任何序列化输出中（验收：json.dumps 不包含测试正文句）。
@@ -317,11 +317,11 @@ def test_indexable_does_not_leak_numeric_sentence(tmp_path):
             "value": [
                 {"sentence": "Results show AUC 0.85 and 85% accuracy",
                  "span": {"start_char": 12, "end_char": 46},
-                 "chunk_uid": "c9", "locator": {"base": "normalized_text"},
+                "chunk_uid": "9" * 40, "locator": {"base": "normalized_text"},
                  "values": [{"number": "0.85"}, {"number": "85", "unit": "%"}]}
             ],
             "confidence": 0.7,
-            "evidence": {"chunk_uid": "c9", "locator": {"base": "normalized_text"},
+            "evidence": {"chunk_uid": "9" * 40, "locator": {"base": "normalized_text"},
                          "sentence": "Results show AUC 0.85 and 85% accuracy",
                          "span": {"start_char": 12, "end_char": 46}},
         }
@@ -338,7 +338,35 @@ def test_indexable_does_not_leak_numeric_sentence(tmp_path):
     numeric = next(f for f in view["fields"] if f["field"] == "numeric_findings")
     assert numeric["status"] == "extracted"
     assert numeric["value"] is None
-    assert numeric["audit"]["chunk_uid"] == "c9"
+    assert numeric["audit"]["chunk_uid"] == "9" * 40
+
+
+def test_indexable_audit_metadata_is_fail_closed(tmp_path):
+    # 未授权路径不能把受污染的 provenance 元数据当作安全审计标签回显。
+    record = _structured_record()
+    field = next(item for item in record["fields"] if item["field"] == "main_result")
+    leaked_text = "PRIVATE BODY TEXT MUST NOT LEAK"
+    field["evidence"] = {
+        "chunk_uid": leaked_text,
+        "locator": {"base": leaked_text, "field": leaked_text},
+        "sentence": leaked_text,
+        "span": {"start_char": 0, "end_char": len(leaked_text)},
+    }
+    structured_idx, admission_idx = _indexes(
+        tmp_path,
+        [record],
+        [_admission_record(usage_rights="indexable", license="cc-by")],
+    )
+
+    view = query_structured("PX-001", "s1", structured_index=structured_idx, admission_index=admission_idx)
+
+    main_result = next(item for item in view["fields"] if item["field"] == "main_result")
+    assert main_result["audit"] == {
+        "chunk_uid": None,
+        "locator_type": "unknown",
+        "confidence": 0.6,
+    }
+    assert leaked_text not in json.dumps(view, ensure_ascii=False)
 
 
 def test_multiple_sources_indexable_do_not_leak(tmp_path):

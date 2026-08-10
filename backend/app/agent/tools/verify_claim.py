@@ -231,8 +231,19 @@ def run(args: dict[str, Any]) -> Iterator[str]:
         if countable(judgement) and judgement.stance in {"SUPPORT", "CONTRADICT"}
     ]
     if accepted_evidence and persist:
-        record_stances(claim, verdict, accepted_evidence)
-        payload["资产写入"] = {"状态": "已写入", "记录数": len(accepted_evidence)}
+        written = record_stances(claim, verdict, accepted_evidence)
+        if written == len(accepted_evidence):
+            payload["资产写入"] = {"状态": "已写入", "记录数": written}
+        else:
+            # Do not report a derived evidence asset as available unless every
+            # accepted row was durably recorded. The verdict remains usable,
+            # while the write failure stays visible to callers and audit logs.
+            payload["资产写入"] = {
+                "状态": "未写入",
+                "原因": "stance 资产写入未完整确认，不能读取为争议资产。",
+                "已确认记录数": written,
+                "应写入记录数": len(accepted_evidence),
+            }
     elif accepted_evidence:
         payload["资产写入"] = {"状态": "未写入", "原因": "未请求 persist=true"}
     return json.dumps(payload, ensure_ascii=False)

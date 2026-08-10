@@ -1,6 +1,6 @@
 # D｜文献内容结构化
 
-- 状态：`active`（D00–D03 `PASS`；D04 Wave 0 技术门禁 `PASS`、外部语义质量门禁 `BLOCKED`；D05 `DONE` 待复核）
+- 状态：`active`（D00–D03 `PASS`；D04 Wave 0 技术门禁 `PASS`、外部语义质量门禁 `BLOCKED`；D05 技术 `PASS`）
 - 负责人：数据/后端负责人；复核：领域专家 + 项目负责人
 - 当前领取：D04/D05（复核）→ D 线收尾（讯飞数据到达后 E08 联动）；上游：[冻结目标说明书](../../project/国赛目标说明书.md)
 - 交付边界：把**已准入**文献变为可追溯、可检索、可被 Agent 调用的结构化记录；不做
@@ -97,13 +97,14 @@ D00 基线与准入边界 → D01 数据合同 → D02 解析与切片 → D03 �
 
 ### D05｜结构化文献出口
 
-- 状态：`DONE`（产物已生成，验收待项目负责人复核）；依赖：D03、D04。
+- 状态：技术 `PASS`（2026-08-10 Codex 复核；不替代 D04 外部语义质量门禁）；依赖：D03、D04。
 - 文件所有权：`backend/app/agent/tools/`、API schema/测试、MCP 文档；TUI 仅由 T 线消费稳定事件。
 - 做什么：让 Agent/API 能按 paper ID 返回带 provenance 的结构化字段和可用范围，明确“未抽取”与
   “未授权展示”的区别；不把摘要猜测包装成全文结构化结果。
 - 验收：一次 API/Agent 调用展示字段、来源、置信度和许可边界；无来源字段不会输出为确定事实。
-- 验证：`rtk test python3 -m pytest backend/tests/test_structured_export.py` → **9 passed**；
-  全链回归（D01–D05）→ **76 passed**；`rtk test make test-backend` → **424 passed**；`rtk git diff --check` 退出码 0。
+- 验证：`rtk test python3 -m pytest backend/tests/test_structured_export.py -q` → **14 passed**；
+  D01–D05 回归 → **94 passed**；`rtk test make test-backend` → **510 passed, 5 warnings**（均为 2026-08-10 D05 复核）；
+  `rtk git diff --check` 退出码 0。
   实现：`src/infra/structured_export.py` + `backend/app/agent/tools/paper_structured.py`（只读 tool，已注册）；
   报告：[D05-20260805-结构化文献出口](D/D05-20260805-结构化文献出口.md)（含可复现调用记录，交 A/T 线）。
 
@@ -116,6 +117,6 @@ D00 基线与准入边界 → D01 数据合同 → D02 解析与切片 → D03 �
 | D02 | `PASS` | [交付记录](./D/D02-20260805-可追溯解析切片回链.md)：19 项测试、分页噪声过滤修复与 `backtrace_chunk` 自动化回链验证 |
 | D03 | `DONE`（待复核） | [开发报告](./D/D03-20260805-关键科学信息抽取.md)：10 项测试 + 全量 402 passed + provenance；**20 篇人工抽查与字段级正确率待 D04** |
 | D04 | `技术 PASS / 外部 BLOCKED` | [Data Card 与评测表](./D/D04-20260805-抽取质量与数据卡.md)：人工聚合 + 18 项专项测试 + Wilson CI；silver 重跑/回链只证明 L2 工程一致性，gold/独立盲审裁决仍待完成 |
-| D05 | `DONE`（待复核） | [契约测试与调用记录](./D/D05-20260805-结构化文献出口.md)：9 项测试 + 全量 424 passed + 可复现调用记录（交 A/T 线） |
+| D05 | 技术 `PASS`（2026-08-10） | [契约测试与调用记录](./D/D05-20260805-结构化文献出口.md)：14 项专项契约测试；未授权正文/数值列表/候选句/多来源/受污染审计元数据均 fail-closed。真实论文语义质量仍受 D04 外部门禁约束。 |
 
 讯飞数据在 D00 准入完成前只能保存在受控原始区；它不是“自动通过质量验证”的新金标准。

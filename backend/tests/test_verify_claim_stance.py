@@ -205,6 +205,17 @@ def test_stance_run_persists_all_judged_evidence(_patched: list[tuple]) -> None:
     assert evidence[0]["判定版本"] == stance_judge.JUDGE_VERSION
 
 
+def test_persist_failure_is_not_reported_as_written(_patched: list[tuple], monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failed derived-asset write must stay visible instead of being claimed."""
+    from backend.app.services.stance import store as stance_store
+
+    monkeypatch.setattr(stance_store, "record_stances", lambda *_args: 0)
+    result = _result(CLAIM, persist=True)
+    assert result["支持等级"] == "强支持"
+    assert result["资产写入"]["状态"] == "未写入"
+    assert result["资产写入"]["已确认记录数"] == 0
+
+
 def test_nonverbatim_evidence_sentence_is_rejected(_patched: list[tuple], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         verify_claim,

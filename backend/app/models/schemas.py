@@ -153,6 +153,7 @@ class DisputeItem(BaseModel):
     support_count: int
     contradict_count: int
     paper_count: int
+    paper_ids: list[str] = Field(default_factory=list)
     last_seen: str
 
 

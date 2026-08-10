@@ -43,10 +43,14 @@ SELECT
     count(*) FILTER (WHERE stance = 'SUPPORT') AS support_count,
     count(*) FILTER (WHERE stance = 'CONTRADICT') AS contradict_count,
     count(DISTINCT paper_id) AS paper_count,
-    max(created_at) AS last_seen
+    max(created_at) AS last_seen,
+    -- Append new columns after the existing view shape. PostgreSQL does not
+    -- allow CREATE OR REPLACE VIEW to insert a column before an existing one.
+    array_agg(DISTINCT paper_id ORDER BY paper_id) AS paper_ids
 FROM claim_evidence_stance
 WHERE confidence >= 0.5
   AND qualification IS NULL
+  AND stance IN ('SUPPORT', 'CONTRADICT')
 GROUP BY claim_norm
 HAVING count(*) FILTER (WHERE stance = 'SUPPORT') > 0
    AND count(*) FILTER (WHERE stance = 'CONTRADICT') > 0;

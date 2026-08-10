@@ -38,7 +38,7 @@ ON CONFLICT (claim_norm, paper_id) DO UPDATE SET
 """
 
 _DISPUTED_SQL = """
-SELECT claim, support_count, contradict_count, paper_count, last_seen
+SELECT claim, support_count, contradict_count, paper_count, paper_ids, last_seen
 FROM contradictions
 ORDER BY last_seen DESC
 LIMIT %s
@@ -120,7 +120,8 @@ def disputed_claims(limit: int = 20) -> list[dict[str, Any]]:
             "support_count": r[1],
             "contradict_count": r[2],
             "paper_count": r[3],
-            "last_seen": str(r[4]),
+            "paper_ids": list(r[4]),
+            "last_seen": str(r[5]),
         }
         for r in rows
     ]

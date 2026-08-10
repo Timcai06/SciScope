@@ -93,7 +93,7 @@ def test_record_stances_skips_when_nothing_labeled(monkeypatch: pytest.MonkeyPat
 
 
 def test_disputed_claims_maps_view_rows(monkeypatch: pytest.MonkeyPatch):
-    conn = _FakeConn(rows=[("咖啡能降低心脏病风险", 3, 2, 5, "2026-07-08")])
+    conn = _FakeConn(rows=[("咖啡能降低心脏病风险", 3, 2, 5, ["W1", "W2", "W3", "W4", "W5"], "2026-07-08")])
     monkeypatch.setattr(stance_store, "_connect", lambda: conn)
     out = stance_store.disputed_claims(limit=10)
     assert out == [{
@@ -101,6 +101,7 @@ def test_disputed_claims_maps_view_rows(monkeypatch: pytest.MonkeyPatch):
         "support_count": 3,
         "contradict_count": 2,
         "paper_count": 5,
+        "paper_ids": ["W1", "W2", "W3", "W4", "W5"],
         "last_seen": "2026-07-08",
     }]
 
