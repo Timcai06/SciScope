@@ -163,7 +163,7 @@ var (
 	yearPattern     = regexp.MustCompile(`\b20(?:1[9]|2[0-9])\b`)
 	metricPattern   = regexp.MustCompile(`(?:\b\d+(?:\.\d+)?%|\b0\.\d{2,4}\b|\b\d+(?:,\d{3})+(?:\.\d+)?\b|\b\d+\.\d+\b)`)
 	commandPattern  = regexp.MustCompile(`/(?:timeline|retry|doctor|export|demo|tools|theme|sessions|resume|verify|trend|recommend|review)\b`)
-	toolNamePattern = regexp.MustCompile(`\b(?:verify_claim|search_literature|get_trends|recommend_papers|get_paper|summarize_field|compare_papers|query_knowledge_graph|export_bibliography)\b`)
+	toolNamePattern = regexp.MustCompile(`\b(?:verify_claim|search_literature|get_trends|recommend_papers|get_paper|summarize_field|compare_papers|query_knowledge_graph|export_bibliography|list_disputes)\b`)
 	verdictPattern  = regexp.MustCompile(`强支持|弱支持|不支持|支持等级|论断核查|证据卡|趋势卡|相似度|最高接地相似度`)
 	cautionPattern  = regexp.MustCompile(`风险|限制|边界|注意|谨慎|可能|取决于|不应|不能|然而|但是|仍需|不足`)
 )
@@ -179,6 +179,7 @@ var toolLabels = map[string][2]string{
 	"export_bibliography":   {"\uf02e", "引文导出"}, // bookmark
 	"query_knowledge_graph": {"\uf0e8", "知识图谱"}, // sitemap
 	"verify_claim":          {"\uf058", "论断核查"}, // check-circle
+	"list_disputes":         {"\uf071", "争议前线"}, // warning
 }
 
 // Nerd Font glyphs by default; set SCISCOPE_TUI_ICONS=off for plain text (no font
@@ -315,6 +316,12 @@ func helpString() string {
 		"  SCISCOPE_HOSTED_BACKEND       hosted backend URL for release defaults",
 		"  SCISCOPE_BACKEND              developer override for local/custom backend",
 		"  SCISCOPE_TUI_DEMO_DELAY_MS    demo playback delay",
+		"",
+		"Judge-ready tasks:",
+		"  /verify <claim>              verify one scientific claim with evidence or abstention",
+		"  /review <topic>              map a topic into review-style research leads",
+		"  /trend <topic>               descriptive trend only; not a prediction guarantee",
+		"  /recommend <topic|paper_id>  needs paper embeddings; unavailable is shown explicitly",
 	}, "\n")
 }
 
@@ -539,7 +546,13 @@ func metaDetail(meta eventMeta) string {
 }
 
 func metaEmpty(meta eventMeta) bool {
-	return meta.Runtime == "" && meta.Node == "" && meta.Phase == "" && meta.SessionID == "" && meta.ElapsedMS == 0 && !meta.Retry
+	return meta.Runtime == "" &&
+		meta.Node == "" &&
+		meta.Phase == "" &&
+		meta.SessionID == "" &&
+		meta.ElapsedMS == 0 &&
+		!meta.Retry &&
+		len(meta.StructuredAnswer) == 0
 }
 
 func nodeLabel(node string) string {
@@ -1297,6 +1310,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if body := timelineMarkdownBody(m.timeline); body != "" {
 				m.record("timeline", "", body)
 			}
+			if card := renderStructuredAnswerCard(m.lastMeta.StructuredAnswer, m.vp.Width); card != "" {
+				m.appendBlock(card)
+			}
 			m.record("assistant", "", ans)
 			m.appendAnswerMessage(ans, m.used)
 			m.history = append(m.history, turn{"assistant", ans})
@@ -1618,6 +1634,7 @@ func toolCatalog() []toolInfo {
 		{"compare_papers", "对比两篇论文", "方法差异、贡献比较"},
 		{"export_bibliography", "导出引用文本", "写报告、整理参考文献"},
 		{"query_knowledge_graph", "查询作者/关键词/主题图谱", "合作网络、主题关系"},
+		{"list_disputes", "读取同一论断的正反证据前线", "争议地图、正反证据对照"},
 		{"verify_claim", "核查论断并返回证据", "事实核查、降低幻觉"},
 	}
 }
@@ -1771,6 +1788,17 @@ func renderSlashHelpBlock() string {
 	order := []string{"常用", "会话", "证据", "系统"}
 	body := []string{"使用 / 打开命令启动器; Enter 执行, Esc 返回。"}
 	body = append(body, stFaint.Render("服务或数据不可用时, 按错误面板提示操作: /doctor 查看状态, /retry 重试, 失败原因会随会话保存。"))
+	body = append(body, "")
+	body = append(body, stAccent.Render("评委黄金任务"))
+	for _, task := range goldenJudgeTasks() {
+		body = append(body, "  "+task.Command)
+		body = append(body, stFaint.Render("    "+task.Goal))
+		body = append(body, stFaint.Render("    边界: "+task.Boundary))
+	}
+	body = append(body, "")
+	body = append(body, stAccent.Render("能力边界"))
+	body = append(body, stFaint.Render("  /trend 当前只展示描述性趋势, 不把统计外推写成预测结论。"))
+	body = append(body, stFaint.Render("  /recommend 依赖 paper embeddings; 资产未就绪时必须显示 unavailable。"))
 	for _, group := range order {
 		cmds := groups[group]
 		if len(cmds) == 0 {
@@ -1799,6 +1827,7 @@ func renderToolsBlock() string {
 		{"compare_papers", "对比两篇论文"},
 		{"export_bibliography", "导出引用文本"},
 		{"query_knowledge_graph", "查询作者/关键词/主题图谱"},
+		{"list_disputes", "读取可核验证据支撑的争议前线"},
 		{"verify_claim", "核查论断并返回证据"},
 	}
 	body := []string{"这些工具由 LLM 按问题自主调用; /timeline 查看每次调用过程。"}

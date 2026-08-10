@@ -7,12 +7,13 @@ type turn struct {
 	Content string `json:"content"`
 }
 type eventMeta struct {
-	Runtime   string `json:"runtime"`
-	Node      string `json:"node"`
-	Phase     string `json:"phase"`
-	SessionID string `json:"session_id"`
-	ElapsedMS int    `json:"elapsed_ms"`
-	Retry     bool   `json:"retry"`
+	Runtime          string         `json:"runtime"`
+	Node             string         `json:"node"`
+	Phase            string         `json:"phase"`
+	SessionID        string         `json:"session_id"`
+	ElapsedMS        int            `json:"elapsed_ms"`
+	Retry            bool           `json:"retry"`
+	StructuredAnswer map[string]any `json:"structured_answer"`
 }
 type planMsg []string
 type textMsg string
@@ -91,16 +92,25 @@ type evidencePaper struct {
 }
 
 type claimEvidence struct {
-	PaperID    string  `json:"paper_id"`
-	Title      string  `json:"标题"`
-	Year       int     `json:"年份"`
-	Similarity float64 `json:"接地相似度"`
+	PaperID          string        `json:"paper_id"`
+	Title            string        `json:"标题"`
+	Year             int           `json:"年份"`
+	Similarity       float64       `json:"接地相似度"`
+	Stance           string        `json:"立场"`
+	Confidence       float64       `json:"置信度"`
+	EvidenceSentence string        `json:"证据句"`
+	ChunkUID         string        `json:"chunk_uid"`
+	SourceField      string        `json:"source_field"`
+	DisplayPolicy    displayPolicy `json:"display_policy"`
 }
 
 type claimResult struct {
-	Claim         string          `json:"论断"`
-	Verdict       string          `json:"支持等级"`
-	TopSimilarity float64         `json:"最高接地相似度"`
-	Reason        string          `json:"理由"`
-	Evidence      []claimEvidence `json:"证据"`
+	Claim            string               `json:"论断"`
+	Verdict          string               `json:"支持等级"`
+	TopSimilarity    float64              `json:"最高接地相似度"`
+	Reason           string               `json:"理由"`
+	RejectionReason  string               `json:"拒答原因"`
+	Qualification    []string             `json:"限定条件"`
+	Evidence         []claimEvidence      `json:"证据"`
+	StructuredAnswer structuredAnswerCard `json:"structured_answer"`
 }

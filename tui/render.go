@@ -319,6 +319,118 @@ func renderReflectBlock(s string) string {
 	return panelRow("thinking", "自我纠错", "", []string{s})
 }
 
+func renderStructuredAnswerCard(meta map[string]any, width int) string {
+	contract, ok := parseStructuredAnswerValue(meta)
+	if !ok {
+		return ""
+	}
+	if contract.Status == "" || (contract.Status == "not_applicable" && contract.CitationCompliance == "not_applicable") {
+		return ""
+	}
+	label := contract.VerdictLabel
+	if label == "" {
+		label = contract.Status
+	}
+	metaParts := []string{label}
+	if contract.AnswerMode == "generative_non_evidentiary" {
+		metaParts = append(metaParts, "non-evidentiary")
+	}
+	if contract.CitationCompliance != "" && contract.CitationCompliance != "not_applicable" {
+		metaParts = append(metaParts, "citations "+contract.CitationCompliance)
+	}
+	body := []string{}
+	if contract.Claim != "" {
+		body = append(body, "claim   "+clip(contract.Claim, 96))
+	}
+	if contract.Uncertainty.Category != "" && contract.Uncertainty.Category != "none" {
+		line := "uncert  " + contract.Uncertainty.Category
+		if contract.Uncertainty.CalibratedRejection {
+			line += " · calibrated rejection"
+		}
+		body = append(body, line)
+		if msg := strings.TrimSpace(contract.Uncertainty.Message); msg != "" {
+			body = append(body, "reason  "+clip(msg, 96))
+		}
+		for _, hint := range contract.Uncertainty.QualificationHints {
+			body = append(body, "limit   "+clip(hint, 96))
+		}
+	}
+	if len(contract.Citations) == 0 {
+		body = append(body, "source  无可显示引文；保持 fail-closed，不把生成文本当证据。")
+	} else {
+		for i, citation := range contract.Citations {
+			if i >= 3 {
+				body = append(body, fmt.Sprintf("+%d 条更多引文 · /timeline 查看调用过程", len(contract.Citations)-i))
+				break
+			}
+			title := citation.Title
+			if title == "" {
+				title = citation.PaperID
+			}
+			body = append(body, fmt.Sprintf("[%d] %s", i+1, clip(title, 76)))
+			meta := []string{}
+			if citation.PaperID != "" {
+				meta = append(meta, citation.PaperID)
+			}
+			if citation.Year != 0 {
+				meta = append(meta, fmt.Sprintf("%d", citation.Year))
+			}
+			if citation.Stance != "" {
+				meta = append(meta, citation.Stance)
+			}
+			if label := confidenceLabel(citation.Confidence); label != "" {
+				meta = append(meta, label)
+			}
+			if len(meta) > 0 {
+				body = append(body, strings.Join(meta, " · "))
+			}
+			if citation.ChunkUID != "" {
+				body = append(body, "审计链 chunk "+clip(citation.ChunkUID, 12))
+			}
+			if evidenceDisplayAuthorized(citation.DisplayPolicy) {
+				prov := []string{}
+				if citation.SourceField != "" {
+					prov = append(prov, citation.SourceField)
+				}
+				if len(prov) > 0 {
+					body = append(body, "来源链 "+strings.Join(prov, " · "))
+				}
+			}
+			if evidenceDisplayAuthorized(citation.DisplayPolicy) {
+				if sentence := strings.TrimSpace(citation.EvidenceSentence); sentence != "" {
+					body = append(body, clip(sentence, 96))
+				}
+			} else if strings.TrimSpace(citation.DisplayPolicy.Reason) != "" {
+				body = append(body, "正文隐藏 · "+clip(citation.DisplayPolicy.Reason, 88))
+			}
+		}
+	}
+	if len(contract.ToolBasis) > 0 {
+		body = append(body, "basis   "+strings.Join(contract.ToolBasis, ", "))
+	}
+	return panelRow("contract", "答案合同", strings.Join(metaParts, " · "), body)
+}
+
+func renderEnvelopeCard(kind, title string, env resultEnvelope, elapsed time.Duration, body []string) string {
+	meta := env.Status
+	if d := durationText(elapsed); d != "" {
+		meta += " · " + d
+	}
+	if env.DataSource != "" {
+		body = append(body, "source  "+env.DataSource)
+	}
+	if env.UnavailableReason != "" {
+		body = append(body, "reason  "+env.UnavailableReason)
+	}
+	if env.DegradedReason != "" {
+		body = append(body, "degrade "+env.DegradedReason)
+	}
+	if note := strings.TrimSpace(env.Note); note != "" {
+		body = append(body, "note    "+clip(note, 96))
+	}
+	return panelRow(kind, title, meta, body)
+}
+
 func renderToolResult(name, result string, width int, elapsed time.Duration) string {
 	// A validation gate rejected the call (e.g. fabricated paper_id). Surface it
 	// as a distinct recovery card — the model also gets this back and self-corrects.
@@ -365,12 +477,18 @@ func renderToolResult(name, result string, width int, elapsed time.Duration) str
 			if cr.Claim != "" {
 				body = append(body, clip(cr.Claim, 96))
 			}
+			reason := strings.TrimSpace(cr.RejectionReason)
+			if reason == "" {
+				reason = strings.TrimSpace(cr.Reason)
+			}
 			if len(cr.Evidence) == 0 {
-				reason := strings.TrimSpace(cr.Reason)
 				if reason == "" {
 					reason = "未找到可核验的证据。"
 				}
 				body = append(body, stWarn.Render("证据不足: "+reason))
+			}
+			for _, hint := range cr.Qualification {
+				body = append(body, "限定条件 · "+clip(hint, 92))
 			}
 			for i, ev := range cr.Evidence {
 				if i >= 4 {
@@ -381,11 +499,37 @@ func renderToolResult(name, result string, width int, elapsed time.Duration) str
 				if ev.Year != 0 {
 					meta = append(meta, fmt.Sprintf("%d", ev.Year))
 				}
+				if ev.Stance != "" {
+					meta = append(meta, ev.Stance)
+				}
 				if ev.Similarity > 0 {
 					meta = append(meta, fmt.Sprintf("相似度 %.3f", ev.Similarity))
 				}
+				if label := confidenceLabel(ev.Confidence); label != "" {
+					meta = append(meta, label)
+				}
 				body = append(body, fmt.Sprintf("[%d] %s", i+1, clip(ev.Title, 78)))
 				body = append(body, strings.Join(meta, " · "))
+				if ev.ChunkUID != "" {
+					body = append(body, "审计链 · chunk "+clip(ev.ChunkUID, 12))
+				}
+				if evidenceDisplayAuthorized(ev.DisplayPolicy) {
+					prov := []string{}
+					if ev.SourceField != "" {
+						prov = append(prov, ev.SourceField)
+					}
+					if len(prov) > 0 {
+						body = append(body, "来源链 · "+strings.Join(prov, " · "))
+					}
+					if sentence := strings.TrimSpace(ev.EvidenceSentence); sentence != "" {
+						body = append(body, clip(sentence, 96))
+					}
+				} else if strings.TrimSpace(ev.DisplayPolicy.Reason) != "" {
+					body = append(body, "正文隐藏 · "+clip(ev.DisplayPolicy.Reason, 88))
+				}
+			}
+			if reason != "" && len(cr.Evidence) > 0 && cr.Verdict != "强支持" && cr.Verdict != "部分支持" {
+				body = append(body, stWarn.Render("边界: "+clip(reason, 90)))
 			}
 			return panelRow("verify", "论断核查", meta, body)
 		}
@@ -402,6 +546,186 @@ func renderToolResult(name, result string, width int, elapsed time.Duration) str
 				body = append(body, fmt.Sprintf("[%d] %s · 方向 %s · 阶段 %s · 依据 %s", i+1, kw, trendDirection(row), trendStage(row), trendBasis(row)))
 			}
 			return panelRow("trend", fmt.Sprintf("趋势卡 %d 条", len(rows)), durationText(elapsed), body)
+		}
+		if env, ok := parseResultEnvelope(result); ok {
+			body := []string{}
+			if policy := env.TrendPolicy; len(policy) > 0 {
+				if value, ok := policy["descriptive_only"].(bool); ok && value {
+					body = append(body, "policy  仅描述性趋势；不输出未来数值预测")
+				}
+			}
+			rows, _ := env.Results.([]any)
+			for i, item := range rows {
+				if i >= 3 {
+					body = append(body, fmt.Sprintf("+%d 条更多趋势 · /timeline 查看", len(rows)-i))
+					break
+				}
+				row, _ := item.(map[string]any)
+				body = append(body, fmt.Sprintf("[%d] %v · 方向 %s · 阶段 %s · 依据 %s", i+1, row["关键词"], trendDirection(row), trendStage(row), trendBasis(row)))
+			}
+			if len(rows) == 0 && env.Status != "ok" {
+				body = append(body, "结果为空；保持 fail-closed。")
+			}
+			return renderEnvelopeCard("trend", "趋势卡", env, elapsed, body)
+		}
+	case "recommend_papers":
+		if env, ok := parseResultEnvelope(result); ok {
+			body := []string{}
+			if queryID := fieldText(env.Query, "paper_id"); queryID != "" {
+				body = append(body, "query   "+queryID)
+			}
+			rows, _ := env.Results.([]any)
+			for i, item := range rows {
+				if i >= 3 {
+					body = append(body, fmt.Sprintf("+%d 条更多推荐 · /timeline 查看", len(rows)-i))
+					break
+				}
+				row, _ := item.(map[string]any)
+				body = append(body, fmt.Sprintf("[%d] %s", i+1, clip(fieldText(row, "title"), 78)))
+				meta := []string{}
+				if value := fieldText(row, "paper_id"); value != "" {
+					meta = append(meta, value)
+				}
+				if value := fieldText(row, "year"); value != "" {
+					meta = append(meta, value)
+				}
+				if value := fieldText(row, "field"); value != "" {
+					meta = append(meta, value)
+				}
+				if value := fieldText(row, "similarity"); value != "" {
+					meta = append(meta, "相似度 "+clip(value, 8))
+				}
+				if len(meta) > 0 {
+					body = append(body, strings.Join(meta, " · "))
+				}
+				if keywords, ok := row["shared_keywords"].([]any); ok && len(keywords) > 0 {
+					parts := []string{}
+					for _, kw := range keywords {
+						parts = append(parts, fmt.Sprintf("%v", kw))
+					}
+					body = append(body, "关键词 · "+strings.Join(parts, ", "))
+				}
+				if factors, ok := row["factors"].(map[string]any); ok && len(factors) > 0 {
+					keys := mapKeysSorted(factors)
+					parts := []string{}
+					for _, key := range keys {
+						parts = append(parts, fmt.Sprintf("%s=%v", key, factors[key]))
+					}
+					body = append(body, "推荐理由 · "+strings.Join(parts, " · "))
+				}
+			}
+			if len(rows) == 0 && env.Status != "ok" {
+				body = append(body, "当前无可展示推荐；不伪造语义近邻。")
+			}
+			return renderEnvelopeCard("recommend", "论文推荐", env, elapsed, body)
+		}
+	case "query_knowledge_graph":
+		if env, ok := parseResultEnvelope(result); ok {
+			body := []string{}
+			if kind := fieldText(env.Query, "type"); kind != "" {
+				line := "query   " + kind
+				if center := fieldText(env.Query, "center"); center != "" {
+					line += " · " + center
+				} else if value := fieldText(env.Query, "value"); value != "" {
+					line += " · " + value
+				}
+				body = append(body, line)
+			}
+			switch results := env.Results.(type) {
+			case map[string]any:
+				if paper, ok := results["paper"].(map[string]any); ok {
+					body = append(body, "paper   "+clip(fieldText(paper, "title"), 78))
+				}
+				if rels, ok := results["relations"].(map[string]any); ok && len(rels) > 0 {
+					relNames := mapKeysSorted(rels)
+					body = append(body, "关系   "+strings.Join(relNames, ", "))
+				}
+				if neighbours, ok := results["neighbours"].([]any); ok {
+					for i, item := range neighbours {
+						if i >= 3 {
+							body = append(body, fmt.Sprintf("+%d 条更多关系 · /timeline 查看", len(neighbours)-i))
+							break
+						}
+						row, _ := item.(map[string]any)
+						body = append(body, fmt.Sprintf("[%d] %s → %s", i+1, fieldText(row, "relation"), clip(fieldText(row, "target_label"), 54)))
+						if prov, ok := row["provenance"].(map[string]any); ok {
+							meta := []string{}
+							if pid := fieldText(prov, "paper_id"); pid != "" {
+								meta = append(meta, pid)
+							}
+							if status := fieldText(prov, "record_sha256_status"); status != "" {
+								meta = append(meta, "hash "+status)
+							}
+							if len(meta) > 0 {
+								body = append(body, "来源链 · "+strings.Join(meta, " · "))
+							}
+						}
+					}
+				}
+				if entity, ok := results["entity"].(map[string]any); ok {
+					body = append(body, "entity  "+clip(fieldText(entity, "label"), 72))
+				}
+				if papers, ok := results["papers"].([]any); ok && len(papers) > 0 {
+					parts := []string{}
+					for i, pid := range papers {
+						if i >= 5 {
+							break
+						}
+						parts = append(parts, fmt.Sprintf("%v", pid))
+					}
+					body = append(body, "papers  "+strings.Join(parts, ", "))
+				}
+			case []any:
+				for i, item := range results {
+					if i >= 3 {
+						body = append(body, fmt.Sprintf("+%d 条更多结果 · /timeline 查看", len(results)-i))
+						break
+					}
+					row, _ := item.(map[string]any)
+					terms := fieldText(row, "top_terms")
+					if terms == "" {
+						terms = clip(safeJSONString(row), 88)
+					}
+					body = append(body, fmt.Sprintf("[%d] %s", i+1, terms))
+				}
+			}
+			if len(body) == 0 {
+				body = append(body, "当前无图谱结果；保持 fail-closed。")
+			}
+			return renderEnvelopeCard("graph", "知识图谱", env, elapsed, body)
+		}
+	case "list_disputes":
+		if env, ok := parseDisputeEnvelope(result); ok {
+			body := []string{}
+			if env.Count == 0 {
+				body = append(body, "当前资产中尚无满足条件的争议；空结果不等于不存在科学分歧。")
+			}
+			for i, row := range env.Rows {
+				if i >= 3 {
+					body = append(body, fmt.Sprintf("+%d 条更多争议 · /timeline 查看", len(env.Rows)-i))
+					break
+				}
+				body = append(body, fmt.Sprintf("[%d] %s", i+1, clip(fieldText(row, "claim"), 76)))
+				body = append(body, strings.Join([]string{
+					"support " + fieldText(row, "support_count"),
+					"contradict " + fieldText(row, "contradict_count"),
+					"papers " + fieldText(row, "paper_count"),
+				}, " · "))
+				if ids, ok := row["paper_ids"].([]any); ok && len(ids) > 0 {
+					parts := []string{}
+					for j, id := range ids {
+						if j >= 4 {
+							break
+						}
+						parts = append(parts, fmt.Sprintf("%v", id))
+					}
+					body = append(body, "paper_ids · "+strings.Join(parts, ", "))
+				}
+			}
+			if env.Border != "" {
+				body = append(body, "边界   "+clip(env.Border, 96))
+			}
+			return panelRow("dispute", "争议前线", durationText(elapsed), body)
 		}
 	}
 	return panelRow("result", toolPlainLabel(name), durationText(elapsed), []string{preview(result)})

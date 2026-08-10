@@ -1,7 +1,9 @@
-"""Run the full evaluation evidence pack and persist results.
+"""Run the historical combined evaluation snapshot and persist results.
 
 维护口径说明:
-- 该脚本聚合检索/趋势/推荐三类**离线评测**，用于“样本内一致性验证”，不是全量生产系统SLA。
+- 该脚本聚合旧版检索/趋势/推荐三类**离线评测**，用于历史“样本内一致性验证”，不是全量生产系统SLA。
+- 当前趋势滚动回测与推荐四路 bake-off 分别由
+  ``evaluation.eval_trends_backtest`` 和 ``evaluation.eval_recommend_bakeoff`` 生成；本入口不会生成它们。
 - 输出 JSON/Markdown 仅消费以下固定字段与口径，不改变底层统计。
 - self-retrieval 部分使用评测脚本内置抽样参数(默认 200/150)，指标与样本规模相关，不能外推为“全库真实准确率”。
 - 趋势回测固定按 2022–2024 训练、2025 验证，且仅覆盖 `data/analysis/keyword_trends.csv` 中满足筛选条件的关键词。

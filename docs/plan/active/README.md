@@ -9,10 +9,10 @@ active 目录只保留仍需要开发或验收的任务线。每条线只拥有�
 | 分配文件 | 状态 | 下一领取任务 | 不可越过的边界 |
 |---|---|---|---|
 | [D 文献内容结构化](D-文献内容结构化.md) | `active` | D05 技术收口完成；D04 外部专家质量证明继续挂账 | 不在 TUI 上传任意 PDF；受控摄取、解析与抽取留在 Python 数据层 |
-| [G 知识图谱与研究发现](G-知识图谱与研究发现.md) | `active` | G04b 当前模型远端基线完成；继续多基线对照，用户证明挂账 | 不重建 Web 图谱；先交付可查询的图谱摘要、趋势和推荐证据 |
-| [A 科研问答与协议](A-科研问答与协议.md) | `active` | A02 工程合同 PASS；下一步 A03 | 不复制第二个 Agent Loop；复用现有工具注册表与 SSE 合同 |
-| [T TUI 科研工作流](T-TUI科研工作流.md) | `READY` | A02 已满足；可启动 T01/T02 | Go 只消费 SSE，不承载解析、检索或推理 |
-| [E 证据 L3 与国赛证明](E-证据L3与国赛证明.md) | `active` | E04 OpenCode 顺序调用 PASS；下一步 E06，E02 质量证明继续挂账 | 不把 silver 当金标准；不把工程集成当 L3 质量证明 |
+| [G 知识图谱与研究发现](G-知识图谱与研究发现.md) | `active` | G04b 自动多基线完成；用户/专家证明挂账 | 不重建 Web 图谱；先交付可查询的图谱摘要、趋势和推荐证据 |
+| [A 科研问答与协议](A-科研问答与协议.md) | `active` | A03 自动回归完成；下一步 A04 | 不复制第二个 Agent Loop；复用现有工具注册表与 SSE 合同 |
+| [T TUI 科研工作流](T-TUI科研工作流.md) | `active` | T01/T02 已完成；下一步 T04 | Go 只消费 SSE，不承载解析、检索或推理 |
+| [E 证据 L3 与国赛证明](E-证据L3与国赛证明.md) | `active` | E06 双报告重建完成；下一步 E07，E02 质量证明继续挂账 | 不把 silver 当金标准；不把工程集成当 L3 质量证明 |
 
 ## Wave 执行编排（2026-08-10 双门禁修订）
 
@@ -85,12 +85,12 @@ Wave 1 的 G03/E03/D05 技术主线。
   合同漂移均 fail-closed，工程合同 `PASS`；A03 人工回归与 A04 真实 trace 尚未开始；
 - E04：真实 OpenCode 已按顺序完成 `verify_claim(persist=true)` 和 MCP resource 读取，并修复
   `ReadResourceContents` 客户端兼容性，工程 `PASS`；自然语料 stance 质量不由 fixture 证明；
-- G04b：远端 100 seeds/500 recommendations 当前模型基线已完成，但 popularity/keyword/dense/current
-  统一对照和 diversity/novelty/延迟主表仍 `REVISE`，用户/专家证明仍 `BLOCKED`；
+- G04b：远端 100 seeds × 5 的 popularity proxy/keyword TF-IDF/dense/current 统一自动评测已完成，
+  diversity/novelty/延迟和失败例均落表；自动工程部分 `PASS`，用户/专家证明仍 `BLOCKED`；
 - E08：许可、字段映射和场景联系人仍 `BLOCKED`，只保留准入审计与替代推进边界。
 
-按原子依赖，A03、T01、T02 和 E06 的工程任务已可启动；G04b 多基线对照继续独立补齐，不能把
-当前自动代理指标写成推荐质量或科研效率的已证明提升。
+按原子依赖，A03、T01、T02 和 E06 的工程任务已完成；下一步进入 A04 与 T04 的真实端到端证明。
+G04b 自动代理指标仍不能写成推荐质量或科研效率的已证明提升。
 
 ### Wave 3｜问答验证、TUI 展示与报告源
 

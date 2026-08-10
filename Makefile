@@ -4,6 +4,8 @@ PROJECT_PYTHON := $(shell if [ -x /opt/homebrew/Caskroom/miniconda/base/envs/ai/
 PROJECT_TEST_PYTHON := $(shell if $(PROJECT_PYTHON) -c "import pytest" >/dev/null 2>&1; then echo $(PROJECT_PYTHON); elif python3 -c "import pytest" >/dev/null 2>&1; then command -v python3; else echo $(PROJECT_PYTHON); fi)
 PYTHON ?= $(PROJECT_PYTHON)
 TEST_PYTHON ?= $(PROJECT_TEST_PYTHON)
+LATEXMK ?= latexmk
+REPORT_LATEX_FLAGS ?= -norc -xelatex -interaction=nonstopmode -halt-on-error -synctex=1
 BACKEND_HOST ?= 127.0.0.1
 BACKEND_PORT ?= 8000
 HOSTED_BACKEND_IMAGE ?= sciscope-backend:local
@@ -382,7 +384,8 @@ stance-reconcile:
 	test -n "$(ANNOTATOR_B)" || { echo "ANNOTATOR_B is required" >&2; exit 1; }
 	$(PYTHON) -m evaluation.reconcile_stance_annotations --candidates "$(CANDIDATES)" --annotator-a "$(ANNOTATOR_A)" --annotator-b "$(ANNOTATOR_B)" --out-dir "$(or $(OUT_DIR),output/stance_reconciliation)"
 
-# Full evaluation evidence pack -> output/eval/ (retrieval + trend backtest + recommend).
+# Historical combined snapshot. Current trend/recommend evidence uses the
+# separate eval_trends_backtest and eval_recommend_bakeoff entry points.
 eval-all:
 	SCISCOPE_DB_DSN=$(POSTGRES_DSN) SCISCOPE_EMBEDDER_PATH=$(EMBEDDER_PATH) SCISCOPE_EMBED_FP16=1 $(PYTHON) -m evaluation.eval_all
 
@@ -399,7 +402,7 @@ project-report-figures:
 	XDG_CACHE_HOME=$(CURDIR)/.cache MPLCONFIGDIR=$(CURDIR)/.cache/matplotlib $(PYTHON) -m src.analysis.cli project-figures --analysis-dir $(ANALYSIS_OUTPUT_DIR) --processed-dir data/processed --eval-dir output/eval --output-dir $(PROJECT_REPORT_ASSETS_DIR)
 
 data-report-pdf:
-	python3 /Users/tim/.codex/plugins/cache/openai-bundled/latex/0.2.3/scripts/compile_latex.py $(CURDIR)/output/pdf/sciscope_data_report/main.tex --engine xelatex
+	cd output/pdf/sciscope_data_report && $(LATEXMK) $(REPORT_LATEX_FLAGS) main.tex
 	cp output/pdf/sciscope_data_report/main.pdf output/pdf/sciscope_data_report/sciscope_data_report.pdf
 	rm -f output/pdf/sciscope_data_report/main.aux \
 		output/pdf/sciscope_data_report/main.fdb_latexmk \
@@ -412,7 +415,7 @@ data-report-pdf:
 		output/pdf/sciscope_data_report/main.xdv
 
 project-report-pdf: project-report-figures
-	python3 /Users/tim/.codex/plugins/cache/openai-bundled/latex/0.2.3/scripts/compile_latex.py $(CURDIR)/output/pdf/sciscope_project_report/main.tex --engine xelatex
+	cd output/pdf/sciscope_project_report && $(LATEXMK) $(REPORT_LATEX_FLAGS) main.tex
 	cp output/pdf/sciscope_project_report/main.pdf output/pdf/sciscope_project_report/sciscope_project_report.pdf
 	rm -f output/pdf/sciscope_project_report/main.aux \
 		output/pdf/sciscope_project_report/main.fdb_latexmk \

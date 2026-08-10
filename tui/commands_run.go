@@ -222,13 +222,17 @@ func runReviewCommand(m model, args []string) (model, tea.Cmd) {
 	return m, cmd
 }
 
+func trendFallbackPrompt(topic string) string {
+	return "请围绕这个主题做历史趋势描述,说明热度变化、代表证据、描述边界与不确定性,不得外推未来结论: " + topic
+}
+
 func runTrendCommand(m model, args []string) (model, tea.Cmd) {
 	topic := strings.TrimSpace(strings.Join(args, " "))
 	if topic == "" {
 		m.appendBlock(stWarn.Render("  用法: /trend <研究主题>"))
 		return m, nil
 	}
-	fallback := "请围绕这个主题做趋势分析,说明热度变化、代表证据、趋势边界和未来判断: " + topic
+	fallback := trendFallbackPrompt(topic)
 	q := renderSkillPrompt("trend-analysis", topic, fallback)
 	cmd := m.startQuestion(q, false)
 	return m, cmd

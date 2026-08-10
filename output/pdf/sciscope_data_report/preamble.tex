@@ -31,11 +31,10 @@
 \definecolor{SciPanelWarm}{HTML}{FBF8F1}
 
 % --- Cover-scoped artistic typography (XeLaTeX + macOS system fonts) --------
-% Display: Weibei SC (魏碑 brushstroke) for the title, Songti SC (Ming serif)
-% for elegant supporting text, Bodoni 72 (high-contrast Didone) for Latin &
-% numerals. Body text keeps the portable fandol set so the rest still compiles
-% on any TeX Live.
-\newCJKfontfamily\coverTitle{Weibei SC}
+% Display: use an installed macOS CJK face for the cover title. The previous
+% Weibei SC dependency is not present on this machine and blocks reproducible
+% compilation, so the title falls back to Songti SC here.
+\newCJKfontfamily\coverTitle{Songti SC}
 \newCJKfontfamily\coverCJK{Songti SC}
 \newfontfamily\coverNum{Bodoni 72}
 \newfontfamily\coverSans{Bodoni 72}

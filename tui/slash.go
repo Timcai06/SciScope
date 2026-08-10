@@ -31,9 +31,9 @@ type slashCmd struct {
 var slashCmds = []slashCmd{
 	{cmd: "/demo", title: "黄金演示", desc: "播放可验证证据流", category: "常用", key: "demo", kind: commandLocal, suggested: true},
 	{cmd: "/verify", title: "论断核查", desc: "把论断展开为证据核查任务", category: "常用", key: "verify <claim>", kind: commandPrompt, suggested: true},
-	{cmd: "/review", title: "文献综述", desc: "把主题展开为综述/研究现状任务", category: "常用", key: "review <topic>", kind: commandPrompt, suggested: true},
-	{cmd: "/trend", title: "趋势分析", desc: "把主题展开为趋势预测任务", category: "常用", key: "trend <topic>", kind: commandPrompt, suggested: true},
-	{cmd: "/recommend", title: "论文推荐", desc: "把主题或种子论文展开为推荐任务", category: "常用", key: "recommend <topic|paper_id>", kind: commandPrompt, suggested: true},
+	{cmd: "/review", title: "文献综述", desc: "把主题展开为研究现状与证据综述", category: "常用", key: "review <topic>", kind: commandPrompt, suggested: true},
+	{cmd: "/trend", title: "趋势分析", desc: "把主题展开为描述性趋势任务", category: "常用", key: "trend <topic>", kind: commandPrompt, suggested: true},
+	{cmd: "/recommend", title: "论文推荐", desc: "把主题或种子论文展开为推荐线索任务", category: "常用", key: "recommend <topic|paper_id>", kind: commandPrompt, suggested: true},
 	{cmd: "/doctor", title: "状态体检", desc: "检查后端、LLM、会话与图谱", category: "常用", key: "doctor", kind: commandUI, submenu: "doctor", suggested: true},
 	{cmd: "/retry", title: "重试上一问", desc: "同一 LangGraph 会话线程恢复上一问", category: "常用", key: "retry", kind: commandLocal, suggested: true},
 	{cmd: "/export", title: "导出报告", desc: "导出 Markdown 会话与证据", category: "常用", key: "export", kind: commandLocal, suggested: true},

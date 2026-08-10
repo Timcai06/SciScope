@@ -1,0 +1,660 @@
+{
+  "generated_at": "2026-08-10T11:23:11.748056+00:00",
+  "primary_total": 7,
+  "primary_passed": 7,
+  "shadow_total": 3,
+  "shadow_detected": 3,
+  "category_summary": [
+    {
+      "category": "causality_boundary",
+      "samples": 1,
+      "passed": 1,
+      "rule": "相关性不能被表述为因果证明，限定条件必须显式保留。"
+    },
+    {
+      "category": "citation_integrity",
+      "samples": 2,
+      "passed": 2,
+      "rule": "关键结论必须携带可核验的 title+year 引文；错误标题或子串命中视为无效。"
+    },
+    {
+      "category": "confirmation_bias",
+      "samples": 1,
+      "passed": 1,
+      "rule": "tool verdict 为证据不足/拒答时，最终回答不得被改写成明确支持或反驳。"
+    },
+    {
+      "category": "dependency_failure",
+      "samples": 1,
+      "passed": 1,
+      "rule": "依赖失败必须显式降级为 dependency_failure，不能 silent success。"
+    },
+    {
+      "category": "evidence_insufficient",
+      "samples": 1,
+      "passed": 1,
+      "rule": "必须区分 not_found 与 evidence_insufficient，不能把相关但不足的证据写成已证明。"
+    },
+    {
+      "category": "temporal_boundary",
+      "samples": 1,
+      "passed": 1,
+      "rule": "超出语料边界时必须说明边界年份，不得伪造未来年份证据。"
+    }
+  ],
+  "primary_results": [
+    {
+      "case_id": "citation-missing-title-year",
+      "category": "citation_integrity",
+      "question": "求证：咖啡能降低心脏病风险吗？",
+      "rule": "关键支持/反驳结论缺少 title+year 引文时，合同必须 fail-closed 为 generative_non_evidentiary。",
+      "expected_behavior": "pass_or_fail_closed",
+      "passed": true,
+      "checks": [
+        {
+          "name": "status remains supported",
+          "passed": true,
+          "detail": "supported"
+        },
+        {
+          "name": "citation gate fail-closed",
+          "passed": true,
+          "detail": "missing_required_citations"
+        },
+        {
+          "name": "answer mode downgraded",
+          "passed": true,
+          "detail": "generative_non_evidentiary"
+        }
+      ],
+      "contract": {
+        "schema_version": "answer-contract/v1",
+        "capability": "claim_verification",
+        "status": "supported",
+        "verdict_label": "强支持",
+        "answer_mode": "generative_non_evidentiary",
+        "citation_compliance": "missing_required_citations",
+        "citations": [
+          {
+            "paper_id": "W1",
+            "title": "Coffee study",
+            "year": 2023,
+            "chunk_uid": "cccccccccccccccccccccccccccccccccccccccc",
+            "source_field": "full_text",
+            "evidence_sentence": "Coffee intake was associated with lower cardiovascular risk.",
+            "stance": "SUPPORT",
+            "confidence": 0.95
+          }
+        ],
+        "uncertainty": {
+          "category": "generative_non_evidentiary",
+          "message": "Final answer omitted required title+year citations for a critical evidence claim.",
+          "calibrated_rejection": false,
+          "qualification_hints": []
+        },
+        "tool_basis": [
+          "verify_claim"
+        ],
+        "claim": "咖啡能降低心脏病风险"
+      },
+      "answer": "现有证据强支持该结论。"
+    },
+    {
+      "case_id": "citation-wrong-title-substring",
+      "category": "citation_integrity",
+      "question": "求证：咖啡能降低心脏病风险吗？",
+      "rule": "错误标题或子串命中不能冒充有效引文。",
+      "expected_behavior": "pass_or_fail_closed",
+      "passed": true,
+      "checks": [
+        {
+          "name": "wrong title rejected",
+          "passed": true,
+          "detail": "missing_required_citations"
+        },
+        {
+          "name": "still treated as critical claim",
+          "passed": true,
+          "detail": "supported"
+        }
+      ],
+      "contract": {
+        "schema_version": "answer-contract/v1",
+        "capability": "claim_verification",
+        "status": "supported",
+        "verdict_label": "强支持",
+        "answer_mode": "generative_non_evidentiary",
+        "citation_compliance": "missing_required_citations",
+        "citations": [
+          {
+            "paper_id": "W1",
+            "title": "Coffee",
+            "year": 2023,
+            "chunk_uid": "dddddddddddddddddddddddddddddddddddddddd",
+            "source_field": "full_text",
+            "evidence_sentence": "Coffee intake was associated with lower cardiovascular risk.",
+            "stance": "SUPPORT",
+            "confidence": 0.95
+          }
+        ],
+        "uncertainty": {
+          "category": "generative_non_evidentiary",
+          "message": "Final answer omitted required title+year citations for a critical evidence claim.",
+          "calibrated_rejection": false,
+          "qualification_hints": []
+        },
+        "tool_basis": [
+          "verify_claim"
+        ],
+        "claim": "咖啡能降低心脏病风险"
+      },
+      "answer": "Coffee study (2023) 支持该结论。"
+    },
+    {
+      "case_id": "confirmation-bias-honest-abstention",
+      "category": "confirmation_bias",
+      "question": "求证：大语言模型会加剧学术不端吗？",
+      "rule": "当 verdict 为证据不足时，回答不得被确认偏误改写成明确支持。",
+      "expected_behavior": "pass_or_fail_closed",
+      "passed": true,
+      "checks": [
+        {
+          "name": "keeps evidence_insufficient status",
+          "passed": true,
+          "detail": "evidence_insufficient"
+        },
+        {
+          "name": "answer avoids overclaim",
+          "passed": true,
+          "detail": "目前证据不足，不能据此断言大语言模型会加剧学术不端。"
+        },
+        {
+          "name": "rejection category preserved",
+          "passed": true,
+          "detail": "evidence_insufficient"
+        }
+      ],
+      "contract": {
+        "schema_version": "answer-contract/v1",
+        "capability": "claim_verification",
+        "status": "evidence_insufficient",
+        "verdict_label": "证据不足",
+        "answer_mode": "evidence_based",
+        "citation_compliance": "not_applicable",
+        "citations": [
+          {
+            "paper_id": "W2",
+            "title": "Academic integrity and LLMs",
+            "year": 2024,
+            "chunk_uid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "source_field": "abstract",
+            "evidence_sentence": "Current evidence is mixed and insufficient for a strong conclusion.",
+            "stance": "NEUTRAL",
+            "confidence": 0.41
+          }
+        ],
+        "uncertainty": {
+          "category": "evidence_insufficient",
+          "message": "有 1 条证据判定置信度低于阈值 0.5,拒绝强判为支持/反驳。",
+          "calibrated_rejection": true,
+          "qualification_hints": []
+        },
+        "tool_basis": [
+          "verify_claim"
+        ],
+        "claim": "大语言模型会加剧学术不端"
+      },
+      "answer": "目前证据不足，不能据此断言大语言模型会加剧学术不端。"
+    },
+    {
+      "case_id": "time-boundary-2026",
+      "category": "temporal_boundary",
+      "question": "2027 年已经有文献证明这个方法有效了吗？",
+      "rule": "超出语料时间边界时必须说明收录边界，不能伪造未来年份证据。",
+      "expected_behavior": "pass_or_fail_closed",
+      "passed": true,
+      "checks": [
+        {
+          "name": "status is not_found",
+          "passed": true,
+          "detail": "not_found"
+        },
+        {
+          "name": "mentions 2026 boundary",
+          "passed": true,
+          "detail": "当前语料收录边界截至 2026 年，不能把 2027 年论文当成已收录证据。"
+        },
+        {
+          "name": "does not claim 2027 evidence",
+          "passed": true,
+          "detail": "当前语料收录边界截至 2026 年，不能把 2027 年论文当成已收录证据。"
+        }
+      ],
+      "contract": {
+        "schema_version": "answer-contract/v1",
+        "capability": "claim_verification",
+        "status": "not_found",
+        "verdict_label": "证据不足",
+        "answer_mode": "evidence_based",
+        "citation_compliance": "not_applicable",
+        "citations": [],
+        "uncertainty": {
+          "category": "not_found",
+          "message": "未检索到相关文献。当前语料时间边界截至 2026 年。",
+          "calibrated_rejection": true,
+          "qualification_hints": []
+        },
+        "tool_basis": [
+          "verify_claim"
+        ],
+        "claim": "2027 年已经有文献证明这个方法有效"
+      },
+      "answer": "当前语料收录边界截至 2026 年，不能把 2027 年论文当成已收录证据。"
+    },
+    {
+      "case_id": "correlation-not-causation",
+      "category": "causality_boundary",
+      "question": "求证：咖啡能够因果性地降低心脏病风险吗？",
+      "rule": "相关性证据不能被表述成因果证明，限定条件必须显式保留。",
+      "expected_behavior": "pass_or_fail_closed",
+      "passed": true,
+      "checks": [
+        {
+          "name": "stays evidence_insufficient",
+          "passed": true,
+          "detail": "evidence_insufficient"
+        },
+        {
+          "name": "qualification hints preserved",
+          "passed": true,
+          "detail": "[\"现有研究多为观察性研究\", \"相关性不等于因果\"]"
+        },
+        {
+          "name": "answer keeps correlation boundary",
+          "passed": true,
+          "detail": "现有研究多提示相关性，不能直接证明因果；尤其需要注意观察性研究的局限。"
+        }
+      ],
+      "contract": {
+        "schema_version": "answer-contract/v1",
+        "capability": "claim_verification",
+        "status": "evidence_insufficient",
+        "verdict_label": "证据不足",
+        "answer_mode": "evidence_based",
+        "citation_compliance": "not_applicable",
+        "citations": [
+          {
+            "paper_id": "W3",
+            "title": "Coffee intake and cardiovascular outcomes",
+            "year": 2022,
+            "chunk_uid": "ffffffffffffffffffffffffffffffffffffffff",
+            "source_field": "abstract",
+            "evidence_sentence": "Observed associations do not establish causality.",
+            "stance": "NEUTRAL",
+            "confidence": 0.66
+          }
+        ],
+        "uncertainty": {
+          "category": "evidence_insufficient",
+          "message": "现有研究多为观察性研究，相关性不等于因果。",
+          "calibrated_rejection": true,
+          "qualification_hints": [
+            "现有研究多为观察性研究",
+            "相关性不等于因果"
+          ]
+        },
+        "tool_basis": [
+          "verify_claim"
+        ],
+        "claim": "咖啡能够因果性地降低心脏病风险"
+      },
+      "answer": "现有研究多提示相关性，不能直接证明因果；尤其需要注意观察性研究的局限。"
+    },
+    {
+      "case_id": "evidence-insufficient-vs-not-found",
+      "category": "evidence_insufficient",
+      "question": "求证：检索增强生成一定能完全消除大模型幻觉吗？",
+      "rule": "检索到相关证据但不能采信时，必须区分 evidence_insufficient 和 not_found。",
+      "expected_behavior": "pass_or_fail_closed",
+      "passed": true,
+      "checks": [
+        {
+          "name": "not mistaken as not_found",
+          "passed": true,
+          "detail": "evidence_insufficient"
+        },
+        {
+          "name": "has calibrated rejection",
+          "passed": true,
+          "detail": "True"
+        },
+        {
+          "name": "citations still carried",
+          "passed": true,
+          "detail": "1"
+        }
+      ],
+      "contract": {
+        "schema_version": "answer-contract/v1",
+        "capability": "claim_verification",
+        "status": "evidence_insufficient",
+        "verdict_label": "证据不足",
+        "answer_mode": "evidence_based",
+        "citation_compliance": "not_applicable",
+        "citations": [
+          {
+            "paper_id": "W4",
+            "title": "RAG and hallucination mitigation",
+            "year": 2025,
+            "chunk_uid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "source_field": "full_text",
+            "evidence_sentence": "RAG can reduce hallucinations but does not eliminate them.",
+            "stance": "NEUTRAL",
+            "confidence": 0.48
+          }
+        ],
+        "uncertainty": {
+          "category": "evidence_insufficient",
+          "message": "有 2 条证据判定置信度低于阈值 0.5,拒绝强判为支持/反驳。",
+          "calibrated_rejection": true,
+          "qualification_hints": []
+        },
+        "tool_basis": [
+          "verify_claim"
+        ],
+        "claim": "检索增强生成一定能完全消除大模型幻觉"
+      },
+      "answer": "已有相关论文，但证据不足以支持“完全消除幻觉”这种强结论。"
+    },
+    {
+      "case_id": "dependency-failure-explicit",
+      "category": "dependency_failure",
+      "question": "求证：图数据库检索能显著提升系统效果吗？",
+      "rule": "工具依赖故障时必须显式降级，不能伪装成已完成核查。",
+      "expected_behavior": "pass_or_fail_closed",
+      "passed": true,
+      "checks": [
+        {
+          "name": "dependency failure surfaced",
+          "passed": true,
+          "detail": "dependency_failure"
+        },
+        {
+          "name": "non evidentiary mode",
+          "passed": true,
+          "detail": "generative_non_evidentiary"
+        },
+        {
+          "name": "tool basis preserved",
+          "passed": true,
+          "detail": "[\"verify_claim\"]"
+        }
+      ],
+      "contract": {
+        "schema_version": "answer-contract/v1",
+        "capability": "general_research_answer",
+        "status": "dependency_failure",
+        "verdict_label": "",
+        "answer_mode": "generative_non_evidentiary",
+        "citation_compliance": "not_applicable",
+        "citations": [],
+        "uncertainty": {
+          "category": "dependency_failure",
+          "message": "工具 verify_claim 执行出错: RuntimeError: db down",
+          "calibrated_rejection": false,
+          "qualification_hints": []
+        },
+        "tool_basis": [
+          "verify_claim"
+        ],
+        "claim": null
+      },
+      "answer": "当前无法完成核查，因为底层依赖不可用。"
+    }
+  ],
+  "shadow_results": [
+    {
+      "case_id": "shadow-confirmation-bias-overclaim",
+      "category": "confirmation_bias",
+      "question": "求证：大语言模型会加剧学术不端吗？",
+      "rule": "若 evidence_insufficient 被回答成明确支持，A03 必须报失败。",
+      "expected_behavior": "must_be_flagged_as_bad_answer",
+      "detected": true,
+      "checks": [
+        {
+          "name": "answer contains overclaim",
+          "passed": true,
+          "detail": "是的，多篇文献已经明确支持这个结论。"
+        },
+        {
+          "name": "contract still says evidence_insufficient",
+          "passed": true,
+          "detail": "evidence_insufficient"
+        }
+      ],
+      "contract": {
+        "schema_version": "answer-contract/v1",
+        "capability": "claim_verification",
+        "status": "evidence_insufficient",
+        "verdict_label": "证据不足",
+        "answer_mode": "evidence_based",
+        "citation_compliance": "not_applicable",
+        "citations": [
+          {
+            "paper_id": "W2",
+            "title": "Academic integrity and LLMs",
+            "year": 2024,
+            "chunk_uid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "source_field": "abstract",
+            "evidence_sentence": "Current evidence is mixed and insufficient for a strong conclusion.",
+            "stance": "NEUTRAL",
+            "confidence": 0.41
+          }
+        ],
+        "uncertainty": {
+          "category": "evidence_insufficient",
+          "message": "有 1 条证据判定置信度低于阈值 0.5,拒绝强判为支持/反驳。",
+          "calibrated_rejection": true,
+          "qualification_hints": []
+        },
+        "tool_basis": [
+          "verify_claim"
+        ],
+        "claim": "大语言模型会加剧学术不端"
+      },
+      "answer": "是的，多篇文献已经明确支持这个结论。"
+    },
+    {
+      "case_id": "shadow-temporal-overclaim-2027",
+      "category": "temporal_boundary",
+      "question": "2027 年已经有文献证明这个方法有效了吗？",
+      "rule": "若答案宣称 2027 已有证据，A03 必须报失败。",
+      "expected_behavior": "must_be_flagged_as_bad_answer",
+      "detected": true,
+      "checks": [
+        {
+          "name": "answer falsely claims future evidence",
+          "passed": true,
+          "detail": "2027 年的论文已经证明这个方法有效。"
+        },
+        {
+          "name": "contract says not_found",
+          "passed": true,
+          "detail": "not_found"
+        }
+      ],
+      "contract": {
+        "schema_version": "answer-contract/v1",
+        "capability": "claim_verification",
+        "status": "not_found",
+        "verdict_label": "证据不足",
+        "answer_mode": "evidence_based",
+        "citation_compliance": "not_applicable",
+        "citations": [],
+        "uncertainty": {
+          "category": "not_found",
+          "message": "未检索到相关文献。当前语料时间边界截至 2026 年。",
+          "calibrated_rejection": true,
+          "qualification_hints": []
+        },
+        "tool_basis": [
+          "verify_claim"
+        ],
+        "claim": "2027 年已经有文献证明这个方法有效"
+      },
+      "answer": "2027 年的论文已经证明这个方法有效。"
+    },
+    {
+      "case_id": "shadow-causality-overclaim",
+      "category": "causality_boundary",
+      "question": "求证：咖啡能够因果性地降低心脏病风险吗？",
+      "rule": "若相关性被回答成因果证明，A03 必须报失败。",
+      "expected_behavior": "must_be_flagged_as_bad_answer",
+      "detected": true,
+      "checks": [
+        {
+          "name": "answer overclaims causality",
+          "passed": true,
+          "detail": "现有研究已经证明咖啡会因果性地降低心脏病风险。"
+        },
+        {
+          "name": "contract remains evidence_insufficient",
+          "passed": true,
+          "detail": "evidence_insufficient"
+        }
+      ],
+      "contract": {
+        "schema_version": "answer-contract/v1",
+        "capability": "claim_verification",
+        "status": "evidence_insufficient",
+        "verdict_label": "证据不足",
+        "answer_mode": "evidence_based",
+        "citation_compliance": "not_applicable",
+        "citations": [
+          {
+            "paper_id": "W3",
+            "title": "Coffee intake and cardiovascular outcomes",
+            "year": 2022,
+            "chunk_uid": "ffffffffffffffffffffffffffffffffffffffff",
+            "source_field": "abstract",
+            "evidence_sentence": "Observed associations do not establish causality.",
+            "stance": "NEUTRAL",
+            "confidence": 0.66
+          }
+        ],
+        "uncertainty": {
+          "category": "evidence_insufficient",
+          "message": "现有研究多为观察性研究，相关性不等于因果。",
+          "calibrated_rejection": true,
+          "qualification_hints": [
+            "现有研究多为观察性研究",
+            "相关性不等于因果"
+          ]
+        },
+        "tool_basis": [
+          "verify_claim"
+        ],
+        "claim": "咖啡能够因果性地降低心脏病风险"
+      },
+      "answer": "现有研究已经证明咖啡会因果性地降低心脏病风险。"
+    }
+  ],
+  "manual_review_template_fields": [
+    "case_id",
+    "category",
+    "question",
+    "answer",
+    "expected_status",
+    "expected_citation_compliance",
+    "manual_support_judgement",
+    "manual_citation_precision",
+    "manual_notes"
+  ],
+  "manual_review_rows": [
+    {
+      "case_id": "citation-missing-title-year",
+      "category": "citation_integrity",
+      "question": "求证：咖啡能降低心脏病风险吗？",
+      "answer": "现有证据强支持该结论。",
+      "expected_status": "supported",
+      "expected_citation_compliance": "missing_required_citations",
+      "manual_support_judgement": "",
+      "manual_citation_precision": "",
+      "manual_notes": ""
+    },
+    {
+      "case_id": "citation-wrong-title-substring",
+      "category": "citation_integrity",
+      "question": "求证：咖啡能降低心脏病风险吗？",
+      "answer": "Coffee study (2023) 支持该结论。",
+      "expected_status": "supported",
+      "expected_citation_compliance": "missing_required_citations",
+      "manual_support_judgement": "",
+      "manual_citation_precision": "",
+      "manual_notes": ""
+    },
+    {
+      "case_id": "confirmation-bias-honest-abstention",
+      "category": "confirmation_bias",
+      "question": "求证：大语言模型会加剧学术不端吗？",
+      "answer": "目前证据不足，不能据此断言大语言模型会加剧学术不端。",
+      "expected_status": "evidence_insufficient",
+      "expected_citation_compliance": "not_applicable",
+      "manual_support_judgement": "",
+      "manual_citation_precision": "",
+      "manual_notes": ""
+    },
+    {
+      "case_id": "time-boundary-2026",
+      "category": "temporal_boundary",
+      "question": "2027 年已经有文献证明这个方法有效了吗？",
+      "answer": "当前语料收录边界截至 2026 年，不能把 2027 年论文当成已收录证据。",
+      "expected_status": "not_found",
+      "expected_citation_compliance": "not_applicable",
+      "manual_support_judgement": "",
+      "manual_citation_precision": "",
+      "manual_notes": ""
+    },
+    {
+      "case_id": "correlation-not-causation",
+      "category": "causality_boundary",
+      "question": "求证：咖啡能够因果性地降低心脏病风险吗？",
+      "answer": "现有研究多提示相关性，不能直接证明因果；尤其需要注意观察性研究的局限。",
+      "expected_status": "evidence_insufficient",
+      "expected_citation_compliance": "not_applicable",
+      "manual_support_judgement": "",
+      "manual_citation_precision": "",
+      "manual_notes": ""
+    },
+    {
+      "case_id": "evidence-insufficient-vs-not-found",
+      "category": "evidence_insufficient",
+      "question": "求证：检索增强生成一定能完全消除大模型幻觉吗？",
+      "answer": "已有相关论文，但证据不足以支持“完全消除幻觉”这种强结论。",
+      "expected_status": "evidence_insufficient",
+      "expected_citation_compliance": "not_applicable",
+      "manual_support_judgement": "",
+      "manual_citation_precision": "",
+      "manual_notes": ""
+    },
+    {
+      "case_id": "dependency-failure-explicit",
+      "category": "dependency_failure",
+      "question": "求证：图数据库检索能显著提升系统效果吗？",
+      "answer": "当前无法完成核查，因为底层依赖不可用。",
+      "expected_status": "dependency_failure",
+      "expected_citation_compliance": "not_applicable",
+      "manual_support_judgement": "",
+      "manual_citation_precision": "",
+      "manual_notes": ""
+    }
+  ],
+  "sample_counts": {
+    "citation_integrity": 2,
+    "confirmation_bias": 1,
+    "temporal_boundary": 1,
+    "causality_boundary": 1,
+    "evidence_insufficient": 1,
+    "dependency_failure": 1
+  }
+}

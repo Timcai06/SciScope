@@ -37,8 +37,6 @@ GREEN = STEEL
 GOLD = BLUEGREY
 ROSE = MINTGREY
 SLATE = GRAPHITE
-TESTS_PASSED = 141
-
 LAYER_FILLS = [SOFT, "#e5ebeb", "#dbe4e4", "#cfdcdc", "#c1d2d4", "#b1c6c9", MINTGREY]
 SERIES_COLORS = [CHARCOAL, GRAPHITE, STEEL, BLUEGREY, MINTGREY, "#bccacc"]
 
@@ -248,19 +246,24 @@ def _figure_claim_grounding(output_dir: Path) -> Path:
     return path
 
 
-def _figure_eval_dashboard(eval_report: dict[str, Any], output_dir: Path) -> Path:
+def _figure_eval_dashboard(
+    eval_report: dict[str, Any], recommend_bakeoff: dict[str, Any], output_dir: Path
+) -> Path:
     retrieval = eval_report.get("retrieval", {}).get("by_title", {})
     relevance = 1.0
     trend = eval_report.get("trend_backtest", {})
-    rec = eval_report.get("recommendation", {})
+    rec = next(
+        (row for row in recommend_bakeoff.get("results", []) if row.get("baseline") == "current"),
+        {},
+    )
     tests = 1.0
     metrics = [
         ("relevance@5", relevance, "Chinese topic\nqueries"),
         ("recall@10", float(retrieval.get("recall@10", 0)), "title\nself retrieval"),
         ("MRR@10", float(retrieval.get("mrr@10", 0)), "ranking\nquality"),
         ("Pearson", float(trend.get("pearson_pred_vs_actual", 0)), "trend\nbacktest"),
-        ("recommend", float(rec.get("mean_semantic_similarity", 0)), "mean semantic\nsimilarity"),
-        ("tests", tests, f"{TESTS_PASSED} backend\ntests"),
+        ("recommend", float(rec.get("mean_seed_semantic_similarity", 0)), "current mean\nsemantic proxy"),
+        ("tests", tests, "backend regression\nsnapshot passed"),
     ]
     fig, ax = plt.subplots(figsize=(10.5, 4.95))
     values = [m[1] for m in metrics]
@@ -280,7 +283,7 @@ def _figure_eval_dashboard(eval_report: dict[str, Any], output_dir: Path) -> Pat
         label = "pass" if i == len(metrics) - 1 else f"{value:.3f}"
         ax.text(min(value + 0.025, 1.01), i, label, va="center", fontsize=8.6, color=INK, fontweight="bold")
         ax.text(0.020, i, note, va="center", fontsize=7.0, color="white", fontweight="bold", linespacing=1.15)
-    ax.text(0, 1.035, "Source: output/eval/eval_report.json plus current make test-backend result.",
+    ax.text(0, 1.035, "Source: eval_report.json + recommend_bakeoff.json + current backend regression.",
             transform=ax.transAxes, fontsize=7.5, color=MUTED)
     ax.text(0.62, 1.035, "honest note: trend MAE does not beat naive baseline",
             transform=ax.transAxes, fontsize=7.3, color=ROSE)
@@ -323,9 +326,8 @@ def _figure_asset_funnel(
         ax.text(x + 0.025, y + 0.047, label, va="center", fontsize=8.7, fontweight="bold", color=INK)
         ax.text(x + 0.025, y + 0.021, source, va="center", fontsize=6.8, color=MUTED)
         ax.text(0.885, y + 0.039, _fmt_count(value), va="center", ha="right", fontsize=9.4, fontweight="bold", color=INK)
-    _badge(ax, 0.535, 0.735, "runtime vectors: 367,773 chunks / 159,135 papers", color=SLATE, face=PAPER, text_color=INK, width=0.390)
     ax.text(0.045, 0.110,
-            "Asset counts are not inflated claims; runtime DB/vector counts are tracked in delivery docs.",
+            "File-asset counts come from reproducible pipeline summaries; runtime DB state is evidenced separately.",
             fontsize=7.6, color=MUTED)
     path = output_dir / "asset_funnel.png"
     save_figure(fig, path)
@@ -350,12 +352,13 @@ def build_project_report_figures(
     corpus_summary = _load_json(processed_dir / "papers_corpus.summary.json")
     chunks_summary = _load_json(processed_dir / "paper_chunks.summary.json")
     eval_report = _load_json(eval_dir / "eval_report.json")
+    recommend_bakeoff = _load_json(eval_dir / "recommend_bakeoff.json")
 
     figures = [
         _figure_system_capability(output_dir),
         _figure_agent_trace(output_dir),
         _figure_claim_grounding(output_dir),
-        _figure_eval_dashboard(eval_report, output_dir),
+        _figure_eval_dashboard(eval_report, recommend_bakeoff, output_dir),
         _figure_asset_funnel(analysis_summary, corpus_summary, chunks_summary, eval_report, output_dir),
     ]
     manifest = output_dir / "figure_manifest.csv"
@@ -366,7 +369,7 @@ def build_project_report_figures(
                 "system_capability_map.png,Architecture capability overview,static system design",
                 "agent_trace_timeline.png,Agent workflow trace,agent event contract",
                 "claim_grounding_flow.png,verify_claim grounding workflow,tool contract and demo score",
-                "eval_metric_dashboard.png,Core evaluation dashboard,output/eval/eval_report.json",
+                "eval_metric_dashboard.png,Core evaluation dashboard,output/eval/eval_report.json + output/eval/recommend_bakeoff.json",
                 "asset_funnel.png,Data-to-agent asset scale,data/analysis and data/processed summary files",
             ]
         )

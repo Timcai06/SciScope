@@ -1,6 +1,6 @@
 \section{示例问答与测试用例}
 
-下列为系统在真实 16 万篇语料上的\textbf{实际输出}(非示意),用于直观展示检索、跨语言、推荐与证据接地能力。
+下列样例来自\textbf{固定验收会话、历史运行记录或当前工程基线},用于直观展示检索、跨语言、推荐与证据接地能力。它们证明"系统如何工作",不自动构成更高层的质量主表、人工 Gold 或真实用户成效证明。
 
 \subsection{用例一:英文混合检索(双臂命中)}
 \begin{plainbox}
@@ -41,11 +41,11 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 \end{tableblock}
 \end{plainbox}
 
-\subsection{用例四:趋势热点(模型输出)}
+\subsection{用例四:趋势热点(描述性输出)}
 \begin{plainbox}
-\textbf{新兴热点排行}(关键词清洗后):
+\textbf{描述性热点排行}(关键词清洗后):
 \texttt{retrieval augmented generation} → \texttt{large language model} → \texttt{gene delivery} → \dots\par\vspace{2pt}
-与 2022--2026 年科研态势吻合,RAG 与大语言模型领跑。
+与 2022--2026 年科研态势相符; 但根据当前滚动回测,这类输出只可用于\textbf{描述历史方向和候选热点},不得写成对下一年度的确定预测。
 \end{plainbox}
 
 \subsection{用例五:证据接地问答}
@@ -74,7 +74,7 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 下面展示论断核查能力的真实输出轨迹:用户给出中文论断,系统检索英文文献并用同一跨语言 e5 向量空间计算“论断--证据”接地度,返回支持等级而不是让大模型直接判断。
 \begin{plainbox}
 \textbf{待核查论断}:检索增强生成能够降低大语言模型回答中的幻觉风险\par\vspace{2pt}
-\textbf{工具输出}:支持等级=\textbf{强支持},最高接地相似度=\textbf{0.846}\par\vspace{2pt}
+\textbf{工具输出}(历史接地样例):支持等级=\textbf{强支持},最高接地相似度=\textbf{0.846}\par\vspace{2pt}
 \textbf{主要证据}:
 \begin{enumerate}[itemsep=1pt]
 \item \emph{Retrieval-Augmented Generation and Hallucination in Large Language Models: A Scholarly Overview} \hfill 2025, 相似度 0.846
@@ -82,7 +82,7 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 \item \emph{ReRag: A New Architecture for Reducing the Hallucination by Retrieval-Augmented Generation} \hfill 2024, 相似度 0.836
 \item \emph{Benchmarking Large Language Models in Retrieval-Augmented Generation} \hfill 2023, 相似度 0.827
 \end{enumerate}
-\textbf{关键特性}:中文论断可由英文论文接地;工具返回的是\textbf{强支持 / 部分支持 / 证据不足}的校准信号,要求模型据证表述,证据不足时不得强行断言。
+\textbf{关键特性}:中文论断可由英文论文接地;工具返回的是\textbf{支持 / 反驳 / 证据不足}及其校准边界,要求模型据证表述,证据不足时不得强行断言。该样例用于展示证据链,不等于正式人工 Gold 质量证明。
 \end{plainbox}
 
 \subsection{用例八:TUI 产品化工作流与黄金会话导出}

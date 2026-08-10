@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -1087,6 +1088,16 @@ func TestTrendSlashCommandUsesSkillTemplate(t *testing.T) {
 	if !strings.Contains(got.lastQuestion, "SciScope 技能: 趋势分析") || !strings.Contains(got.lastQuestion, "graph rag") {
 		t.Fatalf("expected /trend to render trend skill, got %q", got.lastQuestion)
 	}
+	for _, forbidden := range []string{"未来判断", "可能走向", "趋势预测"} {
+		if strings.Contains(got.lastQuestion, forbidden) {
+			t.Fatalf("/trend prompt should avoid extrapolation framing %q:\n%s", forbidden, got.lastQuestion)
+		}
+	}
+	for _, want := range []string{"历史趋势", "不得把趋势写成未来预测或确定走向", "描述边界"} {
+		if !strings.Contains(got.lastQuestion, want) {
+			t.Fatalf("/trend prompt missing %q:\n%s", want, got.lastQuestion)
+		}
+	}
 }
 
 func TestRecommendSlashCommandUsesSkillTemplate(t *testing.T) {
@@ -1390,6 +1401,76 @@ func TestDoneAppendsOnlyAnswerToConversationBlocks(t *testing.T) {
 	}
 }
 
+func TestFinalStructuredAnswerRoundTripsFromJSONMetaIntoDoneSidecar(t *testing.T) {
+	t.Setenv("SCISCOPE_SESSION_DIR", t.TempDir())
+	raw := `{
+		"type":"final",
+		"payload":"《Coffee study》(2023) 提供了部分支持，但仍需限定研究对象。",
+		"meta":{
+			"runtime":"langgraph",
+			"node":"force_synthesis",
+			"structured_answer":{
+				"schema_version":"answer-contract/v1",
+				"capability":"claim_verification",
+				"status":"partially_supported",
+				"verdict_label":"部分支持",
+				"answer_mode":"evidence_based",
+				"citation_compliance":"ok",
+				"tool_basis":["verify_claim"],
+				"claim":"咖啡能降低心脏病风险",
+				"uncertainty":{"category":"evidence_insufficient","message":"研究对象仍有限定。","calibrated_rejection":true,"qualification_hints":["样本主要来自单一队列。"]},
+				"citations":[
+					{"paper_id":"W1","title":"Coffee study","year":2023,"chunk_uid":"cccccccccccccccccccccccccccccccccccccccc","source_field":"full_text","evidence_sentence":"Coffee lowered cardiovascular risk.","stance":"SUPPORT","confidence":0.81,"display_policy":{"authorized":false,"reason":"indexable_only_metadata_not_display"}}
+				]
+			}
+		}
+	}`
+	var frame struct {
+		Type    string    `json:"type"`
+		Payload string    `json:"payload"`
+		Meta    eventMeta `json:"meta"`
+	}
+	if err := json.Unmarshal([]byte(raw), &frame); err != nil {
+		t.Fatalf("failed to decode SSE frame: %v", err)
+	}
+	if len(frame.Meta.StructuredAnswer) == 0 {
+		t.Fatalf("expected structured_answer in decoded meta: %#v", frame.Meta)
+	}
+	if direct := plainANSI(renderStructuredAnswerCard(frame.Meta.StructuredAnswer, 100)); !strings.Contains(direct, "答案合同") {
+		t.Fatalf("decoded meta should render sidecar directly:\n%s", direct)
+	}
+
+	m := initialModel()
+	m.ready = true
+	m.answering = true
+	m.vp = viewport.New(100, 20)
+
+	next, _ := m.Update(nodePulseMsg{kind: frame.Type, meta: frame.Meta})
+	got := next.(model)
+	if len(got.lastMeta.StructuredAnswer) == 0 {
+		t.Fatalf("structured answer lost after node pulse: %#v", got.lastMeta)
+	}
+	next, _ = got.Update(finalMsg(frame.Payload))
+	got = next.(model)
+	next, _ = got.Update(doneMsg{})
+	got = next.(model)
+
+	if len(got.blocks) < 2 {
+		t.Fatalf("expected sidecar + answer blocks, got %#v", got.blocks)
+	}
+	plain := plainANSI(strings.Join(got.blocks, "\n"))
+	for _, want := range []string{"答案合同", "部分支持", "审计链 chunk cccccccccccc", "《Coffee study》(2023) 提供了部分支持"} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("round-trip final meta missing %q:\n%s", want, plain)
+		}
+	}
+	for _, forbidden := range []string{"Coffee lowered cardiovascular risk.", "full_text"} {
+		if strings.Contains(plain, forbidden) {
+			t.Fatalf("unauthorized final meta leaked %q:\n%s", forbidden, plain)
+		}
+	}
+}
+
 func TestFinalMessageRefreshesStreamingAnswerImmediately(t *testing.T) {
 	m := initialModel()
 	m.ready = true
@@ -1632,6 +1713,35 @@ func TestHelpStringDocumentsHostedBackendDefault(t *testing.T) {
 	}
 	if !strings.Contains(help, "SCISCOPE_HOSTED_BACKEND") && !strings.Contains(strings.ToLower(help), "hosted") {
 		t.Fatalf("help should document hosted backend default:\n%s", help)
+	}
+	for _, want := range []string{
+		"Judge-ready tasks:",
+		"/verify <claim>",
+		"/review <topic>",
+		"/recommend <topic|paper_id>",
+		"descriptive trend only",
+	} {
+		if !strings.Contains(help, want) {
+			t.Fatalf("help missing %q:\n%s", want, help)
+		}
+	}
+}
+
+func TestSlashHelpIncludesGoldenTasksAndHonestBoundaries(t *testing.T) {
+	help := renderSlashHelpBlock()
+
+	for _, want := range []string{
+		"评委黄金任务",
+		"/verify 检索增强生成能够降低大语言模型回答中的幻觉风险",
+		"claim → stance → 证据句",
+		"/review retrieval augmented generation 在科研问答中的证据链设计",
+		"能力边界",
+		"/trend 当前只展示描述性趋势",
+		"/recommend 依赖 paper embeddings",
+	} {
+		if !strings.Contains(help, want) {
+			t.Fatalf("slash help missing %q:\n%s", want, help)
+		}
 	}
 }
 

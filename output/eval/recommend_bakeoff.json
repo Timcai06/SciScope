@@ -1,0 +1,256 @@
+{
+  "schema_version": "recommend-bakeoff/v1",
+  "generated_at": "2026-08-10T11:06:24.778075+00:00",
+  "code_commit": "020744e",
+  "parameters": {
+    "sample": 100,
+    "seed": 42,
+    "limit": 5
+  },
+  "sample_manifest": {
+    "candidate_count": 159164,
+    "candidate_uid_sha256": "e84f10e8001ce1e6630945d7da022c7aa1ddfcff3d566caf875d932c708caa97",
+    "seed_uids": [
+      "4d4173634fdf4a0e04d1bf041d5cb1b67567fd44",
+      "549c85a5a38e2efdf7653b92022769706a2d5768",
+      "66d014152460c9a6e6e9645cc0365fa080c8ab5c",
+      "ab3871e2c72b8f6a4810cbed7258ffdf157b3751",
+      "2213c8f50a37b08404956c843a431be85936e13e",
+      "fe9b8448f09af9024846c3aa71ac6a55ede66231",
+      "6791559e37c1c9e971ce3949014bd908f5c706c6",
+      "655ad9c9412c119ac0b7abaa18cba3928a3449ce",
+      "faa9ed1940d77a5106d3b19822c95ef482d939e7",
+      "8b5959dc6345bb5962fa8a44faf056788d7bbadc",
+      "75ebb217def50b62c2dd7b5be1a35ee274730b57",
+      "4be3d47e40f3a83e32971270cd97cbe30cb94c7c",
+      "706c43cca354c118df5e5772299863b2bd95e880",
+      "ea0f9a0f156e9c6a52451bc280e20f5dc318921d",
+      "a4b27a99a79b029b8c96b3b65bc8d9ef95747a5f",
+      "cce93a522a11df6414681a9648f2b7a70cec0421",
+      "898fd5353c54a762115c5fccdb0fc8b9e694680f",
+      "9c95659304dfe9c41fe28f4f1028fb46d5bbc241",
+      "6bca52cb0444e871af1d34931bcf4b1ecdc2d44c",
+      "c3e5798711e320672b1ecbb2352715c4adca8a56",
+      "34de948532289d1bfe8bcccc81905e5ae2188a73",
+      "badbf53796b5e1f13e34febafc45dd32b1fbfa94",
+      "56d274e6bb7db2b4fc06a508ba2fdd14f5195afb",
+      "0feaa60606a85ae41c8a852512eb379397189b8d",
+      "82ec2444efb07103f67d5a62056bbea29dc31b16",
+      "3b678f5a0509a540902403c630a249dba0fe00ff",
+      "5ac8be5feb9dbc1c37cb6fc5f95fb6d2f885da6a",
+      "264bd845a65b8d10e004ad6151718abd64a54273",
+      "542fd3789e180b95826450c7d7492afcb6a6bdd1",
+      "d7b97bdbadfbee2febec3ddf3280a9f6a71f1ac1",
+      "9e76881e607616a5f2c1b5bba73999eb673aa128",
+      "4cda1d8dd02015c473288e1d5ee17fa4558cd50e",
+      "ad0cd076f5b5c459e51ee996475bda7c1a7111e1",
+      "42f1500091a78bab56c248cc7ab6d16b5c262083",
+      "680bc253dfcdd4a7d245b69acdb9a79d1303f5ab",
+      "e92f0d5634fca92612725375ee816fb20cf6aa11",
+      "2b83ebfe32852f716e20f243a4a62d4ed9e40fcc",
+      "bdc3d2ccd5df11c75f2f5466519e0276cfc435f2",
+      "751dc454d7eb9343d8d21f474b5398f88f4202b7",
+      "a3ca5b53f5773b5ea7c67e8de84cd50b98027625",
+      "fe65ff63c5a0c3ef068194ecffc17d03bf256c40",
+      "4ae99ca149f4825b79d160e06aa0324ca4053095",
+      "f7eeb435318af2d95fda956a9abd0c58cff525aa",
+      "b6c06dc9deeb80bc81d35f346712f9ad02476f61",
+      "4e3e6f2e87f91341570cf594f2e4720b56f8c81c",
+      "8005d119c69059c34b3f956a7add715f7bf0f091",
+      "e9dedc2178aa3426872e4bada25047d398b90848",
+      "c7189469f0b354aefefb753e2733e2d92e9aaa30",
+      "f312bfcd7932c288924a867a63c1494668136dc2",
+      "b2d8f529d38fac3bde3a3b56cc9fd34c0be9c475",
+      "3ded64a1db639798408519fe88871c9732f7aa12",
+      "258d7baa032ead961a0140a50e4b9c7f7eddb620",
+      "dab17a51340a7d07a066d7b8a62f1758864ec2c3",
+      "cdefc19a257019b27f5fc2ac37edcf8acfbb27f7",
+      "54c623c45c783122e6b8c7f8fe4888166f8d6564",
+      "12c9cc62b6f99648cadcf5de6fefe70a06125962",
+      "a3c57844d5e4995d622bc8a4af0f38d85abf9334",
+      "4b67da31c8edf1d6e490dbf90c2bc93f388b5622",
+      "c50ff9706998f11bc62c75787f4edf9da4595f3d",
+      "32a72cc312fcf9b608292e818a14ad311b34087c",
+      "126d93bbc6f9b92fc22223fcd456bae2bd5345b4",
+      "9f8674e50e6abcef66a3da8f981fab2b8477089f",
+      "f294443417847cf9980c3d4e4d3f0487d7ab1303",
+      "30643fdc99466eb9fa457db188076837309ea6d3",
+      "03f9112719bd8deab443f5d545aef694c4b4cb05",
+      "dfa4eaaa92cff37b0173213253acc75f87229aaa",
+      "708219b6e5d0d3a924b20be56269d493065fbeaf",
+      "b03044380275feaa125970591835557267da4208",
+      "c5dc938a6eb63b70934fa90745c814c8c31c694d",
+      "d6d45fa8aa4529fba7fb24a178325c016efdccbb",
+      "3c7c1ac7de8fcea893b60d987a36dd98e7d2f938",
+      "aa7ca32e4a2da21aa5364c6b7fe1dea8b94307a8",
+      "2e2cca7b64f9e87a19df3c58796cd1c5683d03c4",
+      "27dccc8204354014303d3629e369fdd0d1c02383",
+      "d600cc1e6b4970be31d766c9c6f48722d5e0fab0",
+      "a5b6f90abe50ee958808e3f1ef5a8af40e87fe6d",
+      "15f471435253d50128e54a58ac0607fd1bb5e79b",
+      "6d3dd7a31fae32a47b51747949943f82f675c0af",
+      "6f734d05a6eccd89a51a5ab57677f8f71b3e7ef9",
+      "e9b38a9473c9215a580fbbafd79bacc078ae7f0a",
+      "10e35e839c7479da2008ff09ccfcbb9980ad50e0",
+      "4c368a367b34ad1a1598867efa671b7d8c911934",
+      "ae56d83fb21d8bdab0678f2b08ce7b5e935b3796",
+      "07f3f32819aa6f50ca28f131d731f8747e0a18c0",
+      "cdb0c6215dcba987196482d5cd79c6f957238340",
+      "46349adc7064dcd81c31cbb371bb7359dd350b4e",
+      "dd3f17301a6ea12d96100e406ee0d923cbfed53e",
+      "8ba4736ac0dd345ad4cab117927d7db2325dd4ab",
+      "ccc4f959c0af5ec33045732d6e0c847f120e1e43",
+      "1c43a18bf826e6df5f33e59f63ad8052b1d5aa13",
+      "a0b1b5d45d1b54b904c5211fa711d6ec6525399b",
+      "9adbdf6ab2ff55bd7f0b0fd7f5f8d76a56711fca",
+      "bd9bf77ca77ba73055274acdfb4fb9ef398846cb",
+      "8d2b7741b15154ac8e2b08f59a93ab8cc67b6bf3",
+      "e73512e13fcdd8cc06fa492b7c8371e3d402f087",
+      "71a7798e9827237a729c61f2d1fd9fe41cef3a78",
+      "aaec01218790e2ea84ad8203307d85cd2c2c8700",
+      "226ba65ef3f9075dbd89a83fd96d9793ae2a5711",
+      "ac7dcddfab623b47e08916c018120a51c766aa97",
+      "272012048d1ebb3e58bb308cfde7caae178b82dc"
+    ],
+    "selection_mode": "replay"
+  },
+  "corpus": {
+    "papers": 159164,
+    "paper_embeddings": 159164,
+    "embedding_model_count": 1,
+    "embedding_model": "intfloat/multilingual-e5-base",
+    "max_metadata_richness": 7.980365765111246
+  },
+  "baseline_definitions": {
+    "popularity_proxy": "global authors_count + keywords_count metadata-richness proxy; no citations/views/saves exist",
+    "keyword_tfidf": "IDF-weighted overlap of normalized keywords",
+    "dense": "direct pgvector cosine nearest neighbours",
+    "current": "production semantic + keyword + author + recency fusion with MMR"
+  },
+  "latency_scope": "per-seed wall clock including each baseline native ranking and evaluator hydration",
+  "results": [
+    {
+      "baseline": "popularity_proxy",
+      "seeds_sampled": 100,
+      "seeds_with_recommendations": 100,
+      "coverage": 1.0,
+      "total_recommendations": 500,
+      "same_field_rate": 0.338,
+      "shared_keyword_rate": 0.052,
+      "mean_seed_semantic_similarity": 0.843097,
+      "mean_intra_list_diversity": 0.158853,
+      "mean_metadata_novelty_proxy": 0.027143,
+      "latency_ms": {
+        "p50": 68.53,
+        "p95": 69.037,
+        "samples": 100
+      },
+      "failure_count": 0,
+      "failure_examples": []
+    },
+    {
+      "baseline": "keyword_tfidf",
+      "seeds_sampled": 100,
+      "seeds_with_recommendations": 73,
+      "coverage": 0.73,
+      "total_recommendations": 363,
+      "same_field_rate": 0.730028,
+      "shared_keyword_rate": 1.0,
+      "mean_seed_semantic_similarity": 0.926279,
+      "mean_intra_list_diversity": 0.077933,
+      "mean_metadata_novelty_proxy": 0.517354,
+      "latency_ms": {
+        "p50": 48.404,
+        "p95": 156.018,
+        "samples": 100
+      },
+      "failure_count": 27,
+      "failure_examples": [
+        {
+          "paper_id": "36892110",
+          "reason": "no_recommendations"
+        },
+        {
+          "paper_id": "10.1016/j.patcog.2026.114247",
+          "reason": "no_recommendations"
+        },
+        {
+          "paper_id": "10.69821/remuvac.v2i2.279",
+          "reason": "no_recommendations"
+        },
+        {
+          "paper_id": "10.5207/jieie.2024.38.6.482",
+          "reason": "no_recommendations"
+        },
+        {
+          "paper_id": "10.30738/union.v13i4.22032",
+          "reason": "no_recommendations"
+        },
+        {
+          "paper_id": "38075649",
+          "reason": "no_recommendations"
+        },
+        {
+          "paper_id": "10.69645/hxtn9694",
+          "reason": "no_recommendations"
+        },
+        {
+          "paper_id": "10.24144/2307-3322.2025.92.4.12",
+          "reason": "no_recommendations"
+        },
+        {
+          "paper_id": "10.25022/jkler.2023.20.169",
+          "reason": "no_recommendations"
+        },
+        {
+          "paper_id": "10.3390/healthcare12010086",
+          "reason": "no_recommendations"
+        }
+      ]
+    },
+    {
+      "baseline": "dense",
+      "seeds_sampled": 100,
+      "seeds_with_recommendations": 100,
+      "coverage": 1.0,
+      "total_recommendations": 500,
+      "same_field_rate": 0.694,
+      "shared_keyword_rate": 0.508,
+      "mean_seed_semantic_similarity": 0.933225,
+      "mean_intra_list_diversity": 0.06821,
+      "mean_metadata_novelty_proxy": 0.580979,
+      "latency_ms": {
+        "p50": 4.154,
+        "p95": 10.152,
+        "samples": 100
+      },
+      "failure_count": 0,
+      "failure_examples": []
+    },
+    {
+      "baseline": "current",
+      "seeds_sampled": 100,
+      "seeds_with_recommendations": 100,
+      "coverage": 1.0,
+      "total_recommendations": 500,
+      "same_field_rate": 0.718,
+      "shared_keyword_rate": 0.628,
+      "mean_seed_semantic_similarity": 0.926293,
+      "mean_intra_list_diversity": 0.082263,
+      "mean_metadata_novelty_proxy": 0.588524,
+      "latency_ms": {
+        "p50": 100.623,
+        "p95": 128.113,
+        "samples": 100
+      },
+      "failure_count": 0,
+      "failure_examples": []
+    }
+  ],
+  "claim_boundary": {
+    "automatic_proxy_metrics_only": true,
+    "winner_declared": false,
+    "human_or_expert_value_status": "BLOCKED",
+    "note": "No automatic metric proves researcher satisfaction, novelty discovery, or efficiency improvement."
+  }
+}

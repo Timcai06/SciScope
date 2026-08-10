@@ -2,7 +2,7 @@
 
 \subsection{运行环境}
 \begin{itemize}
-\item Python 3.11(conda 环境),Go 1.26(终端客户端);PostgreSQL 15 + pgvector 扩展。
+\item Python 3.11(conda 环境),Go 1.26(终端客户端);PostgreSQL 16 + pgvector 扩展。
 \item 关键依赖:\texttt{fastapi}、\texttt{psycopg}、\texttt{pgvector}、\texttt{sentence-transformers}、\texttt{scikit-learn}、\texttt{networkx}、\texttt{pandas}。
 \item 本地大模型(可选):vLLM-Metal / LM Studio 等 OpenAI 兼容服务;无则自动用 mock,检索证据仍真实。
 \end{itemize}
@@ -58,10 +58,15 @@ scoop install sciscope-tui
 
 \subsection{质量与效果验证}
 \begin{codepanel}\ttfamily\small
-make test\hfill\# 后端自动化测试(以当前环境输出为准)\\
+make test-backend\hfill\# 后端自动化测试(以当前环境输出为准)\\
 make agent-smoke\hfill\# live agent 黑盒验收:库表规模、skills、工具预算\\
 make eval-retrieval\hfill\# 自检索评估:recall@k / MRR / 延迟
 \end{codepanel}
+
+\begin{plainbox}
+\textbf{复现边界(据实)}:本机开发基线与远端 2080 Ti 运行态需要分开看待。2026-08-10 已验证的远端全量运行态包括
+\texttt{chunk\_embeddings=367{,}861/367{,}861}、\texttt{paper\_embeddings=159{,}164/159{,}164} 与 ANN 索引; 本机报告构建与接口调试可不携带这组全量资产。公开托管后端为 demo-lite 子集,不能替代本地/自建全量部署的能力证明。
+\end{plainbox}
 
 \subsection{全量重建(数据更新后)}
 持续爬取积累新数据后,一次性重建并自动并入去重与全部模型:

@@ -1,18 +1,18 @@
 \section{结果分析(系统效果与效率)}
 
 \begin{plainbox}
-\textbf{说明}:本章给出三组可复核证据:检索有效性(recall/MRR 与延迟)、跨语言相关性(relevance@5)与工程稳健性(自动化测试与资产口径)。指标以脚本生成的评测报告和运行时库表为准;若与具体业务场景不一致,应以场景化验证补充,避免确定性外推。
+\textbf{说明}:本章只写三类可复核证据:历史固定评测(检索 recall/MRR 与延迟)、当前工程运行态(测试、全量 embedding、OpenCode/MCP 闭环)和当前自动代理基线(推荐 proxy、趋势回测)。历史评测、工程 PASS 与外部质量证明分开陈述;若与真实业务场景不一致,必须以后续人工 Gold、用户试点或场景化验证补充,避免确定性外推。
 \end{plainbox}
 
 \begin{reportbox}{核心指标一览}
 \begin{tableblock}
 \begin{tabularx}{0.96\textwidth}{>{\bfseries}p{32mm}X}
 \toprule
-检索质量 & 标题自检索 recall@10=\textbf{0.985},MRR@10=\textbf{0.9583},平均延迟 \textbf{141.6 ms}。 \\
-跨语言相关性 & 中文主题查询 relevance@5=\textbf{1.0}(15/15),优化前为 0.667。 \\
-趋势预测 & 2022--2024 拟合预测 2025,关键词活跃度排序 Pearson=\textbf{0.9756}。 \\
-论文推荐 & top-5 平均语义相似 \textbf{0.8918},同领域率 0.6733,共享关键词率 0.6013。 \\
-工程质量 & 后端自动化测试实测 \textbf{152 passed};\texttt{make agent-smoke} 黑盒验收通过;运行时库表含 367{,}773 条片段向量和 159{,}135 条论文级向量。 \\
+检索质量(历史固定评测) & 标题自检索 recall@10=\textbf{0.985},MRR@10=\textbf{0.9583},平均延迟 \textbf{141.6 ms};关键词自检索 recall@10=0.745,MRR@10=0.7045。 \\
+跨语言相关性(历史定向样例) & 15 条固定中文主题查询上的 relevance@5=\textbf{1.0}(15/15),优化前为 0.667; 该结果只代表定向样例,不是全局质量证明。 \\
+趋势描述边界(当前回测) & Pearson=\textbf{0.9756},但 MAE 与 sMAPE 在 2/2 个滚动切分上均未超过 naive 基线,故当前只可称\textbf{描述性趋势}。 \\
+论文推荐(四路自动多基线) & `current` 100 seeds/500 recs: same-field \textbf{0.7180},shared-keyword \textbf{0.6280},semantic \textbf{0.9263},diversity \textbf{0.0823},novelty proxy \textbf{0.5885}; 相对 `dense` 的 0.6940/0.5080/0.9332/0.0682/0.5810 是工程权衡,不是全面胜出。 \\
+工程运行态(2026-08-10) & 后端回归 \textbf{524 passed, 1 skipped}; 远端全量 embedding 运行态已验证 \texttt{chunk\_embeddings=367{,}861/367{,}861}、\texttt{paper\_embeddings=159{,}164/159{,}164}; OpenCode 顺序调用核查 tool + disputes resource 已通过。 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
@@ -21,7 +21,7 @@
 \begin{figure}[!htbp]
 \centering
 \figasset[0.94\textwidth]{eval_metric_dashboard.png}
-\caption{核心评测指标图形化总览。数据来源:\texttt{output/eval/eval\_report.json} 与当前验收记录;中文相关性为固定主题查询评测口径,测试项为后端测试基线。}
+\caption{核心评测指标图形化总览。数据来源:\texttt{output/eval/eval\_report.json}、\texttt{output/eval/trends\_backtest.json}、\texttt{output/eval/recommend\_bakeoff.json} 与当前验收记录;中文相关性为固定主题查询评测口径,测试与 OpenCode 为 2026-08-10 工程基线。}
 \label{fig:eval-dashboard}
 \end{figure}
 
@@ -35,7 +35,7 @@
 图~\ref{fig:eval-dashboard} 将核心效果指标集中展示,图~\ref{fig:asset-funnel} 则说明这些指标背后的文件资产链路。二者分别对应"系统效果"与"可复现资产"两个评审入口。
 
 \subsection{检索质量与效率(核心测试)}
-采用\textbf{自检索协议}(以论文自身标题/关键词为查询,检验能否检回该文)评测混合检索。评测结果固化于 \texttt{output/eval/eval\_report.json},运行时库表当前包含 159{,}187 篇论文:
+采用\textbf{自检索协议}(以论文自身标题/关键词为查询,检验能否检回该文)评测混合检索。评测结果固化于 \texttt{output/eval/eval\_report.json};当前运行时库表包含 159{,}164 篇论文和 367{,}861 个片段,该章中的 recall/MRR 仍引用 2026-06-22 历史固定评测而非 2026-08-10 重跑结果:
 
 \begin{tableblock}
 \begin{tabularx}{0.94\textwidth}{Xcccc}
@@ -50,8 +50,8 @@
 
 标题查询 recall@10 达 \textbf{0.985}(目标论文几乎总在前 10),平均延迟 141.6 ms,体现混合检索"\textbf{效果与效率}"兼顾。关键词查询由于同义词、缩写和领域词复用更强,指标低于标题查询,但仍保持 recall@10=0.745 和 MRR@10=0.7045;本报告保留该差异,不把关键词检索夸大成标题级精确命中。
 
-\subsection{跨语言检索相关性优化(技术创新)}
-针对真实用户的\textbf{中文短查询},初版多语言嵌入存在"按语言而非主题召回"的偏差
+\subsection{跨语言检索相关性优化(历史定向样例)}
+针对中文短查询,初版多语言嵌入存在"按语言而非主题召回"的偏差
 (如查"扩散模型"却召回到无关的中文医学论文)。我们用 15 个主题查询构建
 \texttt{relevance@5} 指标(top-5 是否含主题相关论文,\texttt{make} 可复现),针对性实施了一组优化:
 
@@ -69,35 +69,15 @@
 \end{tabularx}
 \end{tableblock}
 
-效果:\texttt{relevance@5} 从 \textbf{0.667 提升至 1.0}(15/15 全部命中主题),
-"扩散模型""强化学习""量子计算""推荐系统"等此前跑偏的中文查询\textbf{全部修复}。
+在这组固定样例上,\texttt{relevance@5} 从 \textbf{0.667 提升至 1.0}(15/15 全部命中主题),
+"扩散模型""强化学习""量子计算""推荐系统"等此前跑偏的中文查询被修复。该结果是\textbf{定向样例工程优化证据},不能替代更大规模人工 qrels 或真实用户评测。
 
-\subsection{语义覆盖修复(消融对比)}
-初版仅对"有全文"论文嵌入,导致语义检索严重偏向生物医学、对最大领域\textbf{计算机科学近乎失明}(论文级向量仅 87 篇);
-经\textbf{全量标题摘要嵌入}修复后,论文级向量 17{,}913 → 159{,}164,各领域覆盖如下(消融前后对比):
-
-\begin{figure}[!htbp]
-\centering
-% bar heights pre-scaled (max 58038 -> 40mm); avoids runtime division
-\begin{tikzpicture}[x=1mm,y=1mm,font=\scriptsize]
-\draw[draw=SciLine,line width=0.4pt] (0,0) -- (132,0);
-\foreach \f/\after/\hb/\ha/\xpos in {
-  {computer science}/58038/0.1/40/6,
-  {biomedicine}/46405/6.7/32/36,
-  {physical sciences}/28098/3.9/19.4/66,
-  {materials science}/14572/0.1/10/96}{
-  \filldraw[fill=white,draw=SciLine,line width=0.5pt] (\xpos,0) rectangle (\xpos+3.4,\hb);
-  \filldraw[fill=SciInk,draw=SciInk,line width=0.5pt] (\xpos+4.4,0) rectangle (\xpos+7.8,\ha);
-  \node[anchor=north,text width=26mm,align=center] at (\xpos+3.4,-1.5) {\f};
-  \node[anchor=south,font=\tiny] at (\xpos+6.1,\ha) {\after};
-}
-\node[anchor=west,font=\tiny] at (104,38) {空心:修复前\quad 实心:修复后};
-\end{tikzpicture}
-\caption{语义检索领域覆盖:修复前(空心)vs 修复后(实心)。计算机科学从 87 跃升至 58{,}038,偏科消除。数据来源:论文级向量覆盖统计与全量标题摘要嵌入修复记录。}
-\label{fig:semantic-coverage-ablation}
-\end{figure}
-
-修复后语义检索与推荐覆盖运行时全领域论文库,中文问句可跨语言命中英文文献。
+\subsection{全量向量运行态}
+2026-08-10 在 2080 Ti 远端运行态中,全量 \texttt{chunk\_embeddings} 与
+\texttt{paper\_embeddings} 已分别达到 367{,}861/367{,}861 与
+159{,}164/159{,}164,从而关闭了"推荐缺 embedding"这一工程阻塞。这里仅使用能够由远端数据库
+计数和运行日志复核的总量,不再保留缺少独立证据产物的领域覆盖消融数字。该证据证明的是
+\textbf{全量资产可运行};推荐质量与用户价值仍需单独评测。
 
 \subsection{差异化能力对比}
 \begin{figure}[!htbp]
@@ -115,7 +95,7 @@
 能力维度 & \textbf{SciScope} & 通用大模型 & 商用文献工具 & 普通检索 \\
 \midrule
 据实接地 / 可验证 & \textbf{论断核查 + 引用证据} & 易幻觉 & 部分支持 & 不支持 \\
-跨语言中→英检索 & \textbf{relevance@5=1.0} & 依模型能力波动 & 通常较弱 & 不支持 \\
+跨语言中→英检索 & \textbf{固定中文主题样例已验证} & 依模型能力波动 & 通常较弱 & 不支持 \\
 本地部署 / 数据主权 & \textbf{数据、索引、模型本地} & 查询上传第三方 & 查询上传第三方 & 仅检索外部库 \\
 自主多步编排 & \textbf{可观测规划/反思 + 专业技能 + 10 类运行时能力} & 非工具化问答 & 固定流程为主 & 不支持 \\
 可复现 / IP 清晰 & \textbf{\texttt{make} 重建资产} & 黑盒调用 & 平台黑盒 & 无模型资产 \\
@@ -124,16 +104,20 @@
 \end{tableblock}
 差异化不来自"又接了一个大模型",而来自\textbf{本地语料资产、可复现模型文件、证据接地检验和自主工具编排}共同形成的科研智能体闭环。
 
-\subsection{趋势预测回测与推荐评估(评测证据包)}
-完整评测可由 \texttt{make eval-all} 复现,结果固化于 \texttt{output/eval/eval\_report.\{json,md\}}。
+\subsection{趋势回测与推荐评估(评测证据包)}
+历史自检索评测由 \texttt{make eval-all} 保留;当前趋势回测由
+\texttt{python -m evaluation.eval\_trends\_backtest} 重建,推荐四路对照由
+\texttt{python -m evaluation.eval\_recommend\_bakeoff} 在全量远端数据库重建。对应产物分别是
+\texttt{output/eval/eval\_report.\{json,md\}}、\texttt{trends\_backtest.\{json,md\}} 与
+\texttt{recommend\_bakeoff.\{json,md\}};不再声称单个旧入口覆盖全部当前指标。
 
-\textbf{趋势预测回测}(拟合 2022--2024 → 预测 2025,1{,}998 个关键词):预测与真实的 Pearson 相关 \textbf{0.9756},说明模型能较好排序哪些关键词更活跃;但方向性与点预测不应被解释为确定预测,归一化词频存在年际噪声和近均值回归。本报告仅把趋势模型作为排序、动量和 burst 的候选信号。
+\textbf{趋势回测}(拟合 2022--2024 → 预测 2025,1{,}998 个关键词):预测与真实的 Pearson 相关 \textbf{0.9756},但在两个固定滚动切分上,趋势模型的 MAE 与 sMAPE 均未超过 last-value / moving-average naive 基线,因此当前输出被明确降级为 \textbf{descriptive\_only=true}。它可以用于描述历史方向、波动和 burst,但\textbf{不得}在答辩或报告中写成"预测能力"或"研究方向预测结论"。
 
-\textbf{推荐离线评估}(150 篇种子,top-5):同领域率 \textbf{0.6733}、共享关键词率 \textbf{0.6013}、平均语义相似 \textbf{0.8918}——远高于随机基线,且每条附可解释因子。
+\textbf{推荐自动多基线评测}(2026-08-10,100 篇 seeds,top-5):四路方法 `popularity\_proxy / keyword\_tfidf / dense / current` 已统一落表。`current` 的 coverage 为 \textbf{1.0},same-field \textbf{0.7180},shared-keyword \textbf{0.6280},平均语义相似 \textbf{0.9263},diversity \textbf{0.0823},novelty proxy \textbf{0.5885}; 相比 pure `dense` 的 0.6940 / 0.5080 / 0.9332 / 0.0682 / 0.5810,它在同领域率、共享关键词、多样性和新颖度代理上更高,但语义相似度更低,且延迟显著更高(本次 `current` p50 约 100.6\,ms, `dense` p50 约 4.2\,ms)。这些都是\textbf{自动代理指标},只能说明推荐器之间的工程权衡,不能替代研究者满意度、用户盲评或真实科研提效证明。
 
 \subsection{数据治理成效}
 \begin{tableblock}
-\begin{tabularx}{0.94\textwidth}{Xcc}
+\begin{tabularx}{0.94\textwidth}{p{34mm}p{48mm}X}
 \toprule
 \textbf{治理项} & \textbf{处理} & \textbf{效果} \\
 \midrule
@@ -141,7 +125,7 @@
 PDF 垃圾正文过滤 & 清 83 篇 / 46 片段 & 显著减少回答混入 PDF 乱码的风险 \\
 关键词噪声过滤 & arXiv 码/泛标签/期刊名 & 趋势 top 回归真实主题 \\
 摘要覆盖治理 & 140{,}183 篇有摘要 & 摘要覆盖率 83.22\%,支撑主题和检索解释 \\
-全文片段治理 & 17{,}682 篇有正文字段 & 正文覆盖率 10.50\%,用于深读补充证据 \\
+开放正文补充证据 & 分析层正文片段覆盖集中于开放全文来源 & 分析层正文片段覆盖率 8.99\%; 处理后语料中 full-text 非空为 13{,}400/159{,}164(8.42\%),只用于深读补充证据 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
@@ -153,16 +137,16 @@ PDF 垃圾正文过滤 & 清 83 篇 / 46 片段 & 显著减少回答混入 PDF �
 \toprule
 \textbf{模型文件 / 索引 / 质量项} & \textbf{规模} \\
 \midrule
-片段向量 \texttt{chunk\_embeddings}(pgvector) & 367{,}773 \\
-论文级向量 \texttt{paper\_embeddings} & 159{,}135 \\
+片段向量 \texttt{chunk\_embeddings}(pgvector) & 367{,}861（2026-08-10 远端全量运行态） \\
+论文级向量 \texttt{paper\_embeddings} & 159{,}164（2026-08-10 远端全量运行态） \\
 主题模型(LDA + NMF) & 40 主题 / 模型 \\
 知识图谱(作者/关键词/主题) & 客户端友好 JSON \\
-后端自动化测试 & \texttt{make test-backend} 实测 152 passed; \texttt{make agent-smoke} 实测通过 \\
+后端自动化测试 & \texttt{make test-backend} 实测 524 passed、1 skipped（2026-08-10）; \texttt{make agent-smoke} 仅作历史黑盒记录,不替代当前工程基线 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
 \begin{plainbox}
-\textbf{产品化呈现}:智能体运行时采用可观测状态图编排,向终端客户端输出科研工作流阶段、耗时、会话与重试信息;TUI 据此渲染阶段条、分组时间线、会话保存与错误恢复。最终回答采用"研究结论 + 证据工具 + 过程入口"结构,工具日志不混入主聊天。专业技能命令经 \texttt{make agent-smoke} 黑盒验收:能力边界不空转取证,论断核查、趋势分析和论文推荐均触发对应能力,且均在工具预算内停止。全部模型文件仍可由 \texttt{make agent-build} 一键重建,知识产权清晰、评委可复现。
+\textbf{产品化呈现}:智能体运行时采用可观测状态图编排,向终端客户端输出科研工作流阶段、耗时、会话与重试信息;TUI 据此渲染阶段条、分组时间线、会话保存与错误恢复。最终回答采用"研究结论 + 证据工具 + 过程入口"结构,工具日志不混入主聊天。2026-08-10 已新增两条工程证据:一是全量 embedding/ANN 运行态关闭了推荐阻塞,二是真实 OpenCode 已能顺序完成核查 tool 与争议 resource 读取。全部模型文件仍可由 \texttt{make agent-build} 一键重建,知识产权清晰、评委可复现。
 \end{plainbox}
 
 \subsection{开源治理、分发与托管体验}

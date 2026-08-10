@@ -2,7 +2,7 @@
 
 - 状态：`active`（E00、E01、E03、E04、E05 技术 `PASS`；E02 质量主表 `REVISE`；E08 外部阻塞）
 - 负责人：项目负责人；分工：NLP/评测、后端/MCP、演示/报告、领域专家
-- 当前领取：E02；上游：[冻结目标说明书](../../project/国赛目标说明书.md)
+- 当前领取：E06 已完成；下一步 E07（等待 T04/A04）与 E09 收口；上游：[冻结目标说明书](../../project/国赛目标说明书.md)
 - 交付边界：先把“相关”与“支持/反驳/证据不足”区分清楚，再证明 API/MCP、TUI 和报告的
   事实一致；不以开发自测充当专家金标准，不把历史评测当当前运行态。
 
@@ -146,12 +146,17 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 ### E06｜报告源改写与 PDF 重建
 
-- 状态：`PENDING`；依赖：E05、E02、E03、E04。
+- 状态：`PASS`（2026-08-10 独立复核通过）；依赖：E05、E02、E03、E04。
 - 文件所有权：`output/pdf/sciscope_data_report/sections/`、
   `output/pdf/sciscope_project_report/sections/` 及报告构建产物；不得改变未在 E05 批准的数字。
 - 做什么：将已验证/已证明事实写入两份报告，历史和计划明确标注；重建 PDF 并做口径一致性核对。
 - 验收：两份 PDF 都由源码重建；任意核心数字可回链 E00 台账；未完成能力不被写成现状。
 - 验证：`rtk make data-report-pdf`、`rtk make project-report-pdf` 和一致性核对记录。
+- 当前收口：见 [E06-20260810-双报告源改写与 PDF 重建](E/E06-20260810-双报告源改写与PDF重建.md)。
+  本轮已完成两份 PDF 重建,并同步修正报告中的运行库规模、全量 embedding 口径、趋势边界、
+  推荐当前模型自动代理基线、OpenCode/MCP 工程 PASS 以及正文覆盖定义。构建期额外修复了两个
+  非内容性阻塞: `Makefile` 中过期的 LaTeX 脚本版本路径,以及数据报告封面缺失 `Weibei SC`
+  字体导致的 XeLaTeX 编译失败。
 
 ### E07｜评委演示、硬件清单与离线回退
 
@@ -197,7 +202,7 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 | E03 | `工程 live PASS / 质量 REVISE` | 同 claim 的真实 PostgreSQL 写入与 DB/API/tool/resource 三读证据；不得解释为 stance 质量证明 |
 | E04 | `PASS` | [E04 顺序调用](E/E04-20260810-OpenCode顺序调用.md)：真实 OpenCode 已完成 `verify_claim(persist=true)` + `read_mcp_resource` 顺序调用，并保留 session 导出 |
 | E05 | `PASS` | [报告口径.md](../../project/报告口径.md)：报告口径表 |
-| E06 | `PENDING` | 两份重建 PDF 与一致性记录 |
+| E06 | `PASS` | [E06-20260810-双报告源改写与 PDF 重建](E/E06-20260810-双报告源改写与PDF重建.md)：两份重建 PDF、口径一致性记录及独立复核 |
 | E07 | `PENDING` | 演练、硬件清单、离线回退 |
 | E08 | `BLOCKED` | 授权、准入与真实场景/反馈 |
 | E09 | `PENDING` | 提交包与独立复现记录 |

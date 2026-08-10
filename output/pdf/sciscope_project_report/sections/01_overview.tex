@@ -11,9 +11,9 @@ SciScope 的定位不是更强的问答模型,而是将文献资产、检索证�
 
 \subsection{主要工作}
 \begin{itemize}
-\item \textbf{数据底座}:从 arXiv、PubMed、PMC、OpenAlex、Crossref、DOAJ 6 个公开来源采集、清洗、规范化、去重,形成 168{,}447 条分析语料、159{,}164 篇处理后语料文件和 159{,}187 篇运行时入库论文,覆盖计算机/生物医学/材料等多领域、主窗口 2022--2026。
+\item \textbf{数据底座}:从 arXiv、PubMed、PMC、OpenAlex、Crossref、DOAJ 6 个公开来源采集、清洗、规范化、去重,形成 168{,}447 条分析语料、159{,}164 篇处理后语料文件; 运行时 PostgreSQL 当前装载 159{,}164 篇论文和 367{,}861 个检索片段,覆盖计算机/生物医学/材料等多领域、主窗口 2022--2026。
 \item \textbf{数据分析报告}(交付物 1):文献分布、关键词演化、作者合作网络、主题模型、趋势统计(见同级交付物 \texttt{sciscope\_data\_report})。
-\item \textbf{科研智能体模型}(交付物 2):本地嵌入索引、混合检索、趋势预测、论文推荐、知识图谱五大模型,配套 FastAPI 服务与终端智能体客户端。
+\item \textbf{科研智能体模型}(交付物 2):本地嵌入索引、混合检索、趋势描述/方向辅助、论文推荐、知识图谱与论断核查能力,配套 FastAPI 服务、MCP 出口和终端智能体客户端。
 \item \textbf{系统工程}:PostgreSQL + pgvector 服务层、本地大模型(vLLM/MLX)生成层、一键复现的 Makefile 流水线与自动化测试。
 \end{itemize}
 
@@ -24,15 +24,15 @@ SciScope 的定位不是更强的问答模型,而是将文献资产、检索证�
 \subsection{创新点}
 \begin{reportbox}{五个核心创新}
 \begin{enumerate}
-\item \textbf{大模型无关的证据接地架构(LLM-agnostic, evidence-grounded)}:大语言模型(LLM)只负责"用人话写答案",领域智能沉淀在本地可复现的索引/模型文件中;生成层经 OpenAI 兼容接口\textbf{可插拔}(本地 7B ↔ DeepSeek 云端,一处配置切换),换任意大模型系统照常工作。
+\item \textbf{大模型无关的证据接地架构(LLM-agnostic, evidence-grounded)}:大语言模型(LLM)只负责"用人话写答案",领域智能沉淀在本地可复现的索引/模型文件中;生成层经 OpenAI 兼容接口\textbf{可插拔}(本地 7B 与 DeepSeek 云端一处配置切换),换任意大模型系统照常工作。
 \item \textbf{可信工具契约与确定性校验门}:智能体具备 10 类运行时能力,覆盖检索、趋势、推荐、图谱、引用导出、论断核查与专员委派。每类能力声明只读边界、参数校验和结果上限;调用前可拦截模型编造的论文主键,显式科研技能还设置首工具强制调用与工具预算,从架构上降低幻觉、空跑和捏造风险,便于审计。
 \item \textbf{字面 + 语义混合检索(Hybrid Retrieval)}:PostgreSQL 全文检索(FTS)与 pgvector 向量检索双路并行,用倒数排名融合(Reciprocal Rank Fusion, RRF)合并,兼顾精确匹配与语义/跨语言理解(中文问句可命中英文文献)。
 \item \textbf{"模型文件"即可复现资产}:不依赖黑盒训练权重,而是用本项目代码从本项目语料\textbf{计算/拟合}出的嵌入索引、趋势模型、推荐向量、知识图谱;\texttt{make agent-build} 可一键重建,知识产权清晰、评委可复现。
-\item \textbf{开放互通与专员子智能体}:SciScope 可作为模型上下文协议(Model Context Protocol, MCP)服务端把科研能力开放给外部客户端,也可消费外部 MCP 工具;复杂任务可下派给综述员、趋势分析师、批判核查员三类专员子智能体,且结构上禁止递归委派。
+\item \textbf{开放互通与专员子智能体}:SciScope 可作为模型上下文协议(Model Context Protocol, MCP)服务端把科研能力开放给外部客户端,也可消费外部 MCP 工具;复杂任务可下派给综述员、趋势分析师、批判核查员三类专员子智能体,且结构上禁止递归委派。2026-08-10 已验证真实 OpenCode 顺序调用"先核查 tool,再读取 disputes resource"的协议闭环,但这证明的是接口可调用,不是自然语料质量证明。
 \item \textbf{可观测运行与数据质量工程}:智能体事件携带用户可读阶段、耗时、终止原因和估算 token 用量;黑盒验收持续检查真实库表规模、能力边界、论断核查、趋势分析和论文推荐链路。数据层通过标题优先去重、front-matter 剔除、PDF 垃圾过滤和关键词噪声过滤提升检索、趋势与图谱信噪比。
 \end{enumerate}
 \end{reportbox}
 
 \begin{plainbox}
-\textbf{数字口径说明}:本报告将数据规模分为四类口径:数据分析报告使用 \texttt{data/analysis/summary.json} 的 168{,}447 条分析语料;处理后语料文件使用 \texttt{data/processed/papers\_corpus.summary.json} 的 159{,}164 篇;运行时服务以 PostgreSQL 当前库表为准,即 159{,}187 篇论文、367{,}773 个片段、367{,}773 条片段向量和 159{,}135 条论文级向量;系统效果以 \texttt{output/eval/eval\_report.json} 为准。四类口径用途不同,不混写为同一个总数。
+\textbf{数字口径说明}:本报告将数据规模与证据分为四层口径:数据分析报告使用 \texttt{data/analysis/summary.json} 的 168{,}447 条分析语料;处理后语料文件使用 \texttt{data/processed/papers\_corpus.summary.json} 的 159{,}164 篇;本机运行时 PostgreSQL 当前库表为 159{,}164 篇论文与 367{,}861 个片段; 2026-08-10 远端 2080 Ti 全量运行态已验证 \texttt{chunk\_embeddings=367{,}861/367{,}861} 与 \texttt{paper\_embeddings=159{,}164/159{,}164}。系统效果还需区分历史评测(如 \texttt{output/eval/eval\_report.json})、当前工程回归、以及尚未完成的人工 Gold/真实用户证明。四类口径用途不同,不混写为同一个总数。
 \end{plainbox}
