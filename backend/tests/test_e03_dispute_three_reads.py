@@ -110,7 +110,7 @@ def test_e03_one_persisted_canonical_claim_has_identical_api_tool_and_mcp_reads(
     db_row = persisted[stance_store.normalize_claim(CLAIM)]
     api_row = TestClient(create_app()).get("/api/disputes?limit=20").json()["disputes"][0]
     tool_row = json.loads(list_disputes.run({"limit": 20}))["争议"][0]
-    resource_row = json.loads(asyncio.run(mcp_server._read_resource("sciscope://disputes/recent"))[0].text)["disputes"][0]
+    resource_row = json.loads(asyncio.run(mcp_server._read_resource("sciscope://disputes/recent"))[0].content)["disputes"][0]
 
     for row in (api_row, tool_row, resource_row):
         assert row["claim"] == db_row["claim"] == CLAIM
@@ -203,7 +203,7 @@ def test_e03_live_postgres_three_reads(monkeypatch) -> None:
         api_rows = TestClient(create_app()).get("/api/disputes?limit=100").json()["disputes"]
         tool_rows = json.loads(list_disputes.run({"limit": 100}))["争议"]
         resource_rows = json.loads(
-            asyncio.run(mcp_server._read_resource("sciscope://disputes/recent"))[0].text
+            asyncio.run(mcp_server._read_resource("sciscope://disputes/recent"))[0].content
         )["disputes"]
 
         expected_ids = sorted(PAPER_IDS)

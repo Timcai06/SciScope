@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "sciscope": {
+      "type": "local",
+      "command": [
+        "/bin/zsh",
+        "-lc",
+        "cd /Users/tim/DEV/数据要素-科研agent && /opt/homebrew/Caskroom/miniconda/base/envs/ai/bin/python -m backend.app.mcp_server_e04_fixture"
+      ],
+      "environment": {
+        "SCISCOPE_DB_DSN": "postgresql://tim@127.0.0.1:55433/sciscope",
+        "SCISCOPE_ALLOW_WRITE_TOOLS": "true"
+      },
+      "enabled": true,
+      "timeout": 10000
+    }
+  }
+}

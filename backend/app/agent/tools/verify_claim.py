@@ -66,6 +66,62 @@ def _judge_stances(claim: str, evidence_texts: list[str]) -> stance_judge.JudgeR
     return stance_judge.judge_evidence(claim, evidence_texts)
 
 
+def _structured_answer(
+    *,
+    claim: str,
+    verdict: str,
+    evidence: list[dict[str, Any]],
+    reason: str = "",
+    judgement_mode: str = "stance",
+    qualification_hints: list[str] | None = None,
+) -> dict[str, Any]:
+    status = {
+        "强支持": "supported",
+        "部分支持": "partially_supported",
+        "证据反驳": "contradicted",
+        "存在争议": "disputed",
+        "证据不足": "evidence_insufficient",
+    }.get(verdict, "not_applicable")
+    if verdict == "证据不足" and "未检索到相关文献" in reason:
+        status = "not_found"
+    if judgement_mode == "similarity":
+        status = "abstained"
+    return {
+        "schema_version": "answer-contract/v1",
+        "capability": "claim_verification",
+        "status": status,
+        "verdict_label": verdict,
+        "answer_mode": "evidence_based",
+        "citation_compliance": "not_applicable",
+        "claim": claim,
+        "tool_basis": ["verify_claim"],
+        "citations": [
+            {
+                "paper_id": item.get("paper_id"),
+                "title": item.get("标题") or "",
+                "year": item.get("年份"),
+                "chunk_uid": item.get("chunk_uid"),
+                "source_field": item.get("source_field"),
+                "evidence_sentence": item.get("证据句") or "",
+                "stance": item.get("立场"),
+                "confidence": item.get("置信度"),
+            }
+            for item in evidence
+            if isinstance(item, dict)
+        ],
+        "uncertainty": {
+            "category": {
+                "not_found": "not_found",
+                "evidence_insufficient": "evidence_insufficient",
+                "abstained": "abstained",
+            }.get(status, "none"),
+            "message": reason,
+            "calibrated_rejection": status in {"not_found", "evidence_insufficient", "abstained"},
+            "qualification_hints": qualification_hints or [],
+        },
+    }
+
+
 def _check_persist_permission(args: dict[str, Any]) -> str | None:
     """Allow ordinary verification, but gate the optional stance-asset write."""
     if args.get("persist") and not base.ALLOW_WRITE_TOOLS:
@@ -88,7 +144,18 @@ def run(args: dict[str, Any]) -> Iterator[str]:
     results = retrieval_service.search(claim, limit=6)
     if not results:
         return json.dumps(
-            {"论断": claim, "支持等级": "证据不足", "理由": "未检索到相关文献。", "证据": []},
+            {
+                "论断": claim,
+                "支持等级": "证据不足",
+                "理由": "未检索到相关文献。",
+                "证据": [],
+                "structured_answer": _structured_answer(
+                    claim=claim,
+                    verdict="证据不足",
+                    evidence=[],
+                    reason="未检索到相关文献。",
+                ),
+            },
             ensure_ascii=False,
         )
 
@@ -98,7 +165,15 @@ def run(args: dict[str, Any]) -> Iterator[str]:
         snippet = (r.snippet or "").strip()
         title = (r.title or "").strip()
         evid_texts.append(f"{title}. {snippet}"[:512])
-        evid_meta.append({"paper_id": r.paper_id, "标题": title, "年份": r.year})
+        evid_meta.append(
+            {
+                "paper_id": r.paper_id,
+                "标题": title,
+                "年份": r.year,
+                "chunk_uid": getattr(r, "chunk_uid", None),
+                "source_field": getattr(r, "source_field", None),
+            }
+        )
 
     yield "计算跨语言接地相似度中…"
     embedder = get_embedder(get_settings().embedding_model)
@@ -140,10 +215,32 @@ def run(args: dict[str, Any]) -> Iterator[str]:
                         "接地相似度": round(sim, 3),
                         "立场": "NEUTRAL",
                         "判定方式": "similarity",
+                        "chunk_uid": meta.get("chunk_uid"),
+                        "source_field": meta.get("source_field"),
                     }
                     for sim, meta, _text in ranked[:4]
                 ],
                 "提示": "请如实表述:当前结论仅基于相关性,未获得立场判定。",
+                "structured_answer": _structured_answer(
+                    claim=claim,
+                    verdict="证据不足",
+                    evidence=[
+                        {
+                            **meta,
+                            "接地相似度": round(sim, 3),
+                            "立场": "NEUTRAL",
+                            "判定方式": "similarity",
+                            "chunk_uid": meta.get("chunk_uid"),
+                            "source_field": meta.get("source_field"),
+                        }
+                        for sim, meta, _text in ranked[:4]
+                    ],
+                    reason=(
+                        "当前仅能给出相关度(相似度=%.3f),无法确认文献立场;相似度衡量「相关」而非「支持」。%s"
+                    )
+                    % (top_sim, reason_detail),
+                    judgement_mode="similarity",
+                ),
             },
             ensure_ascii=False,
         )
@@ -160,6 +257,8 @@ def run(args: dict[str, Any]) -> Iterator[str]:
                 "置信度": round(j.confidence, 2),
                 "证据句": j.sentence,
                 "限定条件": j.qualification,
+                "chunk_uid": meta.get("chunk_uid"),
+                "source_field": meta.get("source_field"),
             }
         )
 
@@ -217,6 +316,14 @@ def run(args: dict[str, Any]) -> Iterator[str]:
     qualified_hints = stance_judge.qualification_conflicts(judgements)
     if qualified_hints:
         payload["限定条件"] = qualified_hints
+    payload["structured_answer"] = _structured_answer(
+        claim=claim,
+        verdict=verdict,
+        evidence=evidence[:4],
+        reason=reject_reason or "",
+        judgement_mode="stance",
+        qualification_hints=qualified_hints,
+    )
 
     # 矛盾即资产 (roadmap Step 2): persistence is explicit because it mutates a
     # derived asset. Ordinary verification remains a read-only research action.

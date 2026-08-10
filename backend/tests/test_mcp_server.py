@@ -41,6 +41,6 @@ def test_lists_and_reads_dispute_frontier(monkeypatch):
     resources = asyncio.run(mcp_server._list_resources())
     assert [(str(resource.uri), resource.mimeType) for resource in resources] == [("sciscope://disputes/recent", "application/json")]
     content = asyncio.run(mcp_server._read_resource("sciscope://disputes/recent"))
-    dispute = json.loads(content[0].text)["disputes"][0]
+    dispute = json.loads(content[0].content)["disputes"][0]
     assert dispute["claim"] == "A"
     assert dispute["paper_ids"] == ["P1", "P2"]

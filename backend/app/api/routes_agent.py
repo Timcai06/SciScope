@@ -85,6 +85,9 @@ def agent_stream(request: AgentRequest, http_request: Request) -> StreamingRespo
       ``intent`` carries ``{intent, label, reason}`` — the deterministic routing
       result for the turn (capability label + classification basis, never the
       internal steering prompt).
+    - ``final`` keeps the user-visible answer string in ``payload``; when present,
+      ``meta.structured_answer`` carries the shared answer/citation/uncertainty
+      contract for machine consumers.
     - Errors in the loop are emitted as ``type=error`` and then terminated.
     - Stream termination is always signaled by a literal ``data: [DONE]`` frame.
 

@@ -57,6 +57,8 @@ def _fake_search(query: str, limit: int = 6):
             title="Coffee consumption and cardiovascular outcomes",
             snippet="A cohort study associating coffee intake with lower CVD risk.",
             year=2023,
+            chunk_uid="c" * 40,
+            source_field="full_text",
         )
     ]
 
@@ -114,6 +116,10 @@ def test_supported_claim_is_graded_strong(_patched: None) -> None:
     assert result["判定版本"] == stance_judge.JUDGE_VERSION
     assert result["证据"][0]["证据句"] == "A cohort study associating coffee intake with lower CVD risk."
     assert result["证据"][0]["置信度"] == 0.95
+    assert result["证据"][0]["chunk_uid"] == "c" * 40
+    assert result["证据"][0]["source_field"] == "full_text"
+    assert result["structured_answer"]["status"] == "supported"
+    assert result["structured_answer"]["citations"][0]["chunk_uid"] == "c" * 40
 
 
 def test_default_verification_does_not_persist_stance_asset(_patched: list[tuple]) -> None:

@@ -48,6 +48,60 @@ class AgentRequest(BaseModel):
         return stripped
 
 
+class AnswerCitation(BaseModel):
+    """Traceable citation/provenance unit for evidence-backed answers."""
+
+    paper_id: str | None = None
+    title: str = ""
+    year: int | None = None
+    chunk_uid: str | None = None
+    source_field: str | None = None
+    evidence_sentence: str = ""
+    stance: Literal["SUPPORT", "CONTRADICT", "NEUTRAL"] | None = None
+    confidence: float | None = None
+
+
+class AnswerUncertainty(BaseModel):
+    """Why the system withheld or qualified a conclusion."""
+
+    category: Literal[
+        "none",
+        "not_found",
+        "evidence_insufficient",
+        "abstained",
+        "dependency_failure",
+        "generative_non_evidentiary",
+    ] = "none"
+    message: str = ""
+    calibrated_rejection: bool = False
+    qualification_hints: list[str] = Field(default_factory=list)
+
+
+class StructuredAnswer(BaseModel):
+    """Shared answer/citation/uncertainty contract for API, SSE, and MCP."""
+
+    schema_version: str = "answer-contract/v1"
+    capability: Literal["claim_verification", "general_research_answer"] = "general_research_answer"
+    status: Literal[
+        "supported",
+        "partially_supported",
+        "contradicted",
+        "disputed",
+        "not_found",
+        "evidence_insufficient",
+        "abstained",
+        "dependency_failure",
+        "not_applicable",
+    ] = "not_applicable"
+    verdict_label: str = ""
+    answer_mode: Literal["evidence_based", "generative_non_evidentiary"] = "generative_non_evidentiary"
+    citation_compliance: Literal["ok", "missing_required_citations", "not_applicable"] = "not_applicable"
+    citations: list[AnswerCitation] = Field(default_factory=list)
+    uncertainty: AnswerUncertainty = Field(default_factory=AnswerUncertainty)
+    tool_basis: list[str] = Field(default_factory=list)
+    claim: str | None = None
+
+
 class ChatRequest(BaseModel):
     """Chat input contract for evidence-backed question answering."""
 

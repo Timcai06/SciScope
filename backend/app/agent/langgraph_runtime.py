@@ -20,6 +20,7 @@ from typing import Any, Callable, Iterator, Literal, TypedDict
 from backend.app.agent.compaction import autocompact
 from backend.app.agent.compaction import estimate_tokens as _estimate_tokens
 from backend.app.agent.compaction import messages_tokens as _messages_tokens
+from backend.app.agent.answer_contract import build_structured_answer
 from backend.app.agent.events import AgentEvent, summarize_events
 from backend.app.agent.llm import build_system_prompt, compact, complete, detect_model, drain, stream_chat
 from backend.app.agent import session_memory
@@ -195,6 +196,20 @@ def _final_extra(state: AgentState, stop_reason: str, add_in: int = 0, add_out: 
         "tokens_in": int(state.get("tokens_in") or 0) + add_in,
         "tokens_out": int(state.get("tokens_out") or 0) + add_out,
     }
+
+
+def _final_meta(
+    state: AgentState,
+    answer: str,
+    stop_reason: str,
+    *,
+    add_in: int = 0,
+    add_out: int = 0,
+) -> dict[str, Any]:
+    """Build final-event meta including the shared structured answer contract."""
+    meta = _final_extra(state, stop_reason, add_in, add_out)
+    meta["structured_answer"] = build_structured_answer(answer, state.get("executed") or {})
+    return meta
 
 
 def _finish_node(node: str, started_at: float, state: AgentState, updates: AgentState, extra: dict[str, Any] | None = None) -> AgentState:
@@ -414,6 +429,8 @@ def _execute_tools(state: AgentState) -> AgentState:
     result_events: list[AgentEvent] = []
     for tool_call, result in zip(tool_calls, results):
         name = tool_call["function"]["name"]
+        sig = name + "|" + (tool_call["function"].get("arguments") or "{}")
+        executed.setdefault(sig, result)
         result_events.append(("tool_result", {"name": name, "result": result}))
         messages.append({"role": "tool", "tool_call_id": tool_call.get("id", name), "content": result})
     emit: list[AgentEvent] = [*call_events, *progress_events, *result_events]
@@ -445,10 +462,11 @@ def _reflect(state: AgentState) -> AgentState:
             reason = self_critique(state["question"], answer, state["model"])
 
     if not reason:
+        final_answer = _strip_narration(answer)
         return _finish_node(
             "reflect", started_at, state,
-            {"route": "end", "emit": [("final", _strip_narration(answer))]},
-            extra=_final_extra(state, "completed"),
+            {"route": "end", "emit": [("final", final_answer)]},
+            extra=_final_meta(state, final_answer, "completed"),
         )
 
     messages = list(state.get("messages") or [])
@@ -488,10 +506,17 @@ def _force_synthesis(state: AgentState) -> AgentState:
         stream_chat(messages, state["model"], None),
         lambda kind, payload: text_events.append((kind, payload)),
     )
+    final_answer = _strip_narration(full_text)
     return _finish_node(
         "force_synthesis", started_at, state,
-        {"messages": messages, "last_answer": full_text, "route": "end", "emit": [*text_events, ("final", _strip_narration(full_text))]},
-        extra=_final_extra(state, state.get("stop_reason") or "max_steps", call_in, _estimate_tokens(full_text)),
+        {"messages": messages, "last_answer": full_text, "route": "end", "emit": [*text_events, ("final", final_answer)]},
+        extra=_final_meta(
+            state,
+            final_answer,
+            state.get("stop_reason") or "max_steps",
+            add_in=call_in,
+            add_out=_estimate_tokens(full_text),
+        ),
     )
 
 

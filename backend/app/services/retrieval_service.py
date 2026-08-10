@@ -54,6 +54,8 @@ class RetrievedPaper:
     snippet: str
     score: float
     matched_by: list[str]
+    chunk_uid: str | None = None
+    source_field: str | None = None
 
 
 def is_available() -> bool:
@@ -122,13 +124,15 @@ def _or_tsquery(query: str) -> str:
     return " | ".join(uniq)
 
 
-def _fts_query(conn, tsquery_sql: str, query_text: str, field: str | None, year: int | None) -> list[tuple[str, str]]:
-    """Execute one FTS arm and return ``(paper_uid, chunk_text)`` hits."""
+def _fts_query(
+    conn, tsquery_sql: str, query_text: str, field: str | None, year: int | None
+) -> list[tuple[str, str, str, str]]:
+    """Execute one FTS arm and return ``(paper_uid, chunk_uid, source_field, chunk_text)`` hits."""
     params: list[Any] = [query_text]
     filters = _filter_clause(field, year, params)
     params.append(CHUNK_POOL)
     sql = f"""
-        SELECT pc.paper_uid, pc.text
+        SELECT pc.paper_uid, pc.chunk_uid, pc.source_field, pc.text
         FROM paper_chunks pc
         JOIN papers p ON p.paper_uid = pc.paper_uid
         , {tsquery_sql}('simple', %s) q
@@ -138,29 +142,29 @@ def _fts_query(conn, tsquery_sql: str, query_text: str, field: str | None, year:
     """
     with conn.cursor() as cur:
         cur.execute(sql, params)
-        return [(row[0], row[1]) for row in cur.fetchall()]
+        return [(row[0], row[1], row[2], row[3]) for row in cur.fetchall()]
 
 
-def _lexical_candidates(conn, query: str, field: str | None, year: int | None) -> list[tuple[str, str]]:
+def _lexical_candidates(conn, query: str, field: str | None, year: int | None) -> list[tuple[str, str, str, str]]:
     # Precision-first: websearch-to-tsquery keeps exact phrase/title matches high.
     # query keeps its paper at rank 1; then OR matches fill in for recall on
     # multi-term queries (which AND alone would miss).
-    out: list[tuple[str, str]] = []
+    out: list[tuple[str, str, str, str]] = []
     seen: set[str] = set()
-    for uid, text in _fts_query(conn, "websearch_to_tsquery", query, field, year):
+    for uid, chunk_uid, source_field, text in _fts_query(conn, "websearch_to_tsquery", query, field, year):
         if uid not in seen:
             seen.add(uid)
-            out.append((uid, text))
+            out.append((uid, chunk_uid, source_field, text))
     tsq = _or_tsquery(query)
     if tsq:
-        for uid, text in _fts_query(conn, "to_tsquery", tsq, field, year):
+        for uid, chunk_uid, source_field, text in _fts_query(conn, "to_tsquery", tsq, field, year):
             if uid not in seen:
                 seen.add(uid)
-                out.append((uid, text))
+                out.append((uid, chunk_uid, source_field, text))
     return out[:CHUNK_POOL]
 
 
-def _semantic_candidates(conn, query: str, field: str | None, year: int | None) -> list[tuple[str, str]]:
+def _semantic_candidates(conn, query: str, field: str | None, year: int | None) -> list[tuple[str, str, str, str]]:
     if not runtime_embeddings_enabled() or not _has_embeddings():
         return []
     from pgvector.psycopg import register_vector
@@ -173,7 +177,7 @@ def _semantic_candidates(conn, query: str, field: str | None, year: int | None) 
     filter_params: list[Any] = []
     filters = _filter_clause(field, year, filter_params)
     sql = f"""
-        SELECT pc.paper_uid, pc.text
+        SELECT pc.paper_uid, pc.chunk_uid, pc.source_field, pc.text
         FROM chunk_embeddings ce
         JOIN paper_chunks pc ON pc.chunk_uid = ce.chunk_uid
         JOIN papers p ON p.paper_uid = pc.paper_uid
@@ -184,26 +188,37 @@ def _semantic_candidates(conn, query: str, field: str | None, year: int | None) 
     exec_params = [settings.embedding_model, *filter_params, qvec, CHUNK_POOL]
     with conn.cursor() as cur:
         cur.execute(sql, exec_params)
-        return [(row[0], row[1]) for row in cur.fetchall()]
+        return [(row[0], row[1], row[2], row[3]) for row in cur.fetchall()]
 
 
-def _rrf_fuse(*ranked_lists: list[tuple[str, str]]) -> dict[str, dict[str, Any]]:
+def _rrf_fuse(*ranked_lists: list[tuple[str, str, str, str]]) -> dict[str, dict[str, Any]]:
     """Fuse one or more ranked chunk lists to paper-level scores with RRF."""
     fused: dict[str, dict[str, Any]] = {}
     arm_names = ["lexical", "semantic"]
     for arm_index, ranked in enumerate(ranked_lists):
         seen: set[str] = set()
-        for rank, (paper_uid, snippet) in enumerate(ranked):
+        for rank, (paper_uid, chunk_uid, source_field, snippet) in enumerate(ranked):
             if paper_uid in seen:
                 continue  # only first (best) chunk per paper from each arm
             seen.add(paper_uid)
             entry = fused.setdefault(
-                paper_uid, {"score": 0.0, "snippet": snippet, "matched_by": []}
+                paper_uid,
+                {
+                    "score": 0.0,
+                    "snippet": snippet,
+                    "chunk_uid": chunk_uid,
+                    "source_field": source_field,
+                    "matched_by": [],
+                },
             )
             entry["score"] += 1.0 / (RRF_K + rank + 1)
             entry["matched_by"].append(arm_names[arm_index] if arm_index < len(arm_names) else f"arm{arm_index}")
             if not entry["snippet"]:
                 entry["snippet"] = snippet
+            if not entry.get("chunk_uid"):
+                entry["chunk_uid"] = chunk_uid
+            if not entry.get("source_field"):
+                entry["source_field"] = source_field
     return fused
 
 
@@ -351,6 +366,8 @@ def search(query: str, limit: int = 10, field: str | None = None, year: int | No
                 authors=m.get("authors") or [],
                 field=str(m.get("field") or "unknown"),
                 snippet=str(info.get("snippet") or "")[:400],
+                chunk_uid=str(info.get("chunk_uid") or "") or None,
+                source_field=str(info.get("source_field") or "") or None,
                 score=round(float(info["score"]), 6),
                 matched_by=info["matched_by"],
             )

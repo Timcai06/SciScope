@@ -31,11 +31,17 @@ def summarize_events(events: list[AgentEvent]) -> dict[str, Any]:
     answer = ""
     tools_used: list[dict[str, Any]] = []
     steps = 0
+    structured_answer: dict[str, Any] | None = None
     for event in events:
-        kind, payload, _ = event_parts(event)
+        kind, payload, meta = event_parts(event)
         if kind == "final":
             answer = str(payload)
+            if isinstance(meta.get("structured_answer"), dict):
+                structured_answer = meta["structured_answer"]
         elif kind == "tool_call" and isinstance(payload, dict):
             steps += 1
             tools_used.append({"name": payload.get("name"), "args": payload.get("args") or {}})
-    return {"answer": answer, "steps": steps, "tools_used": tools_used}
+    response = {"answer": answer, "steps": steps, "tools_used": tools_used}
+    if structured_answer is not None:
+        response["structured_answer"] = structured_answer
+    return response

@@ -1,0 +1,24 @@
+{
+  "schema_version": "recommend-wave2-current/v1",
+  "evaluated_at": "2026-08-10",
+  "code_commit": "020744e",
+  "model": "intfloat/multilingual-e5-base",
+  "sample": {
+    "seed": 42,
+    "seeds_sampled": 100,
+    "limit_per_seed": 5,
+    "seeds_with_recommendations": 100,
+    "total_recommendations": 500
+  },
+  "metrics": {
+    "same_field_rate": 0.71,
+    "shared_keyword_rate": 0.672,
+    "mean_semantic_similarity": 0.9265
+  },
+  "evidence_level": "automatic_proxy_baseline",
+  "boundaries": [
+    "No popularity, TF-IDF or pure-dense comparison was run in this artifact.",
+    "Field, keyword and embedding-similarity metrics are proxies, not user relevance judgements.",
+    "No user or domain-expert evaluation was performed."
+  ]
+}

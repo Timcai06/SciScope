@@ -1,8 +1,8 @@
 # A｜科研问答与协议
 
-- 状态：`PENDING`（A00、A01 `PASS`；A02 等待 D05、E02）
+- 状态：`active`（A00、A01、A02 工程 `PASS`；A03、A04 `PENDING`）
 - 负责人：Agent/后端负责人；复核：检索负责人 + 项目负责人
-- 当前领取：等待 D05、E02 → A02；依赖上游：[D 文献内容结构化](D-文献内容结构化.md)、
+- 当前领取：A02 工程已完成；下一步 A03；依赖上游：[D 文献内容结构化](D-文献内容结构化.md)、
   [E 证据 L3 与国赛证明](E-证据L3与国赛证明.md)
 - 交付边界：以现有 Agent 工具注册表、REST/SSE 合同回答有证据的问题；不新建第二套 Agent
   编排，不把模型流畅表达当成文献支持。
@@ -53,12 +53,20 @@ E02 L3 纪律 ──────────────────────
 
 ### A02｜答案、引文与不确定性合同
 
-- 状态：`PENDING`；依赖：A01、D05、E02。
+- 状态：`PASS（工程合同）`（2026-08-10；证据见
+  [A/A02-20260810-答案引文与不确定性合同](A/A02-20260810-答案引文与不确定性合同.md)）；依赖：A01、D05、E02。
 - 文件所有权：Agent 输出 schema、SSE 事件、API schema、测试；展示由 T 线实现。
 - 做什么：每个可验证结论返回来源 paper/chunk、引用范围、能力类型和不确定性；将“未找到”
   与“证据不足”分开，L3 结论带 evidence sentence/校准拒答信息。
 - 验收：结构化输出可被 API、MCP 和 TUI 同时消费；无引文的关键结论被拒绝或标为生成性说明。
 - 验证：schema 测试、序列化测试、正反/不足三类黄金样本。
+- 完成摘要：新增 `StructuredAnswer` 合同与 `answer_contract.py`；final event meta 和
+  `run_agent()` 聚合响应都带统一 `structured_answer`；`verify_claim` 补
+  `chunk_uid/source_field` provenance；修复 citation gate 误降级和 mocked `run_tools`
+  下 `executed` 缺失问题；复核修复 title+year 多格式识别与 malformed embedded
+  `structured_answer` fail-closed；专项 27 passed，全量后端 524 passed、1 skipped。
+  诚实边界：当前检索层只带 `paper_id + chunk_uid + source_field + evidence_sentence`，**尚未带
+  locator/page 级 provenance**；A02 只完成工程合同，不代表 A03/A04 的外部证明已完成。
 
 ### A03｜科研问答回归与对抗集
 
@@ -84,6 +92,6 @@ E02 L3 纪律 ──────────────────────
 |---|---|---|
 | A00 | `PASS` | tool—能力—运行态注册表（[A/A00-20260805-能力盘点与问题边界](A/A00-20260805-能力盘点与问题边界.md)） |
 | A01 | `PASS` | 路由测试与错误意图样本（[A/A01-20260805-意图路由与工具选择](A/A01-20260805-意图路由与工具选择.md)） |
-| A02 | `PENDING` | 输出 schema 与引文/拒答测试 |
+| A02 | `PASS（工程合同）` | [A/A02-20260810-答案引文与不确定性合同](A/A02-20260810-答案引文与不确定性合同.md)：输出 schema、引文/拒答与回归测试；外部质量由 A03/A04 证明 |
 | A03 | `PENDING` | 回归主表、人工复核与失败例 |
 | A04 | `PENDING` | API/SSE 三情形端到端证据 |

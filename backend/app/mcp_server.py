@@ -23,6 +23,7 @@ import json
 
 import mcp.types as types
 from mcp.server import Server
+from mcp.server.lowlevel.helper_types import ReadResourceContents
 from mcp.server.stdio import stdio_server
 
 from backend.app.agent.tools import TOOLS, execute_tool
@@ -69,7 +70,7 @@ async def _list_resources() -> list[types.Resource]:
     ]
 
 
-async def _read_resource(uri) -> list[types.TextResourceContents]:
+async def _read_resource(uri) -> list[ReadResourceContents]:
     """Serve only the fixed, read-only dispute-frontier resource."""
     if str(uri) != _DISPUTES_URI:
         raise ValueError(f"Unknown resource: {uri}")
@@ -79,13 +80,7 @@ async def _read_resource(uri) -> list[types.TextResourceContents]:
         "disputes": rows,
         "boundary": "Only accepted SUPPORT/CONTRADICT evidence is included.",
     }
-    return [
-        types.TextResourceContents(
-            uri=_DISPUTES_URI,
-            mimeType="application/json",
-            text=json.dumps(payload, ensure_ascii=False),
-        )
-    ]
+    return [ReadResourceContents(content=json.dumps(payload, ensure_ascii=False), mime_type="application/json")]
 
 
 server: Server = Server(SERVER_NAME)

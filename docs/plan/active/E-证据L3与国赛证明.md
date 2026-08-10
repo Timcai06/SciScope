@@ -1,6 +1,6 @@
 # E｜证据 L3 与国赛证明
 
-- 状态：`active`（E00、E01、E03、E05 技术 `PASS`；E02 质量主表 `REVISE`；E04 可启动；E08 外部阻塞）
+- 状态：`active`（E00、E01、E03、E04、E05 技术 `PASS`；E02 质量主表 `REVISE`；E08 外部阻塞）
 - 负责人：项目负责人；分工：NLP/评测、后端/MCP、演示/报告、领域专家
 - 当前领取：E02；上游：[冻结目标说明书](../../project/国赛目标说明书.md)
 - 交付边界：先把“相关”与“支持/反驳/证据不足”区分清楚，再证明 API/MCP、TUI 和报告的
@@ -12,7 +12,7 @@
 |---|---|---|
 | `verify_claim` 已有支持、反驳、中立及回退实现 | `backend/app/agent/tools/verify_claim.py` | 句级证据、校准拒答在人工金标准上的质量 |
 | claim—paper—stance 可写入资产，争议视图按同一 `claim_norm` 聚合并返回 `paper_ids` | `infra/postgres/stance.sql`、E03 fixture + 隔离 live PostgreSQL gate | 当前库已有由真实科学 judge 产生、可用于展示的争议案例 |
-| API、Agent tool 和 MCP server 有争议读取入口且 fixture 对账同一 claim/paper IDs | `backend/app/api/routes_disputes.py`、`backend/app/mcp_server.py`、[E03 工程集成](E/E03-20260810-同claim争议三读工程集成.md) | OpenCode 已完成“核查后读取 resource”的真实调用 |
+| API、Agent tool 和 MCP server 有争议读取入口且 fixture 对账同一 claim/paper IDs | `backend/app/api/routes_disputes.py`、`backend/app/mcp_server.py`、[E03 工程集成](E/E03-20260810-同claim争议三读工程集成.md)、[E04 顺序调用](E/E04-20260810-OpenCode顺序调用.md) | 这证明 client 顺序调用与资产闭环，不证明自然语料上的 stance 质量 |
 | 历史评测/黄金会话存在 | `output/eval/`、`output/dialogue/` | 它们是当前主表或外部证明 |
 
 ## 最简依赖图
@@ -117,7 +117,7 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 ### E04｜OpenCode 真调用证据
 
-- 状态：`PENDING`；依赖：E03。
+- 状态：`PASS`（2026-08-10）；依赖：E03。
 - 文件所有权：`opencode.json`、MCP 文档、调用日志/截图；不修改论文语料。
 - 做什么：先由 OpenCode 在写入授权环境调用 `verify_claim(persist=true)` 核查真实论断，再读取
   `sciscope://disputes/recent`；如实说明前者会 upsert 已采信证据至 stance 资产
@@ -125,6 +125,12 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 - 验收：日志能证明顺序、工具输入输出、resource 读取和同一 claim 的争议资产；旧“0 争议只读”
   记录只可作初始态，不得作为完成证据。
 - 验证：`rtk opencode mcp list` 和一次可保存的真实调用产物。
+- 当前收口：见 [E04 顺序调用](E/E04-20260810-OpenCode顺序调用.md)。
+  本轮已拿到真实 OpenCode 事件流与 session 导出：
+  `sciscope_verify_claim` 以 `persist=true` 成功写入 2 条 stance 资产；
+  随后同一会话成功调用 `read_mcp_resource(server=sciscope, uri=sciscope://disputes/recent)`，
+  返回相同 claim/paper IDs。期间同步修复了 SciScope MCP resource 返回契约，
+  并用真实 `ClientSession.read_resource(...)` 复核兼容性。
 
 ### E05｜报告口径准备
 
@@ -166,6 +172,8 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 - 验证：准入报告、处理日志、对照任务记录和第三方证明（若有）。
 - 审计证据：[E08-20260810-讯飞交付包准入审计](E/E08-20260810-讯飞交付包准入审计.md)；
   `output/audit/xunfei_delivery_v1.json`。5,568 个 PDF 的 ZIP CRC 与稳定 ID 解析通过，但缺许可/字段材料且有 1 个零字节文件。
+  若外部材料继续缺失，只能按审计报告 §6 的“阻塞下替代推进路径”继续推进其余 Wave 2–6 工程，
+  不得把讯飞交付包包装成已落地场景或已准入语料。
 
 ### E09｜提交整合与独立复现
 
@@ -187,7 +195,7 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 | E02a | `DONE`（待复核） | [E02a-20260808-SciFact锚点准入.md](E/E02a-20260808-SciFact锚点准入.md)：SciFact 数据准入、完整性校验与 dry-run 评测入口 |
 | E02b | `技术 PASS / 质量 REVISE` | [E02b-20260810-双语Silver替代收口.md](E/E02b-20260810-双语Silver替代收口.md)：冻结的双语 silver 仅作回归/模型一致性；不替代 Gold；可支持 E03 工程集成 |
 | E03 | `工程 live PASS / 质量 REVISE` | 同 claim 的真实 PostgreSQL 写入与 DB/API/tool/resource 三读证据；不得解释为 stance 质量证明 |
-| E04 | `PENDING` | OpenCode 先核查后 resource 的真实产物 |
+| E04 | `PASS` | [E04 顺序调用](E/E04-20260810-OpenCode顺序调用.md)：真实 OpenCode 已完成 `verify_claim(persist=true)` + `read_mcp_resource` 顺序调用，并保留 session 导出 |
 | E05 | `PASS` | [报告口径.md](../../project/报告口径.md)：报告口径表 |
 | E06 | `PENDING` | 两份重建 PDF 与一致性记录 |
 | E07 | `PENDING` | 演练、硬件清单、离线回退 |
