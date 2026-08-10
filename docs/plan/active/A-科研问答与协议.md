@@ -64,7 +64,7 @@ E02 L3 纪律 ──────────────────────
   `run_agent()` 聚合响应都带统一 `structured_answer`；`verify_claim` 补
   `chunk_uid/source_field` provenance；修复 citation gate 误降级和 mocked `run_tools`
   下 `executed` 缺失问题；复核修复 title+year 多格式识别与 malformed embedded
-  `structured_answer` fail-closed；专项 27 passed，全量后端 524 passed、1 skipped。
+  `structured_answer` fail-closed；A02 专项 27 passed；Wave 3 集成后全量后端 537 passed、1 skipped。
   诚实边界：当前检索层只带 `paper_id + chunk_uid + source_field + evidence_sentence`，**尚未带
   locator/page 级 provenance**；A02 只完成工程合同，不代表 A03/A04 的外部证明已完成。
 
