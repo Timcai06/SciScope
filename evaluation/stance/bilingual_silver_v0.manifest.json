@@ -1,0 +1,22 @@
+{
+  "schema_version": "sciscope-stance-silver-v1",
+  "status": "frozen_silver_not_gold",
+  "usage": "regression_and_model_agreement_only",
+  "set_path": "evaluation/stance/bilingual_silver_v0.jsonl",
+  "record_count": 6,
+  "content_sha256": "d16462a94025634bd6555b414a347b45d532ededcb86a03c5aac96298ba5a690",
+  "frozen_at": "2026-08-10",
+  "source_anchor": {
+    "dataset": "SciFact",
+    "split": "dev",
+    "validator": "evaluation/stance/scifact_data.py",
+    "expected_raw_hashes": "evaluation/stance/scifact_data.py:RAW_SHA256"
+  },
+  "evidence_level": "official English rationale anchors plus project_manual_unreviewed Chinese translation/counterclaim silver",
+  "prohibited_claims": [
+    "Not bilingual human Gold v1.",
+    "Not an expert annotation set.",
+    "Not an accuracy, calibration, or competition main-table source.",
+    "Model-to-model agreement is not independent human agreement."
+  ]
+}

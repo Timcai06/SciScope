@@ -1,0 +1,194 @@
+{
+  "mode": "scored",
+  "status": "scored_local_dev",
+  "split": "dev",
+  "predictions": "output/eval/scifact_dev_tfidf_logreg_oracle_cited_v1.predictions.jsonl",
+  "prediction_schema": "SciFact document-evidence JSONL: id + evidence.{doc_id}.{label,sentences}",
+  "data_stats": {
+    "split": "dev",
+    "claims": 300,
+    "claims_with_evidence": 188,
+    "evidence_missing_rate": 0.3733,
+    "rationale_count": 338,
+    "label_distribution": {
+      "NEUTRAL": 112,
+      "SUPPORT": 216,
+      "CONTRADICT": 122
+    },
+    "cited_doc_refs": 209,
+    "cited_doc_resolvable": 209,
+    "doc_ref_resolvable_rate": 1.0,
+    "rationale_sentence_refs": 366,
+    "rationale_sentence_valid": 366,
+    "sentence_ref_valid_rate": 1.0,
+    "corpus_docs": 5183
+  },
+  "metrics": {
+    "abstract": {
+      "precision": 0.269767,
+      "recall": 0.277512,
+      "f1": 0.273585
+    },
+    "sentence": {
+      "precision": 0.106977,
+      "recall": 0.188525,
+      "f1": 0.136499
+    },
+    "counts": {
+      "claims": 300,
+      "gold_abstracts": 209,
+      "predicted_abstracts": 215,
+      "correct_abstracts": 58,
+      "gold_sentences": 366,
+      "predicted_sentences": 645,
+      "correct_sentences": 69
+    }
+  },
+  "failure_examples": {
+    "incorrect_predicted_abstracts": [
+      {
+        "claim_id": 5,
+        "claim": "1/2000 in UK have abnormal PrP positivity.",
+        "doc_id": 13734012,
+        "predicted": {
+          "label": "CONTRADICT",
+          "sentences": [
+            3,
+            7,
+            2
+          ]
+        },
+        "gold_rationales": [
+          {
+            "sentences": [
+              4
+            ],
+            "label": "SUPPORT"
+          }
+        ]
+      },
+      {
+        "claim_id": 42,
+        "claim": "A high microerythrocyte count raises vulnerability to severe anemia in homozygous alpha (+)- thalassemia trait subjects.",
+        "doc_id": 18174210,
+        "predicted": {
+          "label": "SUPPORT",
+          "sentences": [
+            10,
+            8,
+            1
+          ]
+        },
+        "gold_rationales": [
+          {
+            "sentences": [
+              1,
+              9
+            ],
+            "label": "CONTRADICT"
+          },
+          {
+            "sentences": [
+              10
+            ],
+            "label": "CONTRADICT"
+          }
+        ]
+      },
+      {
+        "claim_id": 48,
+        "claim": "A total of 1,000 people in the UK are asymptomatic carriers of vCJD infection.",
+        "doc_id": 13734012,
+        "predicted": {
+          "label": "CONTRADICT",
+          "sentences": [
+            7,
+            2,
+            6
+          ]
+        },
+        "gold_rationales": [
+          {
+            "sentences": [
+              4
+            ],
+            "label": "CONTRADICT"
+          }
+        ]
+      }
+    ],
+    "missed_gold_abstracts": [
+      {
+        "claim_id": 3,
+        "claim": "1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.",
+        "doc_id": 14717500,
+        "predicted": null,
+        "gold_rationales": [
+          {
+            "sentences": [
+              2,
+              5
+            ],
+            "label": "SUPPORT"
+          },
+          {
+            "sentences": [
+              7
+            ],
+            "label": "SUPPORT"
+          }
+        ]
+      },
+      {
+        "claim_id": 5,
+        "claim": "1/2000 in UK have abnormal PrP positivity.",
+        "doc_id": 13734012,
+        "predicted": {
+          "label": "CONTRADICT",
+          "sentences": [
+            3,
+            7,
+            2
+          ]
+        },
+        "gold_rationales": [
+          {
+            "sentences": [
+              4
+            ],
+            "label": "SUPPORT"
+          }
+        ]
+      },
+      {
+        "claim_id": 42,
+        "claim": "A high microerythrocyte count raises vulnerability to severe anemia in homozygous alpha (+)- thalassemia trait subjects.",
+        "doc_id": 18174210,
+        "predicted": {
+          "label": "SUPPORT",
+          "sentences": [
+            10,
+            8,
+            1
+          ]
+        },
+        "gold_rationales": [
+          {
+            "sentences": [
+              1,
+              9
+            ],
+            "label": "CONTRADICT"
+          },
+          {
+            "sentences": [
+              10
+            ],
+            "label": "CONTRADICT"
+          }
+        ]
+      }
+    ]
+  },
+  "note": "本地公开 dev/train 评分，不是官方 test leaderboard，也不构成 SciScope L3 通过。"
+}

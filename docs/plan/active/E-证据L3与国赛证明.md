@@ -1,6 +1,6 @@
 # E｜证据 L3 与国赛证明
 
-- 状态：`active`（E00、E01、E05 `PASS`；E02 已解锁；E08 为外部阻塞）
+- 状态：`active`（E00、E01、E05 `PASS`；E02 技术门禁已关闭、质量主表 `REVISE`；E03 可开展受控工程集成；E08 外部阻塞）
 - 负责人：项目负责人；分工：NLP/评测、后端/MCP、演示/报告、领域专家
 - 当前领取：E02；上游：[冻结目标说明书](../../project/国赛目标说明书.md)
 - 交付边界：先把“相关”与“支持/反驳/证据不足”区分清楚，再证明 API/MCP、TUI 和报告的
@@ -56,22 +56,29 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 ### E02｜L3 句级证据、校准拒答与回退纪律
 
-- 状态：`DONE`（纪律实现验证完成；**正式双语主集与 SciFact 真评分仍待完成**）；依赖：E01。
+- 状态：`技术门禁 PASS / 质量门禁 REVISE`（纪律、官方英文 gold 真评分、双语 silver 来源冻结已完成；正式双语人工 Gold/L3 主表仍待完成）；依赖：E01。
 - 产物：[E02-20260805-L3纪律与评测.md](E/E02-20260805-L3纪律与评测.md)；
   修复 judge 格式异常静默降 NEUTRAL 缺陷（fail-closed），新增 10 条纪律测试。
 - 复核修订（2026-08-05）：fail-closed 完整化——空数组/多余元素/缺失 stance/非对象元素
   一律拒答；confidence 缺失默认 0.0（不再 0.5，杜绝意外导出部分支持/证据反驳）；
-  明确无正式双语主集与 SciFact 锚点评测，**不得 PASS、不得解锁 E03**。
+  当时明确无正式双语主集与 SciFact 锚点评测，不得质量 PASS；2026-08-10 技术替代完成后仅解锁 E03 工程集成。
 - 复核修订 2（2026-08-05，REVISE）：NaN/Infinity/-Infinity 置信度 fail-closed——
   judge 层 `math.isfinite` 检查（非有限值→整次 `ok=False` 走证据不足回退）；
   verify_claim 聚合层同样用 `isfinite` 防御（`inf>=阈值` 为 True，原可导出"强支持"）；
   补 judge 层参数化测试与 verify_claim 层不驱动结论/不写资产测试。
 - 收口修订（2026-08，正式评测可执行性）：最初 SciFact 锚点因无官方 claims/corpus 而
-  `BLOCKED`；E02a 已完成官方数据准入、哈希/schema 校验和 dry-run 入口，但**尚未运行模型真评分**。
+  `BLOCKED`；E02a 已完成官方数据准入、哈希/schema 校验和 dry-run 入口，2026-08-10 又完成
+  oracle-candidate 基线真评分。
   已固化 gold_v1 主集 schema（id/claim/evidence/language/source/domain）、train/dev/test 冻结规则、
   领域·语言分层字段与 E02 主表分开报告格式（检索/证据句定位/stance/校准拒答/similarity 对照/样本边界）；
-  dev_fixture 管线可执行（16 条 baseline，仅纪律实现验证）；fail-closed 回归 31 passed 保持。
-  详见 E02 报告 §8。**不解锁 E03。**
+  dev_fixture 管线可执行（16 条 baseline，仅纪律实现验证）；fail-closed 回归保持。
+  2026-08-10 已补官方 dev 真评分与双语 silver，分别见 E02a Wave 0 报告和 E02b；它们关闭工程
+  输入/来源门禁，但不完成 L3 质量证明。
+- 替代收口（2026-08-10，无法正式专家标注）：新增 [E02b 双语 Silver 替代收口](E/E02b-20260810-双语Silver替代收口.md)。
+  SciFact 官方英文 rationale 保持外部 gold 锚点；6 条中文/跨语翻译与比较方向反转样本只作为
+  `unreviewed_silver`，有来源句索引、变换记录、冻结 SHA256 和模型间 agreement 入口。它关闭
+  可复现输入/来源门禁，**不产生质量分数、不替代 Gold v1/专家裁决/国赛外部证明**；仅与官方
+  SciFact 真评分共同解锁 E03 工程集成。
 - 文件所有权：`backend/app/agent/tools/verify_claim.py`、stance schema/测试、`evaluation/`；不改
   论文语料。
 - 做什么：验收并补齐证据句、限定条件、低置信拒答、解析失败不静默变 `NEUTRAL`、支持/反驳的
@@ -82,20 +89,20 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 ### E02a｜SciFact 锚点数据准入与可执行评测入口
 
-- 状态：`DONE`（数据准入、完整性校验与 dry-run 评测入口完成，验收待项目负责人复核）；依赖：E02 纪律。
+- 状态：`技术 PASS / 质量 REVISE`（数据准入、官方格式 scorer 与公开 dev 真评分完成）；依赖：E02 纪律。
 - 产物：[E02a-20260808-SciFact锚点准入.md](E/E02a-20260808-SciFact锚点准入.md)；
   `evaluation/stance/scifact_data.py`（loader/validator）、`evaluation/stance/scifact_eval.py`
   （dry-run 评测入口）、`evaluation/stance/scifact_anchor.json`（已更新为 downloaded_and_validated）、
   原始数据 `data/scifact/raw/`（官方 S3 下载，含 SHA256 manifest）。
-- 边界：只做数据准入与完整性校验，**不训练模型、不伪造分数、不宣称 L3 已通过**；
-  默认 dry-run，评分需 `--predictions` + `--allow-score` 同时满足；**不解锁 E03**。
+- 边界：默认 dry-run；评分需 `--predictions` + `--allow-score` 同时满足。已跑分模型是
+  TF-IDF/LogReg oracle-candidate 基线，**不宣称 L3 已通过**；只解锁 E03 工程集成。
 - 验收：缺文件/哈希不符/schema 不符 fail-closed；输出样本数、标签分布、缺失率、证据引用可解析率。
 - 验证：`rtk test python3 -m pytest backend/tests/test_scifact_admission.py -q`（9 passed）、
   `rtk test make test-backend`（491 passed）、`rtk summary python3 -m evaluation.stance.scifact_eval --split dev`（dry-run data_ok）。
 
 ### E03｜同一 canonical claim 的争议三读路径
 
-- 状态：`PENDING`；依赖：E02。
+- 状态：`READY（仅工程集成）`；依赖：E02 技术门禁。正式质量验收仍依赖 E02 人工 Gold/L3 主表。
 - 文件所有权：`infra/postgres/stance.sql`、`backend/app/api/routes_disputes.py`、Agent/MCP 读取测试；
   不改变 papers/chunks。
 - 做什么：在受控环境设 `SCISCOPE_ALLOW_WRITE_TOOLS=1` 后，对**同一个 canonical claim 的一次
@@ -104,6 +111,7 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
   视图出现该 claim，并通过 API、Agent tool、MCP resource 三处读取同一资产。
 - 禁止：分别对相反句子调用后将结果称为争议闭环；它们会生成不同 `claim_norm`，不能满足此任务。
 - 验收：数据库、三条读取路径和来源 paper ID 完全对得上；若找不到真实案例，保留 `REVISE`。
+- 证据边界：本任务可以证明写入/读取和 canonical claim 聚合正确，不能用来宣称 stance 模型质量达标。
 - 验证：任务实现后 `rtk curl -fsS 'http://127.0.0.1:8000/api/disputes?limit=20'`、Agent 调用、
   `rtk make mcp` 及 SQL 抽样记录。
 
@@ -150,12 +158,14 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 
 ### E08｜讯飞数据准入与真实场景证明
 
-- 状态：`BLOCKED`（交付压缩包已到达；仍缺许可说明、字段映射确认与领域联系人）；依赖：准入审计、许可说明、领域联系人；与 D00/D01 协作。
+- 状态：`BLOCKED`（交付包传输/ZIP/目录审计已完成；仍缺许可说明、usage-rights、字段映射与领域联系人）；依赖：许可说明、领域联系人；与 D00/D01 协作。
 - 文件所有权：准入记录、许可矩阵、试点协议/反馈、匿名化统计；未经授权不提交原文。
 - 做什么：收到数据后按 D 合同进行隔离、抽样质量/重复率/领域适配审查，选择可落地任务并记录
   用户前后对照；不把“拿到几千篇论文”自动解释为真实用户成效。
 - 验收：来源与授权明确，至少一个可复核真实场景及外部反馈；不能满足则继续 `BLOCKED`。
 - 验证：准入报告、处理日志、对照任务记录和第三方证明（若有）。
+- 审计证据：[E08-20260810-讯飞交付包准入审计](E/E08-20260810-讯飞交付包准入审计.md)；
+  `output/audit/xunfei_delivery_v1.json`。5,568 个 PDF 的 ZIP CRC 与稳定 ID 解析通过，但缺许可/字段材料且有 1 个零字节文件。
 
 ### E09｜提交整合与独立复现
 
@@ -173,9 +183,10 @@ E00 基线/台账 → E01 标注试运行 → E02 L3 纪律与评测 ───�
 |---|---|---|
 | E00 | `PASS` | [E00 基线与证据台账](E/E00-基线与证据台账.md)：冻结基线与指标—证据矩阵 |
 | E01 | `PASS` | [E01-20260805-标注试运行.md](E/E01-20260805-标注试运行.md)：20 条试运行；非正式金标准 |
-| E02 | `DONE`（待复核） | [E02-20260805-L3纪律与评测.md](E/E02-20260805-L3纪律与评测.md)：L3 主表、纪律测试和失败分析 |
+| E02 | `技术 PASS / 质量 REVISE` | [E02-20260805-L3纪律与评测.md](E/E02-20260805-L3纪律与评测.md)：纪律、英文官方基线与双语 silver；正式人工 Gold/L3 主表仍缺 |
 | E02a | `DONE`（待复核） | [E02a-20260808-SciFact锚点准入.md](E/E02a-20260808-SciFact锚点准入.md)：SciFact 数据准入、完整性校验与 dry-run 评测入口 |
-| E03 | `PENDING` | 同 claim 的数据库/API/tool/resource 三读证据 |
+| E02b | `技术 PASS / 质量 REVISE` | [E02b-20260810-双语Silver替代收口.md](E/E02b-20260810-双语Silver替代收口.md)：冻结的双语 silver 仅作回归/模型一致性；不替代 Gold；可支持 E03 工程集成 |
+| E03 | `READY（工程集成）` | 同 claim 的数据库/API/tool/resource 三读证据；不得解释为 stance 质量证明 |
 | E04 | `PENDING` | OpenCode 先核查后 resource 的真实产物 |
 | E05 | `PASS` | [报告口径.md](../../project/报告口径.md)：报告口径表 |
 | E06 | `PENDING` | 两份重建 PDF 与一致性记录 |

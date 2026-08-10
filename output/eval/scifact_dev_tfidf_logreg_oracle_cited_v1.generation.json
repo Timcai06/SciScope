@@ -1,0 +1,43 @@
+{
+  "model": "tfidf-1to2-logreg-c1-min_df2-random_state0",
+  "training_split": "train",
+  "training_claims": 809,
+  "training_cited_document_pairs": 919,
+  "training_label_distribution": {
+    "NEUTRAL": 355,
+    "CONTRADICT": 194,
+    "SUPPORT": 370
+  },
+  "prediction_split": "dev",
+  "prediction_claims": 300,
+  "candidate_boundary": "SciFact cited_doc_ids only (oracle candidate documents; no open-corpus retrieval)",
+  "candidate_document_pairs": 340,
+  "predicted_label_distribution_before_neutral_omission": {
+    "NEUTRAL": 124,
+    "CONTRADICT": 42,
+    "SUPPORT": 174
+  },
+  "non_neutral_documents_written": 215,
+  "rationale_selector": "top 3 claim/abstract-sentence lexical Jaccard overlap",
+  "prediction_schema": "SciFact document-evidence JSONL; NEUTRAL omitted as empty evidence",
+  "data_stats": {
+    "split": "dev",
+    "claims": 300,
+    "claims_with_evidence": 188,
+    "evidence_missing_rate": 0.3733,
+    "rationale_count": 338,
+    "label_distribution": {
+      "NEUTRAL": 112,
+      "SUPPORT": 216,
+      "CONTRADICT": 122
+    },
+    "cited_doc_refs": 209,
+    "cited_doc_resolvable": 209,
+    "doc_ref_resolvable_rate": 1.0,
+    "rationale_sentence_refs": 366,
+    "rationale_sentence_valid": 366,
+    "sentence_ref_valid_rate": 1.0,
+    "corpus_docs": 5183
+  },
+  "non_l3_notice": "A supervised baseline over SciFact oracle candidates; it is not open retrieval, an L3 stance run, or a SciScope capability claim."
+}

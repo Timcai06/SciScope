@@ -1,0 +1,129 @@
+{
+  "admission": {
+    "allowed_action": "retain_in_controlled_incoming_only",
+    "blocking_reasons": [
+      "zero_byte_files",
+      "metadata_files_missing",
+      "license_unverified",
+      "usage_rights_unverified",
+      "field_mapping_unverified"
+    ],
+    "forbidden_actions": [
+      "canonical_import",
+      "database_import",
+      "embedding",
+      "public_export"
+    ],
+    "status": "blocked_pending_d01_manifest_review"
+  },
+  "artifact": {
+    "bytes": 15424441830,
+    "crc_failure": null,
+    "crc_verified": true,
+    "path": "/home/liu/workspaces/sciscope/data/incoming/xunfei/environment.zip",
+    "sha256": "9c22fc91ca33d1656cee43249f8eea8b4b91f3d6b924d126bb42946820f19805"
+  },
+  "existing_corpus_overlap": {
+    "corpus_path": "/home/liu/workspaces/sciscope/repo/data/processed/papers_corpus.json",
+    "corpus_record_count": 159164,
+    "incoming_identifier_match_by_source": {
+      "arxiv": 9,
+      "biorxiv": 2,
+      "medrxiv": 1
+    },
+    "incoming_identifier_matches": 12,
+    "interpretation": "identifier_overlap_candidate_not_content_deduplication",
+    "match_examples": [
+      {
+        "external_id": "2412.16407",
+        "filename": "arxiv_2412.16407.pdf",
+        "source": "arxiv"
+      },
+      {
+        "external_id": "2501.00149",
+        "filename": "arxiv_2501.00149.pdf",
+        "source": "arxiv"
+      },
+      {
+        "external_id": "2501.04018",
+        "filename": "arxiv_2501.04018.pdf",
+        "source": "arxiv"
+      },
+      {
+        "external_id": "2512.12429",
+        "filename": "arxiv_2512.12429.pdf",
+        "source": "arxiv"
+      },
+      {
+        "external_id": "2512.14208",
+        "filename": "arxiv_2512.14208.pdf",
+        "source": "arxiv"
+      },
+      {
+        "external_id": "2512.16437",
+        "filename": "arxiv_2512.16437.pdf",
+        "source": "arxiv"
+      },
+      {
+        "external_id": "2512.22814",
+        "filename": "arxiv_2512.22814.pdf",
+        "source": "arxiv"
+      },
+      {
+        "external_id": "10.1101/2025.11.27.691041",
+        "filename": "biorxiv_10.1101_2025.11.27.691041.pdf",
+        "source": "biorxiv"
+      },
+      {
+        "external_id": "10.64898/2025.12.15.694400",
+        "filename": "biorxiv_10.64898_2025.12.15.694400.pdf",
+        "source": "biorxiv"
+      },
+      {
+        "external_id": "10.1101/2023.07.14.23292679",
+        "filename": "medrxiv_10.1101_2023.07.14.23292679.pdf",
+        "source": "medrxiv"
+      },
+      {
+        "external_id": "2403.02824",
+        "filename": "arxiv_2403.02824.pdf",
+        "source": "arxiv"
+      },
+      {
+        "external_id": "2606.16722",
+        "filename": "arxiv_2606.16722.pdf",
+        "source": "arxiv"
+      }
+    ]
+  },
+  "inventory": {
+    "compressed_bytes": 15423144052,
+    "duplicate_content_candidate_count": 0,
+    "duplicate_names": [],
+    "encrypted_file_count": 0,
+    "entry_count": 5569,
+    "extensions": {
+      ".pdf": 5568
+    },
+    "file_count": 5568,
+    "invalid_name_count": 0,
+    "invalid_name_examples": [],
+    "metadata_candidates": [],
+    "parsed_stable_id_count": 5568,
+    "source_counts": {
+      "arxiv": 531,
+      "biorxiv": 3348,
+      "medrxiv": 1589,
+      "openalex": 100
+    },
+    "suspicious_paths": [],
+    "top_levels": {
+      "environment": 5569
+    },
+    "uncompressed_bytes": 17604554980,
+    "zero_byte_files": [
+      "environment/biorxiv_10.1101_2025.10.13.682097.pdf"
+    ]
+  },
+  "schema_version": "xunfei-delivery-audit/v1"
+}

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SESSION="tim-zsh"
+ZDOTDIR_PATH="${HOME}/.config/tim/zsh"
+
+if [[ ! -r "${ZDOTDIR_PATH}/.zshrc" ]]; then
+  echo "Missing ${ZDOTDIR_PATH}/.zshrc; run scripts/setup_sciscope_shell.sh." >&2
+  exit 1
+fi
+
+if ! command -v zsh >/dev/null 2>&1; then
+  echo "zsh is not installed; use tim-bash until the global CLI setup is complete." >&2
+  exit 1
+fi
+
+if tmux has-session -t "=${SESSION}" 2>/dev/null; then
+  exec tmux attach-session -t "=${SESSION}"
+fi
+
+exec tmux new-session -s "${SESSION}" -c "${PWD}" \
+  "env ZDOTDIR=${ZDOTDIR_PATH} zsh -l"

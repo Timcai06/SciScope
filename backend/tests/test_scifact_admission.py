@@ -142,3 +142,67 @@ def test_scored_run_needs_predictions_and_allow_score(tmp_path: Path, capsys: py
     with pytest.raises(SystemExit) as exc:
         scifact_eval.main()
     assert exc.value.code == 2
+
+
+def test_official_document_evidence_schema_scores_rationale_complete_prediction(tmp_path: Path) -> None:
+    raw, _expected = _make_raw(tmp_path)
+    corpus = scifact_data.load_corpus(raw / "corpus.jsonl")
+    claims = [json.loads(line) for line in (raw / "claims_dev.jsonl").read_text(encoding="utf-8").splitlines() if line]
+    predictions_path = tmp_path / "official_predictions.jsonl"
+    predictions_path.write_text(
+        json.dumps({"id": 1, "evidence": {"1": {"label": "SUPPORT", "sentences": [0, 1]}}})
+        + "\n"
+        + json.dumps({"id": 2, "evidence": {}})
+        + "\n",
+        encoding="utf-8",
+    )
+    predictions = scifact_eval._normalise_predictions(
+        scifact_eval._read_jsonl(predictions_path), claims, corpus, predictions_path
+    )
+    metrics = scifact_eval.score_predictions(claims, predictions)
+    assert metrics["abstract"]["f1"] == 1.0
+    assert metrics["sentence"]["f1"] == 1.0
+
+
+def test_flat_claim_stance_prediction_is_rejected(tmp_path: Path) -> None:
+    raw, _expected = _make_raw(tmp_path)
+    corpus = scifact_data.load_corpus(raw / "corpus.jsonl")
+    claims = [json.loads(line) for line in (raw / "claims_dev.jsonl").read_text(encoding="utf-8").splitlines() if line]
+    predictions_path = tmp_path / "flat_predictions.jsonl"
+    predictions_path.write_text(
+        json.dumps({"id": 1, "stance": "SUPPORT"}) + "\n" + json.dumps({"id": 2, "stance": "NEUTRAL"}) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(scifact_data.SciFactDataError, match="evidence must be an object"):
+        scifact_eval._normalise_predictions(scifact_eval._read_jsonl(predictions_path), claims, corpus, predictions_path)
+
+
+def test_official_detailed_scoring_example_matches_published_metrics() -> None:
+    claims = [
+        {
+            "id": 52,
+            "claim": "example",
+            "evidence": {
+                "11": [
+                    {"sentences": [0, 1], "label": "SUPPORT"},
+                    {"sentences": [11], "label": "SUPPORT"},
+                ],
+                "15": [{"sentences": [4], "label": "SUPPORT"}],
+            },
+        }
+    ]
+    predictions = {
+        52: {
+            11: {"sentences": [1, 11, 13], "label": "SUPPORT"},
+            16: {"sentences": [18, 20], "label": "CONTRADICT"},
+        }
+    }
+
+    metrics = scifact_eval.score_predictions(claims, predictions)
+
+    assert metrics["abstract"] == {"precision": 0.5, "recall": 0.5, "f1": 0.5}
+    assert metrics["sentence"] == {
+        "precision": 0.2,
+        "recall": 0.25,
+        "f1": 0.222222,
+    }

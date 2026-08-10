@@ -12,10 +12,15 @@ import json
 
 from src.infra.extraction_eval import (
     SCHEMA_VERSION,
+    SILVER_SCHEMA_VERSION,
     evaluate_extraction,
+    evaluate_silver_consistency,
     run_extraction_eval,
+    run_silver_consistency_eval,
     wilson_ci,
 )
+from src.infra.structured_extraction import _result_to_dict, extract_from_chunks
+from src.infra.traceable_chunks import build_traceable_chunks
 
 
 def _structured_record(**overrides):
@@ -61,6 +66,32 @@ def _gold(field="main_result", *, sha="sha-1", present=True, value="92%", locata
 
 def _adjudication(field, judgment="correct", *, sha="sha-1", source="s1", paper="P1"):
     return {"source": source, "paper_id": paper, "record_sha256": sha, "field": field, "judgment": judgment}
+
+
+def _silver_inputs():
+    """真实 D01→D02→D03 小链路；不是人工或外部语义金标。"""
+    record = {
+        "paper_id": "SILVER-1",
+        "source": "licensed_fixture",
+        "license": "cc0",
+        "language": "en",
+        "year": 2024,
+        "usage_rights": "indexable",
+        "source_file_sha256": "a" * 64,
+        "title": "A reproducible extraction fixture",
+        "abstract": (
+            "We studied 100 patients. We used a neural network model. "
+            "Results show AUC 0.85. A limitation is a small cohort. "
+            "In conclusion, our findings suggest improvement."
+        ),
+        "full_text": "",
+    }
+    from src.data_contracts.admission import compute_record_hash
+
+    record["record_sha256"] = compute_record_hash(record)
+    chunks = build_traceable_chunks(record).chunks
+    structured = _result_to_dict(extract_from_chunks(chunks))
+    return [structured], chunks
 
 
 # --- Wilson CI ---------------------------------------------------------------
@@ -338,3 +369,66 @@ def test_run_extraction_eval_end_to_end(tmp_path):
     assert main["pending_human_adjudication"] is False
     population = next(f for f in report["fields"] if f["field"] == "study_population")
     assert population["pending_human_adjudication"] is True
+
+
+# --- 自动 silver 一致性/可追溯性（不声明语义正确） -------------------------
+
+
+def test_silver_consistency_reproduces_d03_and_verifies_provenance():
+    structured, chunks = _silver_inputs()
+
+    report = evaluate_silver_consistency(structured, chunks)
+
+    assert report.schema_version == SILVER_SCHEMA_VERSION
+    assert report.technical_gate_pass is True
+    assert report.reproducible_records == 1
+    assert report.provenance_checked_fields > 0
+    assert report.provenance_verified_fields == report.provenance_checked_fields
+    assert report.evidence_level == "L2_automated_silver_reproducibility_and_provenance_only"
+    assert report.semantic_correctness_claimed is False
+    assert report.external_expert_gate_remaining is True
+    assert report.failures == []
+
+
+def test_silver_consistency_fails_closed_on_reproduction_or_evidence_drift():
+    structured, chunks = _silver_inputs()
+    drifted = json.loads(json.dumps(structured[0]))
+    field = next(item for item in drifted["fields"] if item["status"] == "extracted")
+    field["evidence"]["sentence"] = "not the source span"
+
+    report = evaluate_silver_consistency([drifted], chunks)
+
+    assert report.technical_gate_pass is False
+    assert report.reproducible_records == 0
+    assert any(item["check"] == "reproducibility" for item in report.failures)
+    assert any(item["reason"] == "evidence_sentence_not_exact_span" for item in report.failures)
+
+
+def test_silver_consistency_missing_chunks_cannot_pass():
+    structured, _ = _silver_inputs()
+
+    report = evaluate_silver_consistency(structured, [])
+
+    assert report.technical_gate_pass is False
+    assert report.unverifiable_records == 1
+    assert any(item["reason"] == "no_matching_traceable_chunks" for item in report.failures)
+
+
+def test_run_silver_consistency_eval_end_to_end(tmp_path):
+    structured, chunks = _silver_inputs()
+    structured_path = tmp_path / "structured.jsonl"
+    chunks_path = tmp_path / "chunks.jsonl"
+    structured_path.write_text(json.dumps(structured[0], ensure_ascii=False) + "\n", encoding="utf-8")
+    chunks_path.write_text("\n".join(json.dumps(chunk, ensure_ascii=False) for chunk in chunks) + "\n", encoding="utf-8")
+
+    summary = run_silver_consistency_eval(
+        input_structured_path=structured_path,
+        input_chunks_path=chunks_path,
+        output_dir=tmp_path / "out",
+    )
+
+    assert summary["schema_version"] == SILVER_SCHEMA_VERSION
+    assert summary["technical_gate_pass"] is True
+    report = json.loads((tmp_path / "out" / "silver_consistency_report.json").read_text(encoding="utf-8"))
+    assert report["technical_gate_pass"] is True
+    assert report["semantic_correctness_claimed"] is False
