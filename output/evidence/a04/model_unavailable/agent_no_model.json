@@ -1,0 +1,1 @@
+{"answer":"本地大模型未运行。请启动已配置的本地模型服务，或设置 DEEPSEEK_API_KEY 使用云端模型。","steps":0,"tools_used":[],"model":null,"runtime":"langgraph","retry":false,"stop_reason":"no_model","tokens_in":0,"tokens_out":0}

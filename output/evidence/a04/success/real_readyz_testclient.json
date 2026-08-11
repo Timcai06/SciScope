@@ -1,0 +1,17 @@
+{
+  "status": "not_ready",
+  "checks": {
+    "db": {
+      "status": "unavailable",
+      "message": "database readiness probe failed"
+    },
+    "retrieval": {
+      "status": "unavailable",
+      "message": "retrieval readiness probe failed"
+    },
+    "model": {
+      "status": "configured",
+      "message": "deepseek provider configured"
+    }
+  }
+}

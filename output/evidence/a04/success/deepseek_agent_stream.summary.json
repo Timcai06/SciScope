@@ -1,0 +1,61 @@
+{
+  "snapshot_scope": "legacy_full_size_public_only_mac_snapshot",
+  "engineering_proof_only": true,
+  "quality_proof": false,
+  "event_count": 519,
+  "event_sequence_head": [
+    "intent",
+    "plan",
+    "tool_call",
+    "tool_call",
+    "tool_progress",
+    "tool_progress",
+    "tool_progress",
+    "tool_result",
+    "tool_result",
+    "text",
+    "text",
+    "text"
+  ],
+  "event_sequence_tail": [
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "text",
+    "final",
+    "done"
+  ],
+  "http_aggregate_stop_reason": "completed",
+  "http_aggregate_model": "deepseek-chat",
+  "http_aggregate_steps": 4,
+  "tools_used": [
+    "search_literature",
+    "verify_claim",
+    "get_paper",
+    "get_paper"
+  ],
+  "structured_answer_present": true,
+  "structured_answer_status": "partially_supported",
+  "answer_mode": "evidence_based",
+  "citation_compliance": "ok",
+  "tool_basis": [
+    "verify_claim"
+  ],
+  "citations_count": 4,
+  "citation_titles": [
+    "Removal of Hallucination on Hallucination: Debate-Augmented RAG",
+    "Retrieval-Augmented Generation",
+    "Retrieval-Augmented Generation: Enhancing AI with Reliable Knowledge.",
+    "Layered Query Retrieval: An Adaptive Framework for Retrieval-Augmented Generation in Complex Question Answering for Large Language Models"
+  ],
+  "session_id": "a04a-success-20260810",
+  "tokens_in": 10056,
+  "tokens_out": 408,
+  "final_payload_excerpt": "**审慎结论：该论断得到\"部分支持\"——RAG 在多数情况下能降低幻觉风险，但并非无条件成立，检索质量不佳时反而可能加剧幻觉。**\n\n证据立场统计显示：支持 2 条、反驳 0 条、中立 4 条，整体判定为\"部分支持\"。具体依据如下：\n\n**支持面（RAG 确实有助于降低幻觉）**\n- 《Retrieval-Augmented Generation》(2025) 指出 RAG 将大模型的生成能力与信息检索系统的事实可靠性相结合，隐含了降低幻觉的作用。\n- 《Retrieval-"
+}

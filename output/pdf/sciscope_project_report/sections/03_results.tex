@@ -12,7 +12,7 @@
 跨语言相关性(历史定向样例) & 15 条固定中文主题查询上的 relevance@5=\textbf{1.0}(15/15),优化前为 0.667; 该结果只代表定向样例,不是全局质量证明。 \\
 趋势描述边界(当前回测) & Pearson=\textbf{0.9756},但 MAE 与 sMAPE 在 2/2 个滚动切分上均未超过 naive 基线,故当前只可称\textbf{描述性趋势}。 \\
 论文推荐(四路自动多基线) & `current` 100 seeds/500 recs: same-field \textbf{0.7180},shared-keyword \textbf{0.6280},semantic \textbf{0.9263},diversity \textbf{0.0823},novelty proxy \textbf{0.5885}; 相对 `dense` 的 0.6940/0.5080/0.9332/0.0682/0.5810 是工程权衡,不是全面胜出。 \\
-工程运行态(2026-08-10) & 后端回归 \textbf{537 passed, 1 skipped}; 远端全量 embedding 运行态已验证 \texttt{chunk\_embeddings=367{,}861/367{,}861}、\texttt{paper\_embeddings=159{,}164/159{,}164}; OpenCode 顺序调用核查 tool + disputes resource 已通过。 \\
+工程运行态(2026-08-10) & 后端回归 \textbf{539 passed, 1 skipped}; 远端全量 embedding 运行态已验证 \texttt{chunk\_embeddings=367{,}861/367{,}861}、\texttt{paper\_embeddings=159{,}164/159{,}164}; OpenCode 顺序调用核查 tool + disputes resource 已通过。 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
@@ -141,7 +141,7 @@ PDF 垃圾正文过滤 & 清 83 篇 / 46 片段 & 显著减少回答混入 PDF �
 论文级向量 \texttt{paper\_embeddings} & 159{,}164（2026-08-10 远端全量运行态） \\
 主题模型(LDA + NMF) & 40 主题 / 模型 \\
 知识图谱(作者/关键词/主题) & 客户端友好 JSON \\
-后端自动化测试 & \texttt{make test-backend} 实测 537 passed、1 skipped（2026-08-10）; \texttt{make agent-smoke} 仅作历史黑盒记录,不替代当前工程基线 \\
+后端自动化测试 & \texttt{make test-backend} 实测 539 passed、1 skipped（2026-08-10）; \texttt{make agent-smoke} 仅作历史黑盒记录,不替代当前工程基线 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}

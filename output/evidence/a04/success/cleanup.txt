@@ -1,0 +1,7 @@
+2026-08-10 A04a cleanup
+
+- Temporary uvicorn sessions started on the local A04a backend port:
+  - real-provider probe: PID `74189` via interactive session, then graceful `Ctrl-C` shutdown
+  - mock-provider probe: PID `75970` via interactive session, then graceful `Ctrl-C` shutdown
+  - mock-provider recheck: PID `76384` via interactive session, then graceful `Ctrl-C` shutdown
+- Final port probe after cleanup: local `/readyz` probe exited `7` (`Couldn't connect to server`)

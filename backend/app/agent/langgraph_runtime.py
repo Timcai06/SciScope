@@ -239,7 +239,7 @@ def _prepare(state: AgentState) -> AgentState:
         return _finish_node("prepare", started_at, state, {
             "runtime": "langgraph",
             "route": "end",
-            "emit": [("final", "本地大模型未运行(:8001)。请先 `make llm`,或设置 DEEPSEEK_API_KEY 使用云端模型。")],
+            "emit": [("final", "本地大模型未运行。请启动已配置的本地模型服务，或设置 DEEPSEEK_API_KEY 使用云端模型。")],
         }, extra={"stop_reason": "no_model", "tokens_in": 0, "tokens_out": 0})
     messages = [{"role": "system", "content": build_system_prompt()}]
     # Deterministic intent routing (A01): classify before the first LLM call,

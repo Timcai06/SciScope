@@ -1,0 +1,16 @@
+{
+  "http_status": 200,
+  "event_sequence": [
+    "final",
+    "done"
+  ],
+  "final_payload": "本地大模型未运行(:8001)。请先 `make llm`,或设置 DEEPSEEK_API_KEY 使用云端模型。",
+  "structured_answer_present": false,
+  "structured_answer_status": null,
+  "answer_mode": null,
+  "citation_compliance": null,
+  "tool_basis": null,
+  "citations": null,
+  "stop_reason": "no_model",
+  "session_id": "a04a-success-20260810"
+}

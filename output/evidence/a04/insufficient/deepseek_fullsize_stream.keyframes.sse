@@ -1,0 +1,15 @@
+data: {"type": "intent", "payload": {"intent": "claim_verification", "label": "论断核查", "reason": "命中关键词「核查」"}, "meta": {"runtime": "langgraph", "node": "prepare", "phase": "理解问题", "elapsed_ms": 2, "session_id": "a04b-insufficient-20260810"}}
+
+data: {"type": "tool_call", "payload": {"name": "search_literature", "args": {"query": "large language model academic misconduct cheating"}}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 14723, "session_id": "a04b-insufficient-20260810"}}
+
+data: {"type": "tool_call", "payload": {"name": "verify_claim", "args": {"claim": "大语言模型的使用必然会显著增加所有学科的学术不端行为"}}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 14723, "session_id": "a04b-insufficient-20260810"}}
+
+data: {"type": "tool_result", "payload": {"name": "verify_claim", "result_summary": {"verdict_label": "证据不足", "judgement_mode": "stance", "top_grounding_similarity": 0.84, "stance_stats": {"support": 0, "contradict": 0, "neutral": 6}, "structured_answer": {"status": "evidence_insufficient", "answer_mode": "evidence_based", "citation_compliance": "not_applicable", "uncertainty_category": "evidence_insufficient", "calibrated_rejection": true}}}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 14723, "session_id": "a04b-insufficient-20260810"}}
+
+data: {"type": "tool_call", "payload": {"name": "search_literature", "args": {"query": "academic integrity ChatGPT student cheating empirical evidence"}}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 5637, "session_id": "a04b-insufficient-20260810"}}
+
+data: {"type": "tool_call", "payload": {"name": "summarize_field", "args": {"topic": "LLM academic integrity cheating"}}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 5637, "session_id": "a04b-insufficient-20260810"}}
+
+data: {"type": "final", "payload_summary": {"headline": "该论断证据不足，无法成立。", "notes": ["现有文献只能支持 LLM 对学术诚信构成挑战", "不足以支持“必然”“显著增加”“所有学科”"], "structured_answer": {"status": "evidence_insufficient", "answer_mode": "evidence_based", "citation_compliance": "not_applicable", "uncertainty_category": "evidence_insufficient", "uncertainty_message": "未检索到明确支持或反驳的证据。", "calibrated_rejection": true, "citation_count": 4}}, "meta": {"runtime": "langgraph", "node": "reflect", "phase": "自检修正", "elapsed_ms": 939, "session_id": "a04b-insufficient-20260810", "stop_reason": "completed", "tokens_in": 8918, "tokens_out": 576}}
+
+data: [DONE]

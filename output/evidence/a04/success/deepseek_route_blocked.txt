@@ -1,0 +1,14 @@
+2026-08-10 A04a live route blocker
+
+- Attempted path: real `/api/agent` route execution with
+  `SCISCOPE_USE_MOCK_LLM=false`, `SCISCOPE_LLM_PROVIDER=deepseek`,
+  legacy public-only SciScope DB (`sciscope` on local PostgreSQL).
+- Socket bind path on backend port `8121` failed inside the sandbox with:
+  `operation not permitted`.
+- In-process route execution via FastAPI `TestClient` reached the real agent stack,
+  but failed during `llm_step` when `urllib.request.urlopen(...)` tried to call
+  DeepSeek and raised:
+  `urllib.error.URLError: <urlopen error [Errno 8] nodename nor servname provided, or not known>`
+- This shows the current local execution environment cannot complete the live
+  DeepSeek success trace even after user authorization; the blocker is runtime
+  network / bind capability, not the A02/A03 contract code.

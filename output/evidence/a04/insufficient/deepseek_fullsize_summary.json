@@ -1,0 +1,54 @@
+{
+  "snapshot_type": "legacy-full-size-local-snapshot",
+  "snapshot_note": "Legacy full-size local snapshot with 159187 papers; not the remote canonical corpus. Runtime topology is redacted.",
+  "request": {
+    "path": "output/evidence/a04/insufficient/deepseek_fullsize_request.redacted.json",
+    "question": "请核查：大语言模型的使用必然会显著增加所有学科的学术不端行为。请严格区分相关讨论与能够直接支持该绝对结论的证据。",
+    "session_id": "a04b-insufficient-20260810"
+  },
+  "api_agent": {
+    "path": "output/evidence/a04/insufficient/deepseek_fullsize_agent.response.json",
+    "model": "deepseek-chat",
+    "runtime": "langgraph",
+    "stop_reason": "completed",
+    "steps": 4,
+    "tools_used": [
+      "search_literature",
+      "verify_claim",
+      "search_literature",
+      "summarize_field"
+    ],
+    "structured_answer": {
+      "status": "evidence_insufficient",
+      "verdict_label": "证据不足",
+      "answer_mode": "evidence_based",
+      "citation_compliance": "not_applicable",
+      "uncertainty_category": "evidence_insufficient",
+      "uncertainty_message": "未检索到明确支持或反驳的证据。",
+      "calibrated_rejection": true,
+      "citation_count": 4
+    }
+  },
+  "sse": {
+    "path": "output/evidence/a04/insufficient/deepseek_fullsize_agent_stream.raw.sse",
+    "intent": "claim_verification",
+    "intent_label": "论断核查",
+    "tool_calls_observed": [
+      "search_literature",
+      "verify_claim",
+      "search_literature",
+      "summarize_field"
+    ],
+    "final_node": "reflect",
+    "final_phase": "自检修正",
+    "final_status": "evidence_insufficient",
+    "done_frame_present": true
+  },
+  "engineering_judgement": {
+    "live_http_verified": true,
+    "live_sse_verified": true,
+    "legacy_snapshot_only": true,
+    "remote_canonical_proven": false,
+    "human_quality_proven": false
+  }
+}

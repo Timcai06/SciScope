@@ -1,0 +1,1 @@
+{"status":"ready","checks":{"db":{"status":"configured","message":"database readiness probe succeeded"},"retrieval":{"status":"configured","message":"retrieval and pgvector readiness probe succeeded"},"model":{"status":"mock","message":"mock LLM is enabled for local/dev readiness"}}}

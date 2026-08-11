@@ -1,0 +1,1 @@
+{"answer":"本地大模型未运行(:8001)。请先 `make llm`,或设置 DEEPSEEK_API_KEY 使用云端模型。","steps":0,"tools_used":[],"model":null,"runtime":"langgraph","session_id":"a04a-success-20260810","retry":false,"stop_reason":"no_model","tokens_in":0,"tokens_out":0}

@@ -1,0 +1,4 @@
+data: {"type": "final", "payload": "本地大模型未运行(:8001)。请先 `make llm`,或设置 DEEPSEEK_API_KEY 使用云端模型。", "meta": {"runtime": "langgraph", "node": "prepare", "phase": "理解问题", "elapsed_ms": 0, "session_id": "a04a-success-20260810", "stop_reason": "no_model", "tokens_in": 0, "tokens_out": 0}}
+
+data: [DONE]
+

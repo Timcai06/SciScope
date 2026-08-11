@@ -89,7 +89,7 @@ Wave 1 的 G03/E03/D05 技术主线。
   diversity/novelty/延迟和失败例均落表；自动工程部分 `PASS`，用户/专家证明仍 `BLOCKED`；
 - E08：许可、字段映射和场景联系人仍 `BLOCKED`，只保留准入审计与替代推进边界。
 
-按原子依赖，A03、T01、T02 和 E06 的工程任务已完成；下一步进入 A04 与 T04 的真实端到端证明。
+按原子依赖，A03、T01、T02、E06 与 A04 工程任务已完成；下一步进入 T04 远端 canonical 演练与离线回退。
 G04b 自动代理指标仍不能写成推荐质量或科研效率的已证明提升。
 
 ### Wave 3｜问答验证、TUI 展示与报告源
@@ -103,8 +103,9 @@ G04b 自动代理指标仍不能写成推荐质量或科研效率的已证明提
 
 ### Wave 4｜API/SSE 端到端证明
 
-- 唯一开发任务：`A04`。交付成功、无证据、依赖故障三类真实 API/SSE trace。
-- 波末门禁：三类 trace 可复现；数据库、embedding 或 LLM 不可用时不得 silent success。
+- 状态：`工程 live PASS`（legacy full-size public-only Mac snapshot）；远端 canonical 证明转入 T04。
+- 已交付：成功、`evidence_insufficient`、模型不可用三类真实 API/SSE trace。
+- 波末门禁：三类 trace 可复现；模型不可用时不 silent success。tool-level 数据库/检索故障与人工质量仍不在本次 PASS 范围。
 
 ### Wave 5｜全量演示与评委证据
 

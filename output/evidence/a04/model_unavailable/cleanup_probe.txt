@@ -1,0 +1,4 @@
+target=<temporary-model-backend>
+probe=GET /healthz after shutdown
+exit_code=7
+result=stopped
