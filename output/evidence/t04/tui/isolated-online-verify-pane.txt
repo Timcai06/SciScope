@@ -1,0 +1,60 @@
+╭─────────────────────────────────────────────────────────╮
+│ ◆ SciScope  科研智能体终端  证据 · 时间线 · 重试 · 导出 │
+╰─────────────────────────────────────────────────────────╯
+╭─ contract · 答案合同 · 部分支持 · non-evidentiary · citations missing_required_citations
+│  claim   检索增强生成能够降低大语言模型回答中的幻觉风险
+│  uncert  generative_non_evidentiary
+│  reason  Final answer omitted required title+year citations for a critical evidence claim.
+│  limit   证据针对多模态LVLMs，论断未限定模态，但未明确RAG降低幻觉的结论
+│  limit   证据针对医学问答任务，论断未限定领域，但未明确降低幻觉的实证结论
+│  [1] Retrieval-Augmented Generation and Hallucination in Large Language Models: A…
+│  W4411065983 · 2025 · SUPPORT · 中置信 0.80
+│  审计链 chunk 85598e54abed…
+│  [2] mRAG: Elucidating the Design Space of Multi-modal Retrieval-Augmented Genera…
+│  W4416070646 · 2025 · NEUTRAL · 低置信 0.50
+│  审计链 chunk 424741004b5b…
+│  [3] ReRag: A New Architecture for Reducing the Hallucination by Retrieval- Augme…
+│  W4405272436 · 2024 · SUPPORT · 中置信 0.70
+│  审计链 chunk d5ab39c21c62…
+│  +1 条更多引文 · /timeline 查看调用过程
+│  basis   verify_claim
+╰─
+⏺ 研究结论
+结论  1. 结论
+
+  部分支持。
+  文献一致将检索增强生成（RAG）视为缓解大语言模型幻觉的有效技术路径，但多数证据仍停留在"框架性/方向性"
+
+  ## 2. 关键证据
+
+• 《A Hybrid RAG System with Comprehensive Enhancement on Complex Reasoning》(2024) 明确称 RAG
+  通过整合外部知识库"提升准确性并减少幻觉"（支持）。
+  • 《"Knowing When You Don't Know": A Multilingual Relevance Assessment Dataset for Robust
+Retrieval-Augmented Generation》(2023) 指出 RAG 通过将 LLM
+  输出"接地"于外部知识源来"减少事实性幻觉"（支持）。
+• 《Are Large Language Models Good at Utility Judgments?》(2024) 称 RAG 是"缓解 LLM
+  幻觉问题的有前景方法"（支持）。
+  • 《Honest AI: Fine-Tuning "Small" Language Models to Say "I Don't Know", and Reducing
+Hallucination in RAG》(2024) 将幻觉视为 LLM 应用的关键障碍，并以降低 RAG
+  中的幻觉为研究目标（支持）。
+  • 综合两轮检索：支持证据 9 条、反驳 0 条、中立 1 条，无直接反驳证据。
+
+证据  3. 证据边界
+
+  • 现有证据多为"有前景/被引入以应对"的方向性表述，而非量化因果结论；未见系统报告 RAG
+  降低幻觉的幅度、失败情形或检索质量不佳时的反效果。
+• 部分证据的限定条件与论断不完全匹配（如多模态 LVLMs、医学问答、多语言检索场景），泛化需谨慎。
+  • 因此，"有相关论文支持"不等于"结论已被完全证明"。
+
+建议  4. 建议表述
+
+  │
+  现有研究表明，检索增强生成（RAG）通过将模型输出接地于外部检索证据，是缓解大语言模型幻觉的一种有前景
+  证据工具:   论断核查    检索文献 · /timeline 查看过程
+  会话已保存: /home/liu/workspaces/sciscope/runtime/t04-sessions/online-20260812-214921/sciscope-sessi
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ ❯ 输入研究问题 / 待核查论断,或输入 / 调用命令
+ Enter 发送 · Esc 中断/关闭 · / 命令
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+

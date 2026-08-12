@@ -1,0 +1,868 @@
+data: {"type": "intent", "payload": {"intent": "claim_verification", "label": "论断核查", "reason": "命中关键词「核查」"}, "meta": {"runtime": "langgraph", "node": "prepare", "phase": "理解问题", "elapsed_ms": 0, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "plan", "payload": ["search_literature(检索“retrieval-augmented generation hallucination reduction”相关文献)", "summarize_field(基于检索结果，综述RAG降低幻觉风险的证据与机制)", "verify_claim(核查“RAG能降低幻觉风险”这一论断，综合支持与反驳证据)"], "meta": {"runtime": "langgraph", "node": "plan", "phase": "制定研究计划", "elapsed_ms": 1192, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "tool_call", "payload": {"name": "search_literature", "args": {"query": "retrieval-augmented generation reduce hallucination large language model"}}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 4794, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "tool_call", "payload": {"name": "summarize_field", "args": {"topic": "retrieval-augmented generation hallucination reduction"}}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 4794, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "tool_call", "payload": {"name": "verify_claim", "args": {"claim": "检索增强生成(RAG)能够降低大语言模型回答中的幻觉风险"}}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 4794, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "tool_progress", "payload": {"name": "verify_claim", "message": "检索相关文献中…"}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 4794, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "tool_progress", "payload": {"name": "verify_claim", "message": "计算跨语言接地相似度中…"}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 4794, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "tool_progress", "payload": {"name": "verify_claim", "message": "判定证据立场(L3)…"}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 4794, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "tool_result", "payload": {"name": "search_literature", "result": "[{\"paper_id\": \"W4411065983\", \"标题\": \"Retrieval-Augmented Generation and Hallucination in Large Language Models: A Scholarly Overview\", \"年份\": 2025, \"作者\": [\"Sagar Gupta\"], \"摘要片段\": \"Large Language Models (LLMs) have revolutionized natural language processing tasks, yet they often suffer from \\\"hallucination” the confident generation of factually incorrect information. Retrieval-Au\"}, {\"paper_id\": \"W4405272436\", \"标题\": \"ReRag: A New Architecture for Reducing the Hallucination by Retrieval- Augmented Generation\", \"年份\": 2024, \"作者\": [\"Ryeowook Ko\", \"Mustafa Kağan Gürkan\", \"Fatoş T. Yarman Vural\"], \"摘要片段\": \"As the application areas of Generative AI models become widespread, new problems arise. One of these problems is the “hallucination” observed in Large Language Models (LLM). Recently, Retrieval-Augmen\"}, {\"paper_id\": \"W4408145721\", \"标题\": \"Hallucination Mitigation for Retrieval-Augmented Large Language Models: A Review\", \"年份\": 2025, \"作者\": [\"Wan Zhang\", \"Jing Zhang\"], \"摘要片段\": \"Retrieval-augmented generation (RAG) leverages the strengths of information retrieval and generative models to enhance the handling of real-time and domain-specific knowledge. Despite its advantages, \"}, {\"paper_id\": \"2410.15116\", \"标题\": \"Coarse-to-Fine Highlighting: Reducing Knowledge Hallucination in Large Language Models\", \"年份\": 2024, \"作者\": [\"Qitan Lv\", \"Jie Wang\", \"Hanzhu Chen\"], \"摘要片段\": \"Generation of plausible but incorrect factual information, often termed hallucination, has attracted significant research interest. Retrieval-augmented language model (RALM) -- which enhances models w\"}, {\"paper_id\": \"W4415337914\", \"标题\": \"ConfRAG: Confidence-Guided Retrieval-Augmenting Generation\", \"年份\": 2025, \"作者\": [\"Yin Huang\", \"Yifan Ethan Xu\", \"Kai Sun\"], \"摘要片段\": \"Can Large Language Models (LLMs) be trained to avoid hallucinating factual statements, and can Retrieval-Augmented Generation (RAG) be triggered only when necessary to reduce retrieval and computation\"}, {\"paper_id\": \"W4389974671\", \"标题\": \"\\\"Knowing When You Don't Know\\\": A Multilingual Relevance Assessment Dataset for Robust Retrieval-Augmented Generation\", \"年份\": 2023, \"作者\": [\"Nandan Thakur\", \"Luiz Bonifacio\", \"Xinyu ZHANG\"], \"摘要片段\": \"Retrieval-Augmented Generation (RAG) grounds Large Language Model (LLM) output by leveraging external knowledge sources to reduce factual hallucinations. However, prior work lacks a comprehensive eval\"}]"}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 4794, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "tool_result", "payload": {"name": "summarize_field", "result": "{\"主题\": \"retrieval-augmented generation hallucination reduction\", \"素材论文\": [{\"标题\": \"Attention Mapping for Hallucination Reduction in Arabic Financial Using Retrieval-Augmented Generation Systems\", \"年份\": 2025, \"摘要片段\": \"This research introduces a customized attention visualization framework for mitigating hallucinations in Arabic Retrieval-Augmented Generation (RAG) systems tai\"}, {\"标题\": \"FVA-RAG: Falsification-Verification Alignment for Mitigating Sycophantic Hallucinations\", \"年份\": 2025, \"摘要片段\": \"Retrieval-Augmented Generation (RAG) reduces hallucinations by grounding answers in retrieved evidence, yet standard retrievers often exhibit retrieval sycophan\"}, {\"标题\": \"Removal of Hallucination on Hallucination: Debate-Augmented RAG\", \"年份\": 2025, \"摘要片段\": \"Retrieval-Augmented Generation (RAG) enhances factual accuracy by integrating external knowledge, yet it introduces a critical issue: erroneous or biased retrie\"}, {\"标题\": \"Hallucination Mitigation for Retrieval-Augmented Large Language Models: A Review\", \"年份\": 2025, \"摘要片段\": \"Retrieval-augmented generation (RAG) leverages the strengths of information retrieval and generative models to enhance the handling of real-time and domain-spec\"}, {\"标题\": \"Hallucination Reduction in Large Language Models with Retrieval-Augmented Generation Using Wikipedia Knowledge\", \"年份\": 2024, \"摘要片段\": \"Natural language understanding and generation have seen great progress, yet the persistent issue of hallucination undermines the reliability of model outputs. I\"}, {\"标题\": \"ReRag: A New Architecture for Reducing the Hallucination by Retrieval- Augmented Generation\", \"年份\": 2024, \"摘要片段\": \"As the application areas of Generative AI models become widespread, new problems arise. One of these problems is the “hallucination” observed in Large Language \"}, {\"标题\": \"MultiRAG: A Knowledge-Guided Framework for Mitigating Hallucination in Multi-Source Retrieval Augmented Generation\", \"年份\": 2025, \"摘要片段\": \"Retrieval Augmented Generation (RAG) has emerged as a promising solution to address hallucination issues in Large Language Models (LLMs). However, the integrati\"}, {\"标题\": \"Retrieval-Augmented Generation and Hallucination in Large Language Models: A Scholarly Overview\", \"年份\": 2025, \"摘要片段\": \"Large Language Models (LLMs) have revolutionized natural language processing tasks, yet they often suffer from \\\"hallucination” the confident generation of factu\"}, {\"标题\": \"A retrieval augmented generation based optimization approach for medical knowledge understanding and reasoning in large language models\", \"年份\": 2025, \"摘要片段\": \"Based on the existing Retrieval Augmented Generation (RAG) technology, this study proposes innovative solution to better address the hallucination issues of cur\"}, {\"标题\": \"Reducing hallucination in structured outputs via Retrieval-Augmented Generation\", \"年份\": 2024, \"摘要片段\": \"A common and fundamental limitation of Generative AI (GenAI) is its propensity to hallucinate. While large language models (LLM) have taken the world by storm, \"}], \"提示\": \"请据此综述研究现状,引用标题\"}"}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 4794, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "tool_result", "payload": {"name": "verify_claim", "result": "{\"论断\": \"检索增强生成(RAG)能够降低大语言模型回答中的幻觉风险\", \"支持等级\": \"强支持\", \"判定方式\": \"stance\", \"判定版本\": \"l3-1\", \"最高接地相似度\": 0.881, \"证据\": [{\"paper_id\": \"W4411065983\", \"标题\": \"Retrieval-Augmented Generation and Hallucination in Large Language Models: A Scholarly Overview\", \"年份\": 2025, \"chunk_uid\": \"85598e54abed9ffbc0fdb9a455d979f064cc365d\", \"source_field\": \"abstract\", \"接地相似度\": 0.881, \"立场\": \"SUPPORT\", \"置信度\": 0.9, \"证据句\": \"Retrieval-Augmented Generation (RAG) has emerged as a promising technique to mitigate hallucinations by grounding mo\", \"限定条件\": null}, {\"paper_id\": \"W4416035754\", \"标题\": \"MS-RAG: Simple and Effective Multi-Semantic Retrieval-Augmented Generation\", \"年份\": 2025, \"chunk_uid\": \"7a23375ff75a4c1cfa1b95bb4ed4218bc9134c1b\", \"source_field\": \"abstract\", \"接地相似度\": 0.878, \"立场\": \"SUPPORT\", \"置信度\": 0.9, \"证据句\": \"To alleviate the hallucination problem of large language model (LLM), retrieval-augmented generation (RAG) has been proposed and widely adopted.\", \"限定条件\": null}, {\"paper_id\": \"W4405272436\", \"标题\": \"ReRag: A New Architecture for Reducing the Hallucination by Retrieval- Augmented Generation\", \"年份\": 2024, \"chunk_uid\": \"d5ab39c21c6253bb31d68dc0d60ab2b9d753c40d\", \"source_field\": \"abstract\", \"接地相似度\": 0.872, \"立场\": \"SUPPORT\", \"置信度\": 0.9, \"证据句\": \"Recently, Retrieval-Augmented Generation systems (RAG) have been introduced to cope with this problem.\", \"限定条件\": null}, {\"paper_id\": \"2309.01431\", \"标题\": \"Benchmarking Large Language Models in Retrieval-Augmented Generation\", \"年份\": 2023, \"chunk_uid\": \"a36067aaf8a0b7b5f7075ba84805001d3ef35f51\", \"source_field\": \"abstract\", \"接地相似度\": 0.872, \"立场\": \"SUPPORT\", \"置信度\": 0.9, \"证据句\": \"Retrieval-Augmented Generation (RAG) is a promising approach for mitigating the hallucination of large language models (LLMs).\", \"限定条件\": null}], \"证据立场统计\": {\"支持\": 6, \"反驳\": 0, \"中立\": 0}, \"提示\": \"请据证据如实表述:'证据反驳'表示文献与论断相反,不要断言论断成立;'存在争议'表示文献有分歧,应同时呈现正反两面;'证据不足'不要强行断言。引用上述论文标题。\", \"structured_answer\": {\"schema_version\": \"answer-contract/v1\", \"capability\": \"claim_verification\", \"status\": \"supported\", \"verdict_label\": \"强支持\", \"answer_mode\": \"evidence_based\", \"citation_compliance\": \"not_applicable\", \"claim\": \"检索增强生成(RAG)能够降低大语言模型回答中的幻觉风险\", \"tool_basis\": [\"verify_claim\"], \"citations\": [{\"paper_id\": \"W4411065983\", \"title\": \"Retrieval-Augmented Generation and Hallucination in Large Language Models: A Scholarly Overview\", \"year\": 2025, \"chunk_uid\": \"85598e54abed9ffbc0fdb9a455d979f064cc365d\", \"source_field\": \"abstract\", \"evidence_sentence\": \"Retrieval-Augmented Generation (RAG) has emerged as a promising technique to mitigate hallucinations by grounding mo\", \"stance\": \"SUPPORT\", \"confidence\": 0.9}, {\"paper_id\": \"W4416035754\", \"title\": \"MS-RAG: Simple and Effective Multi-Semantic Retrieval-Augmented Generation\", \"year\": 2025, \"chunk_uid\": \"7a23375ff75a4c1cfa1b95bb4ed4218bc9134c1b\", \"source_field\": \"abstract\", \"evidence_sentence\": \"To alleviate the hallucination problem of large language model (LLM), retrieval-augmented generation (RAG) has been proposed and widely adopted.\", \"stance\": \"SUPPORT\", \"confidence\": 0.9}, {\"paper_id\": \"W4405272436\", \"title\": \"ReRag: A New Architecture for Reducing the Hallucination by Retrieval- Augmented Generation\", \"year\": 2024, \"chunk_uid\": \"d5ab39c21c6253bb31d68dc0d60ab2b9d753c40d\", \"source_field\": \"abstract\", \"evidence_sentence\": \"Recently, Retrieval-Augmented Generation systems (RAG) have been introduced to cope with this problem.\", \"stance\": \"SUPPORT\", \"confidence\": 0.9}, {\"paper_id\": \"2309.01431\", \"title\": \"Benchmarking Large Language Models in Retrieval-Augmented Generation\", \"year\": 2023, \"chunk_uid\": \"a36067aaf8a0b7b5f7075ba84805001d3ef35f51\", \"source_field\": \"abstract\", \"evidence_sentence\": \"Retrieval-Augmented Generation (RAG) is a promising approach for mitigating the hallucination of large language models (LLMs).\", \"stance\": \"SUPPORT\", \"confidence\": 0.9}], \"uncertainty\": {\"category\": \"none\", \"message\": \"\", \"calibrated_rejection\": false, \"qualification_hints\": []}}, \"资产写入\": {\"状态\": \"未写入\", \"原因\": \"未请求 persist=true\"}}"}, "meta": {"runtime": "langgraph", "node": "execute_tools", "phase": "证据检索", "elapsed_ms": 4794, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "核查", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "结论", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "：", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "**", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "该", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "论断", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "获得", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "强", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "支持", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "**", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "。", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "文献", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "库", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "中", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "检索", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "到的", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "证据", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "一致", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "支持", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "R", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "AG", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "能够", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "降低", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "大", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "语言", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "模型", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "幻觉", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "风险", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "这一", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "说法", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "，", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "未", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "发现", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "反驳", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "或", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "中立", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "证据", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "。\n\n", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "##", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "核查", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "结论", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\n\n", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "**", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "结论", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "：", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "R", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "AG", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "降低", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " LL", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "M", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "幻觉", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "风险", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "这一", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "论断", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "得到", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "强", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "支持", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "。", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "**", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "在", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "核查", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "到的", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "6", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "条", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "证据", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "中", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "，", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "全部", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "为", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "支持", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "立场", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "（", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "置信", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "度", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "0", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": ".", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "9", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "），", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "无", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "一条", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "反驳", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "或", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "中立", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "。\n\n", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "**", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "支持", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "证据", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "（", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "代表性", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "论文", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "）", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "**\n", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "-", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " 《", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "Ret", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "rie", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "val", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "-Aug", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "mented", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Generation", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " and", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Hall", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "uc", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "ination", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " in", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Large", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Language", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Models", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": ":", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " A", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Schol", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "arly", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Overview", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "》(", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "202", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "5", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": ")", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "明确指出", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " R", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "AG", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "通过", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "将", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "模型", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "输出", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "接地", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "（", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "ground", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "ing", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "）", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "到", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "外部", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "知识", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "来", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "缓解", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "幻觉", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "。\n", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "-", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " 《", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "Bench", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "mark", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "ing", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Large", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Language", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Models", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " in", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Retrie", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "val", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "-Aug", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "mented", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Generation", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "》(", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "202", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "3", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": ")", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "将", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " R", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "AG", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "描述", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "为", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "缓解", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " LL", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "M", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "幻觉", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "的", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "有", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "前景", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "的方法", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "。\n", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "-", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " 《", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "MS", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "-R", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "AG", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": ":", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Simple", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " and", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Effective", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Multi", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "-Sem", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "antic", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Retrie", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "val", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "-Aug", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "mented", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Generation", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "》(", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "202", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "5", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": ")", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "与", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "《", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "Re", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "R", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "ag", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": ":", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " A", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " New", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Architecture", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " for", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Reducing", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " the", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Hall", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "uc", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "ination", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " by", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Retrie", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "val", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "-Aug", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "mented", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Generation", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "》(", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "202", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "4", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": ")", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "均", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "以", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "缓解", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "幻觉", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "作为", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " R", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "AG", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "的核心", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "动机", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "。\n\n", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "**", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "审", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "慎", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "限定", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "（", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "重要", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "）", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "**\n", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "需要", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "指出", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "的是", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "，", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "支持", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "证据", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "多", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "来自", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "论文", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "的", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "动机", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "陈述", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "层面", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "——", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "即", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " R", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "AG", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "被", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "提出", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "和", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "广泛", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "采用", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "正是", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "为了", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "缓解", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "幻觉", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "，", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "这", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "属于", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "领域", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "共识", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "。", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "但", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "综述", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "类", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "文献", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "（", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "如", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "《", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "Hall", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "uc", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "ination", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Mit", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "igation", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " for", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Retrie", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "val", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "-Aug", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "mented", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Large", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Language", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Models", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": ":", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " A", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " Review", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "》(", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "202", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "5", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": ")", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "）", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "同时", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "提示", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "：", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "R", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "AG", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "并非", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "万能", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "，", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "检索", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "到的", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "内容", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "本身", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "可能", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "错误", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "或", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "带", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "偏", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "（", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "如", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "检索", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "谄", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "媚", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "、", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "错误", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "检索", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "），", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "反而", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "会", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "引入", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "新的", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "幻觉", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "来源", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "。", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "因此", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "更", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "准确的", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "表述", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "是", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "：", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "**", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "R", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "AG", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "在", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "正确", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "检索", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "到", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "相关", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "证据", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "的前提下", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "能", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "显著", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "降低", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "幻觉", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "，", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "但其", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "效果", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "受", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "检索", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "质量", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "制约", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "**", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "。\n\n", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "综合", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "来看", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "，", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "论断", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "本身", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "成立", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "且", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "证据", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "充分", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "，", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "但", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "应", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "理解为", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "有", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "条件的", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "强", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "支持", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "\"", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "——", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "R", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "AG", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": " ", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "是", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "缓解", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "幻觉", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "的有效", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "手段", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "，", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "而非", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "彻底", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "消除", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "幻觉", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "的", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "保证", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "text", "payload": "。", "meta": {"runtime": "langgraph", "node": "llm_step", "phase": "推理与检索决策", "elapsed_ms": 4157, "session_id": "t04-20260812T134352Z-run-1"}}
+
+data: {"type": "final", "payload": "核查结论：**该论断获得强支持**。文献库中检索到的证据一致支持\"RAG 能够降低大语言模型幻觉风险\"这一说法，未发现反驳或中立证据。\n\n## 核查结论\n\n**结论：RAG 降低 LLM 幻觉风险这一论断得到强支持。** 在核查到的 6 条证据中，全部为支持立场（置信度 0.9），无一条反驳或中立。\n\n**支持证据（代表性论文）**\n- 《Retrieval-Augmented Generation and Hallucination in Large Language Models: A Scholarly Overview》(2025) 明确指出 RAG 通过将模型输出\"接地\"（grounding）到外部知识来缓解幻觉。\n- 《Benchmarking Large Language Models in Retrieval-Augmented Generation》(2023) 将 RAG 描述为缓解 LLM 幻觉的\"有前景的方法\"。\n- 《MS-RAG: Simple and Effective Multi-Semantic Retrieval-Augmented Generation》(2025) 与《ReRag: A New Architecture for Reducing the Hallucination by Retrieval-Augmented Generation》(2024) 均以\"缓解幻觉\"作为 RAG 的核心动机。\n\n**审慎限定（重要）**\n需要指出的是，支持证据多来自论文的\"动机陈述\"层面——即 RAG 被提出和广泛采用正是为了缓解幻觉，这属于领域共识。但综述类文献（如《Hallucination Mitigation for Retrieval-Augmented Large Language Models: A Review》(2025)）同时提示：RAG 并非万能，检索到的内容本身可能错误或带偏（如检索谄媚、错误检索），反而会引入新的幻觉来源。因此更准确的表述是：**RAG 在\"正确检索到相关证据\"的前提下能显著降低幻觉，但其效果受检索质量制约**。\n\n综合来看，论断本身成立且证据充分，但应理解为\"有条件的强支持\"——RAG 是缓解幻觉的有效手段，而非彻底消除幻觉的保证。", "meta": {"runtime": "langgraph", "node": "reflect", "phase": "自检修正", "elapsed_ms": 650, "session_id": "t04-20260812T134352Z-run-1", "stop_reason": "completed", "tokens_in": 5887, "tokens_out": 389, "structured_answer": {"schema_version": "answer-contract/v1", "capability": "claim_verification", "status": "supported", "verdict_label": "强支持", "answer_mode": "evidence_based", "citation_compliance": "ok", "citations": [{"paper_id": "W4411065983", "title": "Retrieval-Augmented Generation and Hallucination in Large Language Models: A Scholarly Overview", "year": 2025, "chunk_uid": "85598e54abed9ffbc0fdb9a455d979f064cc365d", "source_field": "abstract", "evidence_sentence": "Retrieval-Augmented Generation (RAG) has emerged as a promising technique to mitigate hallucinations by grounding mo", "stance": "SUPPORT", "confidence": 0.9}, {"paper_id": "W4416035754", "title": "MS-RAG: Simple and Effective Multi-Semantic Retrieval-Augmented Generation", "year": 2025, "chunk_uid": "7a23375ff75a4c1cfa1b95bb4ed4218bc9134c1b", "source_field": "abstract", "evidence_sentence": "To alleviate the hallucination problem of large language model (LLM), retrieval-augmented generation (RAG) has been proposed and widely adopted.", "stance": "SUPPORT", "confidence": 0.9}, {"paper_id": "W4405272436", "title": "ReRag: A New Architecture for Reducing the Hallucination by Retrieval- Augmented Generation", "year": 2024, "chunk_uid": "d5ab39c21c6253bb31d68dc0d60ab2b9d753c40d", "source_field": "abstract", "evidence_sentence": "Recently, Retrieval-Augmented Generation systems (RAG) have been introduced to cope with this problem.", "stance": "SUPPORT", "confidence": 0.9}, {"paper_id": "2309.01431", "title": "Benchmarking Large Language Models in Retrieval-Augmented Generation", "year": 2023, "chunk_uid": "a36067aaf8a0b7b5f7075ba84805001d3ef35f51", "source_field": "abstract", "evidence_sentence": "Retrieval-Augmented Generation (RAG) is a promising approach for mitigating the hallucination of large language models (LLMs).", "stance": "SUPPORT", "confidence": 0.9}], "uncertainty": {"category": "none", "message": "", "calibrated_rejection": false, "qualification_hints": []}, "tool_basis": ["verify_claim"], "claim": "检索增强生成(RAG)能够降低大语言模型回答中的幻觉风险"}}}
+
+data: [DONE]
+

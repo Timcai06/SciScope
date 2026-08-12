@@ -1,0 +1,60 @@
+╭─────────────────────────────────────────────────────────╮
+│ ◆ SciScope  科研智能体终端  证据 · 时间线 · 重试 · 导出 │
+╰─────────────────────────────────────────────────────────╯
+│  审计链 · chunk a36067aaf8a0…
+╰─
+╭─ contract · 答案合同 · 强支持 · citations ok
+│  claim   检索增强生成(RAG)能够降低大语言模型回答中的幻觉风险
+│  [1] Retrieval-Augmented Generation and Hallucination in Large Language Models: A…
+│  W4411065983 · 2025 · SUPPORT · 高置信 0.90
+│  审计链 chunk 85598e54abed…
+│  [2] MS-RAG: Simple and Effective Multi-Semantic Retrieval-Augmented Generation
+│  W4416035754 · 2025 · SUPPORT · 高置信 0.90
+│  审计链 chunk 7a23375ff75a…
+│  [3] ReRag: A New Architecture for Reducing the Hallucination by Retrieval- Augme…
+│  W4405272436 · 2024 · SUPPORT · 高置信 0.90
+│  审计链 chunk d5ab39c21c62…
+│  +1 条更多引文 · /timeline 查看调用过程
+│  basis   verify_claim
+╰─
+⏺ 研究结论
+
+结论  1. 结论
+
+强支持。文献证据一致支持"检索增强生成(RAG)能够降低大语言模型回答中的幻觉风险"这一论断,证据库中
+  6 条证据全部持支持立场,无反驳或中立证据。
+
+  2. 关键证据
+
+  • 《Retrieval-Augmented Generation and Hallucination in Large Language Models: A Scholarly
+Overview》(2025)明确指出 RAG 通过将生成"接地"(grounding)到检索到的外部信息来缓解幻觉,
+  是"有前景的技术"。
+• 《MS-RAG: Simple and Effective Multi-Semantic Retrieval-Augmented Generation》(2025)将"缓解
+  LLM 幻觉问题"作为 RAG 被提出并被广泛采用的核心动机。
+  • 《ReRag: A New Architecture for Reducing the Hallucination by Retrieval-Augmented
+Generation》(2024)同样以"引入 RAG 来应对幻觉问题"为出发点。
+• 《Benchmarking Large Language Models in Retrieval-Augmented Generation》(2023)称 RAG 是"缓解
+  LLM 幻觉的有前景方法"。
+
+证据  3. 证据边界
+
+  • 证据多来自论文摘要层面的动机陈述,即 RAG 被设计用于缓解幻觉,而非严格的因果实验证明;
+  因此应表述为"有前景/被广泛用于缓解幻觉",而非"已被完全证明能消除幻觉"。
+  • 核查工具提示,部分证据针对医学问答任务,而原论断未限定领域;医学问答可视为 RAG 应用的子集,
+  故立场仍为支持,但置信度略有下调。
+  • RAG 缓解幻觉的效果通常依赖检索质量、上下文相关性等条件,并非无条件成立。
+
+建议  4. 建议表述
+
+  │ 检索增强生成(RAG)通过将模型生成过程"接地"到外部检索到的信息,
+│ 被广泛认为是一种有前景的、能够降低大语言模型幻觉风险的方法;
+  │ 其缓解效果在医学问答等任务中已有相关证据支持,但实际效果受检索质量等因素影响,
+  │ 并非绝对消除幻觉。
+  证据工具:   论断核查 · /timeline 查看过程
+  会话已保存: /home/liu/workspaces/sciscope/runtime/t04-sessions/retry-20260812-215013/sciscope-sessio
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ ❯ 输入研究问题 / 待核查论断,或输入 / 调用命令
+ Enter 发送 · Esc 中断/关闭 · / 命令
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+

@@ -1,0 +1,1 @@
+command=make dead=0

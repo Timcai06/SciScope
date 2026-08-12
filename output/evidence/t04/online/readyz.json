@@ -1,0 +1,17 @@
+{
+  "status": "ready",
+  "checks": {
+    "db": {
+      "status": "configured",
+      "message": "database readiness probe succeeded"
+    },
+    "retrieval": {
+      "status": "configured",
+      "message": "retrieval and pgvector readiness probe succeeded"
+    },
+    "model": {
+      "status": "configured",
+      "message": "deepseek provider configured"
+    }
+  }
+}
