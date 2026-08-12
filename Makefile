@@ -106,7 +106,7 @@ unexport VLLM_MODEL
 unexport VLLM_PORT
 unexport VLLM_VENV
 
-.PHONY: help install install-backend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build npm-package-smoke npm-package-pack npm-package-publish topic-model eval-retrieval stance-packets stance-reconcile eval-stance-similarity eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf submission-package report backend mcp dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend smoke agent-smoke clean
+.PHONY: help install install-backend harvest-sample harvest-source harvest-all-sources harvest-year harvest-balanced-years harvest-fulltext-year harvest-fulltext-years fulltext-enrich-source fulltext-enrich-arxiv fulltext-enrich-arxiv-qbio fulltext-enrich-arxiv-physics fulltext-enrich-arxiv-math fulltext-enrich-pubmed-biomed fulltext-enrich-openalex-medicine-probe fulltext-enrich-doaj-medicine-probe fulltext-enrich-priority-fields fulltext-enrich-low-yield-probes raw-canonical raw-governance normalize normalize-source normalize-all-sources analysis-assets analysis-assets-all processed-corpus data-layer-audit data-layer-tonight data-layer-refresh rag-chunks postgres-schema postgres-load postgres-refresh pgvector-schema embeddings trend-model recommend-model graph-export agent-build full-rebuild tui tui-demo tui-doctor tui-export-last tui-build judge-demo-preflight npm-package-smoke npm-package-pack npm-package-publish topic-model eval-retrieval stance-packets stance-reconcile eval-stance-similarity eval-all backfill-abstracts dedupe-db report-figures project-report-figures data-report-pdf project-report-pdf submission-package report backend mcp dev dev-vllm llm llm-stop vllm-serve vllm-smoke test test-backend smoke agent-smoke clean
 .PHONY: backend-image backend-container-smoke hosted-db-schema hosted-db-load hosted-db-embeddings hosted-db-refresh hosted-smoke hosted-release-preflight
 
 help:
@@ -150,6 +150,7 @@ help:
 	@echo "  make dev              Start backend only (default development path)"
 	@echo "  make tui-demo         Play the offline SciScope TUI golden demo flow"
 	@echo "  make tui-doctor       Check TUI backend/LLM/session readiness"
+	@echo "  make judge-demo-preflight  Validate frozen judge-demo evidence"
 	@echo "  make tui-export-last  Print the latest saved TUI Markdown session"
 	@echo "  make npm-package-smoke Validate the npm wrapper without downloading release assets"
 	@echo "  make npm-package-pack Dry-run the npm package tarball"
@@ -532,3 +533,6 @@ clean:
 	rm -rf .cache .pytest_cache tmp tui/dist tui/sciscope-tui
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +
 	find . -name .DS_Store -type f -delete
+
+judge-demo-preflight:
+	$(PYTHON) scripts/check_judge_demo.py

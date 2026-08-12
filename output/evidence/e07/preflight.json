@@ -1,0 +1,72 @@
+{
+  "schema_version": "e07-judge-demo-preflight/v1",
+  "generated_at": "2026-08-12T14:08:11.989166+00:00",
+  "overall_status": "READY_FOR_HUMAN_REVIEW",
+  "counts": {
+    "pass": 8,
+    "pending": 2,
+    "fail": 0
+  },
+  "checks": [
+    {
+      "check_id": "required-assets",
+      "status": "PASS",
+      "detail": "all required assets exist",
+      "evidence": "output/evidence/t04, output/evidence/e04, output/pdf"
+    },
+    {
+      "check_id": "three-online-runs",
+      "status": "PASS",
+      "detail": "3 runs: HTTP 200, DONE, no error, citations ok",
+      "evidence": "output/evidence/t04/online/summary.json"
+    },
+    {
+      "check_id": "recorded-readiness",
+      "status": "PASS",
+      "detail": "DB, retrieval/pgvector and model configured",
+      "evidence": "output/evidence/t04/online/readyz.json"
+    },
+    {
+      "check_id": "full-corpus-hardware",
+      "status": "PASS",
+      "detail": "full corpus, complete vectors and RTX 2080 Ti recorded",
+      "evidence": "output/evidence/t04/runtime/manifest.md"
+    },
+    {
+      "check_id": "tui-fail-closed-and-retry",
+      "status": "PASS",
+      "detail": "first citation failure retained; recorded retry passed",
+      "evidence": "output/evidence/t04/tui"
+    },
+    {
+      "check_id": "offline-and-failure-fallback",
+      "status": "PASS",
+      "detail": "offline fixture and explicit blocked recovery captured",
+      "evidence": "output/evidence/t04/offline"
+    },
+    {
+      "check_id": "opencode-mcp-order",
+      "status": "PASS",
+      "detail": "verify_claim(persist=true) precedes disputes resource read; fixture boundary applies",
+      "evidence": "output/evidence/e04/opencode_run_e04.jsonl"
+    },
+    {
+      "check_id": "evidence-integrity",
+      "status": "PASS",
+      "detail": "20 files verified",
+      "evidence": "output/evidence/t04/SHA256SUMS"
+    },
+    {
+      "check_id": "technical-video",
+      "status": "PENDING",
+      "detail": "record 60-second submission video and 6-8 minute technical video",
+      "evidence": "human-owned recording"
+    },
+    {
+      "check_id": "nontechnical-review",
+      "status": "PENDING",
+      "detail": "a non-project reviewer must complete the timed acceptance form",
+      "evidence": "human-owned acceptance"
+    }
+  ]
+}
