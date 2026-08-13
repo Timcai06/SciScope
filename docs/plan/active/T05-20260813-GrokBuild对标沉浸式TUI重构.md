@@ -404,7 +404,7 @@ T05-00 必须把这张表扩展到**实际阅读过的上游文件**。未读源
 | T05-06 Evidence / Answer Hierarchy | `DONE（待复核）` | T05-02,T02,A02 | 可与 T05-03 逻辑并行 | Evidence/Claim/Dispute 卡、insufficient、contract 降权 |
 | T05-07 Prompt / Status / Shortcuts | `DONE（待复核）` | T05-04 | 可与 T05-08 并行（文件隔离后） | composer、focus、status、hint strip |
 | T05-08 Overlay / Picker / Command Palette | `DONE（待复核）` | T05-02 | 可与 T05-07 并行（文件隔离后） | 通用 overlay + launcher/session/theme/tools/doctor/confirm |
-| T05-09 Scroll / Focus / Mouse / Resize | `PENDING` | T05-04,T05-07,T05-08 | 串行集成 | follow/manual fold、resize anchoring、trackpad、发送后 viewport 行为 |
+| T05-09 Scroll / Focus / Mouse / Resize | `DONE（待复核）` | T05-04,T05-07,T05-08 | 串行集成 | follow/manual fold、resize anchoring、trackpad、发送后 viewport 行为 |
 | T05-10 文件职责收敛 | `PENDING` | T05-03~09 行为稳定 | 串行 | `main.go` composition root 化、render/view/test 拆分 |
 | T05-11 响应式、性能与视觉回归 | `PENDING` | T05-03~10 | 可并行只读验证 | 80/120/160、ANSI/Unicode、benchmark、golden render、PTY/手工矩阵 |
 | TX01 上游许可证与 provenance 审计 | `PENDING` | 全程 | 可并行只读 | 所有直接 port 代码的来源、commit、LICENSE/NOTICE 合规 |
@@ -747,6 +747,20 @@ OverlayFooter
 **当前已有** `MouseWheelDelta`、AltScreen、MouseCellMotion、FPS，不得重复造底层。
 
 **验收**：连续 streaming + 手工上滚 + resize + overlay 开关的组合场景无跳屏和输入丢失。
+
+**T05-09 交付记录（DONE（待复核））**：
+
+- 产物：`tui/follow_test.go`（4 个状态测试）+ `tui/main.go` KeyMsg/WindowSizeMsg 改动；提交 `tui-follow` 分支提交链（T05-07 修订后）。
+- 覆盖映射：
+  - streaming follow bottom → 既有 `refreshTranscript` 的 `AtBottom→GotoBottom`，测试 `TestManualScrollStopsFollowAndBottomRestores`（滚回底恢复跟随）；
+  - manual scroll 停止强制跳底 → 同测试（滚动到顶后 refresh 保持 YOffset=0）；
+  - folding 保持 anchoring → T05-05 `autoFoldTraces` + `setExpanded` 已改投影不动 YOffset；
+  - resize anchoring → `TestResizeKeepsBottomAnchorAndPreservesTopOffset`（贴底保持贴底；顶部保持 YOffset=0）；
+  - trackpad/wheel → 既有 `MouseWheelDelta=8` + `isVerticalWheel` 委托；
+  - 键盘滚动优先级 → `TestUpDownDelegatesToViewportWhenNoMenu`（无 submenu 无 `/` 菜单时 up/down 委托 vp；home/end 显式 GotoTop/GotoBottom）；
+  - 输入过程不误触 → `TestFollowFocusKeepsComposerTyping`（pgdown 不污染输入框值）。
+- 验证：`go test ./...` 全绿；gofmt/vet 干净；PTY 交互实测 home 回顶部、end 贴底（demo 流中发 `\x1b[H`/`\x1b[F`）。
+- 状态：DONE（待复核）——待项目负责人复核后领取 T05-10。
 
 ---
 
