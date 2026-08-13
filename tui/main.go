@@ -920,10 +920,20 @@ func (m model) renderComposer(width int) string {
 	if width < 48 {
 		width = 48
 	}
-	// T05-07：composer 无框，作为底部视觉锚点；focus 由 textinput 自身光标
-	// 表达（闪烁竖线），不再依赖边框区分；hints 已并入 status 行。
+	// T05-07 修订：composer 保留主题化输入框（Grok prompt_widget 的
+	// show_borders 语义）——边框随 focus 状态：聚焦用 Accent、未聚焦用 Border。
+	// 实测 lipgloss 带边框时 Width(W) 总宽 = W+2，故传 width-2。
 	inputLine := m.ti.View()
-	return lipgloss.NewStyle().Width(width).Render(inputLine)
+	borderColor := activeTheme().Border
+	if m.ti.Focused() {
+		borderColor = activeTheme().Accent
+	}
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor).
+		Padding(0, 1).
+		Width(width - 2).
+		Render(inputLine)
 }
 
 func (m model) argsStr(args map[string]any) string {

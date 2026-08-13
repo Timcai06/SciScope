@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -319,14 +320,40 @@ func (m model) View() string {
 
 	parts = append(parts, m.renderComposer(m.vp.Width))
 	content := strings.Join(parts, "\n")
-	// black canvas（计划 5.1 节）：整个画面用 Canvas token 填充背景；
-	// Height 设为满高（viewport + status + composer），保证每帧输出恰好覆盖
-	// 终端全部行——行数不足时底部会裸露终端默认背景（如 IDE 灰色）。
+	// black canvas（计划 5.1 节，Grok 式 cell 级背景的字符串模型等价实现）：
+	// 组件渲染行内部含 \x1b[0m / \x1b[49m 重置序列，会把行首黑底 reset 掉，
+	// 使行尾填充空格落在终端默认背景（IDE 灰）——对每个重置立即恢复黑底。
+	content = restoreCanvasAfterResets(content, activeTheme().Canvas)
+	// Width/Height 填充保证每帧输出恰好覆盖终端全部行列。
 	return lipgloss.NewStyle().
 		Background(activeTheme().Canvas).
 		Width(m.vp.Width).
 		Height(m.vp.Height + 2).
 		Render(content)
+}
+
+// restoreCanvasAfterResets 把内容中的 SGR 重置（\x1b[0m）与默认背景
+// （\x1b[49m）替换为「重置 + 重新设置画布背景」，使组件行内的任何样式
+// 重置都不会把画布背景丢给终端默认背景色。组件自行设置的有意背景
+// （如选中行 AccentSoft、overlay Surface）在其后输出，自然覆盖画布色。
+func restoreCanvasAfterResets(content string, canvas lipgloss.Color) string {
+	bgSeq := "\x1b[48;2;" + canvasRGBSeq(canvas) + "m"
+	content = strings.ReplaceAll(content, "\x1b[0m", "\x1b[0m"+bgSeq)
+	content = strings.ReplaceAll(content, "\x1b[49m", "\x1b[49m"+bgSeq)
+	return content
+}
+
+// canvasRGBSeq 把 hex 色（#RRGGBB）转成 SGR 真彩参数 "r;g;b"。
+func canvasRGBSeq(c lipgloss.Color) string {
+	hex := strings.TrimPrefix(strings.ToLower(string(c)), "#")
+	if len(hex) != 6 {
+		return "0;0;0"
+	}
+	val := func(i int) int {
+		b, _ := strconv.ParseUint(hex[i:i+2], 16, 8)
+		return int(b)
+	}
+	return fmt.Sprintf("%d;%d;%d", val(0), val(2), val(4))
 }
 
 // renderStatusLine T05-07：一条低视觉权重 status + shortcut strip。
