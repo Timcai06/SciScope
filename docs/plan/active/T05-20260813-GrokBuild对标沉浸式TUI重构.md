@@ -395,7 +395,7 @@ T05-00 必须把这张表扩展到**实际阅读过的上游文件**。未读源
 
 | 任务 | 状态 | 依赖 | 可并行性 | 核心交付 |
 |---|---|---|---|---|
-| T05-00 事实冻结与上游 pin | `PENDING` | T04 PASS | 串行 | SciScope clean baseline、Grok commit/SOURCE_REV、截图、测试、源码映射、许可证台账 |
+| T05-00 事实冻结与上游 pin | `DONE（待复核）` | T04 PASS | 串行 | SciScope clean baseline、Grok commit/SOURCE_REV、截图、测试、源码映射、许可证台账 |
 | T05-01 Theme 与呈现 primitive | `PENDING` | T05-00 | 串行 | black canvas、token、spacing、border budget、Unicode icon policy |
 | T05-02 Typed Scrollback 状态层 | `PENDING` | T05-01 | 串行 | block identity、status/fold/cache、ViewState seam，停止 string-only 扩张 |
 | T05-03 Welcome / ASCII 启动页 | `PENDING` | T05-01,T05-02 | 可与 T05-06 逻辑并行 | 无 Dashboard 的沉浸式 Welcome，响应式 ASCII Logo |
@@ -1171,7 +1171,7 @@ docs(tui): refresh product evidence and judge assets
 
 | 验收项 | 证据 | 结果 |
 |---|---|---|
-| T05-00 基线与 Grok pin | clean HEAD、Go tests、截图、Grok commit/SOURCE_REV/source map | `pending` |
+| T05-00 基线与 Grok pin | clean HEAD、Go tests、截图、Grok commit/SOURCE_REV/source map | `DONE（待复核）`：产物 [T05-00 事实冻结与上游 pin](T/T05-00-20260813-事实冻结与上游pin.md)；基线 `output/evidence/t05/baseline/`、矩阵 `output/evidence/t05/upstream-map/source-map.md`；go test PASS 5.26s |
 | T05-01/02 主题与 scrollback seam | unit tests、render tests、cache/state 证据 | `pending` |
 | T05-03 Welcome | 80/120/160 screenshot + ANSI-normalized render | `pending` |
 | T05-04/05 Conversation + Trace | golden demo、fold/follow state tests、stream capture | `pending` |
