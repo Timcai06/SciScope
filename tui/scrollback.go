@@ -54,6 +54,7 @@ type ScrollbackBlock struct {
 	Kind          BlockKind   // 类型身份（不再靠解析标题文本判断）
 	Status        BlockStatus // running / finished
 	Expanded      bool        // 折叠投影态（fold/unfold 不修改 transcript）
+	Pinned        bool        // 用户手动折叠/展开过：自动折叠不覆盖（display_mode_pinned 语义）
 	StartedAt     time.Time   // 块创建时间
 	EndedAt       time.Time   // finished 时间（running 时为零值）
 	Raw           string      // 源文本
@@ -198,16 +199,50 @@ func (m *model) runningBlock(id string) *ScrollbackBlock {
 }
 
 // setExpanded 折叠/展开投影态。只改 UI 投影，不修改 blocks/transcript 事实
-// （计划 T05-02「必须证明 fold/unfold 不修改 transcript」）。
+// （计划 T05-02「必须证明 fold/unfold 不修改 transcript」）。手动操作设置
+// Pinned，使后续自动折叠不覆盖用户选择（计划 T05-05）。
 func (m *model) setExpanded(id string, expanded bool) bool {
 	for i := range m.blockItems {
 		b := &m.blockItems[i]
 		if b.ID == id {
 			if b.Expanded != expanded {
 				b.Expanded = expanded
+				b.Pinned = true
 				m.blocksVersion++
 				m.refresh()
 			}
+			return true
+		}
+	}
+	return false
+}
+
+// autoFoldTraces T05-05：turn 结束时把未 Pinned 的 finished 轨迹块（研究计划/
+// 自检修正）默认折叠为一行，让首屏优先看到结论而非 workflow engine。
+func (m *model) autoFoldTraces() {
+	changed := false
+	for i := range m.blockItems {
+		b := &m.blockItems[i]
+		if (b.Kind == BlockResearchPlan || b.Kind == BlockResearchTrace) &&
+			b.Status == BlockFinished && !b.Pinned && b.Expanded {
+			b.Expanded = false
+			changed = true
+		}
+	}
+	if changed {
+		m.blocksVersion++
+	}
+}
+
+// toggleLatestTrace T05-05：Enter（输入为空时）切换最后一个可折叠轨迹块。
+func (m *model) toggleLatestTrace() bool {
+	for i := len(m.blockItems) - 1; i >= 0; i-- {
+		b := &m.blockItems[i]
+		if (b.Kind == BlockResearchPlan || b.Kind == BlockResearchTrace) && b.Status == BlockFinished {
+			b.Expanded = !b.Expanded
+			b.Pinned = true
+			m.blocksVersion++
+			m.refresh()
 			return true
 		}
 	}

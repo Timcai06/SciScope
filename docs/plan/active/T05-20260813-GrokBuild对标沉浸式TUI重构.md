@@ -400,9 +400,9 @@ T05-00 必须把这张表扩展到**实际阅读过的上游文件**。未读源
 | T05-02 Typed Scrollback 状态层 | `DONE（待复核）` | T05-01 | 串行 | block identity、status/fold/cache、ViewState seam，停止 string-only 扩张 |
 | T05-03 Welcome / ASCII 启动页 | `DONE（待复核）` | T05-01,T05-02 | 可与 T05-06 逻辑并行 | 无 Dashboard 的沉浸式 Welcome，响应式 ASCII Logo |
 | T05-04 Conversation / Block Grammar | `DONE（待复核）` | T05-02 | 主写串行 | user/plan/tool/assistant 的 Grok 式无框 scrollback、group/fold |
-| T05-05 Research Trace | `PENDING` | T05-04 | 串行 | running 展开、finished 折叠、`/timeline` 完整保留 |
+| T05-05 Research Trace | `DONE（待复核）` | T05-04 | 串行 | running 展开、finished 折叠、`/timeline` 完整保留 |
 | T05-06 Evidence / Answer Hierarchy | `DONE（待复核）` | T05-02,T02,A02 | 可与 T05-03 逻辑并行 | Evidence/Claim/Dispute 卡、insufficient、contract 降权 |
-| T05-07 Prompt / Status / Shortcuts | `PENDING` | T05-04 | 可与 T05-08 并行（文件隔离后） | composer、focus、status、hint strip |
+| T05-07 Prompt / Status / Shortcuts | `DONE（待复核）` | T05-04 | 可与 T05-08 并行（文件隔离后） | composer、focus、status、hint strip |
 | T05-08 Overlay / Picker / Command Palette | `DONE（待复核）` | T05-02 | 可与 T05-07 并行（文件隔离后） | 通用 overlay + launcher/session/theme/tools/doctor/confirm |
 | T05-09 Scroll / Focus / Mouse / Resize | `PENDING` | T05-04,T05-07,T05-08 | 串行集成 | follow/manual fold、resize anchoring、trackpad、发送后 viewport 行为 |
 | T05-10 文件职责收敛 | `PENDING` | T05-03~09 行为稳定 | 串行 | `main.go` composition root 化、render/view/test 拆分 |
@@ -1174,9 +1174,9 @@ docs(tui): refresh product evidence and judge assets
 | T05-00 基线与 Grok pin | clean HEAD、Go tests、截图、Grok commit/SOURCE_REV/source map | `DONE（待复核）`：产物 [T05-00 事实冻结与上游 pin](T/T05-00-20260813-事实冻结与上游pin.md)；基线 `output/evidence/t05/baseline/`、矩阵 `output/evidence/t05/upstream-map/source-map.md`；go test PASS 5.26s |
 | T05-01/02 主题与 scrollback seam | unit tests、render tests、cache/state 证据 | T05-01 `DONE（待复核）`、T05-02 `DONE（待复核）`：[T05-02 typed scrollback](T/T05-02-20260813-typed-scrollback与view-state.md)；scrollback.go 状态层建成，计划「必须证明」5 项均有测试，37 处 append 调用全部 typed 化 |
 | T05-03 Welcome | 80/120/160 screenshot + ANSI-normalized render | `DONE（待复核）`：[Wave B 收口](T/T05-WaveB-20260813-并行四任务.md)；renderWelcome 上线，7 测试全绿，120 列快照 |
-| T05-04/05 Conversation + Trace | golden demo、fold/follow state tests、stream capture | T05-04 `DONE（待复核）`：running 块接入真实流、tool grouping、发送后锚定 gate；T05-05 未开始 |
+| T05-04/05 Conversation + Trace | golden demo、fold/follow state tests、stream capture | T05-04 `DONE（待复核）`；T05-05 `DONE（待复核）`：finished 轨迹块自动折叠一行、Enter 展开、Pinned 不覆盖 |
 | T05-06 Evidence hierarchy | A02/T02 fixture、insufficient/contradictory/display-policy cases | `DONE（待复核）`：domainCard Evidence 卡、Insufficient=Warning、contract 压缩一行，10 测试全绿 |
-| T05-07/08 Composer + Overlay | keymap、focus、palette/session/theme/doctor/confirm interaction tests | T05-08 `DONE（待复核）`：六类统一 Overlay grammar，11 测试全绿；T05-07 未开始 |
+| T05-07/08 Composer + Overlay | keymap、focus、palette/session/theme/doctor/confirm interaction tests | T05-07 `DONE（待复核）`：black canvas 落地、banner 删除、status 一行、composer 无框；T05-08 `DONE（待复核）` |
 | T05-09 Scroll/Mouse/Resize | interaction recording、state tests、manual terminal matrix | `pending` |
 | T05-10 Architecture | file ownership diff、`git diff --check`、全 Go tests | `pending` |
 | T05-11 Perf/Responsive | benchmark、56/60/80/120/160 matrix、no Nerd Font | `pending` |

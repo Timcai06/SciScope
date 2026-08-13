@@ -438,6 +438,11 @@ func (m *model) renderBlocksContent(width int) string {
 			block.RenderVersion++
 		}
 		out := block.Rendered
+		// T05-05：finished 且未展开的轨迹块收敛为一行（Enter 展开）。
+		if (block.Kind == BlockResearchPlan || block.Kind == BlockResearchTrace) &&
+			block.Status == BlockFinished && !block.Expanded {
+			out = m.collapseTraceBlock(block)
+		}
 		if block.Kind == BlockToolCall {
 			if inToolGroup {
 				// 组内成员：缩进 + ⎿ 替代 ⏺，降低重复视觉噪声。
@@ -457,6 +462,22 @@ func (m *model) renderBlocksContent(width int) string {
 func indentToolGroupLine(line string) string {
 	line = strings.Replace(line, "⏺ ", "⎿ ", 1)
 	return "  " + line
+}
+
+// collapseTraceBlock T05-05：折叠轨迹块为一行——首行标题 + 步骤数/工具数 + 展开提示。
+func (m *model) collapseTraceBlock(block *ScrollbackBlock) string {
+	lines := strings.Split(block.Rendered, "\n")
+	first := lines[0]
+	steps := strings.Count(block.Raw, "\n")
+	parts := []string{first}
+	if steps > 0 {
+		parts = append(parts, fmt.Sprintf("%d 步", steps))
+	}
+	if len(m.used) > 0 {
+		parts = append(parts, fmt.Sprintf("%d 工具", len(m.used)))
+	}
+	parts = append(parts, "Enter 展开")
+	return first + stFaint.Render(" · "+strings.Join(parts[1:], " · "))
 }
 
 // maybeAnchorToPrompt T05-04 发送后锚定（feature gate：SCISCOPE_TUI_SEND_ANCHOR=1）：
@@ -899,17 +920,10 @@ func (m model) renderComposer(width int) string {
 	if width < 48 {
 		width = 48
 	}
-	// Render the real textinput widget so the cursor is drawn inside the
-	// composer box (rendering Value() as static text left the hardware cursor
-	// stranded at the bottom of the screen).
+	// T05-07：composer 无框，作为底部视觉锚点；focus 由 textinput 自身光标
+	// 表达（闪烁竖线），不再依赖边框区分；hints 已并入 status 行。
 	inputLine := m.ti.View()
-	hints := stFaint.Render("Enter 发送 · Esc 中断/关闭 · / 命令")
-	return lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true, false, true, false).
-		BorderForeground(cAccent).
-		Padding(0, 1).
-		Width(width - 2).
-		Render(inputLine + "\n" + hints)
+	return lipgloss.NewStyle().Width(width).Render(inputLine)
 }
 
 func (m model) argsStr(args map[string]any) string {
@@ -1133,6 +1147,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			v := strings.TrimSpace(m.ti.Value())
 			if v == "" || m.answering {
+				// T05-05：输入为空时 Enter 切换最近轨迹块折叠（plan/trace）。
+				if v == "" && !m.answering {
+					m.toggleLatestTrace()
+				}
 				return m, nil
 			}
 			if strings.HasPrefix(v, "/") {
@@ -1306,6 +1324,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.answering = false
 		m.answerRunningID = ""
 		m.anchorNextTurn = false
+		m.autoFoldTraces() // T05-05：首屏优先看到结论而非 workflow engine
 		m.livePlan = nil
 		m.liveReflect = ""
 		m.lastTurnErr = ""

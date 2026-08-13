@@ -303,21 +303,11 @@ func (m model) View() string {
 	if !m.ready {
 		return "启动中…"
 	}
-	banner := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).BorderForeground(cAccent).Padding(0, 1)
-	header := banner.Render(stAccent.Render("◆ SciScope") + "  " + stInk.Render("科研智能体终端") + "  " + stFaint.Render("证据 · 时间线 · 重试 · 导出"))
-	parts := []string{header, m.vp.View()}
+	// T05-07：沉浸式布局——scrollback 全屏黑底（无顶部 banner 卡），
+	// status 一条低视觉权重行，composer 是底部锚点。
+	parts := []string{m.vp.View()}
 
-	// thinking spinner (Claude Code-style verb + esc hint) while a turn runs
-	if m.answering {
-		// T05-04: live answer 已通过 typed running 块实时渲染在 scrollback 内，
-		// 不再重复展示割裂的预览 shelf。
-		parts = append(parts, renderWorkflowStatus(m.lastMeta, m.nodeSeen, m.lastStreamKind, time.Since(m.start), m.vp.Width))
-		// plan/reflect now stream inline in the transcript, so no separate shelf.
-		elapsed := int(time.Since(m.start).Seconds())
-		mood := kaomojiForState(m.lastStreamKind, m.lastMeta, true)
-		parts = append(parts, m.spin.View()+" "+stAccent.Render(m.verb+"…")+" "+stFaint.Render(mood)+stFaint.Render(fmt.Sprintf("  (%ds · esc 中断)", elapsed)))
-	} else if m.submenu != "" {
+	if m.submenu != "" {
 		parts = append(parts, m.renderSubmenuPalette(m.vp.Width))
 	} else if strings.HasPrefix(m.ti.Value(), "/") {
 		if menu := m.renderCommandPalette(m.vp.Width); menu != "" {
@@ -325,6 +315,27 @@ func (m model) View() string {
 		}
 	}
 
+	parts = append(parts, m.renderStatusLine(m.vp.Width))
+
 	parts = append(parts, m.renderComposer(m.vp.Width))
-	return strings.Join(parts, "\n")
+	content := strings.Join(parts, "\n")
+	// black canvas（计划 5.1 节）：整个画面用 Canvas token 填充背景。
+	return lipgloss.NewStyle().Background(activeTheme().Canvas).Width(m.vp.Width).Render(content)
+}
+
+// renderStatusLine T05-07：一条低视觉权重 status + shortcut strip。
+// 左侧：模式/spinner 状态（真实不伪造）；右侧：快捷键提示。
+func (m model) renderStatusLine(width int) string {
+	left := stFaint.Render("backend " + backendMode(backendURL()))
+	if m.answering {
+		left = m.spin.View() + " " + stAccent.Render(m.verb+"…") + stFaint.Render(" · esc 中断")
+	} else if m.demo {
+		left = stFaint.Render("演示模式 · esc 中断")
+	}
+	right := stFaint.Render("Enter 发送 · Esc 中断/关闭 · / 命令")
+	gap := width - lipgloss.Width(stripANSI(left)) - lipgloss.Width(right)
+	if gap < 1 {
+		return left
+	}
+	return left + strings.Repeat(" ", gap) + right
 }

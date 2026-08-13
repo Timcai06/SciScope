@@ -224,7 +224,71 @@ func TestBlocksAreRetrievableByTypedKind(t *testing.T) {
 // viewport 依赖（测试编译期验证 ScrollbackBlock 与现有渲染路径兼容）。
 var _ = viewport.Model{}
 
-// T05-04：连续 research tools 语义 grouping——组首 ⏺、组内成员缩进 ⎿。
+// T05-05：turn 结束自动折叠轨迹块（首屏优先结论），手动 Pinned 不覆盖。
+func TestAutoFoldTracesCollapsesUnpinnedAndKeepsPinned(t *testing.T) {
+	m := newScrollbackTestModel()
+	m.appendBlock(BlockResearchPlan, "⏺ 研究计划\n  ⎿ 步骤一\n  ⎿ 步骤二")
+	m.appendBlock(BlockResearchTrace, "⏺ 自检修正\n  ⎿ 修正一")
+	m.appendBlock(BlockAnswer, "⏺ 研究结论\n答案正文")
+
+	// 手动折叠（Pinned）的块不被自动折叠覆盖（保持用户选择）。
+	traceID := m.blockItems[1].ID
+	m.setExpanded(traceID, false)
+
+	m.autoFoldTraces()
+	plan, trace, ans := m.blockItems[0], m.blockItems[1], m.blockItems[2]
+	if plan.Expanded {
+		t.Fatal("unpinned finished plan should auto-fold")
+	}
+	if trace.Expanded {
+		t.Fatal("pinned collapsed trace must keep user choice")
+	}
+	if !trace.Pinned {
+		t.Fatal("setExpanded should mark Pinned")
+	}
+	if !ans.Expanded || ans.Kind != BlockAnswer {
+		t.Fatal("answer block must stay unaffected")
+	}
+	// 折叠渲染：单行 + 展开提示；事实不丢。
+	out := m.renderBlocksContent(100)
+	lines := strings.Split(out, "\n")
+	if len(lines) != 4 {
+		t.Fatalf("folded render should be 4 lines (plan 1 + trace 1 + answer 2), got %d:\n%s", len(lines), out)
+	}
+	if !strings.Contains(lines[0], "Enter 展开") || !strings.Contains(lines[0], "2 步") {
+		t.Fatalf("folded plan should carry steps + expand hint: %q", lines[0])
+	}
+	// 折叠不修改事实。
+	if plan.Raw != "⏺ 研究计划\n  ⎿ 步骤一\n  ⎿ 步骤二" {
+		t.Fatal("fold must not touch block source")
+	}
+}
+
+// T05-05：Enter（输入为空）切换最近轨迹块。
+func TestToggleLatestTraceFlipsNearestTraceBlock(t *testing.T) {
+	m := newScrollbackTestModel()
+	m.appendBlock(BlockResearchPlan, "⏺ 研究计划\n  ⎿ 步骤一")
+	m.appendBlock(BlockAnswer, "⏺ 研究结论\n答案")
+	m.appendBlock(BlockResearchTrace, "⏺ 自检修正\n  ⎿ 修正一")
+
+	if !m.toggleLatestTrace() {
+		t.Fatal("toggleLatestTrace should find a trace block")
+	}
+	if m.blockItems[2].Expanded {
+		t.Fatal("nearest trace block should flip to collapsed")
+	}
+	if !m.blockItems[2].Pinned {
+		t.Fatal("manual toggle should pin the block")
+	}
+	// plan 块不受影响（只切最近）。
+	if !m.blockItems[0].Expanded {
+		t.Fatal("older trace block should be untouched")
+	}
+	// 再次切换恢复展开。
+	if !m.toggleLatestTrace() || !m.blockItems[2].Expanded {
+		t.Fatal("second toggle should expand again")
+	}
+}
 func TestConsecutiveToolCallsAreGrouped(t *testing.T) {
 	m := newScrollbackTestModel()
 	m.appendBlock(BlockToolCall, "⏺ 检索文献")
