@@ -12,7 +12,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 func asciiBrand(width int) string {
@@ -30,33 +29,6 @@ func asciiBrand(width int) string {
 	return stAccent.Render(strings.Join(lines, "\n"))
 }
 
-func renderSplash(width int, sessions []sessionFile) string {
-	_ = sessions
-	if width < 60 {
-		width = 60
-	}
-	subtitle := "证据接地的科研文献智能体"
-	if width < 76 {
-		subtitle = "证据接地的科研智能体"
-	}
-	prompt := "从一个论断、论文、主题或趋势开始;输入 / 查看命令。"
-	body := []string{
-		asciiBrand(width),
-		stInk.Render("科研智能体终端"),
-		stFaint.Render(subtitle),
-		"",
-		stConn.Render(strings.Repeat("─", minInt(width-12, 72))),
-		stFaint.Render(prompt),
-		"",
-	}
-	return lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(cAccent).
-		Padding(1, 2).
-		Width(width - 4).
-		Render(strings.Join(body, "\n"))
-}
-
 func renderThemeBlock() string {
 	lines := []string{stFaint.Render("  可用主题:")}
 	for _, name := range themeOrder {
@@ -72,45 +44,6 @@ func renderThemeBlock() string {
 	lines = append(lines, "")
 	lines = append(lines, stFaint.Render("  用法: /theme paper  或启动前设置 SCISCOPE_TUI_THEME=paper"))
 	return strings.Join(lines, "\n")
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func splashStatusLines() []string {
-	dir := sessionDir()
-	return []string{
-		stFaint.Render("Backend  check with /doctor"),
-		stFaint.Render("LLM      check with /doctor"),
-		stFaint.Render("Sessions " + clip(dir, 30)),
-	}
-}
-
-func recentSplashLines(sessions []sessionFile) []string {
-	if len(sessions) == 0 {
-		return []string{
-			stFaint.Render("暂无本地会话"),
-			stFaint.Render("/demo 播放黄金演示流"),
-			stFaint.Render("完成回答后自动保存"),
-		}
-	}
-	lines := []string{}
-	for i, session := range sessions {
-		if i >= 3 {
-			break
-		}
-		question := session.LastQuestion
-		if question == "" {
-			question = strings.TrimSuffix(session.Name, filepath.Ext(session.Name))
-		}
-		lines = append(lines, stFaint.Render(fmt.Sprintf("/resume %d  %s", session.Index, clip(question, 32))))
-		lines = append(lines, stFaint.Render("  "+session.ModTime.Format("01-02 15:04")))
-	}
-	return lines
 }
 
 // kindIcon previews what a command does before it is run: ◇ expands into an
@@ -136,60 +69,30 @@ func styleUsageCell(cell string) string {
 }
 
 func (m model) renderCommandPalette(width int) string {
-	if width < 48 {
-		width = 48
-	}
 	matches := filterCmds(m.ti.Value())
 	if len(matches) == 0 {
 		return ""
 	}
-	inner := width - 6
-	if inner < 38 {
-		inner = 38
+	// T05-08 接线：命令启动器走统一 Overlay/Picker grammar。
+	items := make([]PickerItem, 0, len(matches))
+	for _, c := range matches {
+		items = append(items, PickerItem{
+			Label:    c.cmd,
+			Title:    c.title,
+			Desc:     c.desc,
+			Category: c.category,
+			Shortcut: c.key,
+			Command:  c.cmd,
+		})
 	}
-	idx := m.menuIdx % len(matches)
-	cursorW, iconW, cmdW, titleW, keyW := 2, 2, 12, 10, 18
-	descW := inner - cursorW - iconW - cmdW - titleW - keyW
-	if descW < 10 {
-		descW = 10
+	state := OverlayState{
+		Kind:      OverlayCommand,
+		Query:     m.ti.Value(),
+		Selection: m.menuIdx % len(items),
+		Sections:  buildOverlaySections(OverlayCommand, items),
+		Footer:    FooterNavigable,
 	}
-	pad := func(s string, w int) string { return lipgloss.NewStyle().Width(w).Render(s) }
-	rows := []string{
-		stAccent.Render("命令启动器") + stFaint.Render("  · Enter 执行 · Esc 关闭 · / 命令"),
-	}
-	lastCat := ""
-	for i, c := range matches {
-		if c.category != lastCat { // group commands under faint category headers
-			rows = append(rows, stFaint.Render("  "+c.category))
-			lastCat = c.category
-		}
-		sel := i == idx
-		marker := "  "
-		if sel {
-			marker = "▶ "
-		}
-		cells := []string{
-			pad(marker, cursorW),
-			pad(kindIcon(c.kind), iconW),
-			pad(c.cmd, cmdW),
-			pad(clipWidth(c.title, titleW-1), titleW),
-			pad(clipWidth(c.desc, descW-1), descW),
-			pad(clipWidth(c.key, keyW-1), keyW),
-		}
-		if sel { // uniform high-contrast highlight for the selected row
-			rows = append(rows, stSelCmd.Width(inner).Render(strings.Join(cells, "")))
-			continue
-		}
-		styled := stFaint.Render(cells[0]) + stAccent.Render(cells[1]) + stInk.Render(cells[2]) +
-			stMuted.Render(cells[3]) + stFaint.Render(cells[4]) + styleUsageCell(cells[5])
-		rows = append(rows, lipgloss.NewStyle().Width(inner).Render(styled))
-	}
-	return lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true, false, true, false).
-		BorderForeground(cFaint).
-		Padding(0, 1).
-		Width(width - 2).
-		Render(strings.Join(rows, "\n"))
+	return renderPickerOverlay(state, width, 26)
 }
 
 func durationText(d time.Duration) string {
@@ -1175,6 +1078,8 @@ func renderRecoveryPanel(s string) string {
 	return panelRow("recovery", action.Title, meta, body)
 }
 
+var sendAnchorEnabled = os.Getenv("SCISCOPE_TUI_SEND_ANCHOR") == "1"
+
 func (m *model) startQuestion(v string, retry bool) tea.Cmd {
 	hist := append([]turn(nil), m.history...)
 	m.ti.SetValue("")
@@ -1184,6 +1089,8 @@ func (m *model) startQuestion(v string, retry bool) tea.Cmd {
 	m.lastQuestion = v
 	m.answering = true
 	m.answer = ""
+	m.answerRunningID = ""
+	m.anchorNextTurn = sendAnchorEnabled // T05-04: 发送后锚定（feature gate）
 	m.used = nil
 	m.toolStart = map[string]time.Time{}
 	m.timeline = nil

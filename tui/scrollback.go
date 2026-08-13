@@ -161,6 +161,32 @@ func (m *model) finishRunningBlock(id string) bool {
 	return false
 }
 
+// setBlockContent 更新块的源文本与工具列表（running 块转正、theme 切换重渲染等），
+// 同步 blocks 事实行并失效该块渲染缓存。
+func (m *model) setBlockContent(id, raw string, tools []string) bool {
+	for i := range m.blockItems {
+		b := &m.blockItems[i]
+		if b.ID == id {
+			if b.Raw != raw {
+				b.Raw = raw
+				if i < len(m.blocks) {
+					m.blocks[i] = raw
+				}
+				b.Rendered = ""
+				b.RenderWidth = 0
+				b.RenderVersion++
+				m.blocksVersion++
+			}
+			if tools != nil {
+				b.Tools = append([]string(nil), tools...)
+			}
+			m.refresh()
+			return true
+		}
+	}
+	return false
+}
+
 // runningBlock 返回指定 ID 的块（不存在返回 nil）。
 func (m *model) runningBlock(id string) *ScrollbackBlock {
 	for i := range m.blockItems {

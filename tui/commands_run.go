@@ -310,9 +310,8 @@ func (m model) View() string {
 
 	// thinking spinner (Claude Code-style verb + esc hint) while a turn runs
 	if m.answering {
-		if preview := renderLiveAnswerPreview(m.answer, m.vp.Width); preview != "" {
-			parts = append(parts, preview)
-		}
+		// T05-04: live answer 已通过 typed running 块实时渲染在 scrollback 内，
+		// 不再重复展示割裂的预览 shelf。
 		parts = append(parts, renderWorkflowStatus(m.lastMeta, m.nodeSeen, m.lastStreamKind, time.Since(m.start), m.vp.Width))
 		// plan/reflect now stream inline in the transcript, so no separate shelf.
 		elapsed := int(time.Since(m.start).Seconds())

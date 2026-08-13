@@ -266,24 +266,35 @@ func TestRenderTranscriptContentReusesWholeTranscriptCache(t *testing.T) {
 	}
 }
 
-func TestStreamingTextKeepsViewportStableUntilFinal(t *testing.T) {
+func TestStreamingTextUpdatesRunningBlockInScrollback(t *testing.T) {
 	m := initialModel()
 	m.ready = true
 	m.answering = true
 	m.vp = newTranscriptViewport(100, 20)
 	m.appendBlock(BlockMessage, "历史 transcript")
 	m.refresh()
-	beforeViewport := m.vp.View()
 	m.lastRefresh = time.Now().Add(-streamRefreshInterval)
 
 	next, _ := m.Update(textMsg("流式增量"))
 	got := next.(model)
 
-	if got.vp.View() != beforeViewport {
-		t.Fatalf("streaming text should not rewrite viewport content before final:\nbefore:\n%s\nafter:\n%s", beforeViewport, got.vp.View())
+	// T05-04：streaming 通过 typed running 块实时进 scrollback（同一块更新，非 append）。
+	if got.answerRunningID == "" {
+		t.Fatal("textMsg should start a running answer block")
 	}
-	if !strings.Contains(got.View(), "流式增量") {
-		t.Fatalf("streaming preview should still show the live answer:\n%s", got.View())
+	if !strings.Contains(got.vp.View(), "流式增量") {
+		t.Fatalf("running block should render the streamed text:\n%s", got.vp.View())
+	}
+	next2, _ := got.Update(textMsg("流式增量二"))
+	got2 := next2.(model)
+	if got2.answerRunningID != got.answerRunningID {
+		t.Fatal("streaming must reuse the same running block")
+	}
+	if !strings.Contains(got2.vp.View(), "流式增量二") {
+		t.Fatalf("updated running block should render latest text:\n%s", got2.vp.View())
+	}
+	if !strings.Contains(got2.View(), "流式增量二") {
+		t.Fatalf("main view should show streamed text in scrollback:\n%s", got2.View())
 	}
 }
 
@@ -883,30 +894,29 @@ func TestDemoModeReadsEnvironment(t *testing.T) {
 }
 
 func TestSplashScreenShowsProductCurtain(t *testing.T) {
-	splash := renderSplash(96, nil)
+	// T05-03：旧 renderSplash 被 renderWelcome 替换；本测试改为验证 Welcome 层级。
+	welcome := renderWelcome(96, nil, nil)
 
 	for _, want := range []string{
 		"███████╗ ██████╗██╗███████╗ ██████╗ ██████╗ ██████╗ ███████╗",
-		"科研智能体终端",
-		"证据接地的科研文献智能体",
-		"从一个论断",
-		"输入 / 查看命令",
+		"SciScope",
+		"证据接地",
+		"/verify",
+		"/review",
+		"/trend",
+		"/demo",
 	} {
-		if !strings.Contains(splash, want) {
-			t.Fatalf("splash missing %q:\n%s", want, splash)
+		if !strings.Contains(welcome, want) {
+			t.Fatalf("welcome missing %q:\n%s", want, welcome)
 		}
 	}
 	for _, removed := range []string{
 		"Quick actions",
-		"黄金演示",
 		"System status",
 		"Recent work",
-		"/demo",
-		"/sessions",
-		"/resume 1",
 	} {
-		if strings.Contains(splash, removed) {
-			t.Fatalf("splash should not render old dashboard content %q:\n%s", removed, splash)
+		if strings.Contains(welcome, removed) {
+			t.Fatalf("welcome should not render old dashboard content %q:\n%s", removed, welcome)
 		}
 	}
 }
@@ -924,16 +934,16 @@ func TestBrandMarkScalesForCompactWidth(t *testing.T) {
 }
 
 func TestSplashScalesDownWithoutLosingActions(t *testing.T) {
-	splash := renderSplash(42, nil)
+	// T05-03：窄屏 Welcome 保持纯文本品牌与命令提示。
+	welcome := renderWelcome(42, nil, nil)
 
 	for _, want := range []string{
 		"SciScope",
-		"科研智能体终端",
-		"输入 /",
-		"查看命令",
+		"/verify",
+		"/trend",
 	} {
-		if !strings.Contains(splash, want) {
-			t.Fatalf("compact splash missing %q:\n%s", want, splash)
+		if !strings.Contains(welcome, want) {
+			t.Fatalf("compact welcome missing %q:\n%s", want, welcome)
 		}
 	}
 }
@@ -968,24 +978,18 @@ func TestSlashCommandPaletteUsesFullWidth(t *testing.T) {
 	m.ti.SetValue("/")
 	palette := m.renderCommandPalette(100)
 
+	// T05-08：统一 Overlay grammar（搜索框 + 分组 + 选中态 ❯ + footer ↑↓/Enter/Esc）。
 	for _, want := range []string{
 		"命令启动器",
-		"Enter 执行",
-		"Esc 关闭",
-		"/ 命令",
-		"▶",
-		"/demo",
-		"/timeline",
-		"/sessions",
+		"↑↓",
+		"Enter",
+		"Esc",
+		"❯",
+		"demo",
 		"黄金演示",
 	} {
 		if !strings.Contains(palette, want) {
 			t.Fatalf("palette missing %q:\n%s", want, palette)
-		}
-	}
-	for _, removed := range []string{"↑/↓", "Tab"} {
-		if strings.Contains(palette, removed) {
-			t.Fatalf("palette should keep shortcut hints minimal, found %q:\n%s", removed, palette)
 		}
 	}
 	if lipgloss.Width(palette) < 96 {
@@ -1002,7 +1006,7 @@ func TestSlashCommandPaletteFiltersByCategoryAndDescription(t *testing.T) {
 
 	for _, want := range []string{
 		"最近会话",
-		"/sessions",
+		"sessions",
 	} {
 		if !strings.Contains(palette, want) {
 			t.Fatalf("filtered palette missing %q:\n%s", want, palette)
@@ -1459,7 +1463,8 @@ func TestFinalStructuredAnswerRoundTripsFromJSONMetaIntoDoneSidecar(t *testing.T
 		t.Fatalf("expected sidecar + answer blocks, got %#v", got.blocks)
 	}
 	plain := plainANSI(strings.Join(got.blocks, "\n"))
-	for _, want := range []string{"答案合同", "部分支持", "审计链 chunk cccccccccccc", "《Coffee study》(2023) 提供了部分支持"} {
+	// T05-06：contract sidecar 默认压缩为一行（详细字段保留在 Full 版/审计路径）。
+	for _, want := range []string{"部分支持", "1 条证据", "引文已验证", "《Coffee study》(2023) 提供了部分支持"} {
 		if !strings.Contains(plain, want) {
 			t.Fatalf("round-trip final meta missing %q:\n%s", want, plain)
 		}
@@ -1553,12 +1558,13 @@ func TestInitialViewportUsesSplashCurtain(t *testing.T) {
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	got := next.(model)
 
-	if !strings.Contains(got.vp.View(), "科研智能体终端") {
-		t.Fatalf("expected initial viewport to show splash:\n%s", got.vp.View())
+	if !strings.Contains(got.vp.View(), "SciScope") {
+		t.Fatalf("expected initial viewport to show welcome:\n%s", got.vp.View())
 	}
 }
 
 func TestSplashShowsRecentSessionSummaries(t *testing.T) {
+	// T05-03：Recent 会话保留在 Welcome（可发现但不抢主视觉）。
 	sessions := []sessionFile{
 		{
 			Index:        1,
@@ -1569,11 +1575,11 @@ func TestSplashShowsRecentSessionSummaries(t *testing.T) {
 		},
 	}
 
-	splash := renderSplash(112, sessions)
+	welcome := renderWelcome(112, sessions, nil)
 
-	for _, removed := range []string{"Recent work", "/resume 1", "核查 RAG", "06-25 13:00"} {
-		if strings.Contains(splash, removed) {
-			t.Fatalf("splash should keep recent sessions out of the opening curtain %q:\n%s", removed, splash)
+	for _, want := range []string{"/resume 1", "核查 RAG", "06-25 13:00"} {
+		if !strings.Contains(welcome, want) {
+			t.Fatalf("welcome should keep recent session discoverable %q:\n%s", want, welcome)
 		}
 	}
 }
@@ -1780,17 +1786,17 @@ func TestExportLastSessionReturnsNewestMarkdown(t *testing.T) {
 }
 
 func TestSplashKeepsStatusOutOfOpeningCurtain(t *testing.T) {
-	splash := renderSplash(112, nil)
+	// T05-03：状态面板退场；faint 脚注可保留真实模式与 /doctor 引导，但不得伪造。
+	welcome := renderWelcome(112, nil, nil)
 
 	for _, removed := range []string{
 		"System status",
-		"Backend",
-		"LLM",
 		"Sessions",
-		"doctor",
+		"connected",
+		"healthy",
 	} {
-		if strings.Contains(splash, removed) {
-			t.Fatalf("splash should not show status dashboard content %q:\n%s", removed, splash)
+		if strings.Contains(welcome, removed) {
+			t.Fatalf("welcome should not show status dashboard content %q:\n%s", removed, welcome)
 		}
 	}
 }

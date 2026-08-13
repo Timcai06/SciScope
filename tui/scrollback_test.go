@@ -223,3 +223,36 @@ func TestBlocksAreRetrievableByTypedKind(t *testing.T) {
 
 // viewport 依赖（测试编译期验证 ScrollbackBlock 与现有渲染路径兼容）。
 var _ = viewport.Model{}
+
+// T05-04：连续 research tools 语义 grouping——组首 ⏺、组内成员缩进 ⎿。
+func TestConsecutiveToolCallsAreGrouped(t *testing.T) {
+	m := newScrollbackTestModel()
+	m.appendBlock(BlockToolCall, "⏺ 检索文献")
+	m.appendBlock(BlockToolResult, "证据卡")
+	m.appendBlock(BlockToolCall, "⏺ 论断核查")
+	out := m.renderBlocksContent(100)
+	lines := strings.Split(out, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d: %q", len(lines), out)
+	}
+	if !strings.Contains(lines[0], "⏺") {
+		t.Fatalf("first tool call keeps ⏺ marker: %q", lines[0])
+	}
+	// 组内（连续 tool 序列中非首条）：⎿ + 缩进。
+	if !strings.Contains(lines[2], "⎿") || !strings.HasPrefix(lines[2], "  ") {
+		t.Fatalf("grouped tool call should use indented ⎿: %q", lines[2])
+	}
+	// tool_result 延续组（不打断 grouping），且不被缩进。
+	if strings.HasPrefix(lines[1], "  ") {
+		t.Fatalf("tool result must not be indented: %q", lines[1])
+	}
+	// 非 tool 块打断组：下一条 tool call 恢复 ⏺。
+	m.appendBlock(BlockSystem, "系统行")
+	m.appendBlock(BlockToolCall, "⏺ 研究趋势")
+	out2 := m.renderBlocksContent(100)
+	lines2 := strings.Split(out2, "\n")
+	last := lines2[len(lines2)-1]
+	if !strings.Contains(last, "⏺") {
+		t.Fatalf("tool call after non-tool block should restart group with ⏺: %q", last)
+	}
+}

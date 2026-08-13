@@ -297,6 +297,8 @@ type model struct {
 	viewportContentVersion      int
 	answer                      string // current streaming answer
 	answering                   bool
+	answerRunningID             string // T05-04: streaming 期间的 running answer 块 ID
+	anchorNextTurn              bool   // T05-04: 发送后锚定 prompt（feature gate）
 	verb                        string
 	tick                        int
 	start                       time.Time // when the current turn began (for the elapsed timer)
@@ -427,6 +429,7 @@ func (m *model) renderBlocksContent(width int) string {
 		return ""
 	}
 	parts := make([]string, 0, len(m.blockItems))
+	inToolGroup := false // T05-04: 连续 research tools 语义 grouping
 	for i := range m.blockItems {
 		block := &m.blockItems[i]
 		if block.Rendered == "" || block.RenderWidth != width {
@@ -434,9 +437,49 @@ func (m *model) renderBlocksContent(width int) string {
 			block.RenderWidth = width
 			block.RenderVersion++
 		}
-		parts = append(parts, block.Rendered)
+		out := block.Rendered
+		if block.Kind == BlockToolCall {
+			if inToolGroup {
+				// 组内成员：缩进 + ⎿ 替代 ⏺，降低重复视觉噪声。
+				out = indentToolGroupLine(out)
+			} else {
+				inToolGroup = true
+			}
+		} else if block.Kind != BlockToolResult {
+			inToolGroup = false
+		}
+		parts = append(parts, out)
 	}
 	return strings.Join(parts, "\n")
+}
+
+// indentToolGroupLine 把连续工具组内的调用行从 ⏺ 降为缩进 ⎿。
+func indentToolGroupLine(line string) string {
+	line = strings.Replace(line, "⏺ ", "⎿ ", 1)
+	return "  " + line
+}
+
+// maybeAnchorToPrompt T05-04 发送后锚定（feature gate：SCISCOPE_TUI_SEND_ANCHOR=1）：
+// 本轮第一个响应事件到达时，把用户问题行锚到 viewport 顶部，让本轮 response
+// 拥有干净页面；用户手工滚动后恢复既有 follow 纪律。
+func (m *model) maybeAnchorToPrompt() {
+	if !m.anchorNextTurn {
+		return
+	}
+	m.anchorNextTurn = false
+	lines := strings.Split(m.viewportContent, "\n")
+	lastPrompt := -1
+	for i, ln := range lines {
+		plain := stripANSI(ln)
+		if strings.Contains(plain, "用户问题") || strings.Contains(plain, "重试问题") {
+			lastPrompt = i
+		}
+	}
+	if lastPrompt < 0 {
+		return
+	}
+	m.vp.GotoTop()
+	m.vp.SetYOffset(lastPrompt)
 }
 
 func (m *model) renderTranscriptContent(width int) string {
@@ -709,22 +752,14 @@ func (m *model) setViewportContent(content string, followBottom bool) {
 }
 
 func (m *model) refresh() {
-	m.refreshTranscript(false)
+	m.refreshTranscript()
 }
 
-func (m *model) refreshWithLiveAnswer() {
-	m.refreshTranscript(true)
-}
-
-func (m *model) refreshTranscript(includeLiveAnswer bool) {
+func (m *model) refreshTranscript() {
 	content := m.renderTranscriptContent(m.vp.Width)
-	if includeLiveAnswer && m.answering && m.answer != "" {
-		// Live answer with a streaming cursor block, for a "being written" feel.
-		content += "\n" + stBullet.Render("⏺ ") + stInk.Render(m.answer) + stAccent.Render("▌")
-	}
 	if strings.TrimSpace(content) == "" && m.vp.Width > 0 {
 		m.loadRecentSessions()
-		content = renderSplash(m.vp.Width, m.recentSessions)
+		content = renderWelcome(m.vp.Width, m.recentSessions, nil)
 	}
 	// Follow new content only when already pinned to the bottom; if the user has
 	// scrolled up to read, keep their position instead of yanking them down.
@@ -877,39 +912,6 @@ func (m model) renderComposer(width int) string {
 		Render(inputLine + "\n" + hints)
 }
 
-func renderLiveAnswerPreview(answer string, width int) string {
-	answer = strings.Trim(answer, "\n")
-	if answer == "" {
-		return ""
-	}
-	if width < 48 {
-		width = 48
-	}
-	inner := width - 4
-	if inner < 24 {
-		inner = 24
-	}
-	lines := strings.Split(answer, "\n")
-	start := len(lines) - 4
-	if start < 0 {
-		start = 0
-	}
-	body := []string{stBullet.Render("⏺ ") + stAccent.Render("正在回答") + stAccent.Render(" ▌")}
-	for _, line := range lines[start:] {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		body = append(body, stInk.Render("  "+clipWidth(line, inner-2)))
-	}
-	return lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true, false, true, false).
-		BorderForeground(cFaint).
-		Padding(0, 1).
-		Width(width - 2).
-		Render(strings.Join(body, "\n"))
-}
-
 func (m model) argsStr(args map[string]any) string {
 	keys := make([]string, 0, len(args))
 	for k := range args {
@@ -1001,13 +1003,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.ready {
 			m.vp = newTranscriptViewport(msg.Width, vh)
 			m.loadRecentSessions()
-			m.setViewportContent(renderSplash(msg.Width, m.recentSessions), true)
+			m.setViewportContent(renderWelcome(msg.Width, m.recentSessions, nil), true)
 			m.ready = true
 		} else {
 			m.vp.Width, m.vp.Height = msg.Width, vh
 			if len(m.blocks) == 0 && m.answer == "" {
 				m.loadRecentSessions()
-				m.setViewportContent(renderSplash(msg.Width, m.recentSessions), true)
+				m.setViewportContent(renderWelcome(msg.Width, m.recentSessions, nil), true)
 			}
 		}
 		m.ti.Width = msg.Width - 4
@@ -1021,6 +1023,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastQuestion = v
 		m.answering = true
 		m.answer = ""
+		m.answerRunningID = ""
 		m.used = nil
 		m.toolStart = map[string]time.Time{}
 		m.timeline = nil
@@ -1210,9 +1213,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.addTimeline(timelineEvent{Kind: "tool_result", Phase: metaPhase(msg.meta), Tool: msg.name, Label: toolResultLabel(msg.name, msg.result), Detail: metaDetail(msg.meta), Duration: elapsed})
 		m.record("tool_result", msg.name, summarizeToolResultMarkdown(msg.name, msg.result))
-		// Render the rich evidence/verify/trend card by default (not just in /demo
-		// or /timeline) so the evidence chain is always visible inline.
-		m.appendBlock(BlockToolResult, renderToolResult(msg.name, msg.result, m.vp.Width, elapsed))
+		// T05-06 接线：证据类工具走 typed Evidence 渲染层；其余保持旧路径。
+		kind := BlockToolResult
+		if isEvidenceTool(msg.name) {
+			kind = BlockEvidence
+		}
+		m.appendBlock(kind, renderEvidenceToolResult(msg.name, msg.result, m.vp.Width, elapsed))
 		return m, listen(m.sub)
 
 	case reflectMsg:
@@ -1224,15 +1230,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, listen(m.sub)
 
 	case textMsg:
+		if m.answerRunningID == "" {
+			// T05-04: 第一个流式 chunk 创建 running answer 块；后续 chunk 更新同一块。
+			m.answerRunningID = m.startRunningBlock(BlockAnswer)
+			m.answering = true
+			m.maybeAnchorToPrompt()
+		}
 		m.answer += string(msg)
+		m.updateRunningBlock(m.answerRunningID, m.answer)
 		return m, tea.Batch(m.requestStreamRefresh(), listen(m.sub))
 
 	case finalMsg:
 		if m.answer == "" {
 			m.answer = string(msg)
 		}
+		if m.answerRunningID == "" && m.answer != "" {
+			// 兼容无 textMsg 的 finalMsg 直达路径（fixture/异常流）：补建 running 块。
+			m.answerRunningID = m.startRunningBlock(BlockAnswer)
+			m.updateRunningBlock(m.answerRunningID, m.answer)
+			m.answering = true
+		}
 		m.refreshPending = false
-		m.refreshWithLiveAnswer()
+		m.refresh()
 		return m, listen(m.sub)
 
 	case errMsg:
@@ -1252,11 +1271,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if body := timelineMarkdownBody(m.timeline); body != "" {
 				m.record("timeline", "", body)
 			}
-			if card := renderStructuredAnswerCard(m.lastMeta.StructuredAnswer, m.vp.Width); card != "" {
+			if card := renderStructuredAnswerCardCompressed(m.lastMeta.StructuredAnswer, m.vp.Width); card != "" {
 				m.appendBlock(BlockContract, card)
 			}
 			m.record("assistant", "", ans)
-			m.appendAnswerMessage(ans, m.used)
+			if m.answerRunningID != "" {
+				// T05-04: running answer 块转正——同一块 ID，正式 Glamour 渲染。
+				m.finishRunningBlock(m.answerRunningID)
+				m.setBlockContent(m.answerRunningID, renderAnswerMessage(ans, m.used, m.vp.Width), m.used)
+				m.answerRunningID = ""
+			} else {
+				m.appendAnswerMessage(ans, m.used)
+			}
 			m.history = append(m.history, turn{"assistant", ans})
 			if len(m.history) > 12 {
 				m.history = m.history[len(m.history)-12:]
@@ -1278,6 +1304,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.answer = ""
 		m.answering = false
+		m.answerRunningID = ""
+		m.anchorNextTurn = false
 		m.livePlan = nil
 		m.liveReflect = ""
 		m.lastTurnErr = ""
@@ -1290,14 +1318,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func renderConversationBlock(block conversationBlock, width int) string {
+func renderConversationBlock(block ScrollbackBlock, width int) string {
 	switch block.Kind {
 	case BlockUser:
 		return renderUserMessage(block.Raw, block.Retry)
 	case BlockAnswer:
+		if block.Status == BlockRunning {
+			// T05-04: running 块 animated accent —— 流式正文 + 光标，不跑 Glamour。
+			return stBullet.Render("⏺ ") + stAccent.Render("研究结论") + "\n" +
+				stInk.Render(strings.TrimRight(block.Raw, "\n")) + stAccent.Render("▌")
+		}
 		return renderAnswerMessage(block.Raw, block.Tools, width)
 	default:
-		// 其他 typed kind 暂保持原渲染字符串（无框语法属 T05-04）。
+		// 其他 typed kind 暂保持原渲染字符串（无框语法属 T05-04 逐步迁移）。
 		return block.Raw
 	}
 }
@@ -1654,50 +1687,47 @@ func (m model) submenuItems() []submenuItem {
 	}
 }
 
-func (m model) renderSubmenuPalette(width int) string {
-	if width < 48 {
-		width = 48
+// overlayKindForSubmenu 把 submenu 名映射为统一 Overlay kind（T05-08）。
+func overlayKindForSubmenu(name string) (OverlayKind, OverlayFooter) {
+	switch name {
+	case "theme":
+		return OverlayTheme, FooterNavigable
+	case "resume":
+		return OverlaySessions, FooterNavigable
+	case "tools":
+		return OverlayTools, FooterNavigable
+	case "doctor":
+		return OverlayDoctor, FooterNavigable
+	case "clear", "quit":
+		return OverlayConfirm, FooterConfirm
+	default:
+		return OverlayCommand, FooterNavigable
 	}
+}
+
+func (m model) renderSubmenuPalette(width int) string {
 	items := m.submenuItems()
 	if len(items) == 0 {
 		return panelRow("launcher", submenuTitle(m.submenu), "empty", []string{"暂无可选项。Esc 返回。"})
 	}
-	inner := width - 6
-	if inner < 38 {
-		inner = 38
+	// T05-08 接线：二级菜单走统一 Overlay/Picker grammar。
+	kind, footer := overlayKindForSubmenu(m.submenu)
+	pickerItems := make([]PickerItem, 0, len(items))
+	for _, it := range items {
+		pickerItems = append(pickerItems, PickerItem{
+			Title:    it.label,
+			Desc:     it.desc,
+			Shortcut: it.command,
+			Command:  it.command,
+		})
 	}
-	idx := m.submenuIdx % len(items)
-	labelW := 14
-	descW := inner - 3 - labelW - 16
-	if descW < 16 {
-		descW = 16
+	state := OverlayState{
+		Kind:      kind,
+		Selection: m.submenuIdx % len(items),
+		Sections:  buildOverlaySections(kind, pickerItems),
+		Footer:    footer,
 	}
-	title := submenuTitle(m.submenu)
-	rows := []string{stAccent.Render(title) + stFaint.Render("  · Enter 执行 · Esc 返回 · / 命令")}
-	for i, item := range items {
-		marker := "  "
-		if i == idx {
-			marker = "▶ "
-		}
-		cols := lipgloss.JoinHorizontal(
-			lipgloss.Top,
-			lipgloss.NewStyle().Width(3).Render(marker),
-			lipgloss.NewStyle().Width(labelW).Render(item.label),
-			lipgloss.NewStyle().Width(descW).Render(clipWidth(item.desc, descW-1)),
-			lipgloss.NewStyle().Width(16).Render(clipWidth(item.command, 15)),
-		)
-		if i == idx {
-			rows = append(rows, stSelCmd.Width(inner).Render(cols))
-		} else {
-			rows = append(rows, stCmd.Width(inner).Render(cols))
-		}
-	}
-	return lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true, false, true, false).
-		BorderForeground(cFaint).
-		Padding(0, 1).
-		Width(width - 2).
-		Render(strings.Join(rows, "\n"))
+	return renderPickerOverlay(state, width, 26)
 }
 
 func (m *model) openSubmenu(name string) {
