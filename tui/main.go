@@ -44,108 +44,6 @@ type cliOptions struct {
 }
 
 // ---- themes (research-console palettes, à la Claude Code structure) ----
-type tuiTheme struct {
-	Name     string
-	Title    string
-	Desc     string
-	Accent   lipgloss.Color
-	Tool     lipgloss.Color
-	Warn     lipgloss.Color
-	User     lipgloss.Color
-	Error    lipgloss.Color
-	Muted    lipgloss.Color
-	Faint    lipgloss.Color
-	Ink      lipgloss.Color
-	Selected lipgloss.Color
-}
-
-var (
-	themes = map[string]tuiTheme{
-		"dark": {
-			Name: "dark", Title: "深色研究台", Desc: "默认青色证据流,适合深色终端和演示录屏",
-			Accent: "#5fd7d7", Tool: "#87afff", Warn: "#d7af5f", User: "#87d787", Error: "#ff8787",
-			Muted: "#808080", Faint: "#5f5f5f", Ink: "#d7d7d7", Selected: "#1c1c1c",
-		},
-		"paper": {
-			Name: "paper", Title: "报告纸面", Desc: "贴近 PDF 报告的青绿品牌色,适合答辩截图",
-			Accent: "#16847D", Tool: "#4E6F40", Warn: "#B8872B", User: "#0B4F4A", Error: "#B55A5A",
-			Muted: "#667276", Faint: "#9AA8A6", Ink: "#1C2326", Selected: "#F7FBFA",
-		},
-		"light": {
-			Name: "light", Title: "浅色终端", Desc: "提高浅色背景可读性,减少低对比灰字",
-			Accent: "#006D77", Tool: "#255C99", Warn: "#8A5A00", User: "#2F6F3E", Error: "#A23B3B",
-			Muted: "#5D666A", Faint: "#8A9498", Ink: "#1B1F22", Selected: "#F4F7F7",
-		},
-		"contrast": {
-			Name: "contrast", Title: "高对比", Desc: "更亮的强调色和警告色,适合投影或低质量屏幕",
-			Accent: "#00FFFF", Tool: "#5FA8FF", Warn: "#FFD166", User: "#7CFF6B", Error: "#FF5C8A",
-			Muted: "#B8B8B8", Faint: "#777777", Ink: "#FFFFFF", Selected: "#000000",
-		},
-	}
-	themeOrder   = []string{"dark", "paper", "light", "contrast"}
-	currentTheme = "dark"
-
-	cAccent lipgloss.Color
-	cTool   lipgloss.Color
-	cWarn   lipgloss.Color
-	cUser   lipgloss.Color
-	cError  lipgloss.Color
-	cMuted  lipgloss.Color
-	cFaint  lipgloss.Color
-	cInk    lipgloss.Color
-
-	stAccent lipgloss.Style
-	stBullet lipgloss.Style
-	stConn   lipgloss.Style
-	stTool   lipgloss.Style
-	stWarn   lipgloss.Style
-	stError  lipgloss.Style
-	stUser   lipgloss.Style
-	stMuted  lipgloss.Style
-	stFaint  lipgloss.Style
-	stInk    lipgloss.Style
-	stSelCmd lipgloss.Style
-	stCmd    lipgloss.Style
-)
-
-func init() {
-	if name := strings.TrimSpace(os.Getenv("SCISCOPE_TUI_THEME")); name != "" {
-		applyTheme(name)
-		return
-	}
-	applyTheme(currentTheme)
-}
-
-func applyTheme(name string) bool {
-	name = strings.ToLower(strings.TrimSpace(name))
-	theme, ok := themes[name]
-	if !ok {
-		return false
-	}
-	currentTheme = name
-	cAccent = theme.Accent
-	cTool = theme.Tool
-	cWarn = theme.Warn
-	cUser = theme.User
-	cError = theme.Error
-	cMuted = theme.Muted
-	cFaint = theme.Faint
-	cInk = theme.Ink
-	stAccent = lipgloss.NewStyle().Foreground(cAccent).Bold(true)
-	stBullet = lipgloss.NewStyle().Foreground(cAccent).Bold(true) // ⏺
-	stConn = lipgloss.NewStyle().Foreground(cFaint)               // ⎿
-	stTool = lipgloss.NewStyle().Foreground(cTool)
-	stWarn = lipgloss.NewStyle().Foreground(cWarn)
-	stError = lipgloss.NewStyle().Foreground(cError)
-	stUser = lipgloss.NewStyle().Foreground(cUser).Bold(true)
-	stMuted = lipgloss.NewStyle().Foreground(cMuted)
-	stFaint = lipgloss.NewStyle().Foreground(cFaint)
-	stInk = lipgloss.NewStyle().Foreground(cInk)
-	stSelCmd = lipgloss.NewStyle().Background(cAccent).Foreground(theme.Selected).Bold(true)
-	stCmd = lipgloss.NewStyle().Foreground(cMuted)
-	return true
-}
-
 // rotating "spinner verbs" (Claude Code signature) — localized, research-flavored.
 var verbs = []string{
 	"检索中", "推敲中", "归纳中", "研判中", "爬梳中", "斟酌中", "综合中",
@@ -168,40 +66,99 @@ var (
 	cautionPattern  = regexp.MustCompile(`风险|限制|边界|注意|谨慎|可能|取决于|不应|不能|然而|但是|仍需|不足`)
 )
 
-// ---- tool icons/labels (Nerd Font / Font Awesome glyphs, U+F0xx PUA) ----
-var toolLabels = map[string][2]string{
-	"search_literature":     {"\uf002", "检索文献"}, // search
-	"get_trends":            {"\uf201", "研究趋势"}, // line-chart
-	"recommend_papers":      {"\uf02d", "论文推荐"}, // book
-	"get_paper":             {"\uf15c", "论文详情"}, // file-text
-	"summarize_field":       {"\uf0ca", "领域综述"}, // list-ul
-	"compare_papers":        {"\uf24e", "论文对比"}, // balance-scale
-	"export_bibliography":   {"\uf02e", "引文导出"}, // bookmark
-	"query_knowledge_graph": {"\uf0e8", "知识图谱"}, // sitemap
-	"verify_claim":          {"\uf058", "论断核查"}, // check-circle
-	"list_disputes":         {"\uf071", "争议前线"}, // warning
+// ---- tool icons/labels ----
+//
+// T05-01 icon policy（计划 3.2 节）：普通 Unicode 为 canonical 默认，不再依赖
+// Nerd Font PUA 图形；Nerd Font 作为 opt-in 增强模式（SCISCOPE_TUI_ICONS=nerd），
+// SCISCOPE_TUI_ICONS=off 则为纯中文标签（无任何图标依赖）。
+//
+// Unicode 图标全部选 BMP 单列宽符号，避免 emoji 双列宽导致列对齐错乱。
+var toolIconsUnicode = map[string]string{
+	"search_literature":     "⌕", // 检索
+	"get_trends":            "↗", // 趋势
+	"recommend_papers":      "✦", // 推荐
+	"get_paper":             "▤", // 详情
+	"summarize_field":       "≡", // 综述
+	"compare_papers":        "⇄", // 对比
+	"export_bibliography":   "⤓", // 导出
+	"query_knowledge_graph": "◈", // 图谱
+	"verify_claim":          "✓", // 核查
+	"list_disputes":         "△", // 争议
 }
 
-// Nerd Font glyphs by default; set SCISCOPE_TUI_ICONS=off for plain text (no font
-// dependency \u2014 falls back to just the Chinese label, Claude Code-plain style).
-var useIcons = os.Getenv("SCISCOPE_TUI_ICONS") != "off"
+// Nerd Font / Font Awesome glyphs (U+F0xx PUA) — opt-in enhancement only.
+var toolIconsNerd = map[string]string{
+	"search_literature":     "\uf002", // search
+	"get_trends":            "\uf201", // line-chart
+	"recommend_papers":      "\uf02d", // book
+	"get_paper":             "\uf15c", // file-text
+	"summarize_field":       "\uf0ca", // list-ul
+	"compare_papers":        "\uf24e", // balance-scale
+	"export_bibliography":   "\uf02e", // bookmark
+	"query_knowledge_graph": "\uf0e8", // sitemap
+	"verify_claim":          "\uf058", // check-circle
+	"list_disputes":         "\uf071", // warning
+}
+
+var toolLabels = map[string]string{
+	"search_literature":     "检索文献",
+	"get_trends":            "研究趋势",
+	"recommend_papers":      "论文推荐",
+	"get_paper":             "论文详情",
+	"summarize_field":       "领域综述",
+	"compare_papers":        "论文对比",
+	"export_bibliography":   "引文导出",
+	"query_knowledge_graph": "知识图谱",
+	"verify_claim":          "论断核查",
+	"list_disputes":         "争议前线",
+}
+
+// iconMode 解析 SCISCOPE_TUI_ICONS：默认 "" → unicode；"nerd" → Nerd Font；
+// "off" → 无图标（纯标签）。
+func iconMode() string {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("SCISCOPE_TUI_ICONS"))) {
+	case "nerd", "on", "1", "true", "yes":
+		return "nerd"
+	case "off", "0", "false", "no":
+		return "off"
+	default:
+		return "unicode"
+	}
+}
+
+var useIcons = iconMode()
 
 func toolLabel(name string) string {
-	if v, ok := toolLabels[name]; ok {
-		if useIcons {
-			return v[0] + "  " + v[1]
+	v, ok := toolLabels[name]
+	if !ok {
+		v = name
+	}
+	if ic := toolIcon(name); ic != "" {
+		return ic + "  " + v
+	}
+	return v
+}
+
+func toolIcon(name string) string {
+	mode := useIcons
+	if mode == "nerd" {
+		if g, ok := toolIconsNerd[name]; ok {
+			return g
 		}
-		return v[1]
+		return "\uf013"
 	}
-	if useIcons {
-		return "\uf013  " + name
+	if mode == "unicode" {
+		if g, ok := toolIconsUnicode[name]; ok {
+			return g
+		}
+		return "◆"
 	}
-	return name
+	return "" // off：无图标
 }
 
 func toolPlainLabel(name string) string {
 	if v, ok := toolLabels[name]; ok {
-		return v[1]
+		return v
 	}
 	return name
 }
