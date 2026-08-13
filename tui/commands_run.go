@@ -319,8 +319,14 @@ func (m model) View() string {
 
 	parts = append(parts, m.renderComposer(m.vp.Width))
 	content := strings.Join(parts, "\n")
-	// black canvas（计划 5.1 节）：整个画面用 Canvas token 填充背景。
-	return lipgloss.NewStyle().Background(activeTheme().Canvas).Width(m.vp.Width).Render(content)
+	// black canvas（计划 5.1 节）：整个画面用 Canvas token 填充背景；
+	// Height 设为满高（viewport + status + composer），保证每帧输出恰好覆盖
+	// 终端全部行——行数不足时底部会裸露终端默认背景（如 IDE 灰色）。
+	return lipgloss.NewStyle().
+		Background(activeTheme().Canvas).
+		Width(m.vp.Width).
+		Height(m.vp.Height + 2).
+		Render(content)
 }
 
 // renderStatusLine T05-07：一条低视觉权重 status + shortcut strip。

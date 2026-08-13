@@ -1009,8 +1009,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
-		header, footer := 3, 6 // bordered banner = 3 lines; composer/status = 6
-		vh := msg.Height - header - footer
+		// T05-07 后布局：viewport = 全高 - status 1 行 - composer 1 行（无 banner）。
+		vh := msg.Height - 2
 		if vh < 3 {
 			vh = 3
 		}
