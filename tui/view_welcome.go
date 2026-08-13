@@ -61,21 +61,54 @@ func renderWelcome(width int, sessions []sessionFile, hosts map[string]bool) str
 		width = 1
 	}
 	body := []string{
-		"", // 顶部留白，Logo 是唯一大型视觉
+		"", // 顶部留白 1 行（Logo 是唯一大型视觉，垂直方向稍下沉）
 	}
-	body = append(body, strings.Split(welcomeBrand(width), "\n")...)
+	body = append(body, centerLines(strings.Split(welcomeBrand(width), "\n"), width)...)
 	body = append(body,
 		"",
-		stInk.Render(clipWidth(welcomeTagline, width)),
+		centerLine(stInk.Render(clipWidth(welcomeTagline, width)), width),
 		"",
-		welcomeCommandHint(width),
+		centerLine(welcomeCommandHint(width), width),
 		"",
-		stMuted.Render("Recent"),
+		centerLine(stMuted.Render("Recent"), width),
 	)
-	body = append(body, welcomeRecentLines(width, sessions)...)
+	body = append(body, centerLines(welcomeRecentLines(width, sessions), width)...)
 	body = append(body, "")
-	body = append(body, welcomeStatusLines(width, hosts)...)
+	body = append(body, centerLines(welcomeStatusLines(width, hosts), width)...)
 	return strings.Join(body, "\n")
+}
+
+// centerLine 把一行内容水平居中到 width 列（ANSI 安全：按显示宽度计算偏移）。
+func centerLine(line string, width int) string {
+	w := lipgloss.Width(line)
+	if w >= width {
+		return line
+	}
+	pad := (width - w) / 2
+	return strings.Repeat(" ", pad) + line
+}
+
+// centerLines 对多行内容逐行居中（保持行内结构，只整体偏移）。
+func centerLines(lines []string, width int) []string {
+	w := 0
+	for _, l := range lines {
+		if lw := lipgloss.Width(l); lw > w {
+			w = lw
+		}
+	}
+	pad := 0
+	if w < width {
+		pad = (width - w) / 2
+	}
+	out := make([]string, len(lines))
+	for i, l := range lines {
+		if pad > 0 {
+			out[i] = strings.Repeat(" ", pad) + l
+		} else {
+			out[i] = l
+		}
+	}
+	return out
 }
 
 // welcomeBrand 三档响应式品牌标（计划 5.2 节）：
@@ -147,6 +180,9 @@ func welcomeRecentLines(width int, sessions []sessionFile) []string {
 		if q == "" {
 			q = strings.TrimSuffix(s.Name, filepath.Ext(s.Name))
 		}
+		// LastQuestion 可能含换行（extractLastQuestion 从 markdown 多行 chunk
+		// join 而来）：归一化为单行，避免 \n 直接进入单行渲染造成 viewport 行分裂。
+		q = strings.Join(strings.Fields(q), " ")
 		head := "  › /resume " + fmt.Sprint(s.Index) + " · "
 		q = clipWidth(q, width-lipgloss.Width(head))
 		row := head + q

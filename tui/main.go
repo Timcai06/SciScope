@@ -345,6 +345,9 @@ func initialModel() model {
 	sp.Style = stAccent
 	m := model{ti: ti, spin: sp, sub: make(chan tea.Msg, 64), demo: demoMode(), sessionID: newSessionID()}
 	m.syncThemeStyles()
+	// 首帧在 WindowSizeMsg 之前渲染：vp 必须预置合理尺寸，否则零值 viewport
+	// 会让首帧输出垃圾行数（多层嵌套后尤其明显），污染渲染器行 diff。
+	m.vp = newTranscriptViewport(76, 20)
 	return m
 }
 
@@ -1019,24 +1022,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
-		// T05-07 后布局：viewport = 全高 - status 1 行 - composer 1 行（无 banner）。
-		vh := msg.Height - 2
+		// 布局预算：外框左右 4 列（边框 2 + padding 2）；高度：外框上下 2 行 +
+		// status 1 行 + composer 3 行（含自身边框）。
+		innerW := msg.Width - 4
+		if innerW < 40 {
+			innerW = msg.Width
+		}
+		vh := msg.Height - 2 - 4
 		if vh < 3 {
 			vh = 3
 		}
 		if !m.ready {
-			m.vp = newTranscriptViewport(msg.Width, vh)
+			m.vp = newTranscriptViewport(innerW, vh)
 			m.loadRecentSessions()
-			m.setViewportContent(renderWelcome(msg.Width, m.recentSessions, nil), true)
+			m.setViewportContent(renderWelcome(innerW, m.recentSessions, nil), true)
 			m.ready = true
 		} else {
-			m.vp.Width, m.vp.Height = msg.Width, vh
+			m.vp.Width, m.vp.Height = innerW, vh
 			if len(m.blocks) == 0 && m.answer == "" {
 				m.loadRecentSessions()
-				m.setViewportContent(renderWelcome(msg.Width, m.recentSessions, nil), true)
+				m.setViewportContent(renderWelcome(innerW, m.recentSessions, nil), true)
 			}
 		}
-		m.ti.Width = msg.Width - 4
+		m.ti.Width = innerW - 2
 
 	case demoStartMsg:
 		v := string(msg)
@@ -1892,6 +1900,10 @@ func main() {
 	if opts.Demo {
 		m.demo = true
 	}
+	// 关闭终端自动换行（DECAWM）：满宽行（外框 + 内容 = 终端全宽）在行尾写字符
+	// 会触发自动换行导致后续行错位；退出时恢复。
+	fmt.Print("\x1b[?7l")
+	defer fmt.Print("\x1b[?7h")
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithFPS(terminalRenderFPS))
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)

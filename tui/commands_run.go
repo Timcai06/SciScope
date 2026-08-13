@@ -304,56 +304,87 @@ func (m model) View() string {
 	if !m.ready {
 		return "启动中…"
 	}
-	// T05-07：沉浸式布局——scrollback 全屏黑底（无顶部 banner 卡），
-	// status 一条低视觉权重行，composer 是底部锚点。
+	// T05-07 修订（项目负责人要求）：全局 Accent 外边框包裹整个画面。
+	// 外框占左右 2 边框 + 2 padding = 4 列，内部组件使用 innerW。
+	innerW := m.vp.Width - 4
+	if innerW < 40 {
+		innerW = m.vp.Width
+	}
 	parts := []string{m.vp.View()}
 
 	if m.submenu != "" {
-		parts = append(parts, m.renderSubmenuPalette(m.vp.Width))
+		parts = append(parts, m.renderSubmenuPalette(innerW))
 	} else if strings.HasPrefix(m.ti.Value(), "/") {
-		if menu := m.renderCommandPalette(m.vp.Width); menu != "" {
+		if menu := m.renderCommandPalette(innerW); menu != "" {
 			parts = append(parts, menu)
 		}
 	}
 
-	parts = append(parts, m.renderStatusLine(m.vp.Width))
+	parts = append(parts, m.renderStatusLine(innerW))
 
-	parts = append(parts, m.renderComposer(m.vp.Width))
+	parts = append(parts, m.renderComposer(innerW))
 	content := strings.Join(parts, "\n")
 	// black canvas（计划 5.1 节，Grok 式 cell 级背景的字符串模型等价实现）：
 	// 组件渲染行内部含 \x1b[0m / \x1b[49m 重置序列，会把行首黑底 reset 掉，
 	// 使行尾填充空格落在终端默认背景（IDE 灰）——对每个重置立即恢复黑底。
-	content = restoreCanvasAfterResets(content, activeTheme().Canvas)
-	// Width/Height 填充保证每帧输出恰好覆盖终端全部行列。
-	return lipgloss.NewStyle().
-		Background(activeTheme().Canvas).
-		Width(m.vp.Width).
-		Height(m.vp.Height + 2).
-		Render(content)
+	// 注意：不经过 lipgloss 的包裹 Render（其 reflow 对含 ANSI 的行会产生
+	// 拆行）；行宽由各层组件精确保证（vp 116 列、外框 120 列）。
+	content = paintCanvasLines(content, activeTheme().Canvas)
+	// 全局外边框：Accent 色圆角框。手动拼接（不经过 lipgloss Border Render——
+	// 它对含 ANSI 的多行内容做 reflow 时会把转义序列计入宽度，导致行被拆断）。
+	framed := wrapWithFrame(content, m.vp.Width)
+	// 边框行同样铺黑底（行首黑底 + reset 修复）。
+	return paintCanvasLines(framed, activeTheme().Canvas)
 }
 
-// restoreCanvasAfterResets 把内容中的 SGR 重置（\x1b[0m）与默认背景
-// （\x1b[49m）替换为「重置 + 重新设置画布背景」，使组件行内的任何样式
-// 重置都不会把画布背景丢给终端默认背景色。组件自行设置的有意背景
-// （如选中行 AccentSoft、overlay Surface）在其后输出，自然覆盖画布色。
-func restoreCanvasAfterResets(content string, canvas lipgloss.Color) string {
-	bgSeq := "\x1b[48;2;" + canvasRGBSeq(canvas) + "m"
-	content = strings.ReplaceAll(content, "\x1b[0m", "\x1b[0m"+bgSeq)
-	content = strings.ReplaceAll(content, "\x1b[49m", "\x1b[49m"+bgSeq)
-	return content
-}
-
-// canvasRGBSeq 把 hex 色（#RRGGBB）转成 SGR 真彩参数 "r;g;b"。
+// canvasRGBSeq 把 lipgloss 颜色字符串 "#RRGGBB" 转成 SGR RGB 参数 "r;g;b"。
 func canvasRGBSeq(c lipgloss.Color) string {
-	hex := strings.TrimPrefix(strings.ToLower(string(c)), "#")
-	if len(hex) != 6 {
+	s := strings.TrimPrefix(string(c), "#")
+	if len(s) != 6 {
 		return "0;0;0"
 	}
-	val := func(i int) int {
-		b, _ := strconv.ParseUint(hex[i:i+2], 16, 8)
-		return int(b)
+	r, errR := strconv.ParseUint(s[0:2], 16, 8)
+	g, errG := strconv.ParseUint(s[2:4], 16, 8)
+	b, errB := strconv.ParseUint(s[4:6], 16, 8)
+	if errR != nil || errG != nil || errB != nil {
+		return "0;0;0"
 	}
-	return fmt.Sprintf("%d;%d;%d", val(0), val(2), val(4))
+	return fmt.Sprintf("%d;%d;%d", r, g, b)
+}
+
+// paintCanvasLines 给每行行首添加画布背景 SGR，并把行内 SGR 重置
+// （\x1b[0m / \x1b[49m）替换为「重置 + 恢复画布背景」。不经过 lipgloss Render，
+// 因此不会触发任何 reflow/wrap。行宽由调用方保证。
+func paintCanvasLines(content string, canvas lipgloss.Color) string {
+	bgSeq := "\x1b[48;2;" + canvasRGBSeq(canvas) + "m"
+	lines := strings.Split(content, "\n")
+	var b strings.Builder
+	for i, l := range lines {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		l = strings.ReplaceAll(l, "\x1b[0m", "\x1b[0m"+bgSeq)
+		l = strings.ReplaceAll(l, "\x1b[49m", "\x1b[49m"+bgSeq)
+		b.WriteString(bgSeq + l)
+	}
+	return b.String()
+}
+
+// wrapWithFrame 手动绘制全局外边框：content 每行宽 = width-4（含左右各 1 列
+// 内边距），边框行总宽恰为 width。边框色 = Accent。
+func wrapWithFrame(content string, width int) string {
+	stFrame := lipgloss.NewStyle().Foreground(cAccent)
+	top := stFrame.Render("╭" + strings.Repeat("─", width-2) + "╮")
+	bottom := stFrame.Render("╰" + strings.Repeat("─", width-2) + "╯")
+	lines := strings.Split(content, "\n")
+	var b strings.Builder
+	b.WriteString(top)
+	for _, l := range lines {
+		b.WriteString("\n")
+		b.WriteString(stFrame.Render("│") + " " + l + " " + stFrame.Render("│"))
+	}
+	b.WriteString("\n" + bottom)
+	return b.String()
 }
 
 // renderStatusLine T05-07：一条低视觉权重 status + shortcut strip。
