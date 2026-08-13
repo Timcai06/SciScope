@@ -72,3 +72,6 @@ data/.agent_memory/
 
 # OpenCode local continuation state (session IDs and runtime-only progress).
 .omo/
+
+# local upstream reference clones (T05 grok-build etc.)
+.vendor/
