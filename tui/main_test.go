@@ -201,12 +201,12 @@ func TestAppendBlockMaintainsStructuredBlockCache(t *testing.T) {
 	m.ready = true
 	m.vp = viewport.New(100, 20)
 
-	m.appendBlock("第一条")
+	m.appendBlock(BlockMessage, "第一条")
 
 	if len(m.blockItems) != 1 {
 		t.Fatalf("appendBlock should add one structured block, got %#v", m.blockItems)
 	}
-	if m.blockItems[0].Raw != "第一条" || m.blockItems[0].Kind != "message" {
+	if m.blockItems[0].Raw != "第一条" || m.blockItems[0].Kind != BlockMessage {
 		t.Fatalf("unexpected structured block: %#v", m.blockItems[0])
 	}
 }
@@ -256,7 +256,7 @@ func TestRenderTranscriptContentReusesWholeTranscriptCache(t *testing.T) {
 		t.Fatalf("same-width transcript render should reuse cache, version %d -> %d", cacheVersion, m.transcriptCacheVersion)
 	}
 
-	m.appendBlock("gamma")
+	m.appendBlock(BlockMessage, "gamma")
 	third := m.renderTranscriptContent(80)
 	if third != "alpha\nbeta\ngamma" {
 		t.Fatalf("append should invalidate transcript cache, got %q", third)
@@ -271,7 +271,7 @@ func TestStreamingTextKeepsViewportStableUntilFinal(t *testing.T) {
 	m.ready = true
 	m.answering = true
 	m.vp = newTranscriptViewport(100, 20)
-	m.appendBlock("历史 transcript")
+	m.appendBlock(BlockMessage, "历史 transcript")
 	m.refresh()
 	beforeViewport := m.vp.View()
 	m.lastRefresh = time.Now().Add(-streamRefreshInterval)

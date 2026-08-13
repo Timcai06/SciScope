@@ -287,7 +287,7 @@ type model struct {
 	vp                          viewport.Model
 	spin                        spinner.Model
 	blocks                      []string // finalized conversation lines
-	blockItems                  []conversationBlock
+	blockItems                  []ScrollbackBlock
 	blocksVersion               int
 	transcriptCache             string
 	transcriptCacheWidth        int
@@ -326,15 +326,7 @@ type model struct {
 	demo                        bool
 }
 
-type conversationBlock struct {
-	Kind          string
-	Raw           string
-	Tools         []string
-	Retry         bool
-	Rendered      string
-	RenderWidth   int
-	RenderVersion int
-}
+type conversationBlock = ScrollbackBlock
 
 func initialModel() model {
 	ti := textinput.New()
@@ -383,16 +375,19 @@ func (m model) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m *model) appendBlock(s string) {
+// appendBlock 追加一个 typed 块。kind 为块类型身份（不再靠字符串猜测）；
+// raw 为源文本（现含 ANSI 渲染字符串，T05-04 再迁无框语法）。
+func (m *model) appendBlock(kind BlockKind, s string) {
 	m.blocks = append(m.blocks, s)
-	m.blockItems = append(m.blockItems, conversationBlock{Kind: "message", Raw: s})
+	m.blockItems = append(m.blockItems, newScrollbackBlock(kind, s))
 	m.blocksVersion++
 	m.refresh()
 }
 
 func (m *model) appendUserMessage(text string, retry bool) {
 	m.blocks = append(m.blocks, text)
-	m.blockItems = append(m.blockItems, conversationBlock{Kind: "user", Raw: text, Retry: retry})
+	m.blockItems = append(m.blockItems, newScrollbackBlock(BlockUser, text))
+	m.blockItems[len(m.blockItems)-1].Retry = retry
 	m.blocksVersion++
 	m.refresh()
 }
@@ -400,7 +395,8 @@ func (m *model) appendUserMessage(text string, retry bool) {
 func (m *model) appendAnswerMessage(text string, tools []string) {
 	copiedTools := append([]string(nil), tools...)
 	m.blocks = append(m.blocks, text)
-	m.blockItems = append(m.blockItems, conversationBlock{Kind: "assistant", Raw: text, Tools: copiedTools})
+	m.blockItems = append(m.blockItems, newScrollbackBlock(BlockAnswer, text))
+	m.blockItems[len(m.blockItems)-1].Tools = copiedTools
 	m.blocksVersion++
 	m.refresh()
 }
@@ -418,21 +414,10 @@ func (m *model) syncBlockItems() {
 			return
 		}
 	}
-	m.blockItems = make([]conversationBlock, len(m.blocks))
+	m.blockItems = make([]ScrollbackBlock, len(m.blocks))
 	for i, raw := range m.blocks {
-		m.blockItems[i] = conversationBlock{Kind: "message", Raw: raw}
+		m.blockItems[i] = newScrollbackBlock(BlockMessage, raw)
 	}
-	m.blocksVersion++
-}
-
-func (m *model) invalidateRenderCache() {
-	for i := range m.blockItems {
-		m.blockItems[i].Rendered = ""
-		m.blockItems[i].RenderWidth = 0
-	}
-	m.transcriptCache = ""
-	m.transcriptCacheWidth = 0
-	m.transcriptCacheBlockVersion = -1
 	m.blocksVersion++
 }
 
@@ -1184,7 +1169,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for _, s := range msg {
 			planLines = append(planLines, stConn.Render("  ⎿ ")+stInk.Render(s))
 		}
-		m.appendBlock(strings.Join(planLines, "\n"))
+		m.appendBlock(BlockResearchPlan, strings.Join(planLines, "\n"))
 		return m, listen(m.sub)
 
 	case toolCallMsg:
@@ -1211,7 +1196,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if a := m.argsStr(msg.args); a != "" {
 			callLine += stFaint.Render("  " + clip(a, 56))
 		}
-		m.appendBlock(callLine)
+		m.appendBlock(BlockToolCall, callLine)
 		if notice, ok := permissionNotice(msg.name); ok {
 			m.record("permission", msg.name, notice)
 			m.addTimeline(timelineEvent{Kind: "permission", Phase: metaPhase(msg.meta), Tool: msg.name, Label: "权限提示", Detail: notice})
@@ -1227,7 +1212,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.record("tool_result", msg.name, summarizeToolResultMarkdown(msg.name, msg.result))
 		// Render the rich evidence/verify/trend card by default (not just in /demo
 		// or /timeline) so the evidence chain is always visible inline.
-		m.appendBlock(renderToolResult(msg.name, msg.result, m.vp.Width, elapsed))
+		m.appendBlock(BlockToolResult, renderToolResult(msg.name, msg.result, m.vp.Width, elapsed))
 		return m, listen(m.sub)
 
 	case reflectMsg:
@@ -1235,7 +1220,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.record("reflect", "", string(msg))
 		m.liveReflect = string(msg)
 		m.addTimeline(timelineEvent{Kind: "reflect", Phase: "自检修正", Label: "自检修正", Detail: string(msg)})
-		m.appendBlock(stBullet.Render("⏺ ") + stWarn.Render("自检修正") + "\n" + stConn.Render("  ⎿ ") + stFaint.Render(string(msg)))
+		m.appendBlock(BlockResearchTrace, stBullet.Render("⏺ ")+stWarn.Render("自检修正")+"\n"+stConn.Render("  ⎿ ")+stFaint.Render(string(msg)))
 		return m, listen(m.sub)
 
 	case textMsg:
@@ -1255,7 +1240,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.record("error", "", errText)
 		action := recoveryAction(string(msg))
 		m.addTimeline(timelineEvent{Kind: "error", Phase: "错误恢复", Label: action.Title, Detail: action.Message})
-		m.appendBlock(stError.Render("⏺ ✗ ") + renderRecoveryPanel(string(msg)))
+		m.appendBlock(BlockRecovery, stError.Render("⏺ ✗ ")+renderRecoveryPanel(string(msg)))
 		m.lastTurnErr = errText
 		return m, listen(m.sub)
 
@@ -1268,7 +1253,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.record("timeline", "", body)
 			}
 			if card := renderStructuredAnswerCard(m.lastMeta.StructuredAnswer, m.vp.Width); card != "" {
-				m.appendBlock(card)
+				m.appendBlock(BlockContract, card)
 			}
 			m.record("assistant", "", ans)
 			m.appendAnswerMessage(ans, m.used)
@@ -1283,12 +1268,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if path, err := writeSessionMarkdown(sessionDir(), m.transcript, time.Now()); err == nil {
 				m.lastExport = path
 				if m.lastTurnErr != "" {
-					m.appendBlock(stFaint.Render("  会话已保存(含失败原因): " + path))
+					m.appendBlock(BlockSystem, stFaint.Render("  会话已保存(含失败原因): "+path))
 				} else {
-					m.appendBlock(stFaint.Render("  会话已保存: " + path))
+					m.appendBlock(BlockSystem, stFaint.Render("  会话已保存: "+path))
 				}
 			} else {
-				m.appendBlock(stWarn.Render("  会话保存失败: " + err.Error()))
+				m.appendBlock(BlockSystem, stWarn.Render("  会话保存失败: "+err.Error()))
 			}
 		}
 		m.answer = ""
@@ -1307,11 +1292,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func renderConversationBlock(block conversationBlock, width int) string {
 	switch block.Kind {
-	case "user":
+	case BlockUser:
 		return renderUserMessage(block.Raw, block.Retry)
-	case "assistant":
+	case BlockAnswer:
 		return renderAnswerMessage(block.Raw, block.Tools, width)
 	default:
+		// 其他 typed kind 暂保持原渲染字符串（无框语法属 T05-04）。
 		return block.Raw
 	}
 }
@@ -1810,7 +1796,7 @@ func runQuitCommand(m model, args []string) (model, tea.Cmd) {
 	if len(args) >= 1 && args[0] == "yes" {
 		return m, tea.Quit
 	}
-	m.appendBlock(stFaint.Render("  已取消退出。"))
+	m.appendBlock(BlockSystem, stFaint.Render("  已取消退出。"))
 	return m, nil
 }
 
