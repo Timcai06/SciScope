@@ -1038,7 +1038,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.setViewportContent(renderWelcome(innerW, m.recentSessions, nil), true)
 			m.ready = true
 		} else {
+			wasAtBottom := m.vp.AtBottom()
 			m.vp.Width, m.vp.Height = innerW, vh
+			// T05-09 resize 锚定：resize 前在底部则保持贴底（streaming 跟随
+			// 场景），否则保持 YOffset（viewport 内部 clamp）。
+			if wasAtBottom {
+				m.vp.GotoBottom()
+			}
 			if len(m.blocks) == 0 && m.answer == "" {
 				m.loadRecentSessions()
 				m.setViewportContent(renderWelcome(innerW, m.recentSessions, nil), true)
@@ -1122,6 +1128,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Keyboard scrolling of the transcript (viewport's own keymap).
 			m.vp, cmd = m.vp.Update(msg)
 			return m, cmd
+		case "home", "end":
+			// T05-09：viewport 默认 keymap 不含 home/end，显式处理。
+			if msg.String() == "home" {
+				m.vp.GotoTop()
+			} else {
+				m.vp.GotoBottom()
+			}
+			return m, nil
 		case "up", "down", "tab":
 			if m.submenu != "" {
 				items := m.submenuItems()
@@ -1150,6 +1164,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
+			}
+			// T05-09：无 submenu、无 / 命令菜单时，up/down 委托 viewport 滚动
+			// （单行输入框里 up/down 本无意义；滚动 transcript 更符合沉浸式预期）。
+			if msg.String() != "tab" {
+				m.vp, cmd = m.vp.Update(msg)
+				return m, cmd
 			}
 		case "enter":
 			if m.submenu != "" {
