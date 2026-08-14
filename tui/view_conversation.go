@@ -33,7 +33,7 @@ func (m *model) renderBlocksContent(width int) string {
 		}
 		out := block.Rendered
 		// T05-05：finished 且未展开的轨迹块收敛为一行（Enter 展开）。
-		if (block.Kind == BlockResearchPlan || block.Kind == BlockResearchTrace) &&
+		if (block.Kind == BlockResearchPlan || block.Kind == BlockResearchTrace || block.Kind == BlockEvidence) &&
 			block.Status == BlockFinished && !block.Expanded {
 			out = m.collapseTraceBlock(block)
 		}
@@ -62,6 +62,13 @@ func indentToolGroupLine(line string) string {
 func (m *model) collapseTraceBlock(block *ScrollbackBlock) string {
 	lines := strings.Split(block.Rendered, "\n")
 	first := lines[0]
+	// T05 样式优化（项目负责人反馈）：evidence 卡折叠为一行摘要——
+	// 不再把整卡细节堆在结论上方挤压回答内容；Enter 展开查看。
+	if block.Kind == BlockEvidence {
+		summary := evidenceCollapseSummary(lines)
+		return stBullet.Render("⏺ ") + stAccent.Render("证据卡") +
+			stFaint.Render(" · "+summary+" · Enter 展开")
+	}
 	steps := strings.Count(block.Raw, "\n")
 	parts := []string{first}
 	if steps > 0 {
@@ -72,6 +79,23 @@ func (m *model) collapseTraceBlock(block *ScrollbackBlock) string {
 	}
 	parts = append(parts, "Enter 展开")
 	return first + stFaint.Render(" · "+strings.Join(parts[1:], " · "))
+}
+
+// evidenceCollapseSummary 从证据卡渲染行提取折叠摘要（stance/条数等）。
+func evidenceCollapseSummary(lines []string) string {
+	joined := strings.Join(lines, " ")
+	plain := stripANSI(joined)
+	// 立场词优先（强支持/部分支持/证据不足）
+	for _, s := range []string{"强支持", "部分支持", "证据不足", "不支持"} {
+		if strings.Contains(plain, s) {
+			return s
+		}
+	}
+	// 条数（N 条证据）
+	if n := strings.Count(plain, "["); n > 0 {
+		return fmt.Sprintf("%d 条", n)
+	}
+	return "证据详情"
 }
 
 // maybeAnchorToPrompt T05-04 发送后锚定（feature gate：SCISCOPE_TUI_SEND_ANCHOR=1）：
@@ -115,9 +139,22 @@ func renderConversationBlock(block ScrollbackBlock, width int) string {
 		return renderUserMessage(block.Raw, block.Retry)
 	case BlockAnswer:
 		if block.Status == BlockRunning {
-			// T05-04: running 块 animated accent —— 流式正文 + 光标，不跑 Glamour。
+			// T05-04: running 块 animated accent —— 流式正文 + 光标。
+			// T05 样式优化：流式期间同样走轻量 markdown 结构渲染，
+			// 否则 LLM 的 # / * 语法符号在流式过程中裸露（final 才转正）。
+			// 已换行成型的行做完整结构渲染；最后一行（可能未写完）只做
+			// 行内样式 + 光标。
+			raw := strings.TrimRight(block.Raw, "\n")
+			lines := strings.Split(raw, "\n")
+			var body string
+			if len(lines) > 1 {
+				body = renderMarkdownPlain(strings.Join(lines[:len(lines)-1], "\n"), width) + "\n" +
+					stInk.Render(renderMarkdownInline(lines[len(lines)-1]))
+			} else {
+				body = stInk.Render(renderMarkdownInline(raw))
+			}
 			return stBullet.Render("⏺ ") + stAccent.Render("研究结论") + "\n" +
-				stInk.Render(strings.TrimRight(block.Raw, "\n")) + stAccent.Render("▌")
+				body + stAccent.Render("▌")
 		}
 		return renderAnswerMessage(block.Raw, block.Tools, width)
 	default:
@@ -134,11 +171,17 @@ func renderUserMessage(text string, retry bool) string {
 		prefix = "↻"
 		title = "重试问题"
 	}
-	lines := []string{
-		stUser.Render(prefix + " " + title),
-		stInk.Render("  " + text),
-	}
-	return strings.Join(lines, "\n")
+	// T05 样式优化（项目负责人反馈）：用户输入在长对话中易被埋没——
+	// 用左侧 Accent 亮条 + 缩进做视觉锚点（grok 用户消息语义），
+	// 上下文各空一行形成独立区块。不用背景色：行内 reset 会与
+	// paintCanvasLines 的黑底恢复冲突。
+	inner := stUser.Render(prefix+" "+title) + "\n" +
+		stInk.Render("  "+text)
+	return lipgloss.NewStyle().
+		Border(lipgloss.Border{Left: "▎"}).
+		BorderForeground(activeTheme().Accent).
+		Padding(0, 1).
+		Render(inner)
 }
 
 func glamourStyleName() string {
@@ -382,12 +425,16 @@ var (
 )
 
 // renderMarkdownInline 行内样式：`code` 保留反引号（faint）→ **bold** 去
-// 星号（Ink 加粗）→ *em* 去星号（Ink 斜体）。顺序：code 先行（其内容含
-// 星号时不误判）；粗体/斜体在 code 之外匹配。
+// 星号（Ink 加粗）→ *em* 去星号（Ink 斜体）。
+// 嵌套安全：code 先替换为占位符，bold/em 在其外匹配，最后恢复占位符——
+// 避免样式 ANSI 嵌套进后续正则匹配内容（嵌套样式曾在渲染层引发 ANSI
+// 切碎乱码，见 doneMsg Raw 语义修复）。
 func renderMarkdownInline(s string) string {
+	var codes []string
 	s = mdCodeRe.ReplaceAllStringFunc(s, func(m string) string {
 		inner := mdCodeRe.FindStringSubmatch(m)[1]
-		return stMuted.Render("`" + inner + "`")
+		codes = append(codes, "`"+inner+"`")
+		return "\x00code" + string(rune(len(codes)-1)) + "\x00"
 	})
 	s = mdBoldRe.ReplaceAllStringFunc(s, func(m string) string {
 		inner := mdBoldRe.FindStringSubmatch(m)[1]
@@ -397,6 +444,9 @@ func renderMarkdownInline(s string) string {
 		inner := mdEmRe.FindStringSubmatch(m)[1]
 		return lipgloss.NewStyle().Italic(true).Foreground(cInk).Render(inner)
 	})
+	for i, c := range codes {
+		s = strings.ReplaceAll(s, "\x00code"+string(rune(i))+"\x00", stMuted.Render(c))
+	}
 	return s
 }
 
@@ -413,6 +463,7 @@ func renderMarkdownInline(s string) string {
 func renderMarkdownPlain(answer string, width int) string {
 	lines := strings.Split(answer, "\n")
 	var b strings.Builder
+	inCode := false // ``` 围栏代码块
 	for _, raw := range lines {
 		line := strings.TrimRight(raw, " ")
 		trimmed := strings.TrimSpace(line)
@@ -421,6 +472,28 @@ func renderMarkdownPlain(answer string, width int) string {
 			continue
 		}
 		indent := leadingWhitespace(line)
+		// 围栏代码块：``` 开始/结束，内部原样 Muted（代码语义，不做样式）。
+		if strings.HasPrefix(trimmed, "```") {
+			inCode = !inCode
+			b.WriteString(indent + stFaint.Render("┄┄┄") + "\n")
+			continue
+		}
+		if inCode {
+			b.WriteString(indent + stMuted.Render(trimmed) + "\n")
+			continue
+		}
+		// 引用：> 前缀 → 「▎ 」+ Muted 斜体。
+		if strings.HasPrefix(trimmed, "> ") || trimmed == ">" {
+			text := strings.TrimSpace(strings.TrimPrefix(trimmed, ">"))
+			b.WriteString(indent + stAccent.Render("▎ ") +
+				lipgloss.NewStyle().Italic(true).Foreground(cMuted).Render(renderMarkdownInline(text)) + "\n")
+			continue
+		}
+		// 表格行（| 分隔）：保留结构但 Muted 渲染表头与分隔行。
+		if strings.HasPrefix(trimmed, "|") && strings.Contains(trimmed[1:], "|") {
+			b.WriteString(indent + stMuted.Render(renderMarkdownInline(trimmed)) + "\n")
+			continue
+		}
 		switch {
 		case strings.HasPrefix(trimmed, "###"):
 			text := strings.TrimSpace(strings.TrimPrefix(trimmed, "###"))

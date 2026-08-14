@@ -381,14 +381,21 @@ func paintCanvasLines(content string, canvas lipgloss.Color) string {
 // wrapWithFrame 手动绘制全局外边框：content 每行宽 = width-4（含左右各 1 列
 // 内边距），边框行总宽恰为 width。边框色 = Accent。
 func wrapWithFrame(content string, width int) string {
+	// width = 内容区宽（终端宽 - 4：左右边框 2 + 内边距 2）；外框总宽 = width + 4。
 	stFrame := lipgloss.NewStyle().Foreground(cAccent)
-	top := stFrame.Render("╭" + strings.Repeat("─", width-2) + "╮")
-	bottom := stFrame.Render("╰" + strings.Repeat("─", width-2) + "╯")
+	top := stFrame.Render("╭" + strings.Repeat("─", width+2) + "╮")
+	bottom := stFrame.Render("╰" + strings.Repeat("─", width+2) + "╯")
 	lines := strings.Split(content, "\n")
 	var b strings.Builder
 	b.WriteString(top)
 	for _, l := range lines {
 		b.WriteString("\n")
+		// T05 样式优化：行尾补齐空格到内容区宽 width（ANSI 安全：pad 只
+		// 加在行尾纯文本区域），保证每行右框 │ 对齐同一列——evidence 卡
+		// 等内部行宽不足时外框不再出现豁口；顶/底框与行等宽（width+4）。
+		if w := lipgloss.Width(l); w < width {
+			l += strings.Repeat(" ", width-w)
+		}
 		b.WriteString(stFrame.Render("│") + " " + l + " " + stFrame.Render("│"))
 	}
 	b.WriteString("\n" + bottom)

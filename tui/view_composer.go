@@ -27,7 +27,7 @@ func (m model) renderComposer(width int) string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
 		Padding(0, 1).
-		Width(width - 2).
+		Width(width - 4).
 		Render(inputLine)
 }
 

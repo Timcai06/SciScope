@@ -224,7 +224,7 @@ func (m *model) autoFoldTraces() {
 	changed := false
 	for i := range m.blockItems {
 		b := &m.blockItems[i]
-		if (b.Kind == BlockResearchPlan || b.Kind == BlockResearchTrace) &&
+		if (b.Kind == BlockResearchPlan || b.Kind == BlockResearchTrace || b.Kind == BlockEvidence) &&
 			b.Status == BlockFinished && !b.Pinned && b.Expanded {
 			b.Expanded = false
 			changed = true
@@ -239,7 +239,7 @@ func (m *model) autoFoldTraces() {
 func (m *model) toggleLatestTrace() bool {
 	for i := len(m.blockItems) - 1; i >= 0; i-- {
 		b := &m.blockItems[i]
-		if (b.Kind == BlockResearchPlan || b.Kind == BlockResearchTrace) && b.Status == BlockFinished {
+		if (b.Kind == BlockResearchPlan || b.Kind == BlockResearchTrace || b.Kind == BlockEvidence) && b.Status == BlockFinished {
 			b.Expanded = !b.Expanded
 			b.Pinned = true
 			m.blocksVersion++
