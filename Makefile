@@ -10,6 +10,8 @@ BACKEND_HOST ?= 127.0.0.1
 BACKEND_PORT ?= 8000
 HOSTED_BACKEND_IMAGE ?= sciscope-backend:local
 HOSTED_BACKEND_PORT ?= 8000
+# 演示期默认后端（zjgsu2080）；SCISCOPE_BACKEND 运行时仍可覆盖。
+SCISCOPE_HOSTED_BACKEND_URL ?= http://10.21.16.192:8010
 HOSTED_DB_DSN ?=
 DATA_PATH ?= data/sample/papers.sample.json
 HARVEST_SOURCE ?= openalex
@@ -325,7 +327,7 @@ full-rebuild:
 # Terminal agent client (Go / Bubble Tea / Charm) — release binaries use the
 # hosted backend by default; developers can override with SCISCOPE_BACKEND.
 tui:
-	cd tui && GOCACHE=$(GO_BUILD_CACHE) go run .
+	cd tui && GOCACHE=$(GO_BUILD_CACHE) go run -ldflags "-X main.version=$(TUI_VERSION) -X main.defaultHostedBackendURL=$(SCISCOPE_HOSTED_BACKEND_URL)" .
 
 # Offline golden demo: no backend, LLM, PostgreSQL, or network required.
 tui-demo:
