@@ -12,7 +12,7 @@
 跨语言相关性(历史定向样例) & 15 条固定中文主题查询上的 relevance@5=\textbf{1.0}(15/15),优化前为 0.667; 该结果只代表定向样例,不是全局质量证明。 \\
 趋势描述边界(当前回测) & Pearson=\textbf{0.9756},但 MAE 与 sMAPE 在 2/2 个滚动切分上均未超过 naive 基线,故当前只可称\textbf{描述性趋势}。 \\
 论文推荐(四路自动多基线) & `current` 100 seeds/500 recs: same-field \textbf{0.7180},shared-keyword \textbf{0.6280},semantic \textbf{0.9263},diversity \textbf{0.0823},novelty proxy \textbf{0.5885}; 相对 `dense` 的 0.6940/0.5080/0.9332/0.0682/0.5810 是工程权衡,不是全面胜出。 \\
-工程运行态(2026-08-10) & 后端回归 \textbf{539 passed, 1 skipped}; 远端全量 embedding 运行态已验证 \texttt{chunk\_embeddings=367{,}861/367{,}861}、\texttt{paper\_embeddings=159{,}164/159{,}164}; OpenCode 顺序调用核查 tool + disputes resource 已通过。 \\
+工程运行态(2026-08-14) & 后端回归 \textbf{539 passed, 1 skipped}; 2026-08-14 讯飞增量入库后 \texttt{chunk\_embeddings=413{,}971}、\texttt{papers=164{,}730}; 2026-08-10 历史口径 367{,}861/367{,}861 与 159{,}164/159{,}164 保留; OpenCode 顺序调用核查 tool + disputes resource 已通过。 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
@@ -35,7 +35,7 @@
 图~\ref{fig:eval-dashboard} 将核心效果指标集中展示,图~\ref{fig:asset-funnel} 则说明这些指标背后的文件资产链路。二者分别对应"系统效果"与"可复现资产"两个评审入口。
 
 \subsection{检索质量与效率(核心测试)}
-采用\textbf{自检索协议}(以论文自身标题/关键词为查询,检验能否检回该文)评测混合检索。评测结果固化于 \texttt{output/eval/eval\_report.json};当前运行时库表包含 159{,}164 篇论文和 367{,}861 个片段,该章中的 recall/MRR 仍引用 2026-06-22 历史固定评测而非 2026-08-10 重跑结果:
+采用\textbf{自检索协议}(以论文自身标题/关键词为查询,检验能否检回该文)评测混合检索。评测结果固化于 \path{output/eval/eval_report.json};当前运行时库表包含 164{,}730 篇论文和 413{,}971 个片段(2026-08-14,含讯飞增量),该章中的 recall/MRR 仍引用 2026-06-22 历史固定评测而非 2026-08-10 重跑结果:
 
 \begin{tableblock}
 \begin{tabularx}{0.94\textwidth}{Xcccc}
@@ -75,7 +75,7 @@
 \subsection{全量向量运行态}
 2026-08-10 在 2080 Ti 远端运行态中,全量 \texttt{chunk\_embeddings} 与
 \texttt{paper\_embeddings} 已分别达到 367{,}861/367{,}861 与
-159{,}164/159{,}164,从而关闭了"推荐缺 embedding"这一工程阻塞。这里仅使用能够由远端数据库
+159{,}164/159{,}164,从而关闭了"推荐缺 embedding"这一工程阻塞;2026-08-14 讯飞交付包 5{,}566 篇(46{,}110 块;2 篇摄取失败不计入)经 GPU 向量化增量入库,总 \texttt{chunk\_embeddings=413{,}971}、\texttt{papers=164{,}730}。这里仅使用能够由远端数据库
 计数和运行日志复核的总量,不再保留缺少独立证据产物的领域覆盖消融数字。该证据证明的是
 \textbf{全量资产可运行};推荐质量与用户价值仍需单独评测。
 
@@ -97,7 +97,7 @@
 据实接地 / 可验证 & \textbf{论断核查 + 引用证据} & 易幻觉 & 部分支持 & 不支持 \\
 跨语言中→英检索 & \textbf{固定中文主题样例已验证} & 依模型能力波动 & 通常较弱 & 不支持 \\
 本地部署 / 数据主权 & \textbf{数据、索引、模型本地} & 查询上传第三方 & 查询上传第三方 & 仅检索外部库 \\
-自主多步编排 & \textbf{可观测规划/反思 + 专业技能 + 10 类运行时能力} & 非工具化问答 & 固定流程为主 & 不支持 \\
+自主多步编排 & \textbf{可观测规划/反思 + 专业技能 + 12 类运行时能力} & 非工具化问答 & 固定流程为主 & 不支持 \\
 可复现 / IP 清晰 & \textbf{\texttt{make} 重建资产} & 黑盒调用 & 平台黑盒 & 无模型资产 \\
 \bottomrule
 \end{tabularx}
@@ -106,14 +106,14 @@
 
 \subsection{趋势回测与推荐评估(评测证据包)}
 历史自检索评测由 \texttt{make eval-all} 保留;当前趋势回测由
-\texttt{python -m evaluation.eval\_trends\_backtest} 重建,推荐四路对照由
-\texttt{python -m evaluation.eval\_recommend\_bakeoff} 在全量远端数据库重建。对应产物分别是
+\path{python -m evaluation.eval_trends_backtest} 重建,推荐四路对照由
+\path{python -m evaluation.eval_recommend_bakeoff} 在全量远端数据库重建。对应产物分别是
 \texttt{output/eval/eval\_report.\{json,md\}}、\texttt{trends\_backtest.\{json,md\}} 与
 \texttt{recommend\_bakeoff.\{json,md\}};不再声称单个旧入口覆盖全部当前指标。
 
 \textbf{趋势回测}(拟合 2022--2024 → 预测 2025,1{,}998 个关键词):预测与真实的 Pearson 相关 \textbf{0.9756},但在两个固定滚动切分上,趋势模型的 MAE 与 sMAPE 均未超过 last-value / moving-average naive 基线,因此当前输出被明确降级为 \textbf{descriptive\_only=true}。它可以用于描述历史方向、波动和 burst,但\textbf{不得}在答辩或报告中写成"预测能力"或"研究方向预测结论"。
 
-\textbf{推荐自动多基线评测}(2026-08-10,100 篇 seeds,top-5):四路方法 `popularity\_proxy / keyword\_tfidf / dense / current` 已统一落表。`current` 的 coverage 为 \textbf{1.0},same-field \textbf{0.7180},shared-keyword \textbf{0.6280},平均语义相似 \textbf{0.9263},diversity \textbf{0.0823},novelty proxy \textbf{0.5885}; 相比 pure `dense` 的 0.6940 / 0.5080 / 0.9332 / 0.0682 / 0.5810,它在同领域率、共享关键词、多样性和新颖度代理上更高,但语义相似度更低,且延迟显著更高(本次 `current` p50 约 100.6\,ms, `dense` p50 约 4.2\,ms)。这些都是\textbf{自动代理指标},只能说明推荐器之间的工程权衡,不能替代研究者满意度、用户盲评或真实科研提效证明。
+\textbf{推荐自动多基线评测}(2026-08-10,100 篇 seeds,top-5):四路方法 \path{popularity_proxy / keyword_tfidf / dense / current} 已统一落表。`current` 的 coverage 为 \textbf{1.0},same-field \textbf{0.7180},shared-keyword \textbf{0.6280},平均语义相似 \textbf{0.9263},diversity \textbf{0.0823},novelty proxy \textbf{0.5885}; 相比 pure `dense` 的 0.6940 / 0.5080 / 0.9332 / 0.0682 / 0.5810,它在同领域率、共享关键词、多样性和新颖度代理上更高,但语义相似度更低,且延迟显著更高(本次 `current` p50 约 100.6\,ms, `dense` p50 约 4.2\,ms)。这些都是\textbf{自动代理指标},只能说明推荐器之间的工程权衡,不能替代研究者满意度、用户盲评或真实科研提效证明。
 
 \subsection{数据治理成效}
 \begin{tableblock}
@@ -125,7 +125,7 @@
 PDF 垃圾正文过滤 & 清 83 篇 / 46 片段 & 显著减少回答混入 PDF 乱码的风险 \\
 关键词噪声过滤 & arXiv 码/泛标签/期刊名 & 趋势 top 回归真实主题 \\
 摘要覆盖治理 & 140{,}183 篇有摘要 & 摘要覆盖率 83.22\%,支撑主题和检索解释 \\
-开放正文补充证据 & 分析层正文片段覆盖集中于开放全文来源 & 分析层正文片段覆盖率 8.99\%; 处理后语料中 full-text 非空为 13{,}400/159{,}164(8.42\%),只用于深读补充证据 \\
+开放正文补充证据 & 分析层正文片段覆盖集中于开放全文来源 & 分析层正文片段覆盖率 8.99\%; 处理后语料中 full-text 非空为 13{,}400/159{,}164(8.42\%); 另讯飞增量 5{,}566 篇中 5{,}559 篇全文 $\geq$500 字(预印本 PDF 直接解析),全文级深读证据显著扩充 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
@@ -133,12 +133,12 @@ PDF 垃圾正文过滤 & 清 83 篇 / 46 片段 & 显著减少回答混入 PDF �
 
 \subsection{模型资产与工程质量}
 \begin{tableblock}
-\begin{tabularx}{0.94\textwidth}{Xc}
+\begin{tabularx}{0.96\textwidth}{p{42mm}X}
 \toprule
 \textbf{模型文件 / 索引 / 质量项} & \textbf{规模} \\
 \midrule
-片段向量 \texttt{chunk\_embeddings}(pgvector) & 367{,}861（2026-08-10 远端全量运行态） \\
-论文级向量 \texttt{paper\_embeddings} & 159{,}164（2026-08-10 远端全量运行态） \\
+片段向量 \texttt{chunk\_embeddings}(pgvector) & 413{,}971（2026-08-14,讯飞增量入库后） \\
+论文级向量 \texttt{paper\_embeddings} & 164{,}730（2026-08-14,讯飞增量入库后） \\
 主题模型(LDA + NMF) & 40 主题 / 模型 \\
 知识图谱(作者/关键词/主题) & 客户端友好 JSON \\
 后端自动化测试 & \texttt{make test-backend} 实测 539 passed、1 skipped（2026-08-10）; \texttt{make agent-smoke} 仅作历史黑盒记录,不替代当前工程基线 \\
@@ -146,7 +146,7 @@ PDF 垃圾正文过滤 & 清 83 篇 / 46 片段 & 显著减少回答混入 PDF �
 \end{tabularx}
 \end{tableblock}
 \begin{plainbox}
-\textbf{产品化呈现}:智能体运行时采用可观测状态图编排,向终端客户端输出科研工作流阶段、耗时、会话与重试信息;TUI 据此渲染阶段条、分组时间线、会话保存与错误恢复。最终回答采用"研究结论 + 证据工具 + 过程入口"结构,工具日志不混入主聊天。2026-08-10 已新增两条工程证据:一是全量 embedding/ANN 运行态关闭了推荐阻塞,二是真实 OpenCode 已能顺序完成核查 tool 与争议 resource 读取。全部模型文件仍可由 \texttt{make agent-build} 一键重建,知识产权清晰、评委可复现。
+\textbf{产品化呈现}:智能体运行时采用可观测状态图编排,向终端客户端输出科研工作流阶段、耗时、会话与重试信息;TUI 据此渲染阶段条、分组时间线、会话保存与错误恢复。最终回答采用"研究结论 + 证据工具 + 过程入口"结构,工具日志不混入主聊天。2026-08-10 已新增两条工程证据:一是全量 embedding/ANN 运行态关闭了推荐阻塞,二是真实 OpenCode 已能顺序完成核查 tool 与争议 resource 读取。2026-08-14 讯飞交付包 5{,}566 篇全链路入库(GPU 向量化,总 413{,}971 块),演示服务器后端 0.0.0.0:8010 对外服务,mac 本地 TUI 实时连接并通过真实问答验证。全部模型文件仍可由 \texttt{make agent-build} 一键重建,知识产权清晰、评委可复现。
 \end{plainbox}
 
 \subsection{开源治理、分发与托管体验}
@@ -158,11 +158,11 @@ PDF 垃圾正文过滤 & 清 83 篇 / 46 片段 & 显著减少回答混入 PDF �
 \textbf{交付面} & \textbf{当前状态与边界} \\
 \midrule
 终端客户端分发 & 提供 \texttt{npm}、Homebrew 与 Scoop 三条安装路径;其中 Scoop 是当前 Windows 稳定路径,Homebrew 面向 macOS 用户,\texttt{npm} 面向已有 Node.js 的跨平台开发者。 \\
-公开托管后端 & 公开体验入口采用 Render Web Service + Supabase PostgreSQL/pgvector + DeepSeek API,用于安装后快速试用和演示视频录制。 \\
+公开托管后端 & 公开体验入口采用 Render Web Service + Supabase PostgreSQL/pgvector + DeepSeek API,用于安装后快速试用和演示视频录制;与演示服务器(zjgsu2080 0.0.0.0:8010,全量 164{,}730 篇语料)为两条独立通道。 \\
 能力边界 & 托管后端定位为 demo-lite 子集,受免费数据库容量与冷启动限制;完整语义覆盖、全量向量表和长期稳定服务仍以本地/自建 PostgreSQL + pgvector 部署为准。 \\
 提交边界 & 最终提交按"报告与附件逐文件上传"组织,两份 PDF 独立上传;附件保留源代码、运行说明、评测/图谱/模型小型结果,不随附大型 \texttt{data/}、\texttt{models/} 与数据库运行表。 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
 
-因此,本项目的产品化状态不是只停留在离线脚本:评委可通过报告和附件审阅完整方法,通过本地命令重建全量能力,也可通过已分发的 TUI 连接公开后端进行轻量体验。三者分别服务"可审阅、可复现、可试用"三个目标。
+因此,本项目的产品化状态不是只停留在离线脚本:评委可通过报告和附件审阅完整方法,通过本地命令重建全量能力,也可通过已分发的 TUI 连接公开后端进行轻量体验;演示期 TUI 亦实时连接演示服务器(zjgsu2080:8010,全量库 + DeepSeek 生成层),现场可直连问答。三者分别服务"可审阅、可复现、可试用"三个目标。

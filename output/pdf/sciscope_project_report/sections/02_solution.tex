@@ -18,7 +18,7 @@
 \node[layer, text width=150mm] (raw) at (78,5) {6 公开来源(arXiv/PubMed/PMC/OpenAlex/Crossref/DOAJ)→ 原始 JSONL(\texttt{data/raw\_canonical})};
 
 \node[lab] at (-3,22)  {2. 治理};
-\node[layer, text width=150mm] (proc) at (78,22) {清洗规范化 · \textbf{标题优先去重} · front-matter/PDF 垃圾过滤 · NUL 清洗 → 159{,}164 篇处理后语料(\texttt{processed})};
+\node[layer, text width=150mm] (proc) at (78,22) {清洗规范化 · \textbf{标题优先去重} · front-matter/PDF 垃圾过滤 · NUL 清洗 → 159{,}164 篇六源语料 + 5{,}566 篇讯飞交付包语料(\texttt{processed})};
 
 \node[lab] at (-3,42)  {3. 加工};
 \node[band, text width=70mm] (ana) at (40,42) {\textbf{分析层}\\领域分布·关键词演化·作者网络·主题模型\\{\scriptsize ->《数据分析报告》(成果 1)}};
@@ -57,21 +57,17 @@
 \textbf{设计原则}:(1) 离线可复现,每层产物由 \texttt{make} 目标生成;(2) 大模型可替换,生成层走 OpenAI 兼容接口;(3) 关键可验证结论必须带引用或显式降级为证据不足/依赖故障;(4) 本地优先,数据与索引均在本地,支持涉密场景。
 
 \subsection{终端产品形态}
-SciScope 不止是代码与模型文件,而是一个可运行的\textbf{终端智能体客户端}(Go TUI):用户输入研究问题或待核查论断,客户端消费后端 \texttt{/agent/stream} 的 SSE 事件,实时渲染规划、工具调用、证据与最终回答;它本身不承载推理与检索决策,只做协议消费与呈现,见图~\ref{fig:tui-product}。客户端采用\textbf{沉浸式黑底画布 + 全局主题外框}的呈现风格:研究计划与自检过程在回答完成后\textbf{自动折叠为一行摘要},证据卡收敛为可展开层(\texttt{Enter} 展开完整论文列表与接地相似度),首屏优先呈现结论与证据等级,过程细节按需展开——工作流可见而不喧宾夺主。斜杠命令(\texttt{/verify}、\texttt{/trend}、\texttt{/review}、\texttt{/export})按分类分组呈现,回答内容经结构化渲染(标题、列表、加粗、代码块)而非裸露 Markdown 语法符号。
+SciScope 不止是代码与模型文件,而是一个可运行的\textbf{终端智能体客户端}(Go TUI):用户输入研究问题或待核查论断,客户端消费后端 \texttt{/agent/stream} 的 SSE 事件,实时渲染规划、工具调用、证据与最终回答;它本身不承载推理与检索决策,只做协议消费与呈现,见图~\ref{fig:tui-product}。客户端采用\textbf{沉浸式纯黑画布 + 圆角命令面板}的呈现风格(2026-08 已重构为 Grok 式沉浸态):首屏为居中 Welcome(品牌标识 + 最近会话 + 命令入口),研究计划与自检过程在回答完成后\textbf{自动折叠为一行摘要},证据卡收敛为可展开层(\texttt{Enter} 展开完整论文列表与接地相似度),首屏优先呈现结论与证据等级,过程细节按需展开——工作流可见而不喧宾夺主。斜杠命令(\texttt{/verify}、\texttt{/trend}、\texttt{/review}、\texttt{/export})经 \texttt{/} 呼出 \textbf{Command Palette}(常用/会话/证据/系统四分组 + 过滤 + 选中态)呈现,回答内容经结构化渲染(标题、列表、加粗、代码块)而非裸露 Markdown 语法符号。
 
 \begin{figure}[!htbp]
 \centering
 \figasset[0.96\textwidth]{tui_product.png}
-\caption{终端智能体客户端(Go TUI)实景:沉浸式黑底画布与主题外框,欢迎页居中呈现品牌标识与命令入口;底部为“研究问题 / 待核查论断”输入栏。客户端只消费 \texttt{/agent/stream} 的 SSE 事件,渲染研究计划、工具调用、证据与回答。数据来源:运行中的 \texttt{make tui} 客户端截图。}
+\caption{终端智能体客户端(Go TUI)实景:沉浸式纯黑画布,欢迎页居中呈现品牌标识与命令入口;底部为“研究问题 / 待核查论断”输入栏。客户端只消费 \texttt{/agent/stream} 的 SSE 事件,渲染研究计划、工具调用、证据与回答。数据来源:运行中的 \texttt{make tui} 客户端截图。}
 \label{fig:tui-product}
 \end{figure}
 
-\begin{figure}[!htbp]
-\centering
-\figasset[0.96\textwidth]{tui_evidence_flow.png}
-\caption{问答完成态界面:用户问题以左侧主题色亮条标识;研究计划与自检过程折叠为一行摘要;证据卡折叠为“证据卡 · 支持等级 · Enter 展开”,结论与证据等级优先呈现。}
-\label{fig:tui-evidence-flow}
-\end{figure}
+% 问答完成态实景图与 fig:tui-product 为同源截图(2026-08-14 核对),
+% 为避免图文不符暂不重复刊登;问答态截图(用户消息亮条 + 折叠证据卡)在图片处理阶段补齐。
 
 \subsection{核心链路:证据接地的检索增强问答}
 问答不直接交给大模型臆测,而是\textbf{先检索证据、再据证生成},每条回答都可追溯到具体论文:
@@ -90,7 +86,7 @@ SciScope 不止是代码与模型文件,而是一个可运行的\textbf{终端�
 \node[b, text width=22mm] (vec) at (40,-8) {语义检索\\pgvector 向量};
 \node[bb, text width=22mm] (rrf) at (78,0) {RRF 融合\\去重到论文};
 \node[bb, text width=22mm] (ev) at (114,0) {证据卡\\标题/年份/片段};
-\node[b, text width=24mm] (llm) at (151,0) {大模型据证生成\\\textbf{带引用回答}};
+\node[b, text width=24mm] (llm) at (148,0) {大模型据证生成\\\textbf{带引用回答}};
 \draw[arrow] (q) -- (fts); \draw[arrow] (q) -- (vec);
 \draw[arrow] (fts) -- (rrf); \draw[arrow] (vec) -- (rrf);
 \draw[arrow] (rrf) -- (ev); \draw[arrow] (ev) -- (llm);
@@ -142,7 +138,7 @@ SciScope 不止是代码与模型文件,而是一个可运行的\textbf{终端�
 \textbf{核心机制}:
 \begin{itemize}
 \item \textbf{显式规划}:复杂问题先生成可执行研究计划,再据计划逐步执行;计划对用户与评委\textbf{可见},避免"直接给答案"的黑盒感。
-\item \textbf{工具自主编排}:大模型按需调用检索、推荐、趋势、图谱、论断核查等 10 类运行时能力,可\textbf{多步链式}(例如先检索得到真实论文,再据此推荐相近论文或分析趋势);只读能力可并行执行,相同参数自动去重防止空转。
+\item \textbf{工具自主编排}:大模型按需调用检索、推荐、趋势、图谱、论断核查等 12 类运行时能力(与代码注册表 \texttt{NATIVE\_TOOLS} 一一对应),可\textbf{多步链式}(例如先检索得到真实论文,再据此推荐相近论文或分析趋势);只读能力可并行执行,相同参数自动去重防止空转。
 \item \textbf{专业技能工作流}:终端命令把论断核查、文献综述、趋势分析和论文推荐展开为可审计流程模板,约束关键任务必须先取证、再综合。
 \item \textbf{反思与自评}:回答后由模型自评"是否充分、关键论断是否都有证据支撑",不足则改写检索\textbf{重试一次}。
 \item \textbf{上下文压缩}:长会话自动压缩历史工具结果,避免超出上下文窗口。
@@ -154,7 +150,7 @@ SciScope 不止是代码与模型文件,而是一个可运行的\textbf{终端�
 \end{itemize}
 
 \begin{plainbox}
-\textbf{当前产品化路线}:智能体由单一可观测状态图编排,无运行时开关。底层节点被翻译为用户可理解的科研工作流阶段;TUI 在运行中显示阶段条,并用分组时间线回看证据链。会话标识支持同线程恢复与重试。\textbf{MCP 双向互通与专员子智能体已落地}:2026-08-10 已在真实 OpenCode 客户端上验证"先核查 tool、再读取 disputes resource"的顺序调用;下一阶段聚焦持久化 checkpoint 与 Human-in-the-Loop。10 类运行时能力通过同一契约维护,确保报告中的能力清单与实际系统不漂移。
+\textbf{当前产品化路线}:智能体由单一可观测状态图编排,无运行时开关。底层节点被翻译为用户可理解的科研工作流阶段;TUI 在运行中显示阶段条,并用分组时间线回看证据链。会话标识支持同线程恢复与重试(会话 checkpoint 为内存级,进程内持久)。\textbf{MCP 双向互通与专员子智能体已落地}:2026-08-10 已在真实 OpenCode 客户端上验证"先核查 tool、再读取 disputes resource"的顺序调用;下一阶段聚焦跨进程持久化 checkpoint(如 SQLite/Postgres saver)与 Human-in-the-Loop。12 类运行时能力通过同一契约维护,确保报告中的能力清单与实际系统不漂移。
 \end{plainbox}
 
 \begin{tableblock}
@@ -180,11 +176,14 @@ SciScope 不止是代码与模型文件,而是一个可运行的\textbf{终端�
 跨语言文献检索 & 中文或英文问题均可命中英文论文,输出论文、年份、片段与来源 \\
 趋势描述 / 方向辅助 & 给出关键词/主题热度、增长趋势、生命周期与候选方向信号,并标注不确定边界; 未经回测验证不得写成预测能力 \\
 论文推荐 & 基于语义、关键词、作者关系与时近性给出可解释推荐,不是单纯相似度排序 \\
-论文详情与对比 & 对真实论文编号取详情或做多维对比,用于综述与立项查新 \\
+论文详情 & 对真实论文编号取详情,用于综述与立项查新 \\
+结构化论文信息 & 单篇论文的结构化摘要卡(结论/方法/指标),支撑快速精读 \\
+论文对比 & 对多篇真实论文做多维对比,用于选型与批判性阅读 \\
 领域综述素材 & 检索代表论文并组织成综述素材,支撑快速调研 \\
 知识图谱查询 & 展示作者合作、关键词共现、主题社区和 ego 子图,支撑潜在合作者识别 \\
 引文导出 & 输出规范 BibTeX 条目,服务论文写作与报告归档 \\
 论断核查 & 用检索证据 + 立场判定给出支持/反驳/证据不足,并给出可追溯证据与拒答边界 \\
+争议读取 & 列出同 claim 的争议记录与三读立场,支撑分歧追溯与审计 \\
 专员子智能体 & 将综述、趋势、批判核查等聚焦任务交给受限工具集的专员完成 \\
 \bottomrule
 \end{tabularx}
@@ -193,7 +192,7 @@ SciScope 不止是代码与模型文件,而是一个可运行的\textbf{终端�
 \subsection{开放与可扩展:MCP 双向互通 + 专员子智能体}
 在固定的领域工具之外,智能体层做了三项可扩展性升级,使 SciScope 从"封闭工具集"走向\textbf{开放智能体生态}:
 \begin{itemize}
-\item \textbf{1. SciScope 作为 MCP 服务端}:当前能力可经模型上下文协议(Model Context Protocol, MCP)对外暴露,\textbf{任意 MCP 客户端}(Claude Desktop、Cursor、OpenCode 等)可直接调用接地语料检索、论断核查与争议读取——把护城河(16 万语料)开放成生态入口而非自用孤岛。
+\item \textbf{1. SciScope 作为 MCP 服务端}:当前能力可经模型上下文协议(Model Context Protocol, MCP)对外暴露,\textbf{任意 MCP 客户端}(Claude Desktop、Cursor、OpenCode 等)可直接调用接地语料检索、论断核查与争议读取——把护城河(16.5 万语料)开放成生态入口而非自用孤岛。
 \item \textbf{2. 消费外部 MCP 工具}:智能体可将外部 MCP 服务端能力并入统一调度。\textbf{新增能力(如联网取全文、Web 检索)由"插入 MCP 服务"获得,而非改造核心系统},核心工具保持精简、聚焦治理语料。
 \item \textbf{3. 专员子智能体(多 Agent 分工)}:复杂多面任务可下派给\textbf{综述员 / 趋势分析师 / 批判核查员}三类专员,各携受限能力集独立完成子任务;专员不再继续委派,\textbf{结构上杜绝递归}。
 \end{itemize}
@@ -219,7 +218,7 @@ SciScope 不止是代码与模型文件,而是一个可运行的\textbf{终端�
 \item \textbf{推荐模型}:论文级平均向量 + 多信号加权,逐条给出可解释因子;重排采用最大边际相关(Maximum Marginal Relevance, MMR),即 $\lambda sim(q,d)-(1-\lambda)\max_{d'\in S}sim(d,d')$,兼顾相关性与多样性。
 \item \textbf{知识图谱}:NetworkX 中心度/社区,百万级边按中心度剪枝导出 JSON,作者 ego 图走 SQL 实时查询。
 \item \textbf{生成层}:OpenAI 兼容本地服务,输出限长防失控,可平滑切换更大/远程模型。
-\item \textbf{智能体编排}:基于 LangGraph StateGraph 的科研智能体运行时。理解问题、制定计划、选择能力、执行工具、观察结果、自检修正、综合回答被拆为可观察节点;底层使用本地 Qwen2.5-7B,支持流式选工具、只读工具并行执行、调用去重、规划/反思自校验、会话 checkpoint 与同线程重试;事件流向用户呈现科研工作流阶段。
+\item \textbf{智能体编排}:基于 LangGraph StateGraph 的科研智能体运行时。理解问题、制定计划、选择能力、执行工具、观察结果、自检修正、综合回答被拆为可观察节点;底层默认本地 Qwen2.5-7B(演示服务器当前为 DeepSeek 云端,OpenAI 兼容切换,编排逻辑不变),支持流式选工具、只读工具并行执行、调用去重、规划/反思自校验、会话 checkpoint 与同线程重试;事件流向用户呈现科研工作流阶段。
 \end{itemize}
 
 \textbf{证据接地口径}:论断核查不把语义相似度包装为形式逻辑证明, 而是将论断 $c$ 与证据片段 $e$ 的接地强度表达为可解释评分:
@@ -229,8 +228,8 @@ g(c,e)=\alpha\,sim(c,e)+\beta\,source(e)+\gamma\,recency(e)
 
 \subsection{实现过程}
 \textbf{数据生成与采集} → 6 源按领域/年份抓取,形成可追溯的原始分区底账。\\
-\textbf{数据组织与治理} → 规范化字段;标题优先去重(合并跨源/预印本同篇,留最全一条)+ front-matter 剔除 + PDF 垃圾/ NUL 清洗;168{,}447 条分析语料进一步形成 159{,}164 篇处理后语料文件,运行时库表当前装载 159{,}164 篇论文与 367{,}861 个片段。\\
-\textbf{信息汲取与建模} → 切片入库,计算片段/论文向量,拟合趋势/推荐/图谱/主题;关键词统一过滤 arXiv 码与超泛标签。模型资产可由一键流水线重建;其中全量 embedding 与 ANN 索引已于 2026-08-10 在 2080 Ti 远端运行态验证。\\
+\textbf{数据组织与治理} → 规范化字段;标题优先去重(合并跨源/预印本同篇,留最全一条)+ front-matter 剔除 + PDF 垃圾/ NUL 清洗;168{,}447 条分析语料进一步形成 159{,}164 篇处理后语料文件,另讯飞交付包 5{,}566 篇经同一治理链入库,运行时库表当前装载 164{,}730 篇论文与 413{,}971 个片段。\\
+\textbf{信息汲取与建模} → 切片入库,计算片段/论文向量,拟合趋势/推荐/图谱/主题;关键词统一过滤 arXiv 码与超泛标签。模型资产可由一键流水线重建;其中全量 embedding 与 ANN 索引已于 2026-08-10 在 2080 Ti 远端运行态验证,2026-08-14 讯飞增量 46{,}110 块已全部 GPU 向量化入库(\texttt{chunk\_embeddings} 总 413{,}971),演示服务器后端 0.0.0.0:8010 对外可用、mac 本地 TUI 实测连通。\\
 \textbf{服务与交互} → FastAPI 暴露检索/问答/趋势/推荐/图谱及\textbf{智能体流式}接口;终端 AI 助手自主编排工具;数据库不可用时自动回退内存检索,保证演示鲁棒。
 
 \subsection{交付结构与复现索引}

@@ -29,7 +29,7 @@
 \textbf{种子论文}:\texttt{PMC13273979}(AI 药物发现方向)\par\vspace{2pt}
 \textbf{推荐}(每条附可解释因子 semantic / keyword / author / recency):
 \begin{tableblock}
-\begin{tabularx}{\textwidth}{Xccc}
+\begin{tabularx}{0.9\textwidth}{Xccc}
 \toprule
 \textbf{推荐论文} & \textbf{年份} & \textbf{语义相似} & \textbf{融合因子} \\
 \midrule
@@ -56,7 +56,7 @@ Advancing Drug Discovery with AI: Machine and Deep Learning & 2026 & 0.915 & sem
 \end{plainbox}
 
 \subsection{用例六:科研智能体自主多步编排(真实轨迹)}
-下面是终端智能体处理一个复合问题的\textbf{真实执行轨迹}(本地 Qwen2.5-7B),展示"规划 → 自主取证 → 多步链式 → 据证作答":
+下面是终端智能体处理一个复合问题的\textbf{真实执行轨迹}(本地 Qwen2.5-7B;演示服务器当前为 DeepSeek,编排行为一致),展示"规划 → 自主取证 → 多步链式 → 据证作答":
 \begin{plainbox}
 \textbf{提问}:推荐几篇关于知识图谱的代表论文并说明趋势\par\vspace{3pt}
 \statusbadge{1. 规划} 自动生成计划:先检索代表论文 → 再基于真实论文做推荐 → 最后查询"knowledge graph"趋势\par\vspace{2pt}
