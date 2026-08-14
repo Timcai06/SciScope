@@ -18,7 +18,7 @@
 \node[layer, text width=150mm] (raw) at (78,5) {6 公开来源(arXiv/PubMed/PMC/OpenAlex/Crossref/DOAJ)→ 原始 JSONL(\texttt{data/raw\_canonical})};
 
 \node[lab] at (-3,22)  {2. 治理};
-\node[layer, text width=150mm] (proc) at (78,22) {清洗规范化 · \textbf{标题优先去重} · front-matter/PDF 垃圾过滤 · NUL 清洗 → 159{,}164 篇六源语料 + 5{,}566 篇讯飞交付包语料(\texttt{processed})};
+\node[layer, text width=150mm] (proc) at (78,22) {清洗规范化 · \textbf{标题优先去重} · front-matter/PDF 垃圾过滤 · NUL 清洗 → 164{,}709 篇处理后语料(含讯飞 5{,}566, \texttt{processed})};
 
 \node[lab] at (-3,42)  {3. 加工};
 \node[band, text width=70mm] (ana) at (40,42) {\textbf{分析层}\\领域分布·关键词演化·作者网络·主题模型\\{\scriptsize ->《数据分析报告》(成果 1)}};
@@ -228,7 +228,7 @@ g(c,e)=\alpha\,sim(c,e)+\beta\,source(e)+\gamma\,recency(e)
 
 \subsection{实现过程}
 \textbf{数据生成与采集} → 6 源按领域/年份抓取,形成可追溯的原始分区底账。\\
-\textbf{数据组织与治理} → 规范化字段;标题优先去重(合并跨源/预印本同篇,留最全一条)+ front-matter 剔除 + PDF 垃圾/ NUL 清洗;168{,}447 条分析语料进一步形成 159{,}164 篇处理后语料文件,另讯飞交付包 5{,}566 篇经同一治理链入库,运行时库表当前装载 164{,}730 篇论文与 413{,}971 个片段。\\
+\textbf{数据组织与治理} → 规范化字段;标题优先去重(合并跨源/预印本同篇,留最全一条)+ front-matter 剔除 + PDF 垃圾/ NUL 清洗;174{,}013 条分析语料(含讯飞交付包 5{,}566 篇, 2026-08-14 全量重跑)进一步形成 164{,}709 篇处理后语料文件,运行时库表当前装载 164{,}730 篇论文与 413{,}971 个片段。\\
 \textbf{信息汲取与建模} → 切片入库,计算片段/论文向量,拟合趋势/推荐/图谱/主题;关键词统一过滤 arXiv 码与超泛标签。模型资产可由一键流水线重建;其中全量 embedding 与 ANN 索引已于 2026-08-10 在 2080 Ti 远端运行态验证,2026-08-14 讯飞增量 46{,}110 块已全部 GPU 向量化入库(\texttt{chunk\_embeddings} 总 413{,}971),演示服务器后端 0.0.0.0:8010 对外可用、mac 本地 TUI 实测连通。\\
 \textbf{服务与交互} → FastAPI 暴露检索/问答/趋势/推荐/图谱及\textbf{智能体流式}接口;终端 AI 助手自主编排工具;数据库不可用时自动回退内存检索,保证演示鲁棒。
 

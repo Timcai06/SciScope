@@ -1,7 +1,7 @@
 \section{数据覆盖与字段质量}
 
 \begin{reportbox}{当前数据基线}
-本轮数据覆盖 OpenAlex、arXiv、PubMed、PMC、Crossref 和 DOAJ 六个公开来源, 共形成 169,324 条原始记录。经标准化、异常年份治理和跨源去重后, 进入分析层的语料为 168,447 条, 其中 159,382 条位于 2022--2026 年主分析窗口。\textbf{2026-08-14 增量}:讯飞交付包 5{,}566 篇预印本 PDF(经 PDF 内嵌元数据解析)已按同一治理链全链路入库运行时 PostgreSQL(\texttt{source=iflytek}, 与六源主键零冲突), 库表规模为 \texttt{papers=164{,}730}、\texttt{chunk\_embeddings=413{,}971}。本报告分布级统计(来源/年份/领域/覆盖率)已合并讯飞增量重算; 趋势、主题与图谱统计仍以 2026-08-10 快照为基准(3.3\% 增量对热点排序与社区结构的方向性结论影响有限)。
+本轮数据覆盖 OpenAlex、arXiv、PubMed、PMC、Crossref 和 DOAJ 六个公开来源 + 讯飞交付包(\texttt{source=iflytek}), 共形成 174,890 条原始记录。经标准化、异常年份治理和跨源去重后, 进入分析层的语料为 174,013 条, 其中 160,908 条位于 2022--2026 年主分析窗口。讯飞交付包 5{,}566 篇预印本 PDF(bioRxiv/medRxiv/arXiv, 经 PDF 内嵌元数据解析)已于 2026-08-14 全链路入库运行时 PostgreSQL(\texttt{papers=164{,}730}、\texttt{chunk\_embeddings=413{,}971}), 分布/趋势/图谱/主题统计均为合并讯飞后的全量重算结果。
 \end{reportbox}
 
 \subsection{来源结构}

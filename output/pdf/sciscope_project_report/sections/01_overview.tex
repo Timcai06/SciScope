@@ -11,7 +11,7 @@ SciScope 的定位不是更强的问答模型,而是将文献资产、检索证�
 
 \subsection{主要工作}
 \begin{itemize}
-\item \textbf{数据底座}:从 arXiv、PubMed、PMC、OpenAlex、Crossref、DOAJ 6 个公开来源采集、清洗、规范化、去重,形成 168{,}447 条分析语料、159{,}164 篇处理后语料文件;\newline 2026-08-14 讯飞交付包 5{,}566 篇预印本 PDF(bioRxiv/medRxiv/arXiv,\texttt{source=iflytek})已全链路入库,运行时 PostgreSQL 装载 164{,}730 篇论文、413{,}971 个检索片段,覆盖计算机/生物医学/材料等领域,主窗口 2022--2026。
+\item \textbf{数据底座}:从 arXiv、PubMed、PMC、OpenAlex、Crossref、DOAJ 6 个公开来源采集、清洗、规范化、去重,形成 174{,}013 条分析语料(含讯飞交付包 5{,}566 篇,2026-08-14 全量重跑)、164{,}709 篇处理后语料文件;\newline 运行时 PostgreSQL 装载 164{,}730 篇论文、413{,}971 个检索片段,覆盖计算机/生物医学/材料等领域,主窗口 2022--2026。
 \item \textbf{数据分析报告}(交付物 1):文献分布、关键词演化、作者合作网络、主题模型、趋势统计(见同级交付物 \path{sciscope_data_report})。
 \item \textbf{科研智能体模型}(交付物 2):本地嵌入索引、混合检索、趋势描述/方向辅助、论文推荐、知识图谱与论断核查能力,配套 FastAPI 服务、MCP 出口和终端智能体客户端。
 \item \textbf{系统工程}:PostgreSQL + pgvector 服务层、本地大模型(vLLM/MLX)生成层、一键复现的 Makefile 流水线与自动化测试。
@@ -34,5 +34,5 @@ SciScope 的定位不是更强的问答模型,而是将文献资产、检索证�
 \end{reportbox}
 
 \begin{plainbox}
-\textbf{数字口径说明}:本报告将数据规模与证据分为五层口径:数据分析报告使用 \texttt{data/analysis/summary.json} 的 168{,}447 条分析语料(2026-08-10 分析快照,未含讯飞增量);处理后语料文件使用 \texttt{data/processed/papers\_corpus.summary.json} 的 159{,}164 篇,另加讯飞交付包 \texttt{xunfei\_papers.json} 的 5{,}566 篇;演示服务器 PostgreSQL 当前库表为 164{,}730 篇论文与 413{,}971 个片段(2026-08-14,讯飞增量 46{,}110 块 GPU 向量化后); 2026-08-10 远端 2080 Ti 全量运行态历史口径为 \texttt{chunk\_embeddings=367{,}861/367{,}861} 与 \texttt{paper\_embeddings=159{,}164/159{,}164}。系统效果还需区分历史评测(如 \texttt{output/eval/eval\_report.json})、当前工程回归、以及尚未完成的人工 Gold/真实用户证明。五类口径用途不同,不混写为同一个总数。
+\textbf{数字口径说明}:本报告将数据规模与证据分为五层口径:数据分析报告使用 \texttt{data/analysis/summary.json} 的 174{,}013 条分析语料(2026-08-14 全量重跑,含讯飞交付包 5{,}566 篇);处理后语料文件使用 \texttt{data/processed/papers\_corpus.summary.json} 的 164{,}709 篇;演示服务器 PostgreSQL 当前库表为 164{,}730 篇论文与 413{,}971 个片段(2026-08-14,讯飞增量 46{,}110 块 GPU 向量化后); 2026-08-10 远端 2080 Ti 全量运行态历史口径为 \texttt{chunk\_embeddings=367{,}861/367{,}861} 与 \texttt{paper\_embeddings=159{,}164/159{,}164}。系统效果还需区分历史评测(如 \texttt{output/eval/eval\_report.json})、当前工程回归、以及尚未完成的人工 Gold/真实用户证明。五类口径用途不同,不混写为同一个总数。
 \end{plainbox}
