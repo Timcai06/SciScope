@@ -453,9 +453,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.record("assistant", "", ans)
 			if m.answerRunningID != "" {
-				// T05-04: running answer 块转正——同一块 ID，正式 Glamour 渲染。
+				// T05-04: running answer 块转正——同一块 ID。
+				// Raw 必须写纯文本源（ans）：renderBlocksContent 的重渲
+				// 走 renderConversationBlock → renderAnswerMessage(Raw)。
+				// 若把渲染结果写进 Raw，Glamour 会对含 ANSI 的文本再渲染，
+				// 把 ESC 转义剥落产生字面 [0m[38;5;252m 乱码（项目负责人
+				// 真机反馈的根因）。
 				m.finishRunningBlock(m.answerRunningID)
-				m.setBlockContent(m.answerRunningID, renderAnswerMessage(ans, m.used, m.vp.Width), m.used)
+				m.setBlockContent(m.answerRunningID, ans, m.used)
 				m.answerRunningID = ""
 			} else {
 				m.appendAnswerMessage(ans, m.used)

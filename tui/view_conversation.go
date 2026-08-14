@@ -151,19 +151,26 @@ func glamourStyleName() string {
 }
 
 func renderAnswerMessage(answer string, tools []string, width int) string {
-	w := width - 4
+	// 宽度预算：viewport 内容宽 width；Glamour wordwrap 与高亮重排后的行
+	// 若显示宽恰好等于视口宽，viewport 会在含 ANSI 的行上 wrap，把序列
+	// 从中间切断（ESC 留上一行、参数落到下一行 → 字面 [0m[38;5;252m 乱码）。
+	// 因此再留 1 列余量（-5），使行宽恒 < 视口宽，wrap 永不触发。
+	w := width - 5
 	if w < 20 {
 		w = 20
 	}
 	body := strings.Trim(answer, "\n")
 	// Use a fixed named style — NOT WithAutoStyle(), which queries the terminal background
 	// (OSC 11) on every render and leaks the response (]11;rgb:…) into the UI.
-	// 非彩色终端（Ascii profile）跳过 Glamour：ANSI 序列在 dumb 终端会以字面
-	// 文本显示（[0m[38;5;252m 乱码）。
+	// 乱码根治（项目负责人真机反馈）：Glamour 输出 256 色 ANSI
+	// （每段前缀 [0m[38;5;252m），在部分终端会以字面文本显示成「重复的一堆」。
+	// 因此只借用 Glamour 的 markdown 块结构（标题缩进/列表符号/换行），
+	// 渲染后剥净全部 ANSI；颜色统一由 styleAnswerBody 的 theme token 高亮提供
+	// （RGB 序列，与欢迎页/面板同源，终端兼容性一致）。
 	if lipgloss.ColorProfile() != termenv.Ascii {
 		if r, err := glamour.NewTermRenderer(glamour.WithStandardStyle(glamourStyleName()), glamour.WithWordWrap(w)); err == nil {
 			if out, e := r.Render(answer); e == nil {
-				body = strings.Trim(out, "\n")
+				body = strings.Trim(stripANSI(out), "\n")
 			}
 		}
 	}
