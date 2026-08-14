@@ -389,17 +389,3 @@ func wrapWithFrame(content string, width int) string {
 
 // renderStatusLine T05-07：一条低视觉权重 status + shortcut strip。
 // 左侧：模式/spinner 状态（真实不伪造）；右侧：快捷键提示。
-func (m model) renderStatusLine(width int) string {
-	left := stFaint.Render("backend " + backendMode(backendURL()))
-	if m.answering {
-		left = m.spin.View() + " " + stAccent.Render(m.verb+"…") + stFaint.Render(" · esc 中断")
-	} else if m.demo {
-		left = stFaint.Render("演示模式 · esc 中断")
-	}
-	right := stFaint.Render("Enter 发送 · Esc 中断/关闭 · / 命令")
-	gap := width - lipgloss.Width(stripANSI(left)) - lipgloss.Width(right)
-	if gap < 1 {
-		return left
-	}
-	return left + strings.Repeat(" ", gap) + right
-}
