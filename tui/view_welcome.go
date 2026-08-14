@@ -63,7 +63,7 @@ func renderWelcome(width int, sessions []sessionFile, hosts map[string]bool) str
 	body := []string{
 		"", // 顶部留白 1 行（Logo 是唯一大型视觉，垂直方向稍下沉）
 	}
-	body = append(body, centerLines(strings.Split(welcomeBrand(width), "\n"), width)...)
+	body = append(body, centerLines(welcomeBrandBlock(width), width)...)
 	body = append(body,
 		"",
 		centerLine(stInk.Render(clipWidth(welcomeTagline, width)), width),
@@ -76,6 +76,39 @@ func renderWelcome(width int, sessions []sessionFile, hosts map[string]bool) str
 	body = append(body, "")
 	body = append(body, centerLines(welcomeStatusLines(width, hosts), width)...)
 	return strings.Join(body, "\n")
+}
+
+// welcomeBrandBlock 返回带两侧装饰纹样的 Logo 块（仅完整 Logo 模式且空间
+// 足够时启用：总宽 = 12 纹样 + 2 间隔 + 87 Logo + 2 间隔 + 12 镜像纹样 = 115）。
+// 纹样放在 Logo 第 1–4 行（上下顶点行留白，保持徽章形态清晰）。空间不足或
+// 开关关闭时退回纯 Logo。
+func welcomeBrandBlock(width int) []string {
+	logo := strings.Split(welcomeBrand(width), "\n")
+	if width < welcomeFullCols {
+		return logo
+	}
+	left := ornamentLinesForMode()
+	if left == nil {
+		return logo
+	}
+	logoW := 0
+	for _, l := range logo {
+		if w := lipgloss.Width(l); w > logoW {
+			logoW = w
+		}
+	}
+	if logoW+2*(ornamentWidth+2) > width {
+		return logo
+	}
+	out := make([]string, len(logo))
+	for i, l := range logo {
+		side := ornamentBlankLine()
+		if i >= 1 && i <= ornamentRows {
+			side = left[i-1]
+		}
+		out[i] = side + "  " + l + "  " + mirrorOrnamentLine(side)
+	}
+	return out
 }
 
 // centerLine 把一行内容水平居中到 width 列（ANSI 安全：按显示宽度计算偏移）。
