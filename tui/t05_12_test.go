@@ -303,7 +303,7 @@ func TestEvidenceBlockStoresRawJSON(t *testing.T) {
 	}
 }
 
-// ---- 状态栏：一行合并（spinner + 动作 + 计时 + 取消）----
+// ---- 状态栏：一行合并，嵌入输入框边框内底部（grok prompt_widget）----
 
 func TestStatusLineSingleLineWhileAnswering(t *testing.T) {
 	setTrueColor(t)
@@ -311,14 +311,18 @@ func TestStatusLineSingleLineWhileAnswering(t *testing.T) {
 	m.answering = true
 	m.verb = "正在核查证据"
 	m.start = time.Now().Add(-8 * time.Second)
-	status := m.renderStatusLine(96)
-	if strings.Count(status, "\n") != 0 {
-		t.Fatalf("status must be one line:\n%q", status)
+	composer := m.renderComposer(96)
+	if strings.Count(composer, "\n") != 4 {
+		t.Fatalf("composer should be 4 lines (border+2+input+hint), got %d:\n%q", strings.Count(composer, "\n"), composer)
 	}
-	if !strings.Contains(status, "8s") {
-		t.Fatalf("status should show elapsed, got %q", status)
+	hint := m.renderComposerHint(96)
+	if strings.Count(hint, "\n") != 0 {
+		t.Fatalf("hint must be one line:\n%q", hint)
 	}
-	if !strings.Contains(status, "Esc 取消") {
-		t.Fatalf("status should show cancel hint, got %q", status)
+	if !strings.Contains(hint, "8s") {
+		t.Fatalf("hint should show elapsed, got %q", hint)
+	}
+	if !strings.Contains(hint, "Esc 取消") {
+		t.Fatalf("hint should show cancel, got %q", hint)
 	}
 }

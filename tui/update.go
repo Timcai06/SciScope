@@ -184,7 +184,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // （布局与渲染分层；三档响应式档位见 layoutTier）。
 func (m model) updateWindowSize(msg tea.WindowSizeMsg) (model, tea.Cmd) {
 	// 布局预算：外框左右 4 列（边框 2 + padding 2）；高度：外框上下 2 行 +
-	// status 1 行 + composer 4 行（边框 2 + textarea 2 行内容）。
+	// composer 5 行（边框 2 + textarea 2 行 + 框内 hint 1 行，grok 风格）。
 	innerW := msg.Width - 4
 	if innerW < 40 {
 		innerW = msg.Width
@@ -211,7 +211,9 @@ func (m model) updateWindowSize(msg tea.WindowSizeMsg) (model, tea.Cmd) {
 			m.setViewportContent(renderWelcome(innerW, m.recentSessions, nil), true)
 		}
 	}
-	m.ti.SetWidth(innerW - 2)
+	// composer 内宽 = innerW - 4（边框 2 + padding 2）；textarea 行宽必须等于
+	// 该值，否则行尾补齐错位导致外框豁口/超宽。
+	m.ti.SetWidth(innerW - 4)
 	return m, nil
 }
 
@@ -303,8 +305,17 @@ func (m model) updateKey(msg tea.KeyMsg) (model, tea.Cmd) {
 			m.cancel()
 		}
 		return m, nil
-	case "pgup", "pgdown", "ctrl+u", "ctrl+d":
+	case "pgup", "pgdown":
 		// Keyboard scrolling of the transcript (viewport's own keymap).
+		m.vp, cmd = m.vp.Update(msg)
+		return m, cmd
+	case "ctrl+u", "ctrl+d":
+		// 输入框有内容时 ctrl+u/ctrl+d 是 textarea 的删除操作（删到行首/删
+		// 到行尾）；输入框为空时才用于滚动 transcript。
+		if m.ti.Value() != "" {
+			m.ti, cmd = m.ti.Update(msg)
+			return m, cmd
+		}
 		m.vp, cmd = m.vp.Update(msg)
 		return m, cmd
 	case "home", "end":
@@ -432,15 +443,15 @@ func (m model) updateKey(msg tea.KeyMsg) (model, tea.Cmd) {
 		m.pushHistory(v)
 		return m, cmd
 	default:
-		// 可打印字符/空格：转交 textinput（composer 键入）。
-		// 必须显式转发——KeyRunes 不会落入 Update 路由的 default 分支
-		// （KeyMsg 被 case tea.KeyMsg 截获后直达 updateKey）。
-		if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
-			m.ti, cmd = m.ti.Update(msg)
-		}
+		// 未匹配的键（字母/数字/backspace/delete/space 等）全部转交 composer。
+		// 必须显式转发——KeyMsg 被 case tea.KeyMsg 截获后直达 updateKey，
+		// 不会落入 Update 路由的 default；只转发 rune 会漏掉 backspace/delete，
+		// 导致输入框文字无法删除。
+		m.ti, cmd = m.ti.Update(msg)
 		return m, cmd
 	}
-	// 不可达（所有 case 均 return），仅为编译器穷尽性。
+	// tab 且无菜单等兜底：转交 composer（textarea 忽略未知键）。
+	m.ti, cmd = m.ti.Update(msg)
 	return m, cmd
 }
 

@@ -61,8 +61,23 @@ func TestWelcomeBrandBlockOrnament(t *testing.T) {
 	defer lipgloss.SetColorProfile(prev)
 	applyTheme("dark")
 
-	// 空间足够（116 列）：两侧纹样启用，行数 = Logo 6 行，总宽 ≤ 116。
+	// 默认（无 SCISCOPE_TUI_ORNAMENT）：纹样关闭——sextant 在多数终端字体
+	// 不支持会乱码（项目负责人真机反馈），welcomeBrandBlock 与纯 Logo 一致。
+	t.Setenv("SCISCOPE_TUI_ORNAMENT", "")
 	block := welcomeBrandBlock(116)
+	if len(block) != 6 {
+		t.Fatalf("行数 = %d, want 6", len(block))
+	}
+	pureLogo := strings.Split(welcomeBrand(116), "\n")
+	for i := range block {
+		if stripANSI(block[i]) != stripANSI(pureLogo[i]) {
+			t.Errorf("默认模式行 %d 应与纯 Logo 一致: %q vs %q", i, stripANSI(block[i]), stripANSI(pureLogo[i]))
+		}
+	}
+
+	// 显式启用 sextant：空间足够（116 列）时两侧纹样出现，总宽 ≤ 116。
+	t.Setenv("SCISCOPE_TUI_ORNAMENT", "sextant")
+	block = welcomeBrandBlock(116)
 	if len(block) != 6 {
 		t.Fatalf("行数 = %d, want 6", len(block))
 	}
@@ -72,7 +87,6 @@ func TestWelcomeBrandBlockOrnament(t *testing.T) {
 		}
 	}
 	// 第 0 行与第 5 行两侧应为空白（顶点行留白）→ 纯文本与纯 Logo 一致。
-	pureLogo := strings.Split(welcomeBrand(116), "\n")
 	for _, i := range []int{0, 5} {
 		plain := stripANSI(block[i])
 		want := stripANSI(pureLogo[i])
@@ -89,7 +103,7 @@ func TestWelcomeBrandBlockOrnament(t *testing.T) {
 		}
 	}
 	if !hasSextant {
-		t.Error("中间行应含 sextant 纹样")
+		t.Error("sextant 模式下中间行应含 sextant 纹样")
 	}
 
 	// 空间不足（88 列）：退回纯 Logo（87 列）。

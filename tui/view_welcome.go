@@ -70,9 +70,11 @@ func renderWelcome(width int, sessions []sessionFile, hosts map[string]bool) str
 		"",
 		centerLine(welcomeCommandHint(width), width),
 		"",
-		centerLine(stMuted.Render("Recent"), width),
 	)
-	body = append(body, centerLines(welcomeRecentLines(width, sessions), width)...)
+	// Recent 会话区左对齐（项目负责人要求：logo 下的 resume 列表向左对齐，
+	// 不再随品牌区居中），列表行自带 "  ›" 缩进形成层级。
+	body = append(body, stMuted.Render("Recent"))
+	body = append(body, welcomeRecentLines(width, sessions)...)
 	body = append(body, "")
 	body = append(body, centerLines(welcomeStatusLines(width, hosts), width)...)
 	return strings.Join(body, "\n")

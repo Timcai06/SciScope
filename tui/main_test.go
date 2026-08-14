@@ -954,22 +954,20 @@ func TestComposerRendersPolishedInputBox(t *testing.T) {
 	m.sessionID = "tui-test-session"
 	composer := m.renderComposer(96)
 
-	// T05-07：composer 无框化，只承载输入；hints 移至 status 行。
+	// T05-07：composer 只承载输入；快捷键/状态提示嵌入输入框边框内部底部
+	// 一行（grok prompt_widget 风格，不再独立占一行）。
 	for _, want := range []string{"核查 RAG"} {
 		if !strings.Contains(composer, want) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)
 		}
 	}
-	// status 行承载快捷键提示（T05-07）。
-	m.vp = viewport.New(96, 20)
-	m.ready = true
-	status := m.renderStatusLine(96)
-	for _, want := range []string{"Enter", "Esc", "/"} {
-		if !strings.Contains(status, want) {
-			t.Fatalf("status line missing %q:\n%s", want, status)
+	// 框内 hint 行承载快捷键提示（Enter/Ctrl+J//）。
+	for _, want := range []string{"Enter", "Ctrl+J", "/"} {
+		if !strings.Contains(composer, want) {
+			t.Fatalf("composer hint missing %q:\n%s", want, composer)
 		}
 	}
-	for _, removed := range []string{"session tui-test-session", "langgraph", "/retry", "Tab", "Ctrl"} {
+	for _, removed := range []string{"session tui-test-session", "langgraph", "/retry", "Tab"} {
 		if strings.Contains(composer, removed) {
 			t.Fatalf("composer should not expose noisy status %q:\n%s", removed, composer)
 		}
@@ -1847,7 +1845,8 @@ func TestComposerShowsMultilineAndRecoveryHints(t *testing.T) {
 			t.Fatalf("composer missing %q:\n%s", want, composer)
 		}
 	}
-	for _, removed := range []string{"agent", "langgraph", "/retry", "Tab", "Ctrl"} {
+	// 框内 hint 行（grok 风格）包含 Ctrl+J 换行提示，属预期；其余噪声不出现。
+	for _, removed := range []string{"agent", "langgraph", "/retry", "Tab"} {
 		if strings.Contains(composer, removed) {
 			t.Fatalf("composer should stay minimal, found %q:\n%s", removed, composer)
 		}

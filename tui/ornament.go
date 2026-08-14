@@ -35,15 +35,22 @@ const (
 )
 
 // ornamentMode 返回当前纹样渲染模式（sextant / block / off）。
+//
+// 默认 off：sextant 六分块字符（U+1FB00–U+1FB3B）在多数终端字体
+// （macOS Terminal 默认字体等）中不支持，会渲染为乱码/豆腐块并破坏 Logo
+// 两侧的纯黑画面（项目负责人真机反馈）。需要装饰时显式开启：
+//
+//	SCISCOPE_TUI_ORNAMENT=sextant  六分块菱形纹（需终端字体支持）
+//	SCISCOPE_TUI_ORNAMENT=block    半块字符 ▀▄ 交错（兼容性较好）
 func ornamentMode() string {
 	v := strings.ToLower(strings.TrimSpace(os.Getenv("SCISCOPE_TUI_ORNAMENT")))
 	switch v {
+	case "sextant":
+		return "sextant"
 	case "block":
 		return "block"
-	case "off":
-		return "off"
 	default:
-		return "sextant"
+		return "off"
 	}
 }
 

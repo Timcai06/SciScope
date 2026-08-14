@@ -43,8 +43,24 @@ func (m model) renderComposer(width int) string {
 	}
 	// T05-07 修订：composer 保留主题化输入框（Grok prompt_widget 的
 	// show_borders 语义）——边框随 focus 状态：聚焦用 Accent、未聚焦用 Border。
-	// 实测 lipgloss 带边框时 Width(W) 总宽 = W+2，故传 width-2。
-	inputLine := m.ti.View()
+	//
+	// Grok build 风格：快捷键/状态提示嵌入输入框边框内部底部一行
+	// （prompt_widget 的 bottom shortcuts strip），不再单独占一行。
+	//
+	// 行宽补齐手动完成（padLine），不依赖 lipgloss 的 Width 属性：lipgloss
+	// 的 reflow 对含 ANSI 的行会把转义序列计入宽度导致拆行（本项目已知问题，
+	// 与 wrapWithFrame 的手动拼行同一纪律）。
+	innerW := width - 4
+	// textarea.View() 每行以换行符结尾（含末尾），TrimRight 避免拼出多余空行。
+	inputLine := strings.TrimRight(m.ti.View(), "\n")
+	hintLine := m.renderComposerHint(innerW)
+	content := ""
+	for i, ln := range strings.Split(inputLine+"\n"+hintLine, "\n") {
+		if i > 0 {
+			content += "\n"
+		}
+		content += padLine(ln, innerW)
+	}
 	borderColor := activeTheme().Border
 	if m.ti.Focused() {
 		borderColor = activeTheme().Accent
@@ -53,8 +69,40 @@ func (m model) renderComposer(width int) string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(borderColor).
 		Padding(0, 1).
-		Width(width - 4).
-		Render(inputLine)
+		Render(content)
+}
+
+// padLine 把行补齐到 w 列（ANSI 安全：空格只加在行尾纯文本区域）。
+func padLine(line string, w int) string {
+	if d := w - lipgloss.Width(line); d > 0 {
+		line += strings.Repeat(" ", d)
+	}
+	return line
+}
+
+// renderComposerHint 输入框边框内底部提示行（grok prompt_widget shortcuts strip）：
+//   - answering：左 = spinner + 动作 + 计时，右 = Esc 取消（提示词状态栏单行合并）；
+//   - 空闲：右 = Enter 发送 · Ctrl+J 换行 · / 命令。
+func (m model) renderComposerHint(width int) string {
+	var left, right string
+	if m.answering {
+		elapsed := ""
+		if !m.start.IsZero() {
+			elapsed = fmt.Sprintf(" · %ds", int(time.Since(m.start).Seconds()))
+		}
+		left = m.spin.View() + " " + stAccent.Render(m.verb+"…") + stFaint.Render(elapsed)
+		right = stFaint.Render("Esc 取消")
+	} else {
+		right = stFaint.Render("Enter 发送 · Ctrl+J 换行 · / 命令")
+	}
+	if left == "" {
+		return right
+	}
+	gap := width - lipgloss.Width(stripANSI(left)) - lipgloss.Width(right)
+	if gap < 1 {
+		return left
+	}
+	return left + strings.Repeat(" ", gap) + right
 }
 
 // pushHistory 记录已发送输入到历史（去重、最新在前、上限 50），重置浏览位置。
@@ -97,30 +145,4 @@ func (m *model) browseHistory(up bool) {
 		m.ti.SetValue(m.inputHistory[m.historyIdx])
 	}
 	m.ti.SetCursor(len(m.ti.Value()))
-}
-
-func (m model) renderStatusLine(width int) string {
-	// 提示词：状态栏最多一行——✻ 正在核查证据 · 8s · Esc取消。
-	// 不堆叠 spinner/workflow/timer/live preview：running 时合并为
-	// spinner + 动作 + 计时 + 取消提示；空闲时只留 backend 模式 + 快捷键。
-	var left, right string
-	if m.answering {
-		elapsed := ""
-		if !m.start.IsZero() {
-			elapsed = fmt.Sprintf(" · %ds", int(time.Since(m.start).Seconds()))
-		}
-		left = m.spin.View() + " " + stAccent.Render(m.verb+"…") + stFaint.Render(elapsed)
-		right = stFaint.Render("Esc 取消")
-	} else {
-		left = stFaint.Render("backend " + backendMode(backendURL()))
-		if m.demo {
-			left = stFaint.Render("演示模式 · esc 中断")
-		}
-		right = stFaint.Render("Enter 发送 · Ctrl+J 换行 · Esc 中断/关闭 · / 命令")
-	}
-	gap := width - lipgloss.Width(stripANSI(left)) - lipgloss.Width(right)
-	if gap < 1 {
-		return left
-	}
-	return left + strings.Repeat(" ", gap) + right
 }

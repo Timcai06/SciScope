@@ -331,8 +331,6 @@ func (m model) View() string {
 		}
 	}
 
-	parts = append(parts, m.renderStatusLine(innerW))
-
 	if m.searchMode {
 		// 搜索模式：底部输入框切换为搜索框。
 		parts = append(parts, m.renderSearchBox(innerW))

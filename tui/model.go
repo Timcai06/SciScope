@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type model struct {
@@ -83,6 +84,20 @@ func initialModel() model {
 	// 移除 textarea 自身的 InsertNewline，避免 Enter 双触发插入换行。
 	ti.KeyMap.InsertNewline.SetEnabled(false)
 	ti.SetHeight(2) // 视觉紧凑：边框 + 2 行内容，多行内部滚动
+	// 关键：清掉 textarea 默认样式的 ANSI 16 色背景（CursorLine 默认
+	// Background(AdaptiveColor{Dark:"0"}) 会输出 \x1b[40m 黑底、反显 \x1b[7m、
+	// EOB \x1b[30m 黑前景——这些非 RGB 序列会被终端主题映射为深灰/其他色，
+	// 盖掉画布纯黑，导致输入框把黑背景"搞坏"）。全部改为透明样式：
+	// 行首黑底由 paintCanvasLines 的 RGB 黑统一保证，光标反显保留（1 字符宽）。
+	ti.FocusedStyle = textarea.Style{
+		Base:        lipgloss.NewStyle(),
+		CursorLine:  lipgloss.NewStyle(), // 无背景，避免 \x1b[40m
+		EndOfBuffer: stFaint,             // 行尾填充用 Faint 灰前景
+		Placeholder: stMuted,
+		Prompt:      lipgloss.NewStyle(), // Prompt 色由 ti.Prompt 内的 ANSI 控制
+		Text:        lipgloss.NewStyle(),
+	}
+	ti.BlurredStyle = ti.FocusedStyle
 	ti.Focus()
 
 	sp := spinner.New()
@@ -127,6 +142,11 @@ func (m model) inputCursorColumn() int {
 func (m *model) syncThemeStyles() {
 	m.ti.Prompt = stAccent.Render("❯ ")
 	m.spin.Style = stAccent
+	// 主题切换后刷新 textarea 语义样式（Style 是值类型，applyTheme 重建的
+	// stMuted/stFaint 不会自动同步到已赋值的样式）。
+	m.ti.FocusedStyle.Placeholder = stMuted
+	m.ti.FocusedStyle.EndOfBuffer = stFaint
+	m.ti.BlurredStyle = m.ti.FocusedStyle
 }
 
 func (m *model) loadRecentSessions() {
