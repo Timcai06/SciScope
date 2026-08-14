@@ -208,6 +208,17 @@ def clean_fulltext(raw: str) -> str:
     return text.strip()
 
 
+def _strip_nul(x: Any) -> Any:
+    """递归剔除控制字符（NUL/SOH），PostgreSQL text 字段禁止 NUL。"""
+    if isinstance(x, str):
+        return x.replace("\x00", "").replace("\x01", "")
+    if isinstance(x, list):
+        return [_strip_nul(i) for i in x]
+    if isinstance(x, dict):
+        return {k: _strip_nul(v) for k, v in x.items()}
+    return x
+
+
 def to_processed(meta: dict[str, Any], parsed: dict[str, str]) -> dict[str, Any]:
     title = (meta["title"] or meta["meta_title"]).strip()[:400] or f"untitled-{parsed['file_id']}"
     year = meta["year"]
@@ -215,7 +226,7 @@ def to_processed(meta: dict[str, Any], parsed: dict[str, str]) -> dict[str, Any]
     authors = meta["authors"]
     source_id = parsed["source_id"]
     doi = parsed["doi"]
-    return {
+    return _strip_nul({
         "paper_id": f"iflytek-{parsed['file_id']}",
         "title": title,
         "abstract": meta["abstract"][:3000],
@@ -253,7 +264,7 @@ def to_processed(meta: dict[str, Any], parsed: dict[str, str]) -> dict[str, Any]
         "full_text_url": "",
         "is_recent_window": False,
         "_sciscope_raw_file": f"data/raw/iflytek/environment/{parsed['source']}_{parsed['file_id']}.pdf",
-    }
+    })
 
 
 def main() -> int:
