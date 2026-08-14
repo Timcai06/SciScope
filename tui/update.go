@@ -136,204 +136,318 @@ func (m *model) requestStreamRefresh() tea.Cmd {
 	})
 }
 
+// Update 是 Bubble Tea 事件入口。为满足提示词「Msg → Action → State Update →
+// Effect → New Msg」分层，Update 只做领域分发（Action 路由），各领域处理器
+// 独占一类消息的 State Update，并返回 Effect（tea.Cmd）。
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
 	switch msg := msg.(type) {
-
 	case tea.WindowSizeMsg:
-		// 布局预算：外框左右 4 列（边框 2 + padding 2）；高度：外框上下 2 行 +
-		// status 1 行 + composer 3 行（含自身边框）。
-		innerW := msg.Width - 4
-		if innerW < 40 {
-			innerW = msg.Width
-		}
-		vh := msg.Height - 2 - 4
-		if vh < 3 {
-			vh = 3
-		}
-		if !m.ready {
-			m.vp = newTranscriptViewport(innerW, vh)
-			m.loadRecentSessions()
-			m.setViewportContent(renderWelcome(innerW, m.recentSessions, nil), true)
-			m.ready = true
-		} else {
-			wasAtBottom := m.vp.AtBottom()
-			m.vp.Width, m.vp.Height = innerW, vh
-			// T05-09 resize 锚定：resize 前在底部则保持贴底（streaming 跟随
-			// 场景），否则保持 YOffset（viewport 内部 clamp）。
-			if wasAtBottom {
-				m.vp.GotoBottom()
-			}
-			if len(m.blocks) == 0 && m.answer == "" {
-				m.loadRecentSessions()
-				m.setViewportContent(renderWelcome(innerW, m.recentSessions, nil), true)
-			}
-		}
-		m.ti.Width = innerW - 2
-
+		return m.updateWindowSize(msg)
 	case demoStartMsg:
-		v := string(msg)
-		m.ti.SetValue("")
-		m.appendUserMessage(v, false)
-		m.record("user", "", v)
-		m.history = append(m.history, turn{"user", v})
-		m.lastQuestion = v
-		m.answering = true
-		m.answer = ""
-		m.answerRunningID = ""
-		m.used = nil
-		m.toolStart = map[string]time.Time{}
-		m.timeline = nil
-		m.lastMeta = eventMeta{}
-		m.lastStreamKind = ""
-		m.nodeSeen = nil
-		m.livePlan = nil
-		m.liveReflect = ""
-		m.verb = "演示中"
-		m.start = time.Now()
-		return m, listen(m.sub)
-
+		return m.updateDemoStart(msg)
 	case nodePulseMsg:
 		m.lastMeta = msg.meta
 		m.lastStreamKind = msg.kind
 		m.nodeSeen = appendUniqueNode(m.nodeSeen, msg.meta.Node)
 		return m, listen(m.sub)
-
 	case refreshTickMsg:
 		if m.refreshPending {
 			m.refresh()
 		}
 		return m, nil
-
 	case spinner.TickMsg:
-		if !m.answering {
-			return m, nil
-		}
-		m.spin, cmd = m.spin.Update(msg)
-		m.tick++
-		if m.tick%12 == 0 {
-			m.verb = verbs[rand.Intn(len(verbs))]
-		}
-		return m, cmd
-
+		return m.updateSpinnerTick(msg)
 	case tea.MouseMsg:
-		// Mouse wheel scrolls the transcript viewport.
-		if isVerticalWheel(msg) {
-			m.vp, cmd = m.vp.Update(msg)
-		}
-		return m, cmd
-
+		return m.updateMouse(msg)
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c":
-			return m, tea.Quit
-		case "esc":
-			if m.submenu != "" && !m.answering {
-				m.submenu = ""
-				m.submenuIdx = 0
-				m.ti.SetValue("/")
-				return m, nil
+		if m.searchMode {
+			// 搜索模式：字符/退格进 query（updateKey 只处理 enter/esc 等控制键）。
+			if msg.Type == tea.KeyRunes || msg.String() == "backspace" || msg.String() == "space" {
+				return m.updateSearchKey(msg)
 			}
-			if strings.HasPrefix(m.ti.Value(), "/") && !m.answering {
-				m.ti.SetValue("")
-				m.menuIdx = 0
-				return m, nil
-			}
-			if m.answering && m.cancel != nil {
-				m.cancel()
+		}
+		return m.updateKey(msg)
+	case planMsg, textMsg, toolCallMsg, toolResultMsg, reflectMsg, finalMsg, errMsg, doneMsg:
+		return m.updateStreamMsg(msg)
+	default:
+		if m.searchMode {
+			// 搜索模式：字符/退格进入 query，不流入 composer。
+			return m.updateSearchKey(msg)
+		}
+		var cmd tea.Cmd
+		m.ti, cmd = m.ti.Update(msg)
+		return m, cmd
+	}
+}
+
+// updateWindowSize：布局（Action=Window）。viewport 尺寸预算统一在这里计算
+// （布局与渲染分层；三档响应式档位见 layoutTier）。
+func (m model) updateWindowSize(msg tea.WindowSizeMsg) (model, tea.Cmd) {
+	// 布局预算：外框左右 4 列（边框 2 + padding 2）；高度：外框上下 2 行 +
+	// status 1 行 + composer 4 行（边框 2 + textarea 2 行内容）。
+	innerW := msg.Width - 4
+	if innerW < 40 {
+		innerW = msg.Width
+	}
+	vh := msg.Height - 2 - 5
+	if vh < 3 {
+		vh = 3
+	}
+	if !m.ready {
+		m.vp = newTranscriptViewport(innerW, vh)
+		m.loadRecentSessions()
+		m.setViewportContent(renderWelcome(innerW, m.recentSessions, nil), true)
+		m.ready = true
+	} else {
+		wasAtBottom := m.vp.AtBottom()
+		m.vp.Width, m.vp.Height = innerW, vh
+		// T05-09 resize 锚定：resize 前在底部则保持贴底（streaming
+		// 跟随场景），否则保持 YOffset（viewport 内部 clamp）。
+		if wasAtBottom {
+			m.vp.GotoBottom()
+		}
+		if len(m.blocks) == 0 && m.answer == "" {
+			m.loadRecentSessions()
+			m.setViewportContent(renderWelcome(innerW, m.recentSessions, nil), true)
+		}
+	}
+	m.ti.SetWidth(innerW - 2)
+	return m, nil
+}
+
+// updateDemoStart：离线演示流起始（Action=Demo）。
+func (m model) updateDemoStart(msg demoStartMsg) (model, tea.Cmd) {
+	v := string(msg)
+	m.ti.SetValue("")
+	m.appendUserMessage(v, false)
+	m.record("user", "", v)
+	m.history = append(m.history, turn{"user", v})
+	m.lastQuestion = v
+	m.answering = true
+	m.answer = ""
+	m.answerRunningID = ""
+	m.used = nil
+	m.toolStart = map[string]time.Time{}
+	m.timeline = nil
+	m.lastMeta = eventMeta{}
+	m.lastStreamKind = ""
+	m.nodeSeen = nil
+	m.livePlan = nil
+	m.liveReflect = ""
+	m.verb = "演示中"
+	m.start = time.Now()
+	return m, listen(m.sub)
+}
+
+// updateSpinnerTick：spinner 动画帧（Effect=Tick）。
+func (m model) updateSpinnerTick(msg spinner.TickMsg) (model, tea.Cmd) {
+	if !m.answering {
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.spin, cmd = m.spin.Update(msg)
+	m.tick++
+	if m.tick%12 == 0 {
+		m.verb = verbs[rand.Intn(len(verbs))]
+	}
+	return m, cmd
+}
+
+// updateMouse：鼠标滚轮滚动 transcript（Action=Mouse）。
+func (m model) updateMouse(msg tea.MouseMsg) (model, tea.Cmd) {
+	// Mouse wheel scrolls the transcript viewport.
+	if isVerticalWheel(msg) {
+		var cmd tea.Cmd
+		m.vp, cmd = m.vp.Update(msg)
+		return m, cmd
+	}
+	return m, nil
+}
+
+// updateKey：键盘事件（Action=Key）。焦点/模式决定键位语义：submenu、/ 命令
+// 菜单、transcript 滚动、composer 输入。
+func (m model) updateKey(msg tea.KeyMsg) (model, tea.Cmd) {
+	var cmd tea.Cmd
+	switch msg.String() {
+	case "ctrl+c":
+		return m, tea.Quit
+	case "ctrl+f":
+		// T05-12：transcript 搜索（Block 级能力）。
+		m.startSearch()
+		return m, nil
+	case "ctrl+g":
+		// T05-12：block 选择模式。
+		m.startSelect()
+		return m, nil
+	case "esc":
+		if m.searchMode {
+			m.stopSearch()
+			return m, nil
+		}
+		if m.selectMode {
+			m.stopSelect()
+			return m, nil
+		}
+		if m.submenu != "" && !m.answering {
+			m.submenu = ""
+			m.submenuIdx = 0
+			m.ti.SetValue("/")
+			return m, nil
+		}
+		if strings.HasPrefix(m.ti.Value(), "/") && !m.answering {
+			m.ti.SetValue("")
+			m.menuIdx = 0
+			return m, nil
+		}
+		if m.answering && m.cancel != nil {
+			m.cancel()
+		}
+		return m, nil
+	case "pgup", "pgdown", "ctrl+u", "ctrl+d":
+		// Keyboard scrolling of the transcript (viewport's own keymap).
+		m.vp, cmd = m.vp.Update(msg)
+		return m, cmd
+	case "home", "end":
+		// T05-09：viewport 默认 keymap 不含 home/end，显式处理。
+		if msg.String() == "home" {
+			m.vp.GotoTop()
+		} else {
+			m.vp.GotoBottom()
+		}
+		return m, nil
+	case "ctrl+j":
+		// 提示词 Composer 换行支持：Enter 发送、Ctrl+J（\n）换行。
+		// bubbletea 不解析 shift+enter 的 CSI u 序列，Ctrl+J 是所有终端
+		// 都可靠发送 \n 的等价键。
+		m.ti.InsertString("\n")
+		return m, nil
+	case "up", "down", "tab":
+		if m.selectMode {
+			if msg.String() == "up" {
+				m.moveSelect(-1)
+			} else if msg.String() == "down" {
+				m.moveSelect(1)
 			}
 			return m, nil
-		case "pgup", "pgdown", "ctrl+u", "ctrl+d":
-			// Keyboard scrolling of the transcript (viewport's own keymap).
-			m.vp, cmd = m.vp.Update(msg)
-			return m, cmd
-		case "home", "end":
-			// T05-09：viewport 默认 keymap 不含 home/end，显式处理。
-			if msg.String() == "home" {
-				m.vp.GotoTop()
-			} else {
-				m.vp.GotoBottom()
-			}
-			return m, nil
-		case "up", "down", "tab":
-			if m.submenu != "" {
-				items := m.submenuItems()
-				if len(items) > 0 {
-					switch msg.String() {
-					case "up":
-						m.submenuIdx = (m.submenuIdx - 1 + len(items)) % len(items)
-					case "down":
-						m.submenuIdx = (m.submenuIdx + 1) % len(items)
-					case "tab":
-						m.ti.SetValue(items[m.submenuIdx%len(items)].command)
-					}
-					return m, nil
+		}
+		if m.submenu != "" {
+			items := m.submenuItems()
+			if len(items) > 0 {
+				switch msg.String() {
+				case "up":
+					m.submenuIdx = (m.submenuIdx - 1 + len(items)) % len(items)
+				case "down":
+					m.submenuIdx = (m.submenuIdx + 1) % len(items)
+				case "tab":
+					m.ti.SetValue(items[m.submenuIdx%len(items)].command)
 				}
+				return m, nil
 			}
-			if strings.HasPrefix(m.ti.Value(), "/") {
-				ms := filterCmds(m.ti.Value())
-				if len(ms) > 0 {
-					switch msg.String() {
-					case "up":
-						m.menuIdx = (m.menuIdx - 1 + len(ms)) % len(ms)
-					case "down":
-						m.menuIdx = (m.menuIdx + 1) % len(ms)
-					case "tab":
-						m = stageCommand(m, ms[m.menuIdx%len(ms)])
-					}
-					return m, nil
+		}
+		if strings.HasPrefix(m.ti.Value(), "/") {
+			ms := filterCmds(m.ti.Value())
+			if len(ms) > 0 {
+				switch msg.String() {
+				case "up":
+					m.menuIdx = (m.menuIdx - 1 + len(ms)) % len(ms)
+				case "down":
+					m.menuIdx = (m.menuIdx + 1) % len(ms)
+				case "tab":
+					m = stageCommand(m, ms[m.menuIdx%len(ms)])
 				}
+				return m, nil
 			}
-			// T05-09：无 submenu、无 / 命令菜单时，up/down 委托 viewport 滚动
-			// （单行输入框里 up/down 本无意义；滚动 transcript 更符合沉浸式预期）。
-			if msg.String() != "tab" {
-				m.vp, cmd = m.vp.Update(msg)
+		}
+		// T05-09：无 submenu、无 / 命令菜单时的 up/down 语义（提示词 Composer：
+		// 多行输入时在行间移动光标；单行且有历史时浏览历史；否则滚动 transcript）。
+		if msg.String() != "tab" {
+			if strings.Contains(m.ti.Value(), "\n") {
+				m.ti, cmd = m.ti.Update(msg)
 				return m, cmd
 			}
-		case "enter":
-			if m.submenu != "" {
-				items := m.submenuItems()
-				if len(items) > 0 {
-					v := items[m.submenuIdx%len(items)].command
-					m.submenu = ""
-					m.submenuIdx = 0
-					m.ti.SetValue("")
-					return m.runSlash(v)
-				}
+			if m.ti.Value() != "" && len(m.inputHistory) > 0 {
+				m.browseHistory(msg.String() == "up")
 				return m, nil
 			}
-			v := strings.TrimSpace(m.ti.Value())
-			if v == "" || m.answering {
-				// T05-05：输入为空时 Enter 切换最近轨迹块折叠（plan/trace）。
-				if v == "" && !m.answering {
-					m.toggleLatestTrace()
-				}
-				return m, nil
+			m.vp, cmd = m.vp.Update(msg)
+			return m, cmd
+		}
+	case "enter":
+		if m.searchMode {
+			// Enter：跳下一个匹配。
+			m.stepSearch(1)
+			return m, nil
+		}
+		if m.selectMode {
+			// Enter：折叠/展开选中块。
+			if m.selectIdx >= 0 && m.selectIdx < len(m.blockItems) {
+				b := &m.blockItems[m.selectIdx]
+				m.setExpanded(b.ID, !b.Expanded)
 			}
-			if strings.HasPrefix(v, "/") {
-				if ms := filterCmds(m.ti.Value()); len(ms) > 0 && m.menuIdx < len(ms) && !strings.Contains(v, " ") {
-					selected := ms[m.menuIdx]
-					// A command that takes an argument is staged as "/cmd <>" with the
-					// cursor in the slot, instead of running with an empty argument.
-					if commandNeedsArg(selected) {
-						m = stageCommand(m, selected)
-						m.menuIdx = 0
-						return m, nil
-					}
-					v = selected.cmd
-				}
-				if submenu := commandSubmenu(v); submenu != "" {
-					m.openSubmenu(submenu)
+			return m, nil
+		}
+		if m.submenu != "" {
+			items := m.submenuItems()
+			if len(items) > 0 {
+				v := items[m.submenuIdx%len(items)].command
+				m.submenu = ""
+				m.submenuIdx = 0
+				m.ti.SetValue("")
+				next, cmd := m.runSlash(v)
+				return next.(model), cmd
+			}
+			return m, nil
+		}
+		v := strings.TrimSpace(m.ti.Value())
+		if v == "" || m.answering {
+			// T05-05：输入为空时 Enter 切换最近轨迹块折叠（plan/trace）。
+			if v == "" && !m.answering {
+				m.toggleLatestTrace()
+			}
+			return m, nil
+		}
+		if strings.HasPrefix(v, "/") {
+			if ms := filterCmds(m.ti.Value()); len(ms) > 0 && m.menuIdx < len(ms) && !strings.Contains(v, " ") {
+				selected := ms[m.menuIdx]
+				// A command that takes an argument is staged as "/cmd <>" with the
+				// cursor in the slot, instead of running with an empty argument.
+				if commandNeedsArg(selected) {
+					m = stageCommand(m, selected)
 					m.menuIdx = 0
 					return m, nil
 				}
-				m.ti.SetValue("")
-				m.menuIdx = 0
-				return m.runSlash(v)
+				v = selected.cmd
 			}
-			cmd := m.startQuestion(v, false)
-			return m, cmd
+			if submenu := commandSubmenu(v); submenu != "" {
+				m.openSubmenu(submenu)
+				m.menuIdx = 0
+				return m, nil
+			}
+			m.ti.SetValue("")
+			m.menuIdx = 0
+			next, cmd := m.runSlash(v)
+			return next.(model), cmd
 		}
+		cmd := m.startQuestion(v, false)
+		m.pushHistory(v)
+		return m, cmd
+	default:
+		// 可打印字符/空格：转交 textinput（composer 键入）。
+		// 必须显式转发——KeyRunes 不会落入 Update 路由的 default 分支
+		// （KeyMsg 被 case tea.KeyMsg 截获后直达 updateKey）。
+		if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
+			m.ti, cmd = m.ti.Update(msg)
+		}
+		return m, cmd
+	}
+	// 不可达（所有 case 均 return），仅为编译器穷尽性。
+	return m, cmd
+}
+
+// updateStreamMsg：SSE 流式事件（Action=Stream）。各事件更新自己的领域状态
+// 并保持 listen 监听链（Effect=listen）。
+func (m model) updateStreamMsg(msg tea.Msg) (model, tea.Cmd) {
+	switch msg := msg.(type) {
 
 	case planMsg:
 		plain := []string{}
@@ -343,11 +457,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.addTimeline(timelineEvent{Kind: "plan", Phase: "制定研究计划", Label: "执行计划", Detail: strings.Join([]string(msg), " / ")})
 		m.record("plan", "", strings.Join(plain, "\n"))
 		m.livePlan = append([]string(nil), msg...)
-		planLines := []string{stBullet.Render("⏺ ") + stAccent.Render("研究计划")}
-		for _, s := range msg {
-			planLines = append(planLines, stConn.Render("  ⎿ ")+stInk.Render(s))
-		}
-		m.appendBlock(BlockResearchPlan, strings.Join(planLines, "\n"))
+		// 语义化：PlanSteps 存结构化步骤，Raw 存纯文本；着色发生在渲染层。
+		m.appendPlanBlock(msg)
 		return m, listen(m.sub)
 
 	case toolCallMsg:
@@ -370,11 +481,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.addTimeline(timelineEvent{Kind: "tool_call", Phase: metaPhase(msg.meta), Tool: msg.name, Label: toolPlainLabel(msg.name), Detail: detail})
-		callLine := stBullet.Render("⏺ ") + stTool.Render(toolLabel(msg.name))
-		if a := m.argsStr(msg.args); a != "" {
-			callLine += stFaint.Render("  " + clip(a, 56))
-		}
-		m.appendBlock(BlockToolCall, callLine)
+		// 语义化：running tool 块（ToolName/ToolArgs 结构化），渲染层按三态着色。
+		m.startToolBlock(msg.name, m.argsStr(msg.args))
 		if notice, ok := permissionNotice(msg.name); ok {
 			m.record("permission", msg.name, notice)
 			m.addTimeline(timelineEvent{Kind: "permission", Phase: metaPhase(msg.meta), Tool: msg.name, Label: "权限提示", Detail: notice})
@@ -388,12 +496,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.addTimeline(timelineEvent{Kind: "tool_result", Phase: metaPhase(msg.meta), Tool: msg.name, Label: toolResultLabel(msg.name, msg.result), Detail: metaDetail(msg.meta), Duration: elapsed})
 		m.record("tool_result", msg.name, summarizeToolResultMarkdown(msg.name, msg.result))
-		// T05-06 接线：证据类工具走 typed Evidence 渲染层；其余保持旧路径。
-		kind := BlockToolResult
-		if isEvidenceTool(msg.name) {
-			kind = BlockEvidence
+		// Tool Call 生命周期转正：running → succeeded/failed；摘要并入 tool 行，
+		// 不再 append 日志式结果块（提示词：Tool 不要像日志）。
+		status := BlockSucceeded
+		summary := toolResultSummary(msg.name, msg.result)
+		if strings.HasPrefix(msg.result, "[未执行]") {
+			status = BlockFailed
 		}
-		m.appendBlock(kind, renderEvidenceToolResult(msg.name, msg.result, m.vp.Width, elapsed))
+		m.finishLatestToolBlock(msg.name, status, summary, elapsed)
+		// 证据类工具：结果另存为 typed Evidence 领域对象卡（Raw=JSON 原文，
+		// 渲染层解析；不预渲染 ANSI）。
+		if isEvidenceTool(msg.name) {
+			b := newScrollbackBlock(BlockEvidence, msg.result)
+			b.ToolName = msg.name
+			b.ToolDuration = elapsed
+			b.ToolSummary = summary
+			m.blocks = append(m.blocks, msg.result)
+			m.blockItems = append(m.blockItems, b)
+			m.blocksVersion++
+			m.refresh()
+		}
 		return m, listen(m.sub)
 
 	case reflectMsg:
@@ -401,7 +523,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.record("reflect", "", string(msg))
 		m.liveReflect = string(msg)
 		m.addTimeline(timelineEvent{Kind: "reflect", Phase: "自检修正", Label: "自检修正", Detail: string(msg)})
-		m.appendBlock(BlockResearchTrace, stBullet.Render("⏺ ")+stWarn.Render("自检修正")+"\n"+stConn.Render("  ⎿ ")+stFaint.Render(string(msg)))
+		// 语义化：Raw=纯文本自检内容，Meta 标记来源，渲染层着色。
+		b := newScrollbackBlock(BlockResearchTrace, string(msg))
+		b.Meta = "reflect"
+		m.blocks = append(m.blocks, string(msg))
+		m.blockItems = append(m.blockItems, b)
+		m.blocksVersion++
+		m.refresh()
 		return m, listen(m.sub)
 
 	case textMsg:
@@ -436,7 +564,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.record("error", "", errText)
 		action := recoveryAction(string(msg))
 		m.addTimeline(timelineEvent{Kind: "error", Phase: "错误恢复", Label: action.Title, Detail: action.Message})
-		m.appendBlock(BlockRecovery, stError.Render("⏺ ✗ ")+renderRecoveryPanel(string(msg)))
+		// 语义化：Raw=原始错误文本，渲染层重建 recovery 面板。
+		m.appendBlock(BlockRecovery, string(msg))
 		m.lastTurnErr = errText
 		return m, listen(m.sub)
 
@@ -448,8 +577,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if body := timelineMarkdownBody(m.timeline); body != "" {
 				m.record("timeline", "", body)
 			}
-			if card := renderStructuredAnswerCardCompressed(m.lastMeta.StructuredAnswer, m.vp.Width); card != "" {
-				m.appendBlock(BlockContract, card)
+			if line := contractSummaryText(m.lastMeta.StructuredAnswer); line != "" {
+				b := newScrollbackBlock(BlockContract, line)
+				b.Meta = "contract"
+				m.blocks = append(m.blocks, line)
+				m.blockItems = append(m.blockItems, b)
+				m.blocksVersion++
 			}
 			m.record("assistant", "", ans)
 			if m.answerRunningID != "" {
@@ -496,7 +629,5 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refresh()
 		return m, nil
 	}
-
-	m.ti, cmd = m.ti.Update(msg)
-	return m, cmd
+	return m, nil
 }

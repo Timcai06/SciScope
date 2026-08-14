@@ -69,7 +69,7 @@ func runThemeCommand(m model, args []string) (model, tea.Cmd) {
 }
 
 func runTimelineCommand(m model, args []string) (model, tea.Cmd) {
-	m.appendBlock(BlockResearchTrace, renderTimelineBlock(m.timeline))
+	m.appendTimelineBlock(m.timeline)
 	return m, nil
 }
 
@@ -135,9 +135,11 @@ func runResumeCommand(m model, args []string) (model, tea.Cmd) {
 		m.appendBlock(BlockSystem, stWarn.Render("  恢复会话失败: "+err.Error()))
 		return m, nil
 	}
+	// 语义化：恢复块存纯文本（会话 markdown 原文），渲染层透传，不把 ANSI
+	// 塞回 scrollback（提示词核心目标 1：对话历史不保存渲染字符串）。
 	m.blocks = []string{
-		stBullet.Render("⏺ ") + stAccent.Render("已恢复会话 ") + stFaint.Render(filepath.Base(session.Path)),
-		stFaint.Render(strings.TrimSpace(session.Content)),
+		"已恢复会话 " + filepath.Base(session.Path),
+		strings.TrimSpace(session.Content),
 	}
 	m.syncBlockItems()
 	m.transcript = []transcriptEvent{{Kind: "session", Content: session.Content}}
@@ -311,7 +313,15 @@ func (m model) View() string {
 	if innerW < 40 {
 		innerW = m.vp.Width
 	}
-	parts := []string{m.vp.View()}
+	content := m.vp.View()
+	// T05-12：搜索/选择模式的行 marker（▍/❯），在 canvas 黑底前插入。
+	if m.searchMode {
+		content = m.markSearchMatches(content)
+	}
+	if m.selectMode {
+		content = m.markSelectedBlock(content)
+	}
+	parts := []string{content}
 
 	if m.submenu != "" {
 		parts = append(parts, m.renderSubmenuPalette(innerW))
@@ -323,8 +333,13 @@ func (m model) View() string {
 
 	parts = append(parts, m.renderStatusLine(innerW))
 
-	parts = append(parts, m.renderComposer(innerW))
-	content := strings.Join(parts, "\n")
+	if m.searchMode {
+		// 搜索模式：底部输入框切换为搜索框。
+		parts = append(parts, m.renderSearchBox(innerW))
+	} else {
+		parts = append(parts, m.renderComposer(innerW))
+	}
+	content = strings.Join(parts, "\n")
 	// black canvas（计划 5.1 节，Grok 式 cell 级背景的字符串模型等价实现）：
 	// 组件渲染行内部含 \x1b[0m / \x1b[49m 重置序列，会把行首黑底 reset 掉，
 	// 使行尾填充空格落在终端默认背景（IDE 灰）——对每个重置立即恢复黑底。

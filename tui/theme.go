@@ -30,6 +30,8 @@ type tuiTheme struct {
 	AccentSoft   lipgloss.Color // 弱强调（选中行背景等）
 
 	Accent   lipgloss.Color
+	Success  lipgloss.Color // 成功状态（tool 完成等，低饱和）
+	Evidence lipgloss.Color // 证据领域对象强调
 	Warning  lipgloss.Color
 	Error    lipgloss.Color
 	Ink      lipgloss.Color
@@ -50,7 +52,8 @@ var (
 			Name: "dark", Title: "深色研究台", Desc: "默认黑色沉浸画布,青色证据流,适合深色终端和演示录屏",
 			Canvas: "#000000", Surface: "#080A0A", SurfaceHover: "#111414",
 			Border: "#292D2D", AccentSoft: "#214646",
-			Accent: "#5FD7D7", Warning: "#D7AF5F", Error: "#FF7777",
+			Accent: "#5FD7D7", Success: "#7FB8A6", Evidence: "#6FB8B8",
+			Warning: "#D7AF5F", Error: "#FF7777",
 			Ink: "#E7E7E7", Muted: "#8A8F8F", Faint: "#505555", Selected: "#1c1c1c",
 			// 普通 Tool/User 不再拥有高饱和角色色：并入灰阶（计划 5.1 色彩纪律）
 			Tool: "#8A8F8F", User: "#E7E7E7", Warn: "#D7AF5F",
@@ -59,7 +62,8 @@ var (
 			Name: "paper", Title: "报告纸面", Desc: "贴近 PDF 报告的青绿品牌色,适合答辩截图",
 			Canvas: "#FFFFFF", Surface: "#F7FBFA", SurfaceHover: "#EDF3F2",
 			Border: "#B8C6C4", AccentSoft: "#D3E6E3",
-			Accent: "#16847D", Warning: "#B8872B", Error: "#B55A5A",
+			Accent: "#16847D", Success: "#3E7D5C", Evidence: "#16847D",
+			Warning: "#B8872B", Error: "#B55A5A",
 			Ink: "#1C2326", Muted: "#667276", Faint: "#9AA8A6", Selected: "#F7FBFA",
 			Tool: "#4E6F40", User: "#0B4F4A", Warn: "#B8872B",
 		},
@@ -67,7 +71,8 @@ var (
 			Name: "light", Title: "浅色终端", Desc: "提高浅色背景可读性,减少低对比灰字",
 			Canvas: "#FFFFFF", Surface: "#F4F7F7", SurfaceHover: "#E9EFEF",
 			Border: "#C9D2D1", AccentSoft: "#CFE4E2",
-			Accent: "#006D77", Warning: "#8A5A00", Error: "#A23B3B",
+			Accent: "#006D77", Success: "#2F7D4F", Evidence: "#006D77",
+			Warning: "#8A5A00", Error: "#A23B3B",
 			Ink: "#1B1F22", Muted: "#5D666A", Faint: "#8A9498", Selected: "#F4F7F7",
 			Tool: "#255C99", User: "#2F6F3E", Warn: "#8A5A00",
 		},
@@ -75,7 +80,8 @@ var (
 			Name: "contrast", Title: "高对比", Desc: "更亮的强调色和警告色,适合投影或低质量屏幕",
 			Canvas: "#000000", Surface: "#101010", SurfaceHover: "#1F1F1F",
 			Border: "#666666", AccentSoft: "#005F5F",
-			Accent: "#00FFFF", Warning: "#FFD166", Error: "#FF5C8A",
+			Accent: "#00FFFF", Success: "#00E5A0", Evidence: "#00FFFF",
+			Warning: "#FFD166", Error: "#FF5C8A",
 			Ink: "#FFFFFF", Muted: "#B8B8B8", Faint: "#777777", Selected: "#000000",
 			Tool: "#5FA8FF", User: "#7CFF6B", Warn: "#FFD166",
 		},
@@ -83,27 +89,31 @@ var (
 	themeOrder   = []string{"dark", "paper", "light", "contrast"}
 	currentTheme = "dark"
 
-	cAccent lipgloss.Color
-	cTool   lipgloss.Color
-	cWarn   lipgloss.Color
-	cUser   lipgloss.Color
-	cError  lipgloss.Color
-	cMuted  lipgloss.Color
-	cFaint  lipgloss.Color
-	cInk    lipgloss.Color
+	cAccent   lipgloss.Color
+	cSuccess  lipgloss.Color
+	cEvidence lipgloss.Color
+	cTool     lipgloss.Color
+	cWarn     lipgloss.Color
+	cUser     lipgloss.Color
+	cError    lipgloss.Color
+	cMuted    lipgloss.Color
+	cFaint    lipgloss.Color
+	cInk      lipgloss.Color
 
-	stAccent lipgloss.Style
-	stBullet lipgloss.Style
-	stConn   lipgloss.Style
-	stTool   lipgloss.Style
-	stWarn   lipgloss.Style
-	stError  lipgloss.Style
-	stUser   lipgloss.Style
-	stMuted  lipgloss.Style
-	stFaint  lipgloss.Style
-	stInk    lipgloss.Style
-	stSelCmd lipgloss.Style
-	stCmd    lipgloss.Style
+	stAccent   lipgloss.Style
+	stBullet   lipgloss.Style
+	stConn     lipgloss.Style
+	stTool     lipgloss.Style
+	stSuccess  lipgloss.Style
+	stEvidence lipgloss.Style
+	stWarn     lipgloss.Style
+	stError    lipgloss.Style
+	stUser     lipgloss.Style
+	stMuted    lipgloss.Style
+	stFaint    lipgloss.Style
+	stInk      lipgloss.Style
+	stSelCmd   lipgloss.Style
+	stCmd      lipgloss.Style
 )
 
 func init() {
@@ -122,6 +132,8 @@ func applyTheme(name string) bool {
 	}
 	currentTheme = name
 	cAccent = theme.Accent
+	cSuccess = theme.Success
+	cEvidence = theme.Evidence
 	cTool = theme.Tool
 	cWarn = theme.Warn
 	cUser = theme.User
@@ -133,6 +145,8 @@ func applyTheme(name string) bool {
 	stBullet = lipgloss.NewStyle().Foreground(cAccent).Bold(true) // ⏺
 	stConn = lipgloss.NewStyle().Foreground(cFaint)               // ⎿
 	stTool = lipgloss.NewStyle().Foreground(cTool)
+	stSuccess = lipgloss.NewStyle().Foreground(cSuccess)
+	stEvidence = lipgloss.NewStyle().Foreground(cEvidence)
 	stWarn = lipgloss.NewStyle().Foreground(cWarn)
 	stError = lipgloss.NewStyle().Foreground(cError)
 	stUser = lipgloss.NewStyle().Foreground(cUser).Bold(true)
@@ -160,6 +174,12 @@ func FaintText() lipgloss.Style { return lipgloss.NewStyle().Foreground(cFaint) 
 
 // AccentText 强调文本：Accent（focus / active / selected / trusted evidence emphasis）。
 func AccentText() lipgloss.Style { return lipgloss.NewStyle().Foreground(cAccent).Bold(true) }
+
+// SuccessText 成功状态文本：Success（tool 完成等，低饱和）。
+func SuccessText() lipgloss.Style { return lipgloss.NewStyle().Foreground(cSuccess) }
+
+// EvidenceText 证据对象强调文本：Evidence。
+func EvidenceText() lipgloss.Style { return lipgloss.NewStyle().Foreground(cEvidence) }
 
 // WarningText 警告文本：Warning（evidence insufficient / uncertainty / degraded）。
 func WarningText() lipgloss.Style { return lipgloss.NewStyle().Foreground(cWarn) }

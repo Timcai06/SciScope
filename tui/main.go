@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -276,12 +276,12 @@ func helpString() string {
 
 func (m model) Init() tea.Cmd {
 	if m.demo {
-		return tea.Batch(textinput.Blink, func() tea.Msg {
+		return tea.Batch(textarea.Blink, func() tea.Msg {
 			go playDemo(m.sub)
 			return nil
 		}, listen(m.sub), m.spin.Tick)
 	}
-	return textinput.Blink
+	return textarea.Blink
 }
 
 // appendBlock 追加一个 typed 块。kind 为块类型身份（不再靠字符串猜测）；

@@ -143,8 +143,8 @@ func kaomojiForState(kind string, meta eventMeta, answering bool) string {
 }
 
 func renderWorkflowStatus(meta eventMeta, nodes []string, kind string, elapsed time.Duration, width int) string {
-	if width < 56 {
-		width = 56
+	if width < 20 {
+		width = 20
 	}
 	current := metaPhase(meta)
 	if current == "等待事件" && len(nodes) > 0 {
@@ -222,8 +222,8 @@ func appendUniqueNode(nodes []string, node string) []string {
 }
 
 func renderStreamRail(events []timelineEvent, meta eventMeta, nodes []string, kind string, elapsed time.Duration, width int) string {
-	if width < 48 {
-		width = 48
+	if width < 20 {
+		width = 20
 	}
 	runtime := meta.Runtime
 	if runtime == "" {
@@ -301,8 +301,8 @@ func renderThinkingShelf(plan []string, reflect string, width int) string {
 	if len(plan) == 0 && strings.TrimSpace(reflect) == "" {
 		return ""
 	}
-	if width < 48 {
-		width = 48
+	if width < 20 {
+		width = 20
 	}
 	body := []string{}
 	if len(plan) > 0 {
@@ -394,6 +394,50 @@ func toolResultLabel(name, result string) string {
 	return "工具返回"
 }
 
+// toolResultSummary 提取工具结果的一行纯文本摘要，用于 tool 块成功/失败行
+// （提示词：Tool 展示为「找到 15 篇论文 · 完成 2.4s」式摘要，而非日志堆叠）。
+func toolResultSummary(name, result string) string {
+	if strings.HasPrefix(result, "[未执行]") {
+		return strings.TrimSpace(strings.TrimPrefix(result, "[未执行]"))
+	}
+	switch name {
+	case "search_literature", "summarize_field":
+		var papers []evidencePaper
+		if json.Unmarshal([]byte(result), &papers) == nil && len(papers) > 0 {
+			return fmt.Sprintf("找到 %d 篇论文", len(papers))
+		}
+	case "verify_claim":
+		var cr claimResult
+		if json.Unmarshal([]byte(result), &cr) == nil && cr.Verdict != "" {
+			if len(cr.Evidence) == 0 {
+				reason := strings.TrimSpace(cr.RejectionReason)
+				if reason == "" {
+					reason = strings.TrimSpace(cr.Reason)
+				}
+				if reason == "" {
+					reason = "证据不足"
+				}
+				return "证据不足: " + clip(reason, 40)
+			}
+			label := cr.Verdict
+			if cr.TopSimilarity > 0 {
+				label += fmt.Sprintf(" · %.3f", cr.TopSimilarity)
+			}
+			return label
+		}
+	case "get_trends":
+		var rows []map[string]any
+		if json.Unmarshal([]byte(result), &rows) == nil && len(rows) > 0 {
+			return fmt.Sprintf("%d 条趋势", len(rows))
+		}
+	}
+	s := strings.TrimSpace(stripANSI(result))
+	if s == "" {
+		return ""
+	}
+	return clip(s, 48)
+}
+
 func timelineMarkdownBody(events []timelineEvent) string {
 	lines := []string{}
 	lastPhase := ""
@@ -456,24 +500,4 @@ func renderTimelineBlock(events []timelineEvent) string {
 		body = append(body, line)
 	}
 	return panelRow("timeline", "本轮执行时间线", fmt.Sprintf("%d events", len(events)), body)
-}
-
-func renderPlanBlock(plan planMsg) string {
-	body := []string{}
-	for i, step := range plan {
-		body = append(body, fmt.Sprintf("[%d] %s", i+1, step))
-	}
-	return panelRow("thinking", "思考过程", fmt.Sprintf("%d 步", len(plan)), body)
-}
-
-func renderToolCallBlock(name, args string) string {
-	body := []string{}
-	if strings.TrimSpace(args) != "" {
-		body = append(body, args)
-	}
-	return panelRow("action", toolPlainLabel(name), "tool call", body)
-}
-
-func renderReflectBlock(s string) string {
-	return panelRow("thinking", "自我纠错", "", []string{s})
 }

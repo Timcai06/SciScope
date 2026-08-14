@@ -410,6 +410,22 @@ func renderStructuredAnswerCardCompressed(meta map[string]any, width int) string
 	return RenderAnswerContractCompressed(contract)
 }
 
+// contractSummaryText 返回 answer-contract 的一行纯文本摘要（渲染层上色，
+// 不预渲染 ANSI——语义化 Block 原则）。
+func contractSummaryText(meta map[string]any) string {
+	contract, ok := parseStructuredAnswerValue(meta)
+	if !ok {
+		return ""
+	}
+	if contract.Status == "" || (contract.Status == "not_applicable" && contract.CitationCompliance == "not_applicable") {
+		return ""
+	}
+	parts := []string{contractVerdictLabel(contract)}
+	parts = append(parts, fmt.Sprintf("%d 条证据", len(contract.Citations)))
+	parts = append(parts, contractComplianceText(contract.CitationCompliance))
+	return strings.Join(parts, " · ")
+}
+
 // isEvidenceTool 判断工具是否属于证据类（typed BlockEvidence kind）。
 func isEvidenceTool(name string) bool {
 	switch name {

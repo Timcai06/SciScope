@@ -16,6 +16,7 @@ package main
 
 import (
 	"regexp"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -41,29 +42,43 @@ const (
 
 // BlockStatus 是块的生命周期状态。finished 块可缓存；running 块随 streaming
 // 更新同一实例而非无限 append（计划 T05-02「必须证明」）。
+// succeeded / failed 表达 Tool Call 的完成态（提示词：Running → Success → Failed）。
 type BlockStatus string
 
 const (
-	BlockRunning  BlockStatus = "running"
-	BlockFinished BlockStatus = "finished"
+	BlockRunning   BlockStatus = "running"
+	BlockFinished  BlockStatus = "finished"
+	BlockSucceeded BlockStatus = "succeeded"
+	BlockFailed    BlockStatus = "failed"
 )
 
-// ScrollbackBlock 是 UI 投影单元。Raw 保存源文本（含现有 ANSI 渲染字符串，
-// 渲染语法迁移属 T05-04），Rendered 是宽度相关的渲染缓存。
+// ScrollbackBlock 是 UI 投影单元。Raw 只保存纯文本源/结构化事实（用户问题、
+// 答案、plan 步骤、tool 摘要等），渲染与着色全部发生在渲染层（renderConversationBlock），
+// 不再保存已经渲染和上色的 ANSI 字符串（提示词核心目标 1）。
 type ScrollbackBlock struct {
 	ID            string      // 单调递增块身份
 	Kind          BlockKind   // 类型身份（不再靠解析标题文本判断）
-	Status        BlockStatus // running / finished
+	Status        BlockStatus // running / finished / succeeded / failed
 	Expanded      bool        // 折叠投影态（fold/unfold 不修改 transcript）
 	Pinned        bool        // 用户手动折叠/展开过：自动折叠不覆盖（display_mode_pinned 语义）
 	StartedAt     time.Time   // 块创建时间
 	EndedAt       time.Time   // finished 时间（running 时为零值）
-	Raw           string      // 源文本
+	Raw           string      // 纯文本源（不再含 ANSI）
 	Retry         bool        // user 块的 retry 标记
 	Tools         []string    // answer 块使用的工具列表
 	Rendered      string      // 渲染缓存（宽度/主题相关）
 	RenderWidth   int
 	RenderVersion int
+
+	// ---- 语义化字段（提示词「Block 负责数据/状态/生命周期」）----
+	ToolName     string          // tool_call / tool_result 的工具名
+	ToolArgs     string          // tool_call 参数摘要（纯文本）
+	ToolSummary  string          // tool_result 结果摘要（纯文本，如「找到 15 篇论文」）
+	ToolDuration time.Duration   // tool 执行耗时
+	ToolResult   string          // tool_result 原始 JSON（Evidence 卡由渲染层解析，不预渲染）
+	PlanSteps    []string        // research_plan 步骤（纯文本）
+	Events       []timelineEvent // research_trace 时间线（/timeline 审计，不预渲染）
+	Meta         string          // 块元信息（阶段/自检修正/timeline 等，纯文本）
 }
 
 var scrollbackIDSeq atomic.Int64
@@ -303,6 +318,86 @@ func (m *model) blockByKind(kind BlockKind) []ScrollbackBlock {
 		}
 	}
 	return out
+}
+
+// startToolBlock 创建 running tool_call 块（结构化数据：工具名 + 参数摘要）。
+// streaming 期间 toolResultMsg 到达后由 finishLatestToolBlock 转正为
+// succeeded / failed——Tool Call 完整生命周期 Running → Success/Failed。
+func (m *model) startToolBlock(name, args string) string {
+	b := ScrollbackBlock{
+		ID:        nextBlockID(),
+		Kind:      BlockToolCall,
+		Status:    BlockRunning,
+		Expanded:  true, // running 块默认展开
+		StartedAt: time.Now(),
+		ToolName:  name,
+		ToolArgs:  args,
+	}
+	m.blocks = append(m.blocks, b.Raw)
+	m.blockItems = append(m.blockItems, b)
+	m.blocksVersion++
+	m.refresh()
+	return b.ID
+}
+
+// finishLatestToolBlock 把最近的 running tool_call 块（工具名匹配）转正为
+// succeeded/failed，写入结果摘要与耗时。返回是否找到并更新。
+func (m *model) finishLatestToolBlock(name string, status BlockStatus, summary string, elapsed time.Duration) bool {
+	for i := len(m.blockItems) - 1; i >= 0; i-- {
+		b := &m.blockItems[i]
+		if b.Kind == BlockToolCall && b.ToolName == name && b.Status == BlockRunning {
+			b.Status = status
+			b.ToolSummary = summary
+			b.ToolDuration = elapsed
+			b.EndedAt = time.Now()
+			b.Rendered = ""
+			b.RenderWidth = 0
+			b.RenderVersion++
+			m.blocksVersion++
+			m.refresh()
+			return true
+		}
+	}
+	return false
+}
+
+// appendPlanBlock 追加研究计划块（PlanSteps 结构化，Raw 为纯文本步骤）。
+func (m *model) appendPlanBlock(steps []string) {
+	raw := strings.Join(steps, "\n")
+	b := ScrollbackBlock{
+		ID:        nextBlockID(),
+		Kind:      BlockResearchPlan,
+		Status:    BlockFinished,
+		Expanded:  true,
+		StartedAt: time.Now(),
+		EndedAt:   time.Now(),
+		Raw:       raw,
+		PlanSteps: append([]string(nil), steps...),
+	}
+	m.blocks = append(m.blocks, raw)
+	m.blockItems = append(m.blockItems, b)
+	m.blocksVersion++
+	m.refresh()
+}
+
+// appendTimelineBlock 追加 /timeline 审计时间线块（Events 结构化，Raw 为
+// 纯文本摘要；渲染层重建 panelRow，不预渲染 ANSI）。
+func (m *model) appendTimelineBlock(events []timelineEvent) {
+	b := ScrollbackBlock{
+		ID:        nextBlockID(),
+		Kind:      BlockResearchTrace,
+		Status:    BlockFinished,
+		Expanded:  true,
+		StartedAt: time.Now(),
+		EndedAt:   time.Now(),
+		Raw:       timelineMarkdownBody(events),
+		Events:    append([]timelineEvent(nil), events...),
+		Meta:      "timeline",
+	}
+	m.blocks = append(m.blocks, b.Raw)
+	m.blockItems = append(m.blockItems, b)
+	m.blocksVersion++
+	m.refresh()
 }
 
 // literalSGRResidueRe 匹配无 ESC 前缀的字面 SGR 残骸（[0m、[38;5;252m 等）。

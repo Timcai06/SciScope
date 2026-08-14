@@ -24,7 +24,11 @@ func (m *model) renderBlocksContent(width int) string {
 	}
 	parts := make([]string, 0, len(m.blockItems))
 	inToolGroup := false // T05-04: 连续 research tools 语义 grouping
+	// T05-12：记录每块起始行号，供 block 选择模式（ctrl+g）定位。
+	m.blockStartLines = make([]int, 0, len(m.blockItems))
+	lineNo := 0
 	for i := range m.blockItems {
+		m.blockStartLines = append(m.blockStartLines, lineNo)
 		block := &m.blockItems[i]
 		if block.Rendered == "" || block.RenderWidth != width {
 			block.Rendered = renderConversationBlock(*block, width)
@@ -48,13 +52,18 @@ func (m *model) renderBlocksContent(width int) string {
 			inToolGroup = false
 		}
 		parts = append(parts, out)
+		lineNo += strings.Count(out, "\n") + 1
 	}
 	return strings.Join(parts, "\n")
 }
 
-// indentToolGroupLine 把连续工具组内的调用行从 ⏺ 降为缩进 ⎿。
+// indentToolGroupLine 把连续工具组内的调用行从状态图标降为缩进 ⎿。
+// 状态图标包括：⏺（running）、✓（succeeded）、✗（failed）。图标为 1-3 字节
+// rune + 空格，故空格字节索引在 1..4 内。
 func indentToolGroupLine(line string) string {
-	line = strings.Replace(line, "⏺ ", "⎿ ", 1)
+	if i := strings.Index(line, " "); i >= 0 && i <= 4 {
+		line = "⎿ " + line[i+1:]
+	}
 	return "  " + line
 }
 
@@ -157,10 +166,119 @@ func renderConversationBlock(block ScrollbackBlock, width int) string {
 				body + stAccent.Render("▌")
 		}
 		return renderAnswerMessage(block.Raw, block.Tools, width)
+	case BlockToolCall:
+		// 三态生命周期渲染（提示词：Running → Success → Failed），无框摘要式。
+		return renderToolCallBlock(&block, width)
+	case BlockResearchPlan:
+		// 语义化：PlanSteps 结构化，无框紧凑展示（提示词：Plan 不抢空间）。
+		return renderPlanBlockSemantic(&block)
+	case BlockResearchTrace:
+		if block.Meta == "timeline" {
+			// /timeline 审计时间线：Events 结构化，渲染层重建（领域对象允许边框）。
+			return renderTimelineBlock(block.Events)
+		}
+		return renderReflectBlockSemantic(&block)
+	case BlockRecovery:
+		// 语义化：Raw=原始错误文本，渲染层重建 recovery 面板。
+		return renderRecoveryPanel(block.Raw)
+	case BlockContract:
+		return renderContractBlock(&block)
+	case BlockEvidence:
+		// 语义化：Raw=工具结果 JSON 原文，渲染层解析证据卡（不预渲染 ANSI）。
+		return renderEvidenceBlock(&block, width)
+	case BlockToolResult:
+		// 旧数据兼容透传；新数据流不再产生 BlockToolResult（摘要并入 tool 行）。
+		return block.Raw
 	default:
-		// 其他 typed kind 暂保持原渲染字符串（无框语法属 T05-04 逐步迁移）。
 		return block.Raw
 	}
+}
+
+// renderToolCallBlock 渲染 Tool Call 三态（无框、摘要式，提示词「Tool 不要像日志」）：
+//
+//	running:   ⏺ 搜索论文数据库…
+//	succeeded: ✓ 搜索论文数据库 · 找到 15 篇论文 · 完成 2.4s
+//	failed:    ✗ 校验拦截 · 校验拦截原因 · 0.3s
+//
+// Wide 档位（>110 列）额外显示参数 metadata。
+// 注意用 toolPlainLabel（不带工具图标）：状态图标（⏺/✓/✗）是本渲染层唯一
+// 的图标源，避免与 toolLabel 的工具图标叠加成「✓ ✓ 论断核查」。
+func renderToolCallBlock(b *ScrollbackBlock, width int) string {
+	label := toolPlainLabel(b.ToolName)
+	if label == "" {
+		label = b.Raw
+	}
+	meta := ""
+	if layoutTierFor(width) == tierWide && b.ToolArgs != "" {
+		meta = "  " + clip(b.ToolArgs, 40)
+	}
+	switch b.Status {
+	case BlockRunning:
+		return stBullet.Render("⏺ ") + stAccent.Render(label+"…") + stFaint.Render(meta)
+	case BlockSucceeded:
+		line := stBullet.Render("✓ ") + stInk.Render(label)
+		if b.ToolSummary != "" {
+			line += stMuted.Render(" · " + b.ToolSummary)
+		}
+		if d := durationText(b.ToolDuration); d != "" {
+			line += stFaint.Render(" · " + d)
+		}
+		return line + stFaint.Render(meta)
+	case BlockFailed:
+		line := stBullet.Render("✗ ") + stError.Render(label)
+		if b.ToolSummary != "" {
+			line += stError.Render(" · " + b.ToolSummary)
+		}
+		return line + stFaint.Render(meta)
+	default:
+		if b.Raw != "" {
+			return b.Raw
+		}
+		return stInk.Render(label)
+	}
+}
+
+// renderPlanBlockSemantic 渲染研究计划块（无框、缩进、紧凑）。
+func renderPlanBlockSemantic(b *ScrollbackBlock) string {
+	lines := []string{stBullet.Render("⏺ ") + stAccent.Render("研究计划")}
+	steps := b.PlanSteps
+	if len(steps) == 0 && b.Raw != "" {
+		for _, ln := range strings.Split(b.Raw, "\n") {
+			steps = append(steps, strings.TrimSpace(strings.TrimPrefix(ln, "- ")))
+		}
+	}
+	for _, s := range steps {
+		lines = append(lines, stConn.Render("  ⎿ ")+stInk.Render(s))
+	}
+	return strings.Join(lines, "\n")
+}
+
+// renderReflectBlockSemantic 渲染自检修正块（无框）。
+func renderReflectBlockSemantic(b *ScrollbackBlock) string {
+	return stBullet.Render("⏺ ") + stWarn.Render("自检修正") + "\n" +
+		stConn.Render("  ⎿ ") + stFaint.Render(b.Raw)
+}
+
+// renderContractBlock 渲染 answer-contract 压缩行（首段 Accent，其余 Muted）。
+func renderContractBlock(b *ScrollbackBlock) string {
+	if b.Raw == "" {
+		return ""
+	}
+	parts := strings.Split(b.Raw, " · ")
+	out := make([]string, 0, len(parts))
+	for i, p := range parts {
+		if i == 0 {
+			out = append(out, stAccent.Render(p))
+		} else {
+			out = append(out, stMuted.Render(p))
+		}
+	}
+	return "  " + strings.Join(out, " · ")
+}
+
+// renderEvidenceBlock 渲染证据领域对象卡（Raw=结果 JSON，渲染层解析）。
+func renderEvidenceBlock(b *ScrollbackBlock, width int) string {
+	return renderEvidenceToolResult(b.ToolName, b.Raw, width, b.ToolDuration)
 }
 
 func renderUserMessage(text string, retry bool) string {

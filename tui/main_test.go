@@ -1302,26 +1302,54 @@ func TestApplyThemeRejectsUnknownTheme(t *testing.T) {
 	}
 }
 
-func TestThinkingPanelsUseTraceGrammar(t *testing.T) {
-	plan := renderPlanBlock(planMsg{"解析问题", "检索证据"})
-	if !strings.Contains(plan, "╭─ thinking · 思考过程") {
-		t.Fatalf("plan should render as thinking panel:\n%s", plan)
+func TestTraceBlocksUseSemanticGrammar(t *testing.T) {
+	// 语义化 Block（提示词）：plan/tool/reflect 由结构化数据渲染，无边框
+	// panelRow 语法残留（╭─ 边框只用于 Evidence/Recovery 等领域对象）。
+	plan := renderConversationBlock(ScrollbackBlock{
+		Kind: BlockResearchPlan, Status: BlockFinished,
+		PlanSteps: []string{"解析问题", "检索证据"},
+	}, 80)
+	if !strings.Contains(plan, "研究计划") {
+		t.Fatalf("plan missing header:\n%s", plan)
 	}
-	if !strings.Contains(plan, "│  [1] 解析问题") {
-		t.Fatalf("plan missing numbered step:\n%s", plan)
+	if !strings.Contains(plan, "解析问题") || !strings.Contains(plan, "检索证据") {
+		t.Fatalf("plan missing steps:\n%s", plan)
+	}
+	if strings.Contains(plan, "╭") {
+		t.Fatalf("plan must not use panel border:\n%s", plan)
 	}
 
-	call := renderToolCallBlock("verify_claim", "RAG 降低幻觉")
-	if !strings.Contains(call, "╭─ action · 论断核查") {
-		t.Fatalf("tool call should render as action panel:\n%s", call)
+	call := renderConversationBlock(ScrollbackBlock{
+		Kind: BlockToolCall, Status: BlockSucceeded,
+		ToolName: "verify_claim", ToolSummary: "强支持 · 0.910", ToolDuration: 2500 * time.Millisecond,
+	}, 80)
+	if !strings.Contains(call, "论断核查") || !strings.Contains(call, "强支持 · 0.910") {
+		t.Fatalf("tool call should render summary line:\n%s", call)
 	}
-	if !strings.Contains(call, "RAG 降低幻觉") {
-		t.Fatalf("tool call missing args:\n%s", call)
+	if !strings.Contains(call, "2.5s") {
+		t.Fatalf("tool call missing duration:\n%s", call)
+	}
+	if strings.Contains(call, "╭") {
+		t.Fatalf("tool call must not use panel border:\n%s", call)
 	}
 
-	reflection := renderReflectBlock("限定为降低风险")
-	if !strings.Contains(reflection, "╭─ thinking · 自我纠错") {
-		t.Fatalf("reflect should render as thinking panel:\n%s", reflection)
+	failed := renderConversationBlock(ScrollbackBlock{
+		Kind: BlockToolCall, Status: BlockFailed,
+		ToolName: "export_bibliography", ToolSummary: "校验拦截",
+	}, 80)
+	if !strings.Contains(failed, "✗") {
+		t.Fatalf("failed tool call should show ✗:\n%s", failed)
+	}
+
+	reflection := renderConversationBlock(ScrollbackBlock{
+		Kind: BlockResearchTrace, Status: BlockFinished,
+		Meta: "reflect", Raw: "限定为降低风险",
+	}, 80)
+	if !strings.Contains(reflection, "自检修正") || !strings.Contains(reflection, "限定为降低风险") {
+		t.Fatalf("reflect should render semantic block:\n%s", reflection)
+	}
+	if strings.Contains(reflection, "╭") {
+		t.Fatalf("reflect must not use panel border:\n%s", reflection)
 	}
 }
 
@@ -1841,7 +1869,7 @@ func TestPaletteStagesArgCommandTemplate(t *testing.T) {
 	if got := m.ti.Value(); got != "/recommend <>" {
 		t.Fatalf("staged value = %q, want %q", got, "/recommend <>")
 	}
-	if pos, want := m.ti.Position(), len("/recommend <>")-1; pos != want {
+	if pos, want := m.inputCursorColumn(), len("/recommend <>")-1; pos != want {
 		t.Fatalf("cursor at %d, want %d (between < and >)", pos, want)
 	}
 
