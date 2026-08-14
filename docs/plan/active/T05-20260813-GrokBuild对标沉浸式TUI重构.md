@@ -798,6 +798,18 @@ tui/
 - test 跟随 view 拆分；
 - 不机械搬文件制造巨型无语义 diff。
 
+**T05-10 交付记录（DONE（待复核））**：
+
+- 产物：`tui/model.go`、`tui/update.go`、`tui/view_conversation.go`、`tui/view_trace.go`、`tui/view_composer.go`（新）；`tui/slash.go` 并入 submenu 系列；`main.go` 1939→396 行、`render.go` 1112→985 行。提交 `26a29e6`。
+- 门禁核对：
+  - `main.go` 不再承载大段 renderer ✓（现为 CLI + composition root + backend URL + 工具标签/文本工具）；
+  - `render.go` 不再是唯一 dump 文件 ✓（evidence/tool-result/export/session 保留，轨迹渲染迁出）；
+  - 每个 view 文件单一视觉职责 ✓（conversation/trace/composer/welcome/evidence/overlay）；
+  - 未机械搬文件制造巨型无语义 diff ✓（纯搬移零重构，函数签名不变）。
+- 验证：`go test -count=1 ./...` 全绿；gofmt/vet 干净；demo 80 列 PTY 快照（`output/evidence/t05/baseline/demo-80col-t05-10.raw`）与 T05-07 基线语义画面一致（差异仅 30s 截断帧时序；「研究计划/证据卡/强支持/研究结论/自检修正/检索文献」全部命中）。
+- 已知项（非本任务引入）：demo fixture 文本含字面 ANSI 残骸（T05-07 基线同现），真实后端场景由 `stripLiteralSGRResidue`（textMsg 清洗）覆盖。
+- 状态：DONE（待复核）——待项目负责人复核后领取 T05-11。
+
 ---
 
 ### T05-11｜响应式、性能、视觉回归与 Terminal Matrix
