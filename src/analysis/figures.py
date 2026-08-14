@@ -297,7 +297,7 @@ def _plot_source_records(quality: pd.DataFrame, output_dir: Path) -> dict[str, s
         "file": "source_records_bar.png",
         "report_section": "数据底座与采集状态",
         "source_table": "source_quality_report.csv",
-        "message": "展示当前六个公开来源的基线采集规模。",
+        "message": "展示当前公开来源的基线采集规模(2026-08-14 全量重跑, 含讯飞交付包)。",
         "status": "final",
     }
 
