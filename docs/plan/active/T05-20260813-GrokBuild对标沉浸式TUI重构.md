@@ -856,6 +856,20 @@ tui/
 - Windows Terminal：至少完成 build + fixed-width render test；有真实 Windows 环境时再记录人工视觉证据；
 - `TERM=dumb` 或无 truecolor：必须 fail gracefully，不得输出控制字符垃圾。
 
+**T05-11 交付记录（DONE（待复核））**：
+
+- 产物：`tui/t05_11_test.go`（宽度矩阵 / resize 矩阵 / cache hit / Ascii 降级 / 2 个 benchmark）；`view_conversation.go` glamourRenderCount 计数器；`commands_run.go` Ascii profile 装饰层降级。提交 `T05-11`（提交链最新）。
+- 门禁核对：
+  - 宽度矩阵 56/60/80/120/160 ✓（View 行宽 ≤ 终端宽、研究结论可见、无 panic）；
+  - resize 120→80→160 ✓（无 panic、block ID 不丢失）；
+  - cache hit ✓（相同宽度二次渲染 Glamour 计数不增，宽度变化才重渲）；
+  - 性能预算 ✓（500 blocks 7.2μs/op、modal filter 3.7μs/op，远优于门禁；30 FPS 上限未改变）；
+  - streaming cache ✓（既有 RenderWidth/RenderVersion 机制，T05-11 补计数证据）；
+  - TERM=dumb / 无 truecolor fail gracefully ✓（Ascii profile 零 ESC 序列，纯文本保留）；
+  - PTY 快照：`output/evidence/t05/baseline/demo-{80,120,160}col-t05-11.raw/.txt`，全部零字面残骸。
+- Terminal matrix 人工项（agent 无 GUI 权限，待项目负责人）：macOS Terminal / iTerm2 / VS Code Terminal 主流程；Warp 视环境可用性；Windows Terminal 需真实环境。
+- 状态：DONE（待复核）——T 线实现全部完成，待复核后进入 TX01/TX02。
+
 ---
 
 ### TX01｜上游许可证与源码 Provenance 审计
