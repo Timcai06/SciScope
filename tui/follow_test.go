@@ -19,7 +19,9 @@ func fillBlocks(t *testing.T, m model) model {
 }
 
 func TestUpDownDelegatesToViewportWhenNoMenu(t *testing.T) {
+	prev := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
 	applyTheme("dark")
 	m := initialModel()
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -44,7 +46,9 @@ func TestUpDownDelegatesToViewportWhenNoMenu(t *testing.T) {
 }
 
 func TestManualScrollStopsFollowAndBottomRestores(t *testing.T) {
+	prev := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
 	applyTheme("dark")
 	m := initialModel()
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -76,7 +80,9 @@ func TestManualScrollStopsFollowAndBottomRestores(t *testing.T) {
 }
 
 func TestResizeKeepsBottomAnchorAndPreservesTopOffset(t *testing.T) {
+	prev := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
 	applyTheme("dark")
 	m := initialModel()
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
@@ -101,7 +107,9 @@ func TestResizeKeepsBottomAnchorAndPreservesTopOffset(t *testing.T) {
 
 func TestFollowFocusKeepsComposerTyping(t *testing.T) {
 	// 输入框 focus 恒在：滚动键不污染输入框值
+	prev := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)
+	defer lipgloss.SetColorProfile(prev)
 	applyTheme("dark")
 	m := initialModel()
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})

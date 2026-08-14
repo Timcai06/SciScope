@@ -15,6 +15,7 @@
 package main
 
 import (
+	"regexp"
 	"sync/atomic"
 	"time"
 )
@@ -302,4 +303,23 @@ func (m *model) blockByKind(kind BlockKind) []ScrollbackBlock {
 		}
 	}
 	return out
+}
+
+// literalSGRResidueRe 匹配无 ESC 前缀的字面 SGR 残骸（[0m、[38;5;252m 等）。
+// 前缀用捕获组保留（RE2 不支持 lookbehind）。
+var literalSGRResidueRe = regexp.MustCompile(`(^|[^\x1b])\[\d+(?:;\d+)*m`)
+
+// stripLiteralSGRResidue 清洗 LLM 输出中的字面 ANSI 残骸：训练数据含终端日志，
+// LLM 有时输出脱掉 ESC 的序列文本（[0m[38;5;252m），终端会原样显示成乱码。
+// 只匹配数字参数形态（[0m / [38;5;252m），不会误伤 markdown 链接与列表语法。
+// 连续残骸（[0m[38;5;252m）需循环替换：前一个序列的结束字符被消费后，
+// 后一个序列才会在下一轮暴露为串首。
+func stripLiteralSGRResidue(s string) string {
+	for {
+		next := literalSGRResidueRe.ReplaceAllString(s, "$1")
+		if next == s {
+			return next
+		}
+		s = next
+	}
 }

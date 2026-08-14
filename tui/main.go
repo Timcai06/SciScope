@@ -29,6 +29,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 var version = "dev"
@@ -1292,7 +1293,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.answering = true
 			m.maybeAnchorToPrompt()
 		}
-		m.answer += string(msg)
+		// 清洗 LLM 输出中的字面 ANSI 残骸（无 ESC 前缀的 [0m / [38;5;252m
+		// 等）：训练数据里的终端日志残留，终端会原样显示成乱码。
+		m.answer += stripLiteralSGRResidue(string(msg))
 		m.updateRunningBlock(m.answerRunningID, m.answer)
 		return m, tea.Batch(m.requestStreamRefresh(), listen(m.sub))
 
@@ -1424,9 +1427,13 @@ func renderAnswerMessage(answer string, tools []string, width int) string {
 	body := strings.Trim(answer, "\n")
 	// Use a fixed named style — NOT WithAutoStyle(), which queries the terminal background
 	// (OSC 11) on every render and leaks the response (]11;rgb:…) into the UI.
-	if r, err := glamour.NewTermRenderer(glamour.WithStandardStyle(glamourStyleName()), glamour.WithWordWrap(w)); err == nil {
-		if out, e := r.Render(answer); e == nil {
-			body = strings.Trim(out, "\n")
+	// 非彩色终端（Ascii profile）跳过 Glamour：ANSI 序列在 dumb 终端会以字面
+	// 文本显示（[0m[38;5;252m 乱码）。
+	if lipgloss.ColorProfile() != termenv.Ascii {
+		if r, err := glamour.NewTermRenderer(glamour.WithStandardStyle(glamourStyleName()), glamour.WithWordWrap(w)); err == nil {
+			if out, e := r.Render(answer); e == nil {
+				body = strings.Trim(out, "\n")
+			}
 		}
 	}
 	body = styleAnswerBody(body)

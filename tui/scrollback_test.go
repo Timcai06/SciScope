@@ -229,7 +229,7 @@ func TestAutoFoldTracesCollapsesUnpinnedAndKeepsPinned(t *testing.T) {
 	m := newScrollbackTestModel()
 	m.appendBlock(BlockResearchPlan, "⏺ 研究计划\n  ⎿ 步骤一\n  ⎿ 步骤二")
 	m.appendBlock(BlockResearchTrace, "⏺ 自检修正\n  ⎿ 修正一")
-	m.appendBlock(BlockAnswer, "⏺ 研究结论\n答案正文")
+	m.appendBlock(BlockAnswer, "答案正文")
 
 	// 手动折叠（Pinned）的块不被自动折叠覆盖（保持用户选择）。
 	traceID := m.blockItems[1].ID
