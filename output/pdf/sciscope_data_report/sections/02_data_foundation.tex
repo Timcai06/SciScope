@@ -1,7 +1,7 @@
 \section{数据覆盖与字段质量}
 
 \begin{reportbox}{当前数据基线}
-本轮数据覆盖 OpenAlex、arXiv、PubMed、PMC、Crossref 和 DOAJ 六个公开来源, 共形成 169,324 条原始记录。经标准化、异常年份治理和跨源去重后, 进入分析层的语料为 168,447 条, 其中 159,382 条位于 2022--2026 年主分析窗口。\textbf{2026-08-14 增量}:讯飞交付包 5{,}566 篇预印本 PDF(经 PDF 内嵌元数据解析)已按同一治理链全链路入库运行时 PostgreSQL(\texttt{source=iflytek}, 与六源主键零冲突), 库表规模为 \texttt{papers=164{,}730}、\texttt{chunk\_embeddings=413{,}971}; 本分析快照未重跑分析管线, 分布/趋势/图谱统计仍以 168{,}447 条为基准。
+本轮数据覆盖 OpenAlex、arXiv、PubMed、PMC、Crossref 和 DOAJ 六个公开来源, 共形成 169,324 条原始记录。经标准化、异常年份治理和跨源去重后, 进入分析层的语料为 168,447 条, 其中 159,382 条位于 2022--2026 年主分析窗口。\textbf{2026-08-14 增量}:讯飞交付包 5{,}566 篇预印本 PDF(经 PDF 内嵌元数据解析)已按同一治理链全链路入库运行时 PostgreSQL(\texttt{source=iflytek}, 与六源主键零冲突), 库表规模为 \texttt{papers=164{,}730}、\texttt{chunk\_embeddings=413{,}971}。本报告分布级统计(来源/年份/领域/覆盖率)已合并讯飞增量重算; 趋势、主题与图谱统计仍以 2026-08-10 快照为基准(3.3\% 增量对热点排序与社区结构的方向性结论影响有限)。
 \end{reportbox}
 
 \subsection{来源结构}
@@ -18,6 +18,7 @@ PubMed & 28,163 & 生物医学摘要和出版信息较完整 & 适合医学方�
 PMC & 29,227 & 开放全文片段较多 & 适合补充正文级证据和深度文本分析 \\
 Crossref & 28,500 & DOI 和出版元数据覆盖广 & 适合跨源校验和出版来源分析 \\
 DOAJ & 11,320 & 开放期刊文章集中 & 适合观察开放获取文献结构 \\
+讯飞交付包(iflytek) & 5,566 & 预印本全文 PDF, 经 PDF 内嵌元数据解析(bioRxiv 3,347 / medRxiv 1,589 / arXiv 531 / OpenAlex 99) & 适合补充全文级深读证据与预印本信号 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
@@ -25,13 +26,13 @@ DOAJ & 11,320 & 开放期刊文章集中 & 适合观察开放获取文献结构 
 \begin{figure}[!htbp]
   \centering
   \figasset[0.82\textwidth]{source_records_bar.png}
-  \caption{六个公开来源的标准化分析记录规模。数据来源:\texttt{data/analysis/source\_quality\_report.csv};统计窗口为全分析语料 168,447 条。OpenAlex 规模最大, DOAJ 规模最小, 后续跨来源比较需注意来源结构差异。}
+  \caption{六个公开来源的标准化分析记录规模(2026-08-10 快照, 不含讯飞增量; 讯飞 5,566 条见 2.1 节来源表)。数据来源:\texttt{data/analysis/source\_quality\_report.csv};统计窗口为全分析语料 168,447 条。OpenAlex 规模最大, DOAJ 规模最小, 后续跨来源比较需注意来源结构差异。}
   \label{fig:data-source-records}
 \end{figure}
 
 \subsection{字段完整度}
 
-标题、作者和年份字段整体完整度较高, 是分布统计和作者网络分析的主要基础。摘要覆盖率为 83.22\%, 可以支撑摘要级主题和趋势分析。正文片段覆盖率为 8.99\%, 适合做高质量证据补充, 但暂不适合把全文级结论推广到全部来源。见图~\ref{fig:data-field-readiness}。
+标题、作者和年份字段整体完整度较高, 是分布统计和作者网络分析的主要基础。合并语料(含讯飞增量)摘要覆盖率为 85.64\%, 可以支撑摘要级主题和趋势分析; 正文片段覆盖率为 13.36\%, 其中讯飞预印本 5,559/5,566 篇带全文, 使全文级证据明显扩充(2026-08-10 快照同口径为 87.08\%/10.50\%)。见图~\ref{fig:data-field-readiness}。
 
 \begin{tableblock}
 \begin{tabularx}{\textwidth}{>{\bfseries}p{28mm}rrrrr}
@@ -44,6 +45,7 @@ PubMed & 28,163 & 27,547 & 28,131 & 28,162 & 17 \\
 PMC & 29,227 & 15,938 & 29,121 & 29,226 & 13,925 \\
 Crossref & 28,500 & 14,311 & 28,044 & 27,280 & 0 \\
 DOAJ & 11,319 & 11,155 & 11,310 & 11,310 & 121 \\
+讯飞交付包(iflytek) & 5,558 & 2,339 & 8,303 & 2,200 & 5,559 \\
 \bottomrule
 \end{tabularx}
 \end{tableblock}
