@@ -35,6 +35,20 @@ query embeddings are enabled on a larger instance and verified.
 
 ## Screenshots To Add Or Refresh
 
+> 2026-08-14 更新（T05 沉浸式 TUI 重构后，截图由项目负责人真机拍摄）：
+> 存放目录 `output/assets/sciscope_project_report/`，命名与场景如下。
+
+- `tui_product.png`（替换旧图，封面 + 02_solution 双处引用）：欢迎页——
+  居中 Logo、全局主题外框、两侧菱形纹样、命令入口。终端 120×40，Retina。
+- `tui_evidence_flow.png`（新，02_solution fig:tui-evidence-flow）：问答完成态——
+  用户问题亮条、折叠的研究计划、折叠的证据卡（"证据卡 · 支持等级 · Enter 展开"）、
+  研究结论与证据工具行。
+- `tui_command_menu.png`（新，交互形态配图）：输入 `/` 后的命令菜单——
+  ◆ 分类分组头 + 单行条目（命令名 + 名称 + 描述）。
+- `tui_evidence_expanded.png`（新，证据可展开层配图）：Enter 展开后的完整证据卡
+  （论文列表 + 接地相似度）。
+
+旧清单（hosted backend 相关，保留备查）：
 - TUI default startup connected to hosted backend.
 - `sciscope-tui doctor` showing hosted backend `ok`.
 - A real `/api/chat` answer with answer, evidence titles, confidence, and graph
