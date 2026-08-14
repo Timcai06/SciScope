@@ -8,9 +8,12 @@ PY=~/miniconda3/envs/sciscope/bin/python
 export PGPASSFILE=/home/liu/workspaces/sciscope/runtime/.pgpass
 DSN="postgresql://sciscope@127.0.0.1:5432/sciscope"
 
-echo "=== [1/5] 解包 ==="
+echo "=== [1/5] 解包（gz 包装的 zip）==="
 if [ ! -d data/raw/iflytek/environment ]; then
-  tar -xzf data/raw/iflytek/environment.tar.gz -C data/raw/iflytek
+  cd data/raw/iflytek
+  gunzip -c /home/liu/workspaces/sciscope/data/incoming/xunfei/environment.tar.gz > environment.zip
+  unzip -q environment.zip
+  cd ~/sciscope
 fi
 PDF_COUNT=$(ls data/raw/iflytek/environment/*.pdf | wc -l)
 echo "PDF 数: $PDF_COUNT"
