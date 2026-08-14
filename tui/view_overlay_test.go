@@ -164,8 +164,17 @@ func TestPickerOverlayDescRendersFaintSecondLine(t *testing.T) {
 	sections := buildOverlaySections(OverlayCommand, fixtureItems())
 	state := OverlayState{Kind: OverlayCommand, Sections: sections, Footer: FooterNavigable}
 	out := renderPickerOverlay(state, 80, 24)
-	if !strings.Contains(out, stFaint.Render("    播放可验证证据流")) {
-		t.Fatalf("overlay missing faint desc second line:\n%s", out)
+	// T05 样式优化（项目负责人反馈）：desc 与名称同行（不再独立第二行），
+	// 且描述内容仍出现在 overlay 输出中。
+	if !strings.Contains(out, "播放可验证证据流") {
+		t.Fatalf("overlay missing desc content:\n%s", out)
+	}
+	// 单行约束：条目行不出现「以四个空格开头的 desc 独立行」形态。
+	for _, ln := range strings.Split(out, "\n") {
+		plain := stripANSI(ln)
+		if strings.HasPrefix(plain, "    播放") || strings.HasPrefix(plain, "     ") && strings.Contains(plain, "证据流") {
+			t.Fatalf("desc 仍独立成行（应为单行条目）: %q", plain)
+		}
 	}
 }
 

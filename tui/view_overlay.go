@@ -17,6 +17,7 @@
 package main
 
 import (
+	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -293,17 +294,19 @@ func renderPickerOverlay(state OverlayState, width, height int) string {
 		item int // -1 = 分组头
 		text string
 	}
-	flattened := make([]overlayLine, 0, itemCount*2+len(sections))
+	flattened := make([]overlayLine, 0, itemCount+len(sections))
 	idx := 0
 	for _, sec := range sections {
 		if sec.Title != "" {
-			flattened = append(flattened, overlayLine{-1, stFaint.Render("  " + clipWidth(sec.Title, contentW-2))})
+			// T05 样式优化：分组头醒目化——Accent 菱形 + Ink 分类名 + faint 数量，
+			// 与条目行形成清晰视觉层级。
+			head := stAccent.Render("◆ ") + stInk.Render(sec.Title) +
+				stFaint.Render(" · "+fmt.Sprint(len(sec.Items)))
+			flattened = append(flattened, overlayLine{-1, clipWidth(head, contentW-2)})
 		}
 		for _, it := range sec.Items {
+			// T05 样式优化：单行条目（名称 + 描述同行），不再为 desc 单独开行。
 			flattened = append(flattened, overlayLine{idx, renderPickerRow(it, idx == sel, query, contentW)})
-			if d := strings.TrimSpace(it.Desc); d != "" {
-				flattened = append(flattened, overlayLine{idx, stFaint.Render("    " + clipWidth(d, contentW-4))})
-			}
 			idx++
 		}
 	}
@@ -368,37 +371,35 @@ func renderPickerOverlay(state OverlayState, width, height int) string {
 // （AccentSoft 背景），Title 命中 query 的片段用 stAccent 高亮，shortcut 右对齐
 // 且 faint（Shortcut 为空时退回 Label）；行显示宽度恰为 contentW。
 func renderPickerRow(item PickerItem, selected bool, query string, contentW int) string {
+	// T05 样式优化（项目负责人反馈）：单行条目——命令名 + 名称 + 描述同行，
+	// 不再为 desc 单独换行；命令名（Label）固定最前，描述 faint 尾部截断。
 	title := strings.TrimSpace(item.Title)
-	shortcut := item.Shortcut
-	if shortcut == "" {
-		shortcut = item.Label
+	label := strings.TrimSpace(item.Label)
+	if label == "" {
+		label = strings.TrimSpace(item.Shortcut)
 	}
-	titleMax := contentW - 6 // marker(2) + 分隔空格(2) + shortcut 最小(2)
-	if titleMax < 4 {
-		titleMax = 4
+	desc := strings.TrimSpace(item.Desc)
+	labelW := lipgloss.Width(label)
+	avail := contentW - 4 - labelW - 2 // marker(2) + 分隔空格 + 右侧内容
+	if avail < 6 {
+		avail = 6
 	}
-	if lipgloss.Width(title) > titleMax {
-		title = clipWidth(title, titleMax)
+	right := title
+	if desc != "" {
+		right = title + " · " + desc
 	}
-	title = highlightFuzzy(title, query)
-	shortW := contentW - 2 - lipgloss.Width(title) - 2
-	if shortW < 2 {
-		shortW = 2
-	}
-	shortcut = clipWidth(shortcut, shortW)
-	pad := shortW - lipgloss.Width(shortcut)
-	if pad < 0 {
-		pad = 0
-	}
+	// 先截断（纯文本安全）再高亮（高亮在截断后的文本上做，不切 ANSI）。
+	right = clipWidth(right, avail)
+	right = highlightFuzzy(right, query)
 	marker := "  "
 	if selected {
 		marker = "❯ "
 	}
-	line := marker + title + "  " + strings.Repeat(" ", pad) + stFaint.Render(shortcut)
+	line := marker + stAccent.Render(label) + " " + stInk.Render(right)
 	if selected {
 		return selectedRow(line)
 	}
-	return stInk.Render(line)
+	return line
 }
 
 // overlayFooterLine 渲染底部提示行（计划 T05-08 footer 三档层级）：

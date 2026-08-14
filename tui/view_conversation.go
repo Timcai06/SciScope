@@ -14,9 +14,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 )
 
 func (m *model) renderBlocksContent(width int) string {
@@ -157,29 +155,19 @@ var glamourRenderCount int64
 
 func renderAnswerMessage(answer string, tools []string, width int) string {
 	atomic.AddInt64(&glamourRenderCount, 1)
-	// 宽度预算：viewport 内容宽 width；Glamour wordwrap 与高亮重排后的行
-	// 若显示宽恰好等于视口宽，viewport 会在含 ANSI 的行上 wrap，把序列
-	// 从中间切断（ESC 留上一行、参数落到下一行 → 字面 [0m[38;5;252m 乱码）。
+	// 宽度预算：viewport 内容宽 width；markdown 重排后的行若显示宽恰好
+	// 等于视口宽，viewport 会在含 ANSI 的行上 wrap，把序列从中间切断
+	// （ESC 留上一行、参数落到下一行 → 字面 [0m[38;5;252m 乱码）。
 	// 因此再留 1 列余量（-5），使行宽恒 < 视口宽，wrap 永不触发。
 	w := width - 5
 	if w < 20 {
 		w = 20
 	}
-	body := strings.Trim(answer, "\n")
-	// Use a fixed named style — NOT WithAutoStyle(), which queries the terminal background
-	// (OSC 11) on every render and leaks the response (]11;rgb:…) into the UI.
-	// 乱码根治（项目负责人真机反馈）：Glamour 输出 256 色 ANSI
-	// （每段前缀 [0m[38;5;252m），在部分终端会以字面文本显示成「重复的一堆」。
-	// 因此只借用 Glamour 的 markdown 块结构（标题缩进/列表符号/换行），
-	// 渲染后剥净全部 ANSI；颜色统一由 styleAnswerBody 的 theme token 高亮提供
-	// （RGB 序列，与欢迎页/面板同源，终端兼容性一致）。
-	if lipgloss.ColorProfile() != termenv.Ascii {
-		if r, err := glamour.NewTermRenderer(glamour.WithStandardStyle(glamourStyleName()), glamour.WithWordWrap(w)); err == nil {
-			if out, e := r.Render(answer); e == nil {
-				body = strings.Trim(stripANSI(out), "\n")
-			}
-		}
-	}
+	// 轻量 markdown 结构渲染（T05 样式优化，项目负责人反馈）：
+	// 不再依赖 Glamour——其输出剥色后只剩裸露的 # / - 符号，观感混乱。
+	// 自有渲染器把标题/列表/粗体等结构转成 theme token 样式，
+	// 不残留任何 markdown 语法符号；颜色全 RGB（与欢迎页/面板同源）。
+	body := strings.Trim(renderMarkdownPlain(answer, w), "\n")
 	body = styleAnswerBody(body)
 	header := stBullet.Render("⏺ ") + stAccent.Render("研究结论")
 	out := header + "\n" + body
@@ -383,4 +371,92 @@ func stripANSI(s string) string {
 		b.WriteByte(ch)
 	}
 	return b.String()
+}
+
+// ---- 轻量 markdown 结构渲染（替换 Glamour，无语法符号残留）----
+
+var (
+	mdBoldRe = regexp.MustCompile(`\*\*([^*\n]+)\*\*`)
+	mdEmRe   = regexp.MustCompile(`\*([^*\n]+)\*`)
+	mdCodeRe = regexp.MustCompile("`([^`\n]+)`")
+)
+
+// renderMarkdownInline 行内样式：`code` 保留反引号（faint）→ **bold** 去
+// 星号（Ink 加粗）→ *em* 去星号（Ink 斜体）。顺序：code 先行（其内容含
+// 星号时不误判）；粗体/斜体在 code 之外匹配。
+func renderMarkdownInline(s string) string {
+	s = mdCodeRe.ReplaceAllStringFunc(s, func(m string) string {
+		inner := mdCodeRe.FindStringSubmatch(m)[1]
+		return stMuted.Render("`" + inner + "`")
+	})
+	s = mdBoldRe.ReplaceAllStringFunc(s, func(m string) string {
+		inner := mdBoldRe.FindStringSubmatch(m)[1]
+		return lipgloss.NewStyle().Bold(true).Foreground(cInk).Render(inner)
+	})
+	s = mdEmRe.ReplaceAllStringFunc(s, func(m string) string {
+		inner := mdEmRe.FindStringSubmatch(m)[1]
+		return lipgloss.NewStyle().Italic(true).Foreground(cInk).Render(inner)
+	})
+	return s
+}
+
+// renderMarkdownPlain 把 markdown 文本渲染为结构化纯样式输出（无 # / - /
+// ** 等语法符号残留）：
+//
+//	#/##/### 标题   → Accent 加粗文本（去 #，上下留白）
+//	- /*/1. 列表项  → 「· 」前缀（Accent 点 + Ink 内容，保持缩进层级）
+//	段落            → 原样 + 行内样式
+//	空行            → 段落分隔
+//
+// 行宽控制：调用方负责整体宽度预算（renderAnswerMessage 的 width-5），
+// 本函数不做 wordwrap——长行由内容自然换行，避免再引入切 ANSI 的 wrap 源。
+func renderMarkdownPlain(answer string, width int) string {
+	lines := strings.Split(answer, "\n")
+	var b strings.Builder
+	for _, raw := range lines {
+		line := strings.TrimRight(raw, " ")
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			b.WriteString("\n")
+			continue
+		}
+		indent := leadingWhitespace(line)
+		switch {
+		case strings.HasPrefix(trimmed, "###"):
+			text := strings.TrimSpace(strings.TrimPrefix(trimmed, "###"))
+			if text != "" {
+				b.WriteString("\n" + indent + stAccent.Render(text) + "\n")
+			}
+		case strings.HasPrefix(trimmed, "##"):
+			text := strings.TrimSpace(strings.TrimPrefix(trimmed, "##"))
+			if text != "" {
+				b.WriteString("\n" + indent + stAccent.Render(text) + "\n")
+			}
+		case strings.HasPrefix(trimmed, "#"):
+			text := strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
+			if text != "" {
+				b.WriteString("\n" + indent + stAccent.Render(text) + "\n")
+			}
+		case listMarker(trimmed) != "":
+			marker := listMarker(trimmed)
+			text := strings.TrimSpace(trimmed[len(marker):])
+			b.WriteString(indent + stAccent.Render("· ") + renderMarkdownInline(text) + "\n")
+		default:
+			b.WriteString(indent + renderMarkdownInline(trimmed) + "\n")
+		}
+	}
+	return strings.Trim(b.String(), "\n")
+}
+
+// listMarker 返回行首的列表标记（"- "、"* "、"1. " 等）或空串。
+func listMarker(trimmed string) string {
+	if len(trimmed) >= 2 && (trimmed[0] == '-' || trimmed[0] == '*' || trimmed[0] == '+') && trimmed[1] == ' ' {
+		return trimmed[:2]
+	}
+	for i := 0; i < len(trimmed) && trimmed[i] >= '0' && trimmed[i] <= '9'; i++ {
+		if i+1 < len(trimmed) && trimmed[i+1] == '.' && i+2 < len(trimmed) && trimmed[i+2] == ' ' {
+			return trimmed[:i+3]
+		}
+	}
+	return ""
 }
