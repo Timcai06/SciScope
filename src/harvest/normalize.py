@@ -221,6 +221,23 @@ def simple_raw_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def iflytek_work_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
+    """讯飞交付包 PDF 解析条目：字段已在摄取器侧规范化，直接透传。"""
+    work = wrapper.get("raw") or wrapper
+    return normalize_paper(
+        {
+            "paper_id": work.get("paper_id") or wrapper.get("source_id") or "",
+            "title": work.get("title") or "",
+            "abstract": work.get("abstract") or "",
+            "authors": work.get("authors") or [],
+            "year": work.get("year") or work.get("yearPublished"),
+            "keywords": work.get("keywords") or [],
+            "field": wrapper.get("field_seed") or "unknown",
+            "full_text": _full_text(work),
+        }
+    )
+
+
 def crossref_work_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
     work = wrapper.get("raw") or wrapper
     return normalize_paper(
@@ -292,6 +309,8 @@ def paper_wrapper_to_paper(wrapper: dict[str, Any]) -> dict[str, Any]:
         paper = semantic_scholar_work_to_paper(wrapper)
     elif source == "doaj":
         paper = doaj_work_to_paper(wrapper)
+    elif source == "iflytek":
+        paper = iflytek_work_to_paper(wrapper)
     else:
         raise ValueError(f"Unsupported source: {source}")
     # Centrally clean HTML markup/entities from display fields so no source can
