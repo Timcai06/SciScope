@@ -9,12 +9,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
 	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
+
+	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 func (m *model) renderBlocksContent(width int) string {
@@ -150,7 +152,11 @@ func glamourStyleName() string {
 	}
 }
 
+// glamourRenderCount 统计 Glamour 渲染次数（T05-11 cache hit 证据与性能预算）。
+var glamourRenderCount int64
+
 func renderAnswerMessage(answer string, tools []string, width int) string {
+	atomic.AddInt64(&glamourRenderCount, 1)
 	// 宽度预算：viewport 内容宽 width；Glamour wordwrap 与高亮重排后的行
 	// 若显示宽恰好等于视口宽，viewport 会在含 ANSI 的行上 wrap，把序列
 	// 从中间切断（ESC 留上一行、参数落到下一行 → 字面 [0m[38;5;252m 乱码）。

@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 func runClearCommand(m model, args []string) (model, tea.Cmd) {
@@ -329,11 +330,18 @@ func (m model) View() string {
 	// 使行尾填充空格落在终端默认背景（IDE 灰）——对每个重置立即恢复黑底。
 	// 注意：不经过 lipgloss 的包裹 Render（其 reflow 对含 ANSI 的行会产生
 	// 拆行）；行宽由各层组件精确保证（vp 116 列、外框 120 列）。
-	content = paintCanvasLines(content, activeTheme().Canvas)
+	if lipgloss.ColorProfile() != termenv.Ascii {
+		content = paintCanvasLines(content, activeTheme().Canvas)
+	}
 	// 全局外边框：Accent 色圆角框。手动拼接（不经过 lipgloss Border Render——
 	// 它对含 ANSI 的多行内容做 reflow 时会把转义序列计入宽度，导致行被拆断）。
 	framed := wrapWithFrame(content, m.vp.Width)
 	// 边框行同样铺黑底（行首黑底 + reset 修复）。
+	// T05-11 Terminal matrix：TERM=dumb / 无颜色能力（Ascii profile）时
+	// fail gracefully——不输出任何控制字符垃圾，退回纯文本布局。
+	if lipgloss.ColorProfile() == termenv.Ascii {
+		return framed
+	}
 	return paintCanvasLines(framed, activeTheme().Canvas)
 }
 
