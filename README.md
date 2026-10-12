@@ -11,6 +11,22 @@ SciScope 是一个证据接地的科研文献智能体：用户通过跨平台�
 
 ![SciScope TUI product snapshot](docs/assets/sciscope-tui-product.png)
 
+## 证据接地的请求链
+
+用户问题从 Go TUI 经 `POST /api/agent/stream` 进入 Python 后端。LangGraph 负责问题准备、计划、模型与工具轮次、自检和最终回答；客户端呈现计划、工具结果与回答事件。
+
+![SciScope 请求、工具检索与 SSE 结果投影](assets/readme-diagrams/system.png)
+
+图中按消息顺序展示请求、工具证据与 SSE 结果，不代表实测耗时。
+
+- **检索结果可追溯。** 搜索服务返回论文身份、命中的片段、来源字段与检索方式，后端可据此组织证据回答。
+- **检索能力按环境显式启用。** 词法检索与可选语义检索通过 RRF 融合；没有运行时 embedding 或 reranker 时，走对应降级路径。
+- **推理保留在后端。** TUI 不承担模型推理，消费 SSE 并渲染工具时间线与会话结果；Agent 的轮次与工具调用有预算。
+
+实现入口：[`langgraph_runtime.py`](backend/app/agent/langgraph_runtime.py)、[`retrieval_service.py`](backend/app/services/retrieval_service.py)、[`stream.go`](tui/stream.go)。
+
+图中的语义检索是可选分支，不能据此把小样本 hosted demo 写成全量混合检索生产环境。下文的 hosted/local 区分继续适用；本轮仅阅读源码，没有重新核验托管服务在线状态或语料规模。
+
 ## 快速开始
 
 推荐优先使用 npm，macOS 用户也可以用 Homebrew，Windows 用户也可以用 Scoop。
